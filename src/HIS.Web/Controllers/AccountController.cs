@@ -141,15 +141,9 @@ public class AccountController : Controller
     private IActionResult RedirectToDefaultLandingPage(string? role = null)
     {
         role ??= User.FindFirstValue(ClaimTypes.Role);
-
-        return role switch
-        {
-            "ADMIN" => RedirectToAction("Index", "Accounts", new { area = "Admin" }),
-            "DEPARTMENT_HEAD" => RedirectToAction("Index", "Schedule", new { area = "Staff" }),
-            "DOCTOR" => RedirectToAction("Index", "Consultation", new { area = "Staff" }),
-            "NURSE" => RedirectToAction("Index", "Reception", new { area = "Staff" }),
-            "PATIENT" => RedirectToAction("Index", "Booking", new { area = "Patient" }),
-            _ => RedirectToAction("Index", "Home", new { area = "" })
-        };
+        var (action, controller, area) = HIS.Web.Common.RoleNavigationHelper.GetLandingRoute(role);
+        return string.IsNullOrEmpty(area)
+            ? RedirectToAction(action, controller)
+            : RedirectToAction(action, controller, new { area });
     }
 }
