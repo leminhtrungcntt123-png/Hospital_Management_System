@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main", "master", "develop" ]
+  pull_request:
+    branches: [ "main", "master", "develop" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.x'
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Verify code format
+      run: dotnet format --verify-no-changes --no-restore
+
+    - name: Build solution
+      run: dotnet build -c Release --no-restore
+
+    - name: Run Unit Tests
+      run: dotnet test --no-build -c Release --filter "Category!=Integration"
+
+    - name: Run Integration Tests
+      run: dotnet test --no-build -c Release --filter "Category=Integration"
+

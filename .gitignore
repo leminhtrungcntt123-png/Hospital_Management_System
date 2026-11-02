@@ -1,0 +1,21 @@
+## Ignore Visual Studio & .NET artifacts
+bin/
+obj/
+TestResults/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+## VS Code
+.vscode/
+
+## User Secrets & Local settings
+**/appsettings.Development.json
+appsettings.Development.json
+.env
+
+## OS generated
+.DS_Store
+Thumbs.db
+
