@@ -1,2 +1,24 @@
-@{ ViewData["Title"] = "Placeholder"; }
-<h2>Placeholder</h2>
+@{
+    ViewData["Title"] = "Quản lý Tài khoản & Phân quyền";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h3 class="fw-bold mb-1 text-primary">Quản trị Tài khoản & Phân quyền</h3>
+        <p class="text-muted small mb-0">Phân hệ dành riêng cho Quản trị viên (ADMIN) quản lý danh sách tài khoản nhân viên y tế và đặt lại mật khẩu.</p>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white py-3 border-bottom">
+        <h5 class="card-title mb-0 fw-semibold">Thông tin Phân hệ Quản trị</h5>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-success">
+            <strong>Chúc mừng!</strong> Bạn đã đăng nhập thành công với vai trò <strong>Quản trị viên (ADMIN)</strong> và được hệ thống điều hướng tự động vào đúng phân hệ quản lý tài khoản.
+        </div>
+        <p class="text-muted mb-0">
+            Khung điều hướng phân quyền đã hoạt động chính xác. Thanh điều hướng phía trên đã hiển thị đầy đủ các menu thuộc quyền hạn Quản trị viên.
+        </p>
+    </div>
+</div>
