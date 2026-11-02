@@ -1,2 +1,52 @@
-@{ ViewData["Title"] = "Đăng nhập"; }
-<h2>Đăng nhập</h2>
+@model HIS.Web.Models.LoginViewModel
+@{
+    ViewData["Title"] = "Đăng nhập hệ thống";
+}
+
+<div class="row justify-content-center mt-4">
+    <div class="col-md-5 col-lg-4">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-primary text-white text-center py-3">
+                <h4 class="mb-0 fw-bold">HIS Bệnh viện</h4>
+                <small class="text-white-50">Hệ thống thông tin quản lý & điều trị</small>
+            </div>
+            <div class="card-body p-4">
+                <h5 class="card-title text-center mb-3">Đăng nhập</h5>
+
+                <form asp-action="Login" asp-route-returnurl="@ViewData["ReturnUrl"]" method="post">
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2 small" role="alert"></div>
+
+                    <div class="mb-3">
+                        <label asp-for="Username" class="form-label fw-semibold"></label>
+                        <input asp-for="Username" class="form-control" placeholder="Tên đăng nhập" autofocus autocomplete="username" />
+                        <span asp-validation-for="Username" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Password" class="form-label fw-semibold"></label>
+                        <input asp-for="Password" class="form-control" placeholder="Mật khẩu" autocomplete="current-password" />
+                        <span asp-validation-for="Password" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-3 form-check">
+                        <input asp-for="RememberMe" class="form-check-input" />
+                        <label asp-for="RememberMe" class="form-check-label"></label>
+                    </div>
+
+                    <input type="hidden" asp-for="ReturnUrl" />
+
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary py-2 fw-semibold">Đăng nhập</button>
+                    </div>
+                </form>
+            </div>
+            <div class="card-footer bg-light text-center py-2 text-muted small">
+                Tài khoản kiểm thử mẫu: <code>admin</code>, <code>head_noi</code>, <code>doc_an</code>, <code>nurse_mai</code>, <code>patient_nam</code>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

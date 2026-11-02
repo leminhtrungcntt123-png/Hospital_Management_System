@@ -13,7 +13,7 @@ public record RegisterPatientRequest(
 
 public record LoginRequest(string Username, string Password);
 
-public record AuthResponse(int AccountId, string Username, string Role);
+public record AuthResponse(int AccountId, string Username, string Role, string? FullName = null);
 
 public record CreateProfileRequest(
     string FullName,

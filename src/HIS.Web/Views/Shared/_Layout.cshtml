@@ -1,47 +1,155 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="vi">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - HIS.Web</title>
-    <script type="importmap"></script>
+    <title>@ViewData["Title"] - HIS Bệnh viện</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/HIS.Web.styles.css" asp-append-version="true" />
 </head>
-<body>
+<body class="bg-light d-flex flex-column min-vh-100">
     <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
-            <div class="container-fluid">
-                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">HIS.Web</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark border-bottom shadow-sm">
+            <div class="container-fluid px-3">
+                <a class="navbar-brand fw-bold text-white d-flex align-items-center" asp-area="" asp-controller="Home" asp-action="Index">
+                    <span class="badge bg-primary me-2">HIS</span> Bệnh viện Đa khoa
+                </a>
+
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain" aria-controls="navbarMain"
                         aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
+
+                <div class="collapse navbar-collapse" id="navbarMain">
+                    <!-- Left: Role-based Navigation Links (HIS-22) -->
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
+                            <a class="nav-link" asp-area="" asp-controller="Home" asp-action="Index">Trang chủ</a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
-                        </li>
+
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            @if (User.IsInRole("ADMIN"))
+                            {
+                                <li class="nav-item dropdown">
+                                    <a class="nav-link dropdown-toggle text-warning" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        Quản trị hệ thống
+                                    </a>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" asp-area="Admin" asp-controller="Accounts" asp-action="Index">Quản lý Tài khoản & Phân quyền</a></li>
+                                        <li><a class="dropdown-item" asp-area="Admin" asp-controller="Catalog" asp-action="Index">Danh mục Y tế (Khoa, Phòng, Thuốc, BHYT)</a></li>
+                                    </ul>
+                                </li>
+                            }
+
+                            @if (User.IsInRole("DEPARTMENT_HEAD"))
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link text-info" asp-area="Staff" asp-controller="Schedule" asp-action="Index">Lịch trực & Duyệt ca</a>
+                                </li>
+                            }
+
+                            @if (User.IsInRole("DOCTOR"))
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link text-info" asp-area="Staff" asp-controller="Consultation" asp-action="Index">Bàn khám Ngoại trú</a>
+                                </li>
+                            }
+
+                            @if (User.IsInRole("NURSE"))
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link text-info" asp-area="Staff" asp-controller="Reception" asp-action="Index">Tiếp đón & Cấp số</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" asp-area="Staff" asp-controller="Cashier" asp-action="Index">Thu ngân viện phí</a>
+                                </li>
+                            }
+
+                            @if (User.IsInRole("PATIENT"))
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link text-success" asp-area="Patient" asp-controller="Booking" asp-action="Index">Đặt lịch khám</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" asp-area="Patient" asp-controller="MyAppointments" asp-action="Index">Lịch hẹn của tôi</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" asp-area="Patient" asp-controller="FamilyProfiles" asp-action="Index">Hồ sơ người thân</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" asp-area="Patient" asp-controller="MedicalRecords" asp-action="Index">Hồ sơ bệnh án</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" asp-area="Patient" asp-controller="Notifications" asp-action="Index">Thông báo</a>
+                                </li>
+                            }
+                        }
+                    </ul>
+
+                    <!-- Right: User Session Information / Auth Controls (HIS-22) -->
+                    <ul class="navbar-nav ms-auto align-items-lg-center">
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <li class="nav-item me-3 mb-2 mb-lg-0 text-white-50 small">
+                                <span class="d-none d-lg-inline">Xin chào: </span>
+                                <strong class="text-white">@(User.FindFirst("FullName")?.Value ?? User.Identity.Name)</strong>
+                                @if (User.IsInRole("ADMIN"))
+                                {
+                                    <span class="badge bg-danger ms-1">Quản trị viên</span>
+                                }
+                                else if (User.IsInRole("DEPARTMENT_HEAD"))
+                                {
+                                    <span class="badge bg-warning text-dark ms-1">Trưởng khoa</span>
+                                }
+                                else if (User.IsInRole("DOCTOR"))
+                                {
+                                    <span class="badge bg-primary ms-1">Bác sĩ</span>
+                                }
+                                else if (User.IsInRole("NURSE"))
+                                {
+                                    <span class="badge bg-info text-dark ms-1">Điều dưỡng / Tiếp đón</span>
+                                }
+                                else if (User.IsInRole("PATIENT"))
+                                {
+                                    <span class="badge bg-success ms-1">Bệnh nhân</span>
+                                }
+                            </li>
+                            <li class="nav-item">
+                                <form asp-area="" asp-controller="Account" asp-action="Logout" method="post" class="d-inline">
+                                    <button type="submit" class="btn btn-outline-light btn-sm">Đăng xuất</button>
+                                </form>
+                            </li>
+                        }
+                        else
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-white fw-semibold" asp-area="" asp-controller="Account" asp-action="Login">Đăng nhập</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="btn btn-primary btn-sm ms-lg-2" asp-area="" asp-controller="Account" asp-action="Register">Đăng ký</a>
+                            </li>
+                        }
                     </ul>
                 </div>
             </div>
         </nav>
     </header>
-    <div class="container">
+
+    <div class="container-fluid flex-grow-1 px-4 py-3">
         <main role="main" class="pb-3">
             @RenderBody()
         </main>
     </div>
 
-    <footer class="border-top footer text-muted">
-        <div class="container">
-            &copy; 2026 - HIS.Web - <a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
+    <footer class="border-top footer text-muted bg-white py-3 mt-auto">
+        <div class="container-fluid px-4 text-center text-md-start d-flex justify-content-between align-items-center">
+            <span>&copy; 2026 - Hệ thống thông tin bệnh viện (HIS) - Đồ án Lập trình Web</span>
+            <span class="text-secondary small">Phiên bản: 1.0.0-web</span>
         </div>
     </footer>
+
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>

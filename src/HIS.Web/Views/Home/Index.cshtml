@@ -1,8 +1,70 @@
-﻿@{
-    ViewData["Title"] = "Home Page";
+@{
+    ViewData["Title"] = "Trang chủ";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="p-5 mb-4 bg-white rounded-3 shadow-sm border">
+    <div class="container-fluid py-4">
+        <h1 class="display-5 fw-bold text-primary">Hệ thống thông tin Bệnh viện (HIS)</h1>
+        <p class="col-md-9 fs-5 text-muted">
+            Giải pháp số hóa toàn diện quy trình tiếp đón, đặt lịch khám trực tuyến, khám bệnh ngoại trú, viện phí và quản trị bệnh viện theo chuẩn y tế hiện đại.
+        </p>
+
+        @if (User.Identity?.IsAuthenticated == true)
+        {
+            <div class="alert alert-info d-inline-block py-2 px-3 mb-3">
+                Xin chào, <strong>@(User.FindFirst("FullName")?.Value ?? User.Identity.Name)</strong>. Bạn đang đăng nhập với vai trò: 
+                <span class="badge bg-primary">@User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value</span>
+            </div>
+            <div>
+                @if (User.IsInRole("ADMIN"))
+                {
+                    <a class="btn btn-primary btn-lg" asp-area="Admin" asp-controller="Accounts" asp-action="Index">Vào Bàn làm việc Quản trị</a>
+                }
+                else if (User.IsInRole("DEPARTMENT_HEAD"))
+                {
+                    <a class="btn btn-warning btn-lg text-dark" asp-area="Staff" asp-controller="Schedule" asp-action="Index">Vào Quản lý Lịch trực</a>
+                }
+                else if (User.IsInRole("DOCTOR"))
+                {
+                    <a class="btn btn-primary btn-lg" asp-area="Staff" asp-controller="Consultation" asp-action="Index">Vào Bàn khám Ngoại trú</a>
+                }
+                else if (User.IsInRole("NURSE"))
+                {
+                    <a class="btn btn-info btn-lg text-dark" asp-area="Staff" asp-controller="Reception" asp-action="Index">Vào Bàn Tiếp đón & Cấp số</a>
+                }
+                else if (User.IsInRole("PATIENT"))
+                {
+                    <a class="btn btn-success btn-lg" asp-area="Patient" asp-controller="Booking" asp-action="Index">Đặt lịch khám ngay</a>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="d-flex gap-3 mt-3">
+                <a class="btn btn-primary btn-lg px-4" asp-area="" asp-controller="Account" asp-action="Login">Đăng nhập tài khoản</a>
+                <a class="btn btn-outline-secondary btn-lg px-4" asp-area="" asp-controller="Account" asp-action="Register">Đăng ký người bệnh mới</a>
+            </div>
+        }
+    </div>
+</div>
+
+<div class="row align-items-md-stretch g-4">
+    <div class="col-md-4">
+        <div class="h-100 p-4 bg-white border rounded-3 shadow-sm">
+            <h4 class="text-primary fw-bold">Dành cho Người bệnh</h4>
+            <p class="text-muted">Đặt lịch khám ngoại trú 24/7, theo dõi hàng đợi thời gian thực, quản lý hồ sơ y tế gia đình và tra cứu kết quả xét nghiệm.</p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="h-100 p-4 bg-white border rounded-3 shadow-sm">
+            <h4 class="text-success fw-bold">Dành cho Y bác sĩ</h4>
+            <p class="text-muted">Bàn khám bệnh thông minh, xem bệnh sử nhiều cơ sở y tế, kê đơn thuốc cảnh báo tương tác và chỉ định cận lâm sàng.</p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="h-100 p-4 bg-white border rounded-3 shadow-sm">
+            <h4 class="text-info fw-bold">Tiếp đón & Quản trị</h4>
+            <p class="text-muted">Phân luồng bệnh nhân tự động, xử lý viện phí có bảo hiểm y tế (BHYT) đúng tuyến/trái tuyến và báo cáo hoạt động bệnh viện.</p>
+        </div>
+    </div>
 </div>
