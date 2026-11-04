@@ -28,6 +28,7 @@ bld/
 *.sln.docstates
 
 ## Secrets & Local Settings
+appsettings.json
 appsettings.Development.json
 *.local.json
 
@@ -46,3 +47,6 @@ appsettings.Development.json
 .DS_Store
 Thumbs.db
 init.md
+
+## Local database dumps
+backup/

@@ -29,18 +29,40 @@ public class PatientService : IPatientService
 				(p.NationalId != null && EF.Functions.ILike(p.NationalId, $"%{keyword}%")));
 		}
 
-		return await query
+		// Nhãn giới tính dịch sau khi đã đọc xong dữ liệu: EF không dịch được extension trong Select()
+		var rows = await query
 			.OrderByDescending(p => p.Id)
 			.Take(limit)
-			.Select(p => new PatientListItemDto(
+			.Select(p => new
+			{
 				p.Id,
 				p.FullName,
 				p.DateOfBirth,
-				p.Gender.ToGenderVietnamese(),
+				p.Gender,
 				p.PhoneNumber,
-				p.NationalId ?? "",
-				p.Address ?? "",
-				p.InsuranceCardNumber ?? ""))
+				p.NationalId,
+				p.Address
+			})
 			.ToListAsync(cancellationToken);
+
+		var patientIds = rows.Select(r => r.Id).ToList();
+		var cardByPatient = (await _context.InsuranceCards
+			.AsNoTracking()
+			.Where(c => c.IsActive && patientIds.Contains(c.PatientId))
+			.Select(c => new { c.PatientId, c.CardNumber })
+			.ToListAsync(cancellationToken))
+			.ToDictionary(c => c.PatientId, c => c.CardNumber);
+
+		return rows
+			.Select(r => new PatientListItemDto(
+				r.Id,
+				r.FullName,
+				r.DateOfBirth,
+				r.Gender.ToLabel(),
+				r.PhoneNumber,
+				r.NationalId ?? "",
+				r.Address ?? "",
+				cardByPatient.GetValueOrDefault(r.Id, "")))
+			.ToList();
 	}
 }

@@ -8,7 +8,7 @@ public class LabOrder
     public int ServiceId { get; set; }
     public Service Service { get; set; } = null!;
     public string? Note { get; set; }
-    public string Status { get; set; } = "PENDING";
+    public LabOrderStatus Status { get; set; } = LabOrderStatus.Pending;
     public DateTime CreatedAt { get; set; }
 
     // Navigation properties

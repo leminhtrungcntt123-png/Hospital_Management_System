@@ -25,6 +25,7 @@ partial class ReceptionPage
         lblTitle = new Label();
         lblSubtitle = new Label();
         btnNewReception = new Button();
+        btnVerifyLinks = new Button();
         tabsPanel = new Panel();
         btnTabWaiting = new Button();
         btnTabReceived = new Button();
@@ -44,6 +45,8 @@ partial class ReceptionPage
         colDoctor = new DataGridViewTextBoxColumn();
         colAppointmentTime = new DataGridViewTextBoxColumn();
         colQueue = new DataGridViewTextBoxColumn();
+        colPriority = new DataGridViewTextBoxColumn();
+        colBookedBy = new DataGridViewTextBoxColumn();
         colStatus = new DataGridViewTextBoxColumn();
         colAction = new DataGridViewButtonColumn();
         listFooter = new Panel();
@@ -91,6 +94,7 @@ partial class ReceptionPage
         headerPanel.Controls.Add(lblTitle);
         headerPanel.Controls.Add(lblSubtitle);
         headerPanel.Controls.Add(btnNewReception);
+        headerPanel.Controls.Add(btnVerifyLinks);
         headerPanel.Dock = DockStyle.Fill;
         headerPanel.Location = new Point(20, 18);
         headerPanel.Margin = new Padding(0);
@@ -137,6 +141,24 @@ partial class ReceptionPage
         btnNewReception.TabIndex = 2;
         btnNewReception.Text = "+  Tiếp nhận bệnh nhân";
         btnNewReception.UseVisualStyleBackColor = false;
+        // 
+        // btnVerifyLinks
+        // 
+        btnVerifyLinks.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        btnVerifyLinks.BackColor = Color.White;
+        btnVerifyLinks.Cursor = Cursors.Hand;
+        btnVerifyLinks.FlatAppearance.BorderColor = Color.FromArgb(186, 196, 208);
+        btnVerifyLinks.FlatAppearance.MouseDownBackColor = Color.FromArgb(232, 242, 253);
+        btnVerifyLinks.FlatAppearance.MouseOverBackColor = Color.FromArgb(246, 250, 255);
+        btnVerifyLinks.FlatStyle = FlatStyle.Flat;
+        btnVerifyLinks.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+        btnVerifyLinks.ForeColor = Color.FromArgb(22, 102, 177);
+        btnVerifyLinks.Location = new Point(622, 4);
+        btnVerifyLinks.Name = "btnVerifyLinks";
+        btnVerifyLinks.Size = new Size(180, 40);
+        btnVerifyLinks.TabIndex = 3;
+        btnVerifyLinks.Text = "Xác nhận liên kết hồ sơ";
+        btnVerifyLinks.UseVisualStyleBackColor = false;
         // 
         // tabsPanel
         // 
@@ -258,6 +280,7 @@ partial class ReceptionPage
         gridReceptions.AllowUserToAddRows = false;
         gridReceptions.AllowUserToDeleteRows = false;
         gridReceptions.AllowUserToResizeRows = false;
+        gridReceptions.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
         gridReceptions.BackgroundColor = Color.White;
         gridReceptions.BorderStyle = BorderStyle.None;
         gridReceptions.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
@@ -275,7 +298,7 @@ partial class ReceptionPage
         };
         gridReceptions.ColumnHeadersHeight = 36;
         gridReceptions.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
-        gridReceptions.Columns.AddRange(new DataGridViewColumn[] { colAppointmentCode, colPatientCode, colPatientName, colGender, colDateOfBirth, colInsurance, colDepartment, colDoctor, colAppointmentTime, colQueue, colStatus, colAction });
+        gridReceptions.Columns.AddRange(new DataGridViewColumn[] { colAppointmentCode, colPatientCode, colPatientName, colGender, colDateOfBirth, colInsurance, colDepartment, colDoctor, colAppointmentTime, colQueue, colPriority, colBookedBy, colStatus, colAction });
         gridReceptions.DefaultCellStyle = new DataGridViewCellStyle
         {
             Alignment = DataGridViewContentAlignment.MiddleLeft,
@@ -302,77 +325,99 @@ partial class ReceptionPage
         // 
         // colAppointmentCode
         // 
+        colAppointmentCode.FillWeight = 124F;
         colAppointmentCode.HeaderText = "MÃ LƯỢT KHÁM";
+        colAppointmentCode.MinimumWidth = 116;
         colAppointmentCode.Name = "colAppointmentCode";
         colAppointmentCode.ReadOnly = true;
-        colAppointmentCode.Width = 142;
         // 
         // colPatientCode
         // 
+        colPatientCode.FillWeight = 72F;
         colPatientCode.HeaderText = "MÃ BN";
+        colPatientCode.MinimumWidth = 66;
         colPatientCode.Name = "colPatientCode";
         colPatientCode.ReadOnly = true;
-        colPatientCode.Width = 90;
         // 
         // colPatientName
         // 
-        colPatientName.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-        colPatientName.FillWeight = 28F;
+        colPatientName.FillWeight = 122F;
         colPatientName.HeaderText = "HỌ VÀ TÊN";
-        colPatientName.MinimumWidth = 126;
+        colPatientName.MinimumWidth = 100;
         colPatientName.Name = "colPatientName";
         colPatientName.ReadOnly = true;
         // 
         // colGender
         // 
+        colGender.FillWeight = 74F;
         colGender.HeaderText = "GIỚI TÍNH";
+        colGender.MinimumWidth = 66;
         colGender.Name = "colGender";
         colGender.ReadOnly = true;
-        colGender.Width = 94;
         // 
         // colDateOfBirth
         // 
+        colDateOfBirth.FillWeight = 82F;
         colDateOfBirth.HeaderText = "NGÀY SINH";
+        colDateOfBirth.MinimumWidth = 72;
         colDateOfBirth.Name = "colDateOfBirth";
         colDateOfBirth.ReadOnly = true;
-        colDateOfBirth.Width = 96;
         // 
         // colInsurance
         // 
+        colInsurance.FillWeight = 94F;
         colInsurance.HeaderText = "SỐ BHYT";
+        colInsurance.MinimumWidth = 82;
         colInsurance.Name = "colInsurance";
         colInsurance.ReadOnly = true;
-        colInsurance.Width = 156;
         // 
         // colDepartment
         // 
+        colDepartment.FillWeight = 116F;
         colDepartment.HeaderText = "CHUYÊN KHOA";
+        colDepartment.MinimumWidth = 96;
         colDepartment.Name = "colDepartment";
         colDepartment.ReadOnly = true;
-        colDepartment.Width = 160;
         // 
         // colDoctor
         // 
-        colDoctor.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-        colDoctor.FillWeight = 20F;
+        colDoctor.FillWeight = 108F;
         colDoctor.HeaderText = "BÁC SĨ";
-        colDoctor.MinimumWidth = 110;
+        colDoctor.MinimumWidth = 96;
         colDoctor.Name = "colDoctor";
         colDoctor.ReadOnly = true;
         // 
         // colAppointmentTime
         // 
+        colAppointmentTime.FillWeight = 76F;
         colAppointmentTime.HeaderText = "THỜI GIAN";
+        colAppointmentTime.MinimumWidth = 72;
         colAppointmentTime.Name = "colAppointmentTime";
         colAppointmentTime.ReadOnly = true;
-        colAppointmentTime.Width = 92;
         // 
         // colQueue
         // 
+        colQueue.FillWeight = 48F;
         colQueue.HeaderText = "SỐ TT";
+        colQueue.MinimumWidth = 48;
         colQueue.Name = "colQueue";
         colQueue.ReadOnly = true;
-        colQueue.Width = 58;
+        // 
+        // colPriority
+        // 
+        colPriority.FillWeight = 132F;
+        colPriority.HeaderText = "ƯU TIÊN";
+        colPriority.MinimumWidth = 96;
+        colPriority.Name = "colPriority";
+        colPriority.ReadOnly = true;
+        // 
+        // colBookedBy
+        // 
+        colBookedBy.FillWeight = 118F;
+        colBookedBy.HeaderText = "ĐẶT BỞI";
+        colBookedBy.MinimumWidth = 96;
+        colBookedBy.Name = "colBookedBy";
+        colBookedBy.ReadOnly = true;
         // 
         // colStatus
         // 
@@ -380,10 +425,11 @@ partial class ReceptionPage
         {
             Font = new Font("Segoe UI", 8F, FontStyle.Bold)
         };
+        colStatus.FillWeight = 92F;
         colStatus.HeaderText = "TRẠNG THÁI";
+        colStatus.MinimumWidth = 84;
         colStatus.Name = "colStatus";
         colStatus.ReadOnly = true;
-        colStatus.Width = 118;
         // 
         // colAction
         // 
@@ -397,12 +443,13 @@ partial class ReceptionPage
             SelectionBackColor = Color.FromArgb(246, 250, 255),
             SelectionForeColor = Color.FromArgb(22, 102, 177)
         };
+        colAction.FillWeight = 78F;
         colAction.FlatStyle = FlatStyle.Flat;
         colAction.HeaderText = "THAO TÁC";
+        colAction.MinimumWidth = 68;
         colAction.Name = "colAction";
         colAction.ReadOnly = true;
         colAction.Resizable = DataGridViewTriState.False;
-        colAction.Width = 92;
         // 
         // listFooter
         // 
@@ -578,6 +625,7 @@ partial class ReceptionPage
     private Label lblTitle;
     private Label lblSubtitle;
     private Button btnNewReception;
+    private Button btnVerifyLinks;
     private Panel tabsPanel;
     private Button btnTabWaiting;
     private Button btnTabReceived;
@@ -597,6 +645,8 @@ partial class ReceptionPage
     private DataGridViewTextBoxColumn colDoctor;
     private DataGridViewTextBoxColumn colAppointmentTime;
     private DataGridViewTextBoxColumn colQueue;
+    private DataGridViewTextBoxColumn colPriority;
+    private DataGridViewTextBoxColumn colBookedBy;
     private DataGridViewTextBoxColumn colStatus;
     private DataGridViewButtonColumn colAction;
     private Panel listFooter;

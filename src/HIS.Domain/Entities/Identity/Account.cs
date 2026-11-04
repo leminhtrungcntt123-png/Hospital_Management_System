@@ -4,26 +4,36 @@ public class Account
 {
     public int Id { get; set; }
     public string Username { get; set; } = string.Empty;
+    public string? Email { get; set; }
     public string PasswordHash { get; set; } = string.Empty;
     public int RoleId { get; set; }
     public Role Role { get; set; } = null!;
     public bool IsActive { get; set; } = true;
     public int FailedLoginCount { get; set; } = 0;
     public DateTime? LockedUntil { get; set; }
+
+    // Đủ MaxNoShowsBeforeBlock lần NO_SHOW/EXPIRED trong NoShowWindowDays -> chặn đặt lịch web mới.
+    // Không chặn đăng nhập, xem lịch sử, bệnh án hay thông báo.
+    public DateTime? BookingBlockedUntil { get; set; }
+
+    // Mốc bắt đầu đếm lại số lần vắng mặt; dời về now khi vừa áp chặn để hết chặn không bị chặn lại ngay.
+    public DateTime? NoShowResetAt { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
     // Navigation properties
-    public Patient? Patient { get; set; }
     public Doctor? Doctor { get; set; }
     public Nurse? Nurse { get; set; }
     public DepartmentHead? DepartmentHead { get; set; }
-    public ICollection<DutyShift> DutyShifts { get; set; } = new List<DutyShift>();
-    public ICollection<DutyShift> AssignedDutyShifts { get; set; } = new List<DutyShift>();
-    public ICollection<ScheduleException> ApprovedScheduleExceptions { get; set; } = new List<ScheduleException>();
-    public ICollection<AppointmentStatusHistory> PerformedAppointmentHistories { get; set; } = new List<AppointmentStatusHistory>();
-    public ICollection<LabResult> PerformedLabResults { get; set; } = new List<LabResult>();
-    public ICollection<Payment> Payments { get; set; } = new List<Payment>();
-    public ICollection<Invoice> CashierInvoices { get; set; } = new List<Invoice>();
-    public ICollection<AccessLog> AccessLogs { get; set; } = new List<AccessLog>();
+    public ICollection<AccountPatientProfile> PatientLinks { get; set; } = [];
+    public ICollection<Appointment> BookedAppointments { get; set; } = [];
+    public ICollection<Notification> Notifications { get; set; } = [];
+    public ICollection<DutyShift> DutyShifts { get; set; } = [];
+    public ICollection<DutyShift> AssignedDutyShifts { get; set; } = [];
+    public ICollection<ScheduleException> ApprovedScheduleExceptions { get; set; } = [];
+    public ICollection<AppointmentStatusHistory> PerformedAppointmentHistories { get; set; } = [];
+    public ICollection<LabResult> PerformedLabResults { get; set; } = [];
+    public ICollection<Payment> Payments { get; set; } = [];
+    public ICollection<AccessLog> AccessLogs { get; set; } = [];
 }

@@ -12,4 +12,8 @@ public class AppointmentStatusHistory
     public int? PerformedBy { get; set; }
     public Account? Performer { get; set; }
     public DateTime ChangedAt { get; set; }
+
+    // Hủy sát giờ (trong FreeCancelHours trước giờ khám) do chính bệnh nhân thực hiện,
+    // đếm theo performed_by trong tháng dương lịch để áp hạn mức hủy.
+    public bool IsLateCancel { get; set; } = false;
 }

@@ -30,7 +30,9 @@ public class StaffService : IStaffService
                 a.Doctor != null ? a.Doctor.FullName
                     : a.Nurse != null ? a.Nurse.FullName
                     : a.DepartmentHead != null ? a.DepartmentHead.FullName
-                    : a.Patient != null ? a.Patient.FullName
+                    : a.PatientLinks.Any(l => l.Relationship == PatientRelationship.Self)
+                        ? a.PatientLinks.Where(l => l.Relationship == PatientRelationship.Self)
+                            .Select(l => l.Patient.FullName).First()
                     : a.Username,
                 a.Role.Name,
                 a.Role.Code,

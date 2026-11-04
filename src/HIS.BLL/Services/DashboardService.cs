@@ -37,16 +37,28 @@ public class DashboardService : IDashboardService
         var today = DateTime.Today;
         var tomorrow = today.AddDays(1);
 
-        return await _context.Appointments
+        // Đọc giá trị thô trước, dịch nhãn sau: EF không dịch được extension trong Select()
+        var rows = await _context.Appointments
             .AsNoTracking()
             .Where(a => a.Slot != null && a.Slot.StartTime >= today && a.Slot.StartTime < tomorrow)
             .OrderBy(a => a.Slot!.StartTime)
-            .Select(a => new TodayAppointmentItemDto(
+            .Select(a => new
+            {
                 a.AppointmentCode,
                 a.Patient.FullName,
-                a.Slot!.StartTime,
-                a.Status.Name,
-                a.BookingChannel.ToChannelVietnamese()))
+                StartTime = a.Slot!.StartTime,
+                StatusName = a.Status.Name,
+                a.BookingChannel
+            })
             .ToListAsync(cancellationToken);
+
+        return rows
+            .Select(r => new TodayAppointmentItemDto(
+                r.AppointmentCode,
+                r.FullName,
+                r.StartTime,
+                r.StatusName,
+                r.BookingChannel.ToLabel()))
+            .ToList();
     }
 }

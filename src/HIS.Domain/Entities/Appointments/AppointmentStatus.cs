@@ -7,9 +7,13 @@ public class AppointmentStatus
         public const string Pending = "PENDING";
         public const string Confirmed = "CONFIRMED";
         public const string CheckedIn = "CHECKED_IN";
+        public const string ReadyForDoctor = "READY_FOR_DOCTOR";
         public const string InProgress = "IN_PROGRESS";
         public const string Completed = "COMPLETED";
         public const string Cancelled = "CANCELLED";
+        public const string NoShow = "NO_SHOW";
+        public const string Expired = "EXPIRED";
+        public const string RescheduleRequired = "RESCHEDULE_REQUIRED";
     }
 
     //

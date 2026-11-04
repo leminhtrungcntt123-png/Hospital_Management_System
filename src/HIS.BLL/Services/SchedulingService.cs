@@ -1,18 +1,22 @@
 using HIS.BLL.DTOs;
 using HIS.BLL.Interfaces;
+using HIS.BLL.Options;
 using HIS.DAL;
 using HIS.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace HIS.BLL.Services;
 
 public class SchedulingService : ISchedulingService
 {
     private readonly AppDbContext _context;
+    private readonly BookingOptions _options;
 
-    public SchedulingService(AppDbContext context)
+    public SchedulingService(AppDbContext context, IOptions<BookingOptions> options)
     {
         _context = context;
+        _options = options.Value;
     }
 
     // Sinh khung giờ khám tự động theo khoảng ngày
@@ -81,10 +85,23 @@ public class SchedulingService : ISchedulingService
 
         var exceptions = await _context.ScheduleExceptions
             .AsNoTracking()
-            .Where(e => e.ApprovedBy != null
+            .Where(e => e.Status == ScheduleExceptionStatus.Approved
                      && e.Date >= fromDate
                      && e.Date <= request.ToDate)
             .ToListAsync(cancellationToken);
+
+        // Bác sĩ thay thế khám theo tốc độ của chính họ nên phải tra thời gian khám trung bình của cả hai.
+        var scheduleDoctorIds = activeSchedules.Select(s => s.DoctorId)
+            .Concat(exceptions
+                .Where(e => e.ReplacementDoctorId != null)
+                .Select(e => e.ReplacementDoctorId!.Value))
+            .Distinct()
+            .ToList();
+
+        var consultationMinutes = await _context.Doctors
+            .AsNoTracking()
+            .Where(d => scheduleDoctorIds.Contains(d.Id))
+            .ToDictionaryAsync(d => d.Id, d => d.AvgConsultationMinutes, cancellationToken);
 
         var startRange = DateTime.SpecifyKind(fromDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Unspecified);
         var endRange = DateTime.SpecifyKind(request.ToDate.ToDateTime(TimeOnly.MaxValue), DateTimeKind.Unspecified);
@@ -108,13 +125,10 @@ public class SchedulingService : ISchedulingService
         {
             daysProcessed++;
 
-            int dotNetDow = (int)curDate.DayOfWeek;
-            int isoDow = dotNetDow == 0 ? 7 : dotNetDow;
-
             var daySchedules = activeSchedules.Where(s =>
                 s.EffectiveFrom <= curDate &&
                 (s.EffectiveTo == null || s.EffectiveTo >= curDate) &&
-                (s.DayOfWeek == null || s.DayOfWeek == isoDow || s.DayOfWeek == dotNetDow)
+                s.DayOfWeek == curDate.DayOfWeek
             ).ToList();
 
             foreach (var schedule in daySchedules)
@@ -122,7 +136,7 @@ public class SchedulingService : ISchedulingService
                 var ex = exceptions.FirstOrDefault(e =>
                     e.DoctorId == schedule.DoctorId &&
                     e.Date == curDate &&
-                    (string.IsNullOrEmpty(e.Shift) || string.Equals(e.Shift, schedule.Shift, StringComparison.OrdinalIgnoreCase))
+                    (e.Shift == null || e.Shift == schedule.Shift)
                 );
 
                 int slotDoctorId = schedule.DoctorId;
@@ -136,12 +150,27 @@ public class SchedulingService : ISchedulingService
                     slotDoctorId = ex.ReplacementDoctorId.Value;
                 }
 
-                int duration = schedule.SlotDurationMinutes > 0 ? schedule.SlotDurationMinutes : 15;
+                int duration = schedule.SlotDurationMinutes > 0 ? schedule.SlotDurationMinutes : 60;
                 var curTime = schedule.StartTime;
 
-                while (curTime.AddMinutes(duration) <= schedule.EndTime)
+                // Sức chứa khung giờ = độ dài khung / thời gian khám trung bình của bác sĩ thật sự trực.
+                int fallbackAvg = schedule.Doctor.AvgConsultationMinutes > 0 ? schedule.Doctor.AvgConsultationMinutes : 15;
+                int avgMinutes = consultationMinutes.TryGetValue(slotDoctorId, out int avg) && avg > 0 ? avg : fallbackAvg;
+                int capacity = Math.Max(1, duration / avgMinutes);
+                int ratioPct = schedule.OnlineRatioPct is > 0 and <= 100 ? schedule.OnlineRatioPct : _options.OnlineRatioPct;
+                int onlineQuota = QueuePositions.OnlineQuota(capacity, ratioPct);
+
+                while (true)
                 {
                     var nextTime = curTime.AddMinutes(duration);
+
+                    // TimeOnly quấn qua nửa đêm nên ca tối kết thúc sau 00:00 sẽ làm vòng lặp không bao giờ
+                    // vượt EndTime; khung giờ không được vắt sang ngày khác nên gặp điểm quấn là dừng.
+                    if (nextTime <= curTime || nextTime > schedule.EndTime)
+                    {
+                        break;
+                    }
+
                     var slotStart = DateTime.SpecifyKind(curDate.ToDateTime(curTime), DateTimeKind.Unspecified);
                     var slotEnd = DateTime.SpecifyKind(curDate.ToDateTime(nextTime), DateTimeKind.Unspecified);
 
@@ -159,9 +188,11 @@ public class SchedulingService : ISchedulingService
                             RoomId = schedule.RoomId,
                             StartTime = slotStart,
                             EndTime = slotEnd,
-                            Capacity = 1,
+                            Capacity = capacity,
                             BookedCount = 0,
-                            Status = "AVAILABLE",
+                            OnlineQuota = onlineQuota,
+                            OnlineBooked = 0,
+                            Status = SlotStatus.Available,
                             Version = 0
                         });
                     }
@@ -198,7 +229,7 @@ public class SchedulingService : ISchedulingService
             .Include(s => s.Doctor)
                 .ThenInclude(d => d.Department)
             .Include(s => s.Room)
-            .Where(s => s.Status == "AVAILABLE" && s.BookedCount < s.Capacity);
+            .Where(s => s.Status == SlotStatus.Available && s.BookedCount < s.Capacity);
 
         var dayStart = DateTime.SpecifyKind(filter.Date.ToDateTime(TimeOnly.MinValue), DateTimeKind.Unspecified);
         var dayEnd = DateTime.SpecifyKind(filter.Date.ToDateTime(TimeOnly.MaxValue), DateTimeKind.Unspecified);
@@ -234,11 +265,6 @@ public class SchedulingService : ISchedulingService
                 var noon = DateTime.SpecifyKind(filter.Date.ToDateTime(new TimeOnly(12, 0)), DateTimeKind.Unspecified);
                 var evening = DateTime.SpecifyKind(filter.Date.ToDateTime(new TimeOnly(18, 0)), DateTimeKind.Unspecified);
                 query = query.Where(s => s.StartTime >= noon && s.StartTime < evening);
-            }
-            else if (shiftUpper == "EVENING")
-            {
-                var evening = DateTime.SpecifyKind(filter.Date.ToDateTime(new TimeOnly(18, 0)), DateTimeKind.Unspecified);
-                query = query.Where(s => s.StartTime >= evening);
             }
         }
 
@@ -310,7 +336,7 @@ public class SchedulingService : ISchedulingService
             EndTime = s.EndTime,
             Capacity = s.Capacity,
             BookedCount = s.BookedCount,
-            Status = s.Status
+            Status = s.Status.ToDatabaseCode()
         };
     }
 }

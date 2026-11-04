@@ -5,7 +5,7 @@ public class InvoiceItem
     public int Id { get; set; }
     public int InvoiceId { get; set; }
     public Invoice Invoice { get; set; } = null!;
-    public string Category { get; set; } = string.Empty;
+    public InvoiceCategory Category { get; set; }
     public string Description { get; set; } = string.Empty;
     public decimal Amount { get; set; }
 }

@@ -18,7 +18,14 @@ public partial class ReceptionPage : UserControl
     private static readonly Font PagerActiveFont = new("Segoe UI", 8.5F, FontStyle.Bold);
 
     private readonly IReceptionService? _receptionService;
+    private readonly IPatientProfileService? _profileService;
+
+    /// <summary>Tài khoản đăng nhập đang thao tác, ghi vào appointments.booked_by khi quầy mở hoặc check-in hộ.</summary>
+    private readonly int? _operatorAccountId;
+
     private readonly SemaphoreSlim _loadLock = new(1, 1);
+    private readonly System.Windows.Forms.Timer _autoRefreshTimer = new() { Interval = 60000 };
+    private bool _isSweepingOverdue;
 
     private List<ReceptionItemDto> _items = new();
     private ReceptionTab _activeTab = ReceptionTab.Waiting;
@@ -27,19 +34,25 @@ public partial class ReceptionPage : UserControl
 
     public event Action<ReceptionCountsDto>? CountsChanged;
 
-    public ReceptionPage() : this(null)
+    public ReceptionPage() : this(null, null, null)
     {
     }
 
-    public ReceptionPage(IReceptionService? receptionService)
+    public ReceptionPage(
+        IReceptionService? receptionService,
+        IPatientProfileService? profileService = null,
+        int? operatorAccountId = null)
     {
         _receptionService = receptionService;
+        _profileService = profileService;
+        _operatorAccountId = operatorAccountId;
 
         InitializeComponent();
         ApplyTabVisual();
         WireEvents();
 
         Load += async (_, _) => await ReloadAsync();
+        Disposed += (_, _) => _autoRefreshTimer.Dispose();
     }
 
     public void OpenNewReception()
@@ -86,11 +99,37 @@ public partial class ReceptionPage : UserControl
         };
 
         btnExport.Click += BtnExport_Click;
+        btnVerifyLinks.Click += BtnVerifyLinks_Click;
+        btnVerifyLinks.Visible = _profileService != null;
 
         gridReceptions.CellFormatting += GridReceptions_CellFormatting;
         gridReceptions.CellContentClick += GridReceptions_CellContentClick;
         gridReceptions.CellMouseEnter += GridReceptions_CellMouseEnter;
         gridReceptions.CellMouseLeave += (_, _) => gridReceptions.Cursor = Cursors.Default;
+
+        _autoRefreshTimer.Tick += async (_, _) =>
+        {
+            if (_receptionService == null || !IsHandleCreated || IsDisposed || _isSweepingOverdue)
+            {
+                return;
+            }
+
+            _isSweepingOverdue = true;
+
+            try
+            {
+                int expired = await _receptionService.ExpireOverdueAppointmentsAsync();
+                if (expired > 0 && !IsDisposed)
+                {
+                    await ReloadAsync();
+                }
+            }
+            finally
+            {
+                _isSweepingOverdue = false;
+            }
+        };
+        _autoRefreshTimer.Start();
     }
 
     private async void TabButton_Click(object? sender, EventArgs e)
@@ -118,9 +157,14 @@ public partial class ReceptionPage : UserControl
             return;
         }
 
-        using var dialog = new NewReceptionDialog(_receptionService);
+        using var dialog = new NewReceptionDialog(_receptionService, _operatorAccountId);
 
         if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
+        {
+            return;
+        }
+
+        if (IsDisposed || Disposing)
         {
             return;
         }
@@ -137,8 +181,25 @@ public partial class ReceptionPage : UserControl
         if (_receptionService == null
             || e.RowIndex < 0
             || e.ColumnIndex != colAction.Index
-            || _activeTab != ReceptionTab.Waiting
             || gridReceptions.Rows[e.RowIndex].Tag is not ReceptionItemDto item)
+        {
+            return;
+        }
+
+        if (_activeTab == ReceptionTab.Cancelled)
+        {
+            if (!IsReopenableStatus(item.StatusCode))
+            {
+                return;
+            }
+
+            await OfferWalkInNumberAsync(
+                item,
+                $"Bệnh nhân {item.PatientName} ({item.AppointmentCode}) đang ở trạng thái \"{item.StatusName}\".");
+            return;
+        }
+
+        if (_activeTab != ReceptionTab.Waiting)
         {
             return;
         }
@@ -160,12 +221,25 @@ public partial class ReceptionPage : UserControl
 
         try
         {
-            ReceptionActionResult result = await _receptionService.CheckInAsync(item.AppointmentId);
+            ReceptionActionResult result = await _receptionService.CheckInAsync(item.AppointmentId, _operatorAccountId);
+
+            if (IsDisposed || Disposing)
+            {
+                return;
+            }
 
             if (!result.Success)
             {
-                MessageBox.Show(FindForm(), result.Message, "Không thể tiếp nhận", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                await ReloadAsync();
+                if (result.IsOverdue)
+                {
+                    await OfferWalkInNumberAsync(item, result.Message);
+                }
+                else
+                {
+                    MessageBox.Show(FindForm(), result.Message, "Không thể tiếp nhận", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    await ReloadAsync();
+                }
+
                 return;
             }
 
@@ -185,6 +259,74 @@ public partial class ReceptionPage : UserControl
         catch (Exception ex)
         {
             MessageBox.Show(FindForm(), ex.Message, "Lỗi tiếp nhận", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        finally
+        {
+            gridReceptions.Enabled = true;
+            UseWaitCursor = false;
+        }
+    }
+
+    private async Task OfferWalkInNumberAsync(ReceptionItemDto item, string contextMessage)
+    {
+        if (_receptionService == null)
+        {
+            return;
+        }
+
+        DialogResult answer = MessageBox.Show(
+            FindForm(),
+            $"{contextMessage}\n\nBạn có muốn chuyển bệnh nhân sang diện BỐC SỐ KHÁM TRỰC TIẾP (Walk-in) ngay bây giờ không?",
+            "Cấp số khám trực tiếp",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question);
+
+        if (answer != DialogResult.Yes)
+        {
+            await ReloadAsync();
+            return;
+        }
+
+        gridReceptions.Enabled = false;
+        UseWaitCursor = true;
+
+        try
+        {
+            ReceptionActionResult walkInResult = await _receptionService.ConvertToWalkInAsync(item.AppointmentId, _operatorAccountId);
+
+            if (IsDisposed || Disposing)
+            {
+                return;
+            }
+
+            if (walkInResult.Success)
+            {
+                MessageBox.Show(
+                    FindForm(),
+                    $"{walkInResult.Message}\nSố thứ tự khám mới: {walkInResult.QueueNumber}",
+                    "Tiếp nhận trực tiếp thành công",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+
+                _activeTab = ReceptionTab.Received;
+                _page = 1;
+                ApplyTabVisual();
+                await ReloadAsync();
+
+                if (walkInResult.AppointmentId is int newId)
+                {
+                    SelectAppointment(newId);
+                }
+
+                return;
+            }
+
+            MessageBox.Show(FindForm(), walkInResult.Message, "Không thể cấp số trực tiếp", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            await ReloadAsync();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(FindForm(), ex.Message, "Lỗi cấp số trực tiếp", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         finally
         {
@@ -213,7 +355,7 @@ public partial class ReceptionPage : UserControl
             if (loadCounts)
             {
                 ReceptionCountsDto counts = await _receptionService.GetCountsAsync();
-                if (version != _loadVersion)
+                if (version != _loadVersion || IsDisposed || Disposing)
                 {
                     return;
                 }
@@ -223,7 +365,7 @@ public partial class ReceptionPage : UserControl
             }
 
             IReadOnlyList<ReceptionItemDto> items = await _receptionService.GetReceptionListAsync(_activeTab, txtSearch.Text);
-            if (version != _loadVersion)
+            if (version != _loadVersion || IsDisposed || Disposing)
             {
                 return;
             }
@@ -231,11 +373,14 @@ public partial class ReceptionPage : UserControl
             _items = items.ToList();
             _page = Math.Clamp(_page, 1, Math.Max(1, TotalPages));
             RenderPage();
+            await RefreshPendingLinkBadgeAsync(version);
         }
         catch (Exception ex)
         {
-            if (version == _loadVersion)
+            if (version == _loadVersion && !IsDisposed && !Disposing)
             {
+                _items = new List<ReceptionItemDto>();
+                RenderPage();
                 lblListSubtitle.Text = "Không thể tải dữ liệu tiếp đón.";
                 MessageBox.Show(FindForm(), ex.Message, "Lỗi tải dữ liệu", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
@@ -247,6 +392,16 @@ public partial class ReceptionPage : UserControl
     }
 
     private int TotalPages => Math.Max(1, (int)Math.Ceiling(_items.Count / (double)PageSize));
+
+    private string GetActionLabel(ReceptionItemDto item) => _activeTab switch
+    {
+        ReceptionTab.Waiting => "Tiếp nhận",
+        ReceptionTab.Cancelled when IsReopenableStatus(item.StatusCode) => "Bốc số lại",
+        _ => string.Empty
+    };
+
+    private static bool IsReopenableStatus(string statusCode) =>
+        statusCode is "CANCELLED" or "NO_SHOW" or "EXPIRED";
 
     private void RenderPage()
     {
@@ -269,13 +424,15 @@ public partial class ReceptionPage : UserControl
                 DisplayOrDash(item.DoctorName),
                 FormatAppointmentTime(item.AppointmentTime),
                 DisplayOrDash(item.QueueNumber),
+                item.PriorityLabel,
+                DisplayOrDash(item.BookedByLabel),
                 item.StatusName,
-                _activeTab == ReceptionTab.Waiting ? "Tiếp nhận" : string.Empty);
+                GetActionLabel(item));
 
             gridReceptions.Rows[rowIndex].Tag = item;
         }
 
-        colAction.Visible = _activeTab == ReceptionTab.Waiting;
+        colAction.Visible = _activeTab is ReceptionTab.Waiting or ReceptionTab.Cancelled;
         gridReceptions.ClearSelection();
 
         int first = _items.Count == 0 ? 0 : ((_page - 1) * PageSize) + 1;
@@ -370,10 +527,10 @@ public partial class ReceptionPage : UserControl
         {
             "Chờ xác nhận" => Theme.Amber,
             "Đã xác nhận" => Theme.Blue,
-            "Đã tiếp nhận" => Theme.Green,
+            "Đã check-in" or "Đã tiếp nhận" => Theme.Green,
             "Đang khám" => Theme.Purple,
-            "Đã hoàn tất" => Color.FromArgb(71, 90, 111),
-            "Đã hủy" => Theme.Red,
+            "Đã hoàn tất" or "Hoàn thành" => Color.FromArgb(71, 90, 111),
+            "Đã hủy" or "Không đến" => Theme.Red,
             _ => Theme.Muted
         };
     }
@@ -382,7 +539,8 @@ public partial class ReceptionPage : UserControl
     {
         bool isAction = e.RowIndex >= 0
             && e.ColumnIndex == colAction.Index
-            && _activeTab == ReceptionTab.Waiting;
+            && gridReceptions.Rows[e.RowIndex].Cells[colAction.Index].Value is string label
+            && label.Length > 0;
 
         gridReceptions.Cursor = isAction ? Cursors.Hand : Cursors.Default;
     }
@@ -410,7 +568,7 @@ public partial class ReceptionPage : UserControl
         try
         {
             var content = new StringBuilder();
-            content.AppendLine("Mã lượt khám,Mã BN,Họ và tên,Giới tính,Ngày sinh,Số BHYT,Chuyên khoa,Bác sĩ,Thời gian,Số thứ tự,Trạng thái,Đặt qua");
+            content.AppendLine("Mã lượt khám,Mã BN,Họ và tên,Giới tính,Ngày sinh,Số BHYT,Chuyên khoa,Bác sĩ,Thời gian,Số thứ tự,Ưu tiên,Đặt bởi,Trạng thái,Đặt qua");
 
             foreach (ReceptionItemDto item in _items)
             {
@@ -425,6 +583,8 @@ public partial class ReceptionPage : UserControl
                     Csv(item.DoctorName),
                     Csv(item.AppointmentTime.ToString("dd/MM/yyyy HH:mm")),
                     Csv(item.QueueNumber),
+                    Csv(item.PriorityLabel),
+                    Csv(item.BookedByLabel),
                     Csv(item.StatusName),
                     Csv(item.BookingChannel)));
             }
@@ -436,6 +596,53 @@ public partial class ReceptionPage : UserControl
         catch (Exception ex)
         {
             MessageBox.Show(FindForm(), ex.Message, "Lỗi xuất CSV", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private async void BtnVerifyLinks_Click(object? sender, EventArgs e)
+    {
+        if (_profileService == null)
+        {
+            return;
+        }
+
+        using var dialog = new LinkApprovalDialog(_profileService, _operatorAccountId);
+        dialog.ShowDialog(FindForm());
+
+        if (IsDisposed || Disposing)
+        {
+            return;
+        }
+
+        // Duyệt xong thì cột "Đặt bởi" và badge phải phản ánh danh sách mới.
+        if (dialog.VerifiedAny)
+        {
+            await ReloadAsync();
+        }
+    }
+
+    private async Task RefreshPendingLinkBadgeAsync(int version)
+    {
+        if (_profileService == null)
+        {
+            return;
+        }
+
+        try
+        {
+            IReadOnlyList<PatientProfileLinkDto> pending = await _profileService.GetPendingLinksAsync();
+            if (version != _loadVersion || IsDisposed || Disposing)
+            {
+                return;
+            }
+
+            btnVerifyLinks.Text = pending.Count == 0
+                ? "Xác nhận liên kết hồ sơ"
+                : $"Xác nhận liên kết hồ sơ ({pending.Count})";
+        }
+        catch
+        {
+            // Badge chỉ là gợi ý số lượng; danh sách chính đã tải xong thì không được fail theo.
         }
     }
 

@@ -151,20 +151,20 @@ public class AuthService : IAuthService
 
     private async Task<string> ResolveDisplayNameAsync(Account account, CancellationToken cancellationToken)
     {
-        string roleCode = account.Role?.Code?.ToUpperInvariant() ?? string.Empty;
-
-        return roleCode switch
+        // So theo id role (7 vai trò trong DB) thay vì chuỗi code: code trong DB là "DEPT_HEAD",
+        // không phải "DEPARTMENT_HEAD" nên so chuỗi dễ bỏ sót vai trò.
+        return (RoleId)account.RoleId switch
         {
-            "ADMIN" => "Quản trị viên",
-            "DOCTOR" => await _context.Doctors
+            RoleId.Admin => "Quản trị viên",
+            RoleId.Doctor => await _context.Doctors
                 .Where(d => d.AccountId == account.Id)
                 .Select(d => d.FullName)
                 .FirstOrDefaultAsync(cancellationToken) ?? account.Username,
-            "NURSE" => await _context.Nurses
+            RoleId.Nurse => await _context.Nurses
                 .Where(n => n.AccountId == account.Id)
                 .Select(n => n.FullName)
                 .FirstOrDefaultAsync(cancellationToken) ?? account.Username,
-            "DEPARTMENT_HEAD" => await _context.DepartmentHeads
+            RoleId.DepartmentHead => await _context.DepartmentHeads
                 .Where(dh => dh.AccountId == account.Id)
                 .Select(dh => dh.FullName)
                 .FirstOrDefaultAsync(cancellationToken) ?? account.Username,

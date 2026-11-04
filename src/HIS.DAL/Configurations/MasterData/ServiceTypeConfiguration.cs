@@ -19,7 +19,8 @@ public class ServiceTypeConfiguration : IEntityTypeConfiguration<ServiceType>
         builder.HasData(
             new ServiceType { Id = (int)ServiceTypeId.Examination, Code = "EXAMINATION", Name = "Khám bệnh" },
             new ServiceType { Id = (int)ServiceTypeId.LabTest, Code = "LAB_TEST", Name = "Xét nghiệm" },
-            new ServiceType { Id = (int)ServiceTypeId.Imaging, Code = "IMAGING", Name = "Chẩn đoán hình ảnh" }
+            new ServiceType { Id = (int)ServiceTypeId.Imaging, Code = "IMAGING", Name = "Chẩn đoán hình ảnh" },
+            new ServiceType { Id = (int)ServiceTypeId.Functional, Code = "FUNCTIONAL", Name = "Thăm dò chức năng" }
         );
     }
 }

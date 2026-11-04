@@ -1,8 +1,11 @@
 using HIS.BLL.DTOs;
 using HIS.BLL.Interfaces;
+using HIS.BLL.Options;
 using HIS.DAL;
 using HIS.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Options;
 
 namespace HIS.BLL.Services;
 
@@ -10,23 +13,44 @@ public class ReceptionService : IReceptionService
 {
     private static readonly string[] WaitingCodes = { AppointmentStatus.Codes.Pending, AppointmentStatus.Codes.Confirmed };
     private static readonly string[] ReceivedCodes = { AppointmentStatus.Codes.CheckedIn, AppointmentStatus.Codes.InProgress, AppointmentStatus.Codes.Completed };
-    private static readonly string[] CancelledCodes = { AppointmentStatus.Codes.Cancelled };
+    private static readonly string[] CancelledCodes =
+    {
+        AppointmentStatus.Codes.Cancelled, AppointmentStatus.Codes.NoShow, AppointmentStatus.Codes.Expired
+    };
 
     private readonly AppDbContext _context;
+    private readonly QueuePositionAllocator _allocator;
+    private readonly BookingOptions _options;
+    private readonly TimeProvider _timeProvider;
 
-    public ReceptionService(AppDbContext context)
+    public ReceptionService(
+        AppDbContext context,
+        QueuePositionAllocator allocator,
+        IOptions<BookingOptions> options,
+        TimeProvider timeProvider)
     {
         _context = context;
+        _allocator = allocator;
+        _options = options.Value;
+        _timeProvider = timeProvider;
     }
+
+    // Đồng hồ ứng dụng: mốc cắt giải phóng suất A và ngưỡng NO_SHOW phải dùng cùng một nguồn giờ
+    // với updated_at do AppDbContext ghi, và phải giả lập được khi kiểm thử.
+    private DateTime Now => _timeProvider.GetLocalNow().DateTime;
+
+    private DateTime Today => Now.Date;
 
     public async Task<ReceptionCountsDto> GetCountsAsync(CancellationToken cancellationToken = default)
     {
+        await ExpireOverdueAppointmentsAsync(cancellationToken);
+
         var statusMap = await LoadStatusMapAsync(cancellationToken);
         var waitingIds = ResolveIds(statusMap, WaitingCodes);
         var receivedIds = ResolveIds(statusMap, ReceivedCodes);
         var cancelledIds = ResolveIds(statusMap, CancelledCodes);
 
-        DateTime today = DateTime.Today;
+        DateTime today = Today;
         DateTime tomorrow = today.AddDays(1);
         IQueryable<Appointment> todayAppointments = InDay(_context.Appointments.AsNoTracking(), today);
 
@@ -57,6 +81,8 @@ public class ReceptionService : IReceptionService
         string? search = null,
         CancellationToken cancellationToken = default)
     {
+        await ExpireOverdueAppointmentsAsync(cancellationToken);
+
         var statusMap = await LoadStatusMapAsync(cancellationToken);
 
         List<int> statusIds = tab switch
@@ -73,15 +99,19 @@ public class ReceptionService : IReceptionService
             return Array.Empty<ReceptionItemDto>();
         }
 
-        DateTime today = DateTime.Today;
+        DateTime today = Today;
         DateTime tomorrow = today.AddDays(1);
 
         IQueryable<Appointment> query = _context.Appointments
             .AsNoTracking()
             .Include(a => a.Patient)
+                .ThenInclude(p => p.InsuranceCards)
             .Include(a => a.Status)
+            .Include(a => a.BookedByAccount)
+                .ThenInclude(b => b!.Role)
             .Include(a => a.Room)
                 .ThenInclude(r => r!.Department)
+            .Include(a => a.Doctor)
             .Include(a => a.Slot)
                 .ThenInclude(s => s!.Doctor)
             .Include(a => a.Slot)
@@ -105,19 +135,30 @@ public class ReceptionService : IReceptionService
                 EF.Functions.ILike(a.Patient.FullName, pattern) ||
                 EF.Functions.ILike(a.Patient.PhoneNumber, pattern) ||
                 (a.Patient.NationalId != null && EF.Functions.ILike(a.Patient.NationalId, pattern)) ||
-                (a.Patient.InsuranceCardNumber != null && EF.Functions.ILike(a.Patient.InsuranceCardNumber, pattern)) ||
+                (a.Patient.InsuranceCards.Any(c => EF.Functions.ILike(c.CardNumber, pattern))) ||
                 (patientIdFromCode != null && a.PatientId == patientIdFromCode));
         }
 
         List<Appointment> rows = await query.ToListAsync(cancellationToken);
 
-        List<ReceptionItemDto> items = rows.Select(a => MapItem(a)).ToList();
+        // Tab Chờ là màn gọi số nên thứ tự phải dựng theo hàng đợi thật, không theo giờ hẹn.
+        if (tab == ReceptionTab.Waiting)
+        {
+            rows = ApplyCallOrder(rows);
+        }
+
+        // Bệnh nhân nào đang có liên kết chờ duyệt -> quầy thấy ngay trên dòng tiếp nhận.
+        HashSet<int> pendingLinkPatientIds = await LoadPendingLinkPatientIdsAsync(
+            rows.Select(a => a.PatientId).Distinct().ToList(), cancellationToken);
+
+        List<ReceptionItemDto> items = rows
+            .Select(a => MapItem(a, pendingLinkPatientIds.Contains(a.PatientId)))
+            .ToList();
 
         IEnumerable<ReceptionItemDto> ordered = tab switch
         {
-            ReceptionTab.Waiting => items
-                .OrderByDescending(i => i.PriorityLevel)
-                .ThenBy(i => i.AppointmentTime),
+            // Đã sắp hàng ở ApplyCallOrder, giữ nguyên thứ tự đó khi ánh xạ sang DTO.
+            ReceptionTab.Waiting => items,
             ReceptionTab.Received => items.OrderByDescending(i => i.AppointmentTime),
             ReceptionTab.Scheduled => items.OrderBy(i => i.AppointmentTime),
             ReceptionTab.Cancelled => items.OrderByDescending(i => i.AppointmentTime),
@@ -126,6 +167,9 @@ public class ReceptionService : IReceptionService
 
         return ordered.ToList();
     }
+
+    private List<Appointment> ApplyCallOrder(IReadOnlyList<Appointment> waiting) =>
+        QueueCallOrder.Order(waiting, _options.MaxOvertakeAhead, _options.MaxTimesOvertaken);
 
     public async Task<ReceptionPatientDto?> FindPatientAsync(string keyword, CancellationToken cancellationToken = default)
     {
@@ -142,16 +186,19 @@ public class ReceptionService : IReceptionService
         if (patientIdFromCode is int patientId)
         {
             patient = await _context.Patients.AsNoTracking()
+                .Include(p => p.InsuranceCards)
                 .FirstOrDefaultAsync(p => p.Id == patientId, cancellationToken);
         }
 
         patient ??= await _context.Patients.AsNoTracking()
+            .Include(p => p.InsuranceCards)
             .FirstOrDefaultAsync(p =>
                 p.PhoneNumber == normalized ||
                 p.NationalId == normalized ||
-                p.InsuranceCardNumber == normalized, cancellationToken);
+                p.InsuranceCards.Any(c => c.CardNumber == normalized), cancellationToken);
 
         patient ??= await _context.Patients.AsNoTracking()
+            .Include(p => p.InsuranceCards)
             .FirstOrDefaultAsync(p => EF.Functions.ILike(p.FullName, normalized), cancellationToken);
 
         return patient == null ? null : MapPatient(patient);
@@ -187,7 +234,7 @@ public class ReceptionService : IReceptionService
     {
         ValidateRequest(request);
 
-        DateTime now = DateTime.Now;
+        DateTime now = Now;
         string fullName = request.FullName.Trim();
         string phoneNumber = NormalizePhone(request.PhoneNumber);
         string? nationalId = NullIfWhiteSpace(request.NationalId);
@@ -237,11 +284,6 @@ public class ReceptionService : IReceptionService
             throw new InvalidOperationException("Cơ sở dữ liệu chưa có trạng thái CHECKED_IN. Vui lòng nạp dữ liệu danh mục trạng thái.");
         }
 
-        Role patientRole = await _context.Roles
-            .AsNoTracking()
-            .FirstOrDefaultAsync(r => r.Code == "PATIENT", cancellationToken)
-            ?? throw new InvalidOperationException("Cơ sở dữ liệu chưa có vai trò PATIENT. Vui lòng nạp dữ liệu danh mục vai trò.");
-
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
         try
@@ -257,7 +299,6 @@ public class ReceptionService : IReceptionService
 
                 patient.PhoneNumber = phoneNumber;
                 patient.Address = address;
-                patient.InsuranceCardNumber = insuranceCard;
             }
             else
             {
@@ -273,30 +314,19 @@ public class ReceptionService : IReceptionService
                     patient = duplicate;
                     patient.PhoneNumber = phoneNumber;
                     patient.Address = address;
-                    patient.InsuranceCardNumber = insuranceCard;
                 }
                 else
                 {
-                    var account = new Account
-                    {
-                        Username = await GenerateUsernameAsync(cancellationToken),
-                        PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString("N")),
-                        RoleId = patientRole.Id,
-                        IsActive = true,
-                        CreatedAt = now,
-                        UpdatedAt = now
-                    };
-
+                    // Quầy không còn tự sinh tài khoản đăng nhập: hồ sơ vãng lai chỉ là Patient,
+                    // muốn liên kết tài khoản phải đi qua account_patient_profiles.
                     patient = new Patient
                     {
-                        Account = account,
                         FullName = fullName,
                         DateOfBirth = request.DateOfBirth,
-                        Gender = request.Gender,
+                        Gender = EnumCodes.ParseDatabaseCode<Gender>(request.Gender),
                         NationalId = nationalId,
                         PhoneNumber = phoneNumber,
                         Address = address,
-                        InsuranceCardNumber = insuranceCard,
                         CreatedAt = now
                     };
 
@@ -305,19 +335,23 @@ public class ReceptionService : IReceptionService
                 }
             }
 
-            string queueNumber = await GenerateQueueNumberAsync(DateTime.Today, cancellationToken);
+            await UpsertInsuranceCardAsync(patient, insuranceCard, now, cancellationToken);
 
             var appointment = new Appointment
             {
                 AppointmentCode = await GenerateAppointmentCodeAsync(cancellationToken),
                 Patient = patient,
                 StatusId = checkedInStatusId,
-                BookingChannel = BookingChannelCodes.OnSite,
-                VisitType = "WALK_IN",
-                PriorityLevel = Math.Clamp(request.PriorityLevel, 0, 3),
-                QueueNumber = queueNumber,
+                BookingChannel = BookingChannel.OnSite,
+                VisitType = VisitType.WalkIn,
+                PriorityLevel = ResolvePriorityLevel(request.PriorityLevel, patient.DateOfBirth, now),
                 Reason = Truncate(NullIfWhiteSpace(request.Reason), 255),
                 RoomId = roomId,
+                DepartmentId = department.Id,
+                DoctorId = doctor?.Id,
+                // ai mở ca: tài khoản quầy đăng nhập; hồ sơ vãng lai không có booked_by web.
+                BookedBy = request.OperatorAccountId,
+                CheckedInAt = now,
                 CreatedAt = now,
                 UpdatedAt = now
             };
@@ -329,6 +363,29 @@ public class ReceptionService : IReceptionService
             });
 
             _context.Appointments.Add(appointment);
+
+            // Cấp cứu không bốc số: không giữ chỗ trong khung giờ để khỏi chiếm suất của người đã đặt,
+            // lượt khám đi thẳng vào buồng bệnh và số thứ tự để trống.
+            if (!request.IsEmergency)
+            {
+                // Số thứ tự là suất T còn trống của khung giờ đang mở; hết suất thì báo hết số chứ không cấp số ngoài luồng.
+                QueuePlacement? placement = await _allocator.AssignOnSiteAsync(
+                    appointment, now, roomId, doctor?.Id, cancellationToken);
+
+                if (placement is null)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+
+                    throw new InvalidOperationException(
+                        $"Ca {(ExamShifts.For(now) == ExamShift.Morning ? "sáng" : "chiều")} ngày {now:dd/MM/yyyy} của phòng này đã hết số thứ tự. " +
+                        "Vui lòng chọn bác sĩ khác hoặc quay lại vào ca sau.");
+                }
+
+                // Bác sĩ và phòng đọc từ khung giờ thật sự giữ chỗ để màn tiếp nhận không còn trống cột bác sĩ.
+                appointment.RoomId = placement.Slot.RoomId;
+                appointment.DoctorId = placement.Slot.DoctorId;
+            }
+
             await _context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
@@ -337,7 +394,7 @@ public class ReceptionService : IReceptionService
                 appointment.AppointmentCode,
                 patient.Id,
                 patient.Id.ToPatientCode(),
-                queueNumber,
+                appointment.QueueNumber ?? (request.IsEmergency ? "CẤP CỨU" : string.Empty),
                 isNewPatient);
         }
         catch (DbUpdateException ex)
@@ -349,7 +406,10 @@ public class ReceptionService : IReceptionService
         }
     }
 
-    public async Task<ReceptionActionResult> CheckInAsync(int appointmentId, CancellationToken cancellationToken = default)
+    public async Task<ReceptionActionResult> CheckInAsync(
+        int appointmentId,
+        int? operatorAccountId = null,
+        CancellationToken cancellationToken = default)
     {
         var statusMap = await LoadStatusMapAsync(cancellationToken);
         if (!statusMap.TryGetValue(AppointmentStatus.Codes.CheckedIn, out int checkedInStatusId))
@@ -361,6 +421,9 @@ public class ReceptionService : IReceptionService
             .Include(a => a.Patient)
             .Include(a => a.Status)
             .Include(a => a.Slot)
+                .ThenInclude(s => s!.Room)
+            .Include(a => a.Slot)
+                .ThenInclude(s => s!.Doctor)
             .FirstOrDefaultAsync(a => a.Id == appointmentId, cancellationToken);
 
         if (appointment == null)
@@ -375,33 +438,112 @@ public class ReceptionService : IReceptionService
                 $"Lượt khám {appointment.AppointmentCode} đang ở trạng thái \"{appointment.Status.Name}\", không thể tiếp nhận.");
         }
 
-        DateTime now = DateTime.Now;
+        DateTime now = Now;
+
+        // Quá hạn 30 phút chỉ tính khi lượt khám có giờ hẹn (slot). Dùng created_at thay thế sẽ
+        // hủy oan các lượt vừa đặt trên Web cho ngày khác.
+        if (appointment.Slot is not null)
+        {
+            DateTime appointmentTime = appointment.Slot.StartTime;
+
+            if (now > appointmentTime.AddMinutes(30))
+            {
+                bool marked = statusMap.TryGetValue(AppointmentStatus.Codes.NoShow, out int noShowStatusId);
+
+                if (marked)
+                {
+                    int oldId = appointment.StatusId;
+                    appointment.StatusId = noShowStatusId;
+                    appointment.UpdatedAt = now;
+
+                    _context.AppointmentStatusHistories.Add(new AppointmentStatusHistory
+                    {
+                        AppointmentId = appointment.Id,
+                        OldStatusId = oldId,
+                        NewStatusId = noShowStatusId,
+                        ChangedAt = now
+                    });
+
+                    await _context.SaveChangesAsync(cancellationToken);
+                }
+
+                string note = marked
+                    ? "Hệ thống đã đánh dấu Vắng mặt (No-Show)."
+                    : "Cơ sở dữ liệu chưa có trạng thái NO_SHOW nên lượt khám chưa bị đánh dấu.";
+
+                return new ReceptionActionResult(
+                    false,
+                    $"Lượt khám {appointment.AppointmentCode} đã quá giờ hẹn hơn 30 phút (giờ hẹn: {appointmentTime:HH:mm}). {note}",
+                    string.Empty,
+                    IsOverdue: true,
+                    AppointmentId: appointment.Id);
+            }
+        }
+
         string queueNumber = appointment.QueueNumber ?? string.Empty;
 
-        if (string.IsNullOrWhiteSpace(queueNumber))
+        await using (var transaction = await _context.Database.BeginTransactionAsync(cancellationToken))
         {
-            queueNumber = await GenerateQueueNumberAsync(DateTime.Today, cancellationToken);
-            appointment.QueueNumber = queueNumber;
+            int? queueRoomId = appointment.RoomId ?? appointment.Slot?.RoomId;
+
+            if (queueRoomId == null)
+            {
+                return new ReceptionActionResult(
+                    false,
+                    $"Lượt {appointment.AppointmentCode} chưa xác định được phòng khám nên chưa cấp được số thứ tự.");
+            }
+
+            // Qua mốc cắt thì suất A chưa check-in đã bị giải phóng, lượt đến trễ phải xếp lại như suất T.
+            await _allocator.ReleaseExpiredOnlinePositionsAsync(queueRoomId.Value, now, cancellationToken);
+
+            if (appointment.SlotPosition == null)
+            {
+                int? wantedDoctorId = appointment.DoctorId ?? appointment.Slot?.DoctorId;
+
+                QueuePlacement? placement = await _allocator.AssignOnSiteAsync(
+                    appointment, now, queueRoomId, wantedDoctorId, cancellationToken);
+
+                if (placement is null)
+                {
+                    return new ReceptionActionResult(
+                        false,
+                        $"Ca {(ExamShifts.For(now) == ExamShift.Morning ? "sáng" : "chiều")} ngày {now:dd/MM/yyyy} của phòng này đã hết số thứ tự, " +
+                        $"không tiếp nhận được lượt {appointment.AppointmentCode}.");
+                }
+
+                appointment.RoomId = placement.Slot.RoomId;
+                appointment.DoctorId = placement.Slot.DoctorId;
+                queueNumber = placement.QueueNumber;
+            }
+
+            int oldStatusId = appointment.StatusId;
+            appointment.StatusId = checkedInStatusId;
+            appointment.UpdatedAt = now;
+            appointment.CheckedInAt = now;
+
+            if (appointment.RoomId == null && appointment.Slot?.RoomId is int slotRoomId)
+            {
+                appointment.RoomId = slotRoomId;
+            }
+
+            // Lịch hẹn web cũ chưa ghi bác sĩ/khoa trên lượt; suy ra từ slot để màn gọi số sau này có dữ liệu.
+            appointment.DoctorId ??= appointment.Slot?.DoctorId;
+            appointment.DepartmentId ??= appointment.Slot?.Room?.DepartmentId;
+
+            // Lượt do bệnh nhân tự đặt đã có booked_by là tài khoản bệnh nhân; lượt quầy mở hộ thì ghi quầy.
+            appointment.BookedBy ??= operatorAccountId;
+
+            _context.AppointmentStatusHistories.Add(new AppointmentStatusHistory
+            {
+                AppointmentId = appointment.Id,
+                OldStatusId = oldStatusId,
+                NewStatusId = checkedInStatusId,
+                ChangedAt = now
+            });
+
+            await _context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
         }
-
-        int oldStatusId = appointment.StatusId;
-        appointment.StatusId = checkedInStatusId;
-        appointment.UpdatedAt = now;
-
-        if (appointment.RoomId == null && appointment.Slot?.RoomId is int slotRoomId)
-        {
-            appointment.RoomId = slotRoomId;
-        }
-
-        _context.AppointmentStatusHistories.Add(new AppointmentStatusHistory
-        {
-            AppointmentId = appointment.Id,
-            OldStatusId = oldStatusId,
-            NewStatusId = checkedInStatusId,
-            ChangedAt = now
-        });
-
-        await _context.SaveChangesAsync(cancellationToken);
 
         return new ReceptionActionResult(
             true,
@@ -409,7 +551,405 @@ public class ReceptionService : IReceptionService
             queueNumber);
     }
 
-    private static void ValidateRequest(CreateReceptionRequest request)
+    public async Task<int> ExpireOverdueAppointmentsAsync(CancellationToken cancellationToken = default)
+    {
+        var statusMap = await LoadStatusMapAsync(cancellationToken);
+        if (!statusMap.TryGetValue(AppointmentStatus.Codes.NoShow, out int noShowStatusId))
+        {
+            return 0;
+        }
+
+        var waitingIds = ResolveIds(statusMap, WaitingCodes);
+        if (waitingIds.Count == 0) return 0;
+
+        DateTime now = Now;
+        DateTime overdueThreshold = now.AddMinutes(-30);
+
+        // Mốc 30 phút phải tính từ LẦN GỌI SỐ ĐẦU TIÊN (appointments.called_at), theo nghiệp vụ đã chốt.
+        // Gọi màn hình bác sĩ chưa làm trong đợt này nên cột called_at đang trống: chưa gọi số thì
+        // chưa được tự đánh NO_SHOW. Quét theo slot.start_time từng hủy oan lịch hẹn web nên bỏ hẳn.
+        var overdueAppointments = await _context.Appointments
+            .Where(a => a.CalledAt != null
+                     && a.CalledAt < overdueThreshold
+                     && waitingIds.Contains(a.StatusId))
+            .ToListAsync(cancellationToken);
+
+        if (overdueAppointments.Count == 0) return 0;
+
+        foreach (var app in overdueAppointments)
+        {
+            int oldStatusId = app.StatusId;
+            app.StatusId = noShowStatusId;
+            app.UpdatedAt = now;
+
+            _context.AppointmentStatusHistories.Add(new AppointmentStatusHistory
+            {
+                AppointmentId = app.Id,
+                OldStatusId = oldStatusId,
+                NewStatusId = noShowStatusId,
+                ChangedAt = now
+            });
+        }
+
+        var missedStatusIds = ResolveIds(statusMap, new[] { AppointmentStatus.Codes.NoShow, AppointmentStatus.Codes.Expired });
+        await ApplyBookingBlockAsync(overdueAppointments, missedStatusIds, now, cancellationToken);
+
+        await _context.SaveChangesAsync(cancellationToken);
+        return overdueAppointments.Count;
+    }
+
+    /// <summary>
+    /// Đủ MaxNoShowsBeforeBlock lần vắng mặt (NO_SHOW/EXPIRED) trong NoShowWindowDays ngày thì chặn đặt lịch
+    /// web mới trong BookingBlockDays ngày, đồng thời dời no_show_reset_at về now để vừa hết chặn không bị
+    /// chặn lại ngay bởi chính những lượt cũ. Chỉ tính lượt bệnh nhân tự đặt qua web: lượt do quầy mở không
+    /// quy trách nhiệm cho tài khoản nhân viên. Chặn đặt lịch không chặn đăng nhập, xem lịch sử hay bệnh án.
+    /// </summary>
+    private async Task ApplyBookingBlockAsync(
+        IReadOnlyCollection<Appointment> justMissed,
+        List<int> missedStatusIds,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        if (missedStatusIds.Count == 0)
+        {
+            return;
+        }
+
+        var accountIds = justMissed
+            .Where(a => a.BookingChannel == BookingChannel.Web && a.BookedBy != null)
+            .Select(a => a.BookedBy!.Value)
+            .Distinct()
+            .ToList();
+
+        if (accountIds.Count == 0)
+        {
+            return;
+        }
+
+        var accounts = await _context.Accounts
+            .Where(a => accountIds.Contains(a.Id))
+            .ToListAsync(cancellationToken);
+
+        if (accounts.Count == 0)
+        {
+            return;
+        }
+
+        var justMissedIds = justMissed.Select(a => a.Id).ToList();
+
+        // Lô vừa đánh NO_SHOW chưa được lưu nên phải đọc riêng các lần vắng mặt đã ghi trong CSDL.
+        var previousMisses = await _context.Appointments
+            .AsNoTracking()
+            .Where(a => a.BookedBy != null
+                        && accountIds.Contains(a.BookedBy.Value)
+                        && a.BookingChannel == BookingChannel.Web
+                        && missedStatusIds.Contains(a.StatusId)
+                        && !justMissedIds.Contains(a.Id))
+            .Select(a => new { a.BookedBy, a.UpdatedAt })
+            .ToListAsync(cancellationToken);
+
+        DateTime windowFloor = now.AddDays(-_options.NoShowWindowDays);
+
+        foreach (var account in accounts)
+        {
+            if (account.BookingBlockedUntil is DateTime blockedUntil && blockedUntil > now)
+            {
+                continue;
+            }
+
+            DateTime windowStart = account.NoShowResetAt is DateTime reset && reset > windowFloor ? reset : windowFloor;
+
+            int misses = previousMisses.Count(m => m.BookedBy == account.Id && m.UpdatedAt >= windowStart)
+                         + justMissed.Count(a => a.BookedBy == account.Id);
+
+            if (misses < _options.MaxNoShowsBeforeBlock)
+            {
+                continue;
+            }
+
+            account.BookingBlockedUntil = now.AddDays(_options.BookingBlockDays);
+            account.NoShowResetAt = now;
+            account.UpdatedAt = now;
+        }
+    }
+
+    public async Task<ReceptionActionResult> ConvertToWalkInAsync(
+        int appointmentId,
+        int? operatorAccountId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var statusMap = await LoadStatusMapAsync(cancellationToken);
+        if (!statusMap.TryGetValue(AppointmentStatus.Codes.CheckedIn, out int checkedInStatusId))
+        {
+            throw new InvalidOperationException("Cơ sở dữ liệu chưa có trạng thái CHECKED_IN.");
+        }
+
+        var sourceAppointment = await _context.Appointments
+            .Include(a => a.Patient)
+            .Include(a => a.Status)
+            .Include(a => a.Slot)
+                .ThenInclude(s => s!.Doctor)
+            .Include(a => a.Room)
+            .FirstOrDefaultAsync(a => a.Id == appointmentId, cancellationToken);
+
+        if (sourceAppointment == null)
+        {
+            return new ReceptionActionResult(false, "Không tìm thấy lượt khám gốc để chuyển.");
+        }
+
+        string[] reopenableCodes =
+        {
+            AppointmentStatus.Codes.Pending,
+            AppointmentStatus.Codes.Confirmed,
+            AppointmentStatus.Codes.Cancelled,
+            AppointmentStatus.Codes.NoShow,
+            AppointmentStatus.Codes.Expired
+        };
+
+        if (!reopenableCodes.Contains(sourceAppointment.Status.Code))
+        {
+            return new ReceptionActionResult(
+                false,
+                $"Lượt khám {sourceAppointment.AppointmentCode} đang ở trạng thái \"{sourceAppointment.Status.Name}\", không cần cấp lại số trực tiếp.");
+        }
+
+        var existingChild = await _context.Appointments
+            .AsNoTracking()
+            .Where(a => a.ParentAppointmentId == appointmentId)
+            .OrderByDescending(a => a.Id)
+            .Select(a => new { a.Id, a.QueueNumber })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (existingChild != null)
+        {
+            return new ReceptionActionResult(
+                false,
+                $"Lượt {sourceAppointment.AppointmentCode} đã được cấp số trực tiếp trước đó.",
+                existingChild.QueueNumber ?? string.Empty,
+                AppointmentId: existingChild.Id);
+        }
+
+        List<int> completedIds = ResolveIds(statusMap, new[] { AppointmentStatus.Codes.Completed });
+        bool hasCompletedToday = completedIds.Count > 0
+            && await InDay(_context.Appointments.AsNoTracking(), Today)
+                .AnyAsync(a => a.PatientId == sourceAppointment.PatientId && completedIds.Contains(a.StatusId), cancellationToken);
+
+        if (hasCompletedToday)
+        {
+            return new ReceptionActionResult(
+                false,
+                $"Bệnh nhân {sourceAppointment.Patient.FullName} đã có ca khám hoàn thành trong hôm nay nên không mở lượt thường mới.");
+        }
+
+        int? roomId = sourceAppointment.RoomId ?? sourceAppointment.Slot?.RoomId;
+        if (roomId == null)
+        {
+            return new ReceptionActionResult(
+                false,
+                $"Lượt {sourceAppointment.AppointmentCode} chưa xác định được phòng khám. Hãy dùng chức năng Tiếp nhận mới.");
+        }
+
+        DateTime now = Now;
+
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+
+        List<int> waitingIds = ResolveIds(statusMap, WaitingCodes);
+        statusMap.TryGetValue(AppointmentStatus.Codes.NoShow, out int noShowStatusId);
+        bool closeSource = noShowStatusId != 0 && waitingIds.Contains(sourceAppointment.StatusId);
+
+        if (closeSource)
+        {
+            int oldSourceStatusId = sourceAppointment.StatusId;
+            sourceAppointment.StatusId = noShowStatusId;
+            sourceAppointment.UpdatedAt = now;
+
+            // Lượt gốc bỏ chỗ đang giữ để suất đó mở lại cho người khác; số mới sẽ cấp ở dưới.
+            QueuePositionAllocator.ReleaseSeat(sourceAppointment);
+
+            _context.AppointmentStatusHistories.Add(new AppointmentStatusHistory
+            {
+                AppointmentId = sourceAppointment.Id,
+                OldStatusId = oldSourceStatusId,
+                NewStatusId = noShowStatusId,
+                ChangedAt = now
+            });
+        }
+
+        var newAppointment = new Appointment
+        {
+            AppointmentCode = await GenerateAppointmentCodeAsync(cancellationToken),
+            PatientId = sourceAppointment.PatientId,
+            StatusId = checkedInStatusId,
+            BookingChannel = BookingChannel.OnSite,
+            VisitType = VisitType.WalkIn,
+            PriorityLevel = ResolvePriorityLevel(sourceAppointment.PriorityLevel, sourceAppointment.Patient.DateOfBirth, now),
+            Reason = Truncate($"Chuyển sang bốc số trực tiếp từ lịch hẹn trễ {sourceAppointment.AppointmentCode}: {sourceAppointment.Reason}", 255),
+            RoomId = roomId,
+            DepartmentId = sourceAppointment.DepartmentId ?? sourceAppointment.Slot?.Room?.DepartmentId,
+            DoctorId = sourceAppointment.DoctorId ?? sourceAppointment.Slot?.DoctorId,
+            BookedBy = sourceAppointment.BookedBy ?? operatorAccountId,
+            CheckedInAt = now,
+            ParentAppointmentId = sourceAppointment.Id,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        newAppointment.StatusHistories.Add(new AppointmentStatusHistory
+        {
+            NewStatusId = checkedInStatusId,
+            ChangedAt = now
+        });
+
+        _context.Appointments.Add(newAppointment);
+
+        // Phải lưu việc đóng lượt gốc trước khi cấp số: bộ cấp vị trí đọc chỗ đang bị giữ từ CSDL.
+        await _context.SaveChangesAsync(cancellationToken);
+
+        QueuePlacement? placement = await _allocator.AssignOnSiteAsync(
+            newAppointment, now, roomId, newAppointment.DoctorId, cancellationToken);
+
+        if (placement is null)
+        {
+            return new ReceptionActionResult(
+                false,
+                $"Ca {(ExamShifts.For(now) == ExamShift.Morning ? "sáng" : "chiều")} ngày {now:dd/MM/yyyy} của phòng này đã hết số thứ tự, " +
+                $"không chuyển được lượt {sourceAppointment.AppointmentCode} sang bốc số trực tiếp.");
+        }
+
+        newAppointment.RoomId = placement.Slot.RoomId;
+        newAppointment.DoctorId = placement.Slot.DoctorId;
+
+        await _context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return new ReceptionActionResult(
+            true,
+            $"Đã chuyển bệnh nhân {sourceAppointment.Patient.FullName} sang bốc số trực tiếp thành công.",
+            placement.QueueNumber,
+            AppointmentId: newAppointment.Id);
+    }
+
+    public async Task<ReceptionActionResult> AssignStaffPriorityAsync(
+        int appointmentId,
+        int? operatorAccountId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var statusMap = await LoadStatusMapAsync(cancellationToken);
+        var waitingIds = ResolveIds(statusMap, WaitingCodes);
+
+        if (waitingIds.Count == 0)
+        {
+            return new ReceptionActionResult(false, "Cơ sở dữ liệu chưa có trạng thái chờ để xếp hàng.");
+        }
+
+        var appointment = await _context.Appointments
+            .Include(a => a.Patient)
+            .Include(a => a.Status)
+            .Include(a => a.Slot)
+            .FirstOrDefaultAsync(a => a.Id == appointmentId, cancellationToken);
+
+        if (appointment == null)
+        {
+            return new ReceptionActionResult(false, "Không tìm thấy lượt khám để gán ưu tiên.");
+        }
+
+        if (!waitingIds.Contains(appointment.StatusId))
+        {
+            return new ReceptionActionResult(
+                false,
+                $"Lượt {appointment.AppointmentCode} đang ở trạng thái \"{appointment.Status.Name}\", không còn trong hàng đợi nên không gán ưu tiên.");
+        }
+
+        if (appointment.PriorityLevel == PriorityLevels.StaffPriority)
+        {
+            return new ReceptionActionResult(
+                false,
+                $"Lượt {appointment.AppointmentCode} đã được gán ưu tiên trước đó.",
+                appointment.QueueNumber ?? string.Empty);
+        }
+
+        int? roomId = appointment.RoomId ?? appointment.Slot?.RoomId;
+        if (roomId == null)
+        {
+            return new ReceptionActionResult(false, $"Lượt {appointment.AppointmentCode} chưa xác định được phòng khám nên không xếp hàng được.");
+        }
+
+        DateTime now = Now;
+
+        // Hàng đợi đang xét là các lượt còn chờ của cùng phòng trong hôm nay; một ngày của một phòng
+        // chỉ vài chục lượt nên lọc phòng trong bộ nhớ để bắt cả lượt chỉ có room_id trên khung giờ.
+        // Phải lọc theo ngày, không lọc từ giờ hiện tại: các khung đã chạy trong buổi sáng vẫn còn người chờ.
+        var dayWaiting = await InDay(_context.Appointments.Include(a => a.Slot), Today)
+            .Where(a => waitingIds.Contains(a.StatusId))
+            .ToListAsync(cancellationToken);
+
+        var waiting = dayWaiting.Where(a => (a.RoomId ?? a.Slot?.RoomId) == roomId.Value).ToList();
+
+        // Hàng đợi dựng trước khi gán ưu tiên: chỗ đứng tự nhiên phải là chỗ thật của lượt này,
+        // nếu không số người bị chen sẽ tính sai.
+        var queue = ApplyCallOrder(waiting);
+        int naturalIndex = queue.FindIndex(a => a.Id == appointment.Id);
+
+        if (naturalIndex < 0)
+        {
+            return new ReceptionActionResult(false, $"Lượt {appointment.AppointmentCode} không nằm trong hàng đợi của phòng này.");
+        }
+
+        appointment.PriorityLevel = PriorityLevels.StaffPriority;
+        appointment.UpdatedAt = now;
+
+        var passed = new List<Appointment>();
+        int index = naturalIndex;
+
+        while (passed.Count < _options.MaxOvertakeAhead && index > 0)
+        {
+            var ahead = queue[index - 1];
+
+            // Không chen qua một lượt ưu tiên khác, và không chen qua người đã bị chen đủ trần.
+            if (ahead.PriorityLevel >= PriorityLevels.StaffPriority
+                || ahead.OvertakenCount >= _options.MaxTimesOvertaken)
+            {
+                break;
+            }
+
+            index--;
+            ahead.OvertakenCount++;
+            ahead.UpdatedAt = now;
+            passed.Add(ahead);
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        string message = passed.Count == 0
+            ? $"Đã gán ưu tiên cho lượt {appointment.AppointmentCode} nhưng không chen được ai: " +
+              $"người đứng trước đều đã bị chen đủ {_options.MaxTimesOvertaken} lần."
+            : $"Đã gán ưu tiên cho {appointment.Patient.FullName} (số {appointment.QueueNumber}), " +
+              $"vượt lên trước {passed.Count} người: {string.Join(", ", passed.Select(p => p.QueueNumber ?? p.AppointmentCode))}.";
+
+        return new ReceptionActionResult(true, message, appointment.QueueNumber ?? string.Empty, AppointmentId: appointment.Id);
+    }
+
+    // Mức ưu tiên: mức 2 chỉ do nhân viên gán nên giữ nguyên; còn lại hệ thống tự tính từ ngày sinh
+    // (trẻ dưới PriorityChildUnderAge tuổi hoặc người từ PrioritySeniorFromAge tuổi -> mức 1).
+    private int ResolvePriorityLevel(int requestedLevel, DateOnly dateOfBirth, DateTime now)
+    {
+        int requested = Math.Clamp(requestedLevel, PriorityLevels.Normal, PriorityLevels.Max);
+
+        if (requested == PriorityLevels.StaffPriority)
+        {
+            return PriorityLevels.StaffPriority;
+        }
+
+        bool agePriority = PatientAge.NeedsAgePriority(
+            dateOfBirth,
+            DateOnly.FromDateTime(now),
+            _options.PriorityChildUnderAge,
+            _options.PrioritySeniorFromAge);
+
+        return agePriority ? PriorityLevels.AgePriority : requested;
+    }
+
+    private void ValidateRequest(CreateReceptionRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.FullName))
         {
@@ -421,12 +961,12 @@ public class ReceptionService : IReceptionService
             throw new ArgumentException("Họ tên bệnh nhân không được vượt quá 100 ký tự.");
         }
 
-        if (request.DateOfBirth == default || request.DateOfBirth > DateOnly.FromDateTime(DateTime.Today))
+        if (request.DateOfBirth == default || request.DateOfBirth > DateOnly.FromDateTime(Today))
         {
             throw new ArgumentException("Ngày sinh không hợp lệ.");
         }
 
-        if (request.Gender is not (GenderCodes.Male or GenderCodes.Female or GenderCodes.Other))
+        if (EnumCodes.ParseDatabaseCode<Gender>(request.Gender) is null)
         {
             throw new ArgumentException("Vui lòng chọn giới tính.");
         }
@@ -464,9 +1004,9 @@ public class ReceptionService : IReceptionService
 
     private async Task<string> GenerateAppointmentCodeAsync(CancellationToken cancellationToken)
     {
-        for (int attempt = 0; attempt < 10; attempt++)
+        for (int attempt = 0; attempt < 5; attempt++)
         {
-            string code = $"LK{DateTime.Now:yyMMddHHmm}{Random.Shared.Next(10, 100)}";
+            string code = AppointmentCode.Generate(DateOnly.FromDateTime(Now));
             bool exists = await _context.Appointments
                 .AsNoTracking()
                 .AnyAsync(a => a.AppointmentCode == code, cancellationToken);
@@ -475,50 +1015,53 @@ public class ReceptionService : IReceptionService
             {
                 return code;
             }
-
-            await Task.Delay(5, cancellationToken);
         }
 
         throw new InvalidOperationException("Không thể sinh mã lượt khám mới. Vui lòng thử lại.");
     }
 
-    private async Task<string> GenerateQueueNumberAsync(DateTime day, CancellationToken cancellationToken)
+    // Số thẻ BHYT nằm ở insurance_cards (không còn cột trên patients).
+    // Chưa có kế hoạch/thời hạn trong form quầy nên dùng kế hoạch nội tuyến đầu tiên và năm hiện hành.
+    private async Task UpsertInsuranceCardAsync(Patient patient, string? cardNumber, DateTime now, CancellationToken cancellationToken)
     {
-        List<string> queueNumbers = await InDay(_context.Appointments.AsNoTracking(), day)
-            .Where(a => a.QueueNumber != null)
-            .Select(a => a.QueueNumber!)
-            .ToListAsync(cancellationToken);
-
-        int maxNumber = 0;
-        foreach (string queueNumber in queueNumbers)
+        if (string.IsNullOrWhiteSpace(cardNumber))
         {
-            if (queueNumber.Length > 1 && int.TryParse(queueNumber.AsSpan(1), out int number))
-            {
-                maxNumber = Math.Max(maxNumber, number);
-            }
+            return;
         }
 
-        return $"A{maxNumber + 1:D3}";
-    }
+        var existing = await _context.InsuranceCards
+            .FirstOrDefaultAsync(c => c.CardNumber == cardNumber || c.PatientId == patient.Id, cancellationToken);
 
-    private async Task<string> GenerateUsernameAsync(CancellationToken cancellationToken)
-    {
-        for (int attempt = 0; attempt < 10; attempt++)
+        if (existing != null)
         {
-            string username = $"bn{DateTime.Now:yyMMddHHmmss}{Random.Shared.Next(100, 1000)}";
-            bool exists = await _context.Accounts
-                .AsNoTracking()
-                .AnyAsync(a => a.Username == username, cancellationToken);
-
-            if (!exists)
-            {
-                return username;
-            }
-
-            await Task.Delay(5, cancellationToken);
+            existing.Patient = patient;
+            existing.IsActive = true;
+            return;
         }
 
-        throw new InvalidOperationException("Không thể sinh tài khoản bệnh nhân mới. Vui lòng thử lại.");
+        int? defaultPlanId = await _context.InsurancePlans
+            .AsNoTracking()
+            .Where(p => p.ReferralType == ReferralType.InNetwork)
+            .OrderBy(p => p.Id)
+            .Select(p => (int?)p.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (defaultPlanId is null)
+        {
+            return;
+        }
+
+        int year = now.Year;
+        _context.InsuranceCards.Add(new InsuranceCard
+        {
+            Patient = patient,
+            CardNumber = cardNumber,
+            InsurancePlanId = defaultPlanId.Value,
+            ValidFrom = new DateOnly(year, 1, 1),
+            ValidTo = new DateOnly(year, 12, 31),
+            IsActive = true,
+            CreatedAt = now
+        });
     }
 
     private static IQueryable<Appointment> InDay(IQueryable<Appointment> query, DateTime day)
@@ -538,13 +1081,16 @@ public class ReceptionService : IReceptionService
             .ToList();
     }
 
-    private static ReceptionItemDto MapItem(Appointment appointment)
+    private static ReceptionItemDto MapItem(Appointment appointment, bool hasPendingLink)
     {
         string departmentName = appointment.Room?.Department.Name
             ?? appointment.Slot?.Room?.Department?.Name
             ?? "Chưa phân khoa";
 
-        string doctorName = appointment.Slot?.Doctor.FullName ?? string.Empty;
+        // Walk-in không có slot nên bác sĩ phải đọc từ appointments.doctor_id, không phải slot.Doctor.
+        string doctorName = appointment.Doctor?.FullName
+            ?? appointment.Slot?.Doctor.FullName
+            ?? string.Empty;
         DateTime appointmentTime = appointment.Slot?.StartTime ?? appointment.CreatedAt;
 
         return new ReceptionItemDto(
@@ -553,20 +1099,49 @@ public class ReceptionService : IReceptionService
             appointment.Patient.Id,
             appointment.Patient.Id.ToPatientCode(),
             appointment.Patient.FullName,
-            appointment.Patient.Gender.ToGenderVietnamese(),
+            appointment.Patient.Gender.ToLabel(),
             appointment.Patient.DateOfBirth,
-            appointment.Patient.InsuranceCardNumber ?? string.Empty,
+            ActiveInsuranceCardNumber(appointment.Patient),
             departmentName,
             doctorName,
             appointment.Status.Code,
             appointment.Status.Name,
             appointmentTime,
-            appointment.BookingChannel.ToChannelVietnamese(),
-            appointment.VisitType,
+            appointment.BookingChannel.ToLabel(),
+            appointment.VisitType.ToLabel(),
             appointment.PriorityLevel,
             appointment.PriorityLevel.ToPriorityVietnamese(),
             appointment.QueueNumber ?? string.Empty,
-            appointment.Reason ?? string.Empty);
+            appointment.Reason ?? string.Empty,
+            BookedByName(appointment.BookedByAccount),
+            hasPendingLink);
+    }
+
+    // Quầy cần phân biệt ai mở ca: bệnh nhân tự đặt trên web hay nhân viên nhập hộ.
+    private static string BookedByName(Account? account) =>
+        account == null
+            ? "Chưa ghi nhận"
+            : string.Equals(account.Role?.Code, "PATIENT", StringComparison.OrdinalIgnoreCase)
+                ? $"{account.Username} (bệnh nhân)"
+                : $"{account.Username} · {account.Role?.Name ?? "Nhân viên"}";
+
+    private async Task<HashSet<int>> LoadPendingLinkPatientIdsAsync(
+        List<int> patientIds,
+        CancellationToken cancellationToken)
+    {
+        if (patientIds.Count == 0)
+        {
+            return new HashSet<int>();
+        }
+
+        List<int> pending = await _context.AccountPatientProfiles
+            .AsNoTracking()
+            .Where(l => patientIds.Contains(l.PatientId) && l.Status == LinkStatus.Pending)
+            .Select(l => l.PatientId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        return pending.ToHashSet();
     }
 
     private static ReceptionPatientDto MapPatient(Patient patient)
@@ -576,11 +1151,23 @@ public class ReceptionService : IReceptionService
             patient.Id.ToPatientCode(),
             patient.FullName,
             patient.DateOfBirth,
-            patient.Gender ?? string.Empty,
+            // DTO này nuôi form nhập hồ sơ: giữ mã (MALE/FEMALE/OTHER) để combo khớp giá trị gửi về,
+            // còn danh sách quầy dùng ReceptionItemDto.Gender đã dịch sang nhãn tiếng Việt.
+            patient.Gender is Gender gender ? gender.ToDatabaseCode() : "OTHER",
             patient.PhoneNumber,
             patient.NationalId ?? string.Empty,
             patient.Address ?? string.Empty,
-            patient.InsuranceCardNumber ?? string.Empty);
+            ActiveInsuranceCardNumber(patient));
+    }
+
+    // Cột insurance_card_number không còn trên patients; thẻ đang hoạt động lấy từ insurance_cards.
+    private static string ActiveInsuranceCardNumber(Patient patient)
+    {
+        return patient.InsuranceCards
+            .Where(c => c.IsActive)
+            .OrderByDescending(c => c.ValidTo)
+            .Select(c => c.CardNumber)
+            .FirstOrDefault() ?? string.Empty;
     }
 
     private static int? TryParsePatientCode(string keyword)

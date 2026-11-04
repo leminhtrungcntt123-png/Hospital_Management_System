@@ -31,6 +31,7 @@ public partial class MainForm : Form
     private readonly IDepartmentService? _departmentService;
     private readonly IAuthService? _authService;
     private readonly UserSession? _session;
+    private readonly IPatientProfileService? _profileService;
     private UserControl? _currentPage;
 
     public bool LogoutRequested { get; private set; }
@@ -61,7 +62,8 @@ public partial class MainForm : Form
         IDepartmentService departmentService,
         IAuthService authService,
         UserSession session,
-        ISchedulingService? schedulingService = null)
+        ISchedulingService? schedulingService = null,
+        IPatientProfileService? profileService = null)
     {
         _bookingService = bookingService;
         _adminService = adminService;
@@ -70,6 +72,7 @@ public partial class MainForm : Form
         _departmentService = departmentService;
         _authService = authService;
         _session = session;
+        _profileService = profileService;
         _schedulingService = schedulingService;
 
         InitializeComponent();
@@ -381,7 +384,7 @@ public partial class MainForm : Form
         SetActiveNav(btnNavReception);
         lblBreadcrumb.Text = "HIS   ›   Tiếp đón bệnh nhân";
 
-        var page = new ReceptionPage(_receptionService);
+        var page = new ReceptionPage(_receptionService, _profileService, _session?.User?.AccountId);
         page.CountsChanged += counts => UpdateReceptionBadge(counts.Waiting);
         ShowPage(page);
     }

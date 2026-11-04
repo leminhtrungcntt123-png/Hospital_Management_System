@@ -6,8 +6,9 @@ public class ScheduleException
     public int DoctorId { get; set; }
     public Doctor Doctor { get; set; } = null!;
     public DateOnly Date { get; set; }
-    public string? Shift { get; set; }
-    public string Type { get; set; } = string.Empty;
+    public ExamShift? Shift { get; set; }
+    public ScheduleExceptionType Type { get; set; }
+    public ScheduleExceptionStatus Status { get; set; } = ScheduleExceptionStatus.Pending;
     public int? ReplacementDoctorId { get; set; }
     public Doctor? ReplacementDoctor { get; set; }
     public string? Reason { get; set; }

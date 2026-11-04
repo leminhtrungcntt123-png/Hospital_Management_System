@@ -17,10 +17,10 @@ namespace HIS.DAL.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.11")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
-            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+            NpgsqlModelBuilderExtensions.UseIdentityAlwaysColumns(modelBuilder);
 
             modelBuilder.Entity("HIS.Domain.AccessLog", b =>
                 {
@@ -29,7 +29,7 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
 
                     b.Property<int>("AccountId")
                         .HasColumnType("integer")
@@ -52,9 +52,13 @@ namespace HIS.DAL.Migrations
 
                     b.Property<DateTime>("OccurredAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("occurred_at")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<int?>("PatientId")
+                        .HasColumnType("integer")
+                        .HasColumnName("patient_id");
 
                     b.HasKey("Id")
                         .HasName("pk_access_logs");
@@ -64,6 +68,9 @@ namespace HIS.DAL.Migrations
 
                     b.HasIndex("MedicalRecordId")
                         .HasDatabaseName("ix_access_logs_medical_record_id");
+
+                    b.HasIndex("PatientId")
+                        .HasDatabaseName("idx_access_logs_patient");
 
                     b.ToTable("access_logs", (string)null);
                 });
@@ -75,13 +82,22 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("BookingBlockedUntil")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("booking_blocked_until");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("email");
 
                     b.Property<int>("FailedLoginCount")
                         .ValueGeneratedOnAdd()
@@ -96,8 +112,12 @@ namespace HIS.DAL.Migrations
                         .HasColumnName("is_active");
 
                     b.Property<DateTime?>("LockedUntil")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("locked_until");
+
+                    b.Property<DateTime?>("NoShowResetAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("no_show_reset_at");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -111,7 +131,7 @@ namespace HIS.DAL.Migrations
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("updated_at")
                         .HasDefaultValueSql("now()");
 
@@ -124,6 +144,10 @@ namespace HIS.DAL.Migrations
                     b.HasKey("Id")
                         .HasName("pk_accounts");
 
+                    b.HasIndex("Email")
+                        .IsUnique()
+                        .HasDatabaseName("ix_accounts_email");
+
                     b.HasIndex("RoleId")
                         .HasDatabaseName("ix_accounts_role_id");
 
@@ -131,7 +155,94 @@ namespace HIS.DAL.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_accounts_username");
 
-                    b.ToTable("accounts", (string)null);
+                    b.ToTable("accounts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_accounts_email_lower", "email IS NULL OR email = lower(email)");
+                        });
+                });
+
+            modelBuilder.Entity("HIS.Domain.AccountPatientProfile", b =>
+                {
+                    b.Property<int>("AccountId")
+                        .HasColumnType("integer")
+                        .HasColumnName("account_id");
+
+                    b.Property<int>("PatientId")
+                        .HasColumnType("integer")
+                        .HasColumnName("patient_id");
+
+                    b.Property<bool>("CanViewRecords")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("can_view_records");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("integer")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Relationship")
+                        .IsRequired()
+                        .HasMaxLength(15)
+                        .HasColumnType("character varying(15)")
+                        .HasColumnName("relationship");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("ACTIVE")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime?>("VerifiedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("verified_at");
+
+                    b.Property<int?>("VerifiedBy")
+                        .HasColumnType("integer")
+                        .HasColumnName("verified_by");
+
+                    b.HasKey("AccountId", "PatientId")
+                        .HasName("pk_account_patient_profiles");
+
+                    b.HasIndex("AccountId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_link_self_account")
+                        .HasFilter("relationship = 'SELF' AND status <> 'REVOKED'");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_account_patient_profiles_created_by");
+
+                    b.HasIndex("PatientId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_link_self_patient")
+                        .HasFilter("relationship = 'SELF' AND status = 'ACTIVE'");
+
+                    b.HasIndex("VerifiedBy")
+                        .HasDatabaseName("ix_account_patient_profiles_verified_by");
+
+                    b.HasIndex("PatientId", "Status")
+                        .HasDatabaseName("idx_link_patient");
+
+                    b.ToTable("account_patient_profiles", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_account_patient_profiles_relationship", "relationship IN ('SELF','SPOUSE','CHILD','PARENT','SIBLING','OTHER')");
+
+                            t.HasCheckConstraint("ck_account_patient_profiles_status", "status IN ('ACTIVE','PENDING','REVOKED')");
+
+                            t.HasCheckConstraint("ck_link_adult_records_consent", "can_view_records = FALSE OR relationship IN ('SELF','CHILD') OR verified_by IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_link_pending_no_records", "status = 'ACTIVE' OR can_view_records = FALSE");
+
+                            t.HasCheckConstraint("ck_link_self_not_pending", "NOT (relationship = 'SELF' AND status = 'PENDING')");
+                        });
                 });
 
             modelBuilder.Entity("HIS.Domain.Appointment", b =>
@@ -141,13 +252,17 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
 
                     b.Property<string>("AppointmentCode")
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
                         .HasColumnName("appointment_code");
+
+                    b.Property<int?>("BookedBy")
+                        .HasColumnType("integer")
+                        .HasColumnName("booked_by");
 
                     b.Property<string>("BookingChannel")
                         .IsRequired()
@@ -157,15 +272,37 @@ namespace HIS.DAL.Migrations
                         .HasDefaultValue("WEB")
                         .HasColumnName("booking_channel");
 
+                    b.Property<DateTime?>("CalledAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("called_at");
+
+                    b.Property<DateTime?>("CheckedInAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("checked_in_at");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<int?>("DepartmentId")
+                        .HasColumnType("integer")
+                        .HasColumnName("department_id");
+
+                    b.Property<int?>("DoctorId")
+                        .HasColumnType("integer")
+                        .HasColumnName("doctor_id");
+
                     b.Property<DateTime?>("HoldUntil")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("hold_until");
+
+                    b.Property<int>("OvertakenCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("overtaken_count");
 
                     b.Property<int?>("ParentAppointmentId")
                         .HasColumnType("integer")
@@ -199,13 +336,17 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("slot_id");
 
+                    b.Property<int?>("SlotPosition")
+                        .HasColumnType("integer")
+                        .HasColumnName("slot_position");
+
                     b.Property<int>("StatusId")
                         .HasColumnType("integer")
                         .HasColumnName("status_id");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("updated_at")
                         .HasDefaultValueSql("now()");
 
@@ -224,6 +365,16 @@ namespace HIS.DAL.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_appointments_appointment_code");
 
+                    b.HasIndex("DepartmentId")
+                        .HasDatabaseName("ix_appointments_department_id");
+
+                    b.HasIndex("DoctorId")
+                        .HasDatabaseName("ix_appointments_doctor_id");
+
+                    b.HasIndex("HoldUntil")
+                        .HasDatabaseName("idx_appointments_hold")
+                        .HasFilter("status_id = 1");
+
                     b.HasIndex("ParentAppointmentId")
                         .HasDatabaseName("ix_appointments_parent_appointment_id");
 
@@ -234,16 +385,33 @@ namespace HIS.DAL.Migrations
                         .HasDatabaseName("ix_appointments_room_id");
 
                     b.HasIndex("SlotId")
-                        .HasDatabaseName("ix_appointments_slot_id");
+                        .HasDatabaseName("idx_appointments_slot");
 
                     b.HasIndex("StatusId")
                         .HasDatabaseName("idx_appointments_status_id");
+
+                    b.HasIndex("BookedBy", "StatusId")
+                        .HasDatabaseName("idx_appointments_booked_by");
+
+                    b.HasIndex("PatientId", "SlotId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_patient_slot_active")
+                        .HasFilter("slot_id IS NOT NULL AND status_id IN (1,2,3,4,5)");
+
+                    b.HasIndex("SlotId", "SlotPosition")
+                        .IsUnique()
+                        .HasDatabaseName("uq_slot_position")
+                        .HasFilter("slot_position IS NOT NULL AND status_id IN (1,2,3,4,5)");
 
                     b.ToTable("appointments", null, t =>
                         {
                             t.HasCheckConstraint("ck_appointments_booking_channel", "booking_channel IN ('WEB','ON_SITE')");
 
-                            t.HasCheckConstraint("ck_appointments_priority_level", "priority_level BETWEEN 0 AND 3");
+                            t.HasCheckConstraint("ck_appointments_overtaken_count", "overtaken_count BETWEEN 0 AND 3");
+
+                            t.HasCheckConstraint("ck_appointments_priority_level", "priority_level BETWEEN 0 AND 2");
+
+                            t.HasCheckConstraint("ck_appointments_slot_position", "slot_position >= 1");
 
                             t.HasCheckConstraint("ck_appointments_visit_type", "visit_type IN ('SCHEDULED','WALK_IN')");
                         });
@@ -256,7 +424,7 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
 
                     b.Property<int>("BookedCount")
                         .ValueGeneratedOnAdd()
@@ -275,15 +443,27 @@ namespace HIS.DAL.Migrations
                         .HasColumnName("doctor_id");
 
                     b.Property<DateTime>("EndTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("end_time");
+
+                    b.Property<int>("OnlineBooked")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("online_booked");
+
+                    b.Property<int>("OnlineQuota")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(3)
+                        .HasColumnName("online_quota");
 
                     b.Property<int>("RoomId")
                         .HasColumnType("integer")
                         .HasColumnName("room_id");
 
                     b.Property<DateTime>("StartTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("start_time");
 
                     b.Property<string>("Status")
@@ -313,9 +493,13 @@ namespace HIS.DAL.Migrations
 
                     b.ToTable("appointment_slots", null, t =>
                         {
+                            t.HasCheckConstraint("ck_appointment_slots_capacity", "booked_count <= capacity");
+
                             t.HasCheckConstraint("ck_appointment_slots_status", "status IN ('AVAILABLE','FULL','BLOCKED')");
 
-                            t.HasCheckConstraint("ck_capacity", "booked_count <= capacity");
+                            t.HasCheckConstraint("ck_online_booked", "online_booked <= online_quota AND online_booked <= booked_count");
+
+                            t.HasCheckConstraint("ck_online_quota", "online_quota <= capacity");
                         });
                 });
 
@@ -355,6 +539,88 @@ namespace HIS.DAL.Migrations
                         .HasDatabaseName("ix_appointment_statuses_code");
 
                     b.ToTable("appointment_statuses", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Code = "PENDING",
+                            IsTerminal = false,
+                            Name = "Chờ xác nhận",
+                            SortOrder = 1
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Code = "CONFIRMED",
+                            IsTerminal = false,
+                            Name = "Đã xác nhận",
+                            SortOrder = 2
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Code = "CHECKED_IN",
+                            IsTerminal = false,
+                            Name = "Đã check-in",
+                            SortOrder = 3
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Code = "READY_FOR_DOCTOR",
+                            IsTerminal = false,
+                            Name = "Chờ bác sĩ",
+                            SortOrder = 4
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Code = "IN_PROGRESS",
+                            IsTerminal = false,
+                            Name = "Đang khám",
+                            SortOrder = 5
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Code = "COMPLETED",
+                            IsTerminal = true,
+                            Name = "Hoàn thành",
+                            SortOrder = 6
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Code = "CANCELLED",
+                            IsTerminal = true,
+                            Name = "Đã hủy",
+                            SortOrder = 7
+                        },
+                        new
+                        {
+                            Id = 8,
+                            Code = "NO_SHOW",
+                            IsTerminal = true,
+                            Name = "Không đến",
+                            SortOrder = 8
+                        },
+                        new
+                        {
+                            Id = 9,
+                            Code = "EXPIRED",
+                            IsTerminal = true,
+                            Name = "Hết hạn giữ chỗ",
+                            SortOrder = 9
+                        },
+                        new
+                        {
+                            Id = 10,
+                            Code = "RESCHEDULE_REQUIRED",
+                            IsTerminal = false,
+                            Name = "Cần đặt lại lịch",
+                            SortOrder = 10
+                        });
                 });
 
             modelBuilder.Entity("HIS.Domain.AppointmentStatusHistory", b =>
@@ -364,7 +630,7 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
 
                     b.Property<int>("AppointmentId")
                         .HasColumnType("integer")
@@ -372,9 +638,15 @@ namespace HIS.DAL.Migrations
 
                     b.Property<DateTime>("ChangedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("changed_at")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<bool>("IsLateCancel")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_late_cancel");
 
                     b.Property<int>("NewStatusId")
                         .HasColumnType("integer")
@@ -400,8 +672,9 @@ namespace HIS.DAL.Migrations
                     b.HasIndex("OldStatusId")
                         .HasDatabaseName("ix_appointment_status_history_old_status_id");
 
-                    b.HasIndex("PerformedBy")
-                        .HasDatabaseName("ix_appointment_status_history_performed_by");
+                    b.HasIndex("PerformedBy", "ChangedAt")
+                        .HasDatabaseName("idx_history_cancel")
+                        .HasFilter("is_late_cancel");
 
                     b.ToTable("appointment_status_history", (string)null);
                 });
@@ -413,7 +686,7 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
 
                     b.Property<int>("DepartmentId")
                         .HasColumnType("integer")
@@ -447,7 +720,7 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Description")
                         .HasMaxLength(255)
@@ -473,7 +746,7 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
 
                     b.Property<int>("AccountId")
                         .HasColumnType("integer")
@@ -510,7 +783,7 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
 
                     b.Property<int>("AccountId")
                         .HasColumnType("integer")
@@ -562,9 +835,9 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
 
-                    b.Property<int?>("DayOfWeek")
+                    b.Property<int>("DayOfWeek")
                         .HasColumnType("integer")
                         .HasColumnName("day_of_week");
 
@@ -590,6 +863,12 @@ namespace HIS.DAL.Migrations
                         .HasDefaultValue(true)
                         .HasColumnName("is_active");
 
+                    b.Property<int>("OnlineRatioPct")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(60)
+                        .HasColumnName("online_ratio_pct");
+
                     b.Property<int>("RoomId")
                         .HasColumnType("integer")
                         .HasColumnName("room_id");
@@ -603,7 +882,7 @@ namespace HIS.DAL.Migrations
                     b.Property<int>("SlotDurationMinutes")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
-                        .HasDefaultValue(15)
+                        .HasDefaultValue(60)
                         .HasColumnName("slot_duration_minutes");
 
                     b.Property<TimeOnly>("StartTime")
@@ -621,9 +900,142 @@ namespace HIS.DAL.Migrations
 
                     b.ToTable("doctor_schedules", null, t =>
                         {
-                            t.HasCheckConstraint("ck_doctor_schedules_day_of_week", "day_of_week IS NULL OR (day_of_week BETWEEN 1 AND 7)");
+                            t.HasCheckConstraint("ck_doctor_schedules_day_of_week", "day_of_week BETWEEN 0 AND 6");
+
+                            t.HasCheckConstraint("ck_doctor_schedules_online_ratio", "online_ratio_pct BETWEEN 0 AND 100");
 
                             t.HasCheckConstraint("ck_doctor_schedules_shift", "shift IN ('MORNING','AFTERNOON')");
+                        });
+                });
+
+            modelBuilder.Entity("HIS.Domain.DutyShift", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AccountId")
+                        .HasColumnType("integer")
+                        .HasColumnName("account_id");
+
+                    b.Property<int?>("AssignedBy")
+                        .HasColumnType("integer")
+                        .HasColumnName("assigned_by");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("DepartmentId")
+                        .HasColumnType("integer")
+                        .HasColumnName("department_id");
+
+                    b.Property<DateTime>("EndTime")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("end_time");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("note");
+
+                    b.Property<DateTime>("StartTime")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("start_time");
+
+                    b.HasKey("Id")
+                        .HasName("pk_duty_shifts");
+
+                    b.HasIndex("AssignedBy")
+                        .HasDatabaseName("ix_duty_shifts_assigned_by");
+
+                    b.HasIndex("DepartmentId")
+                        .HasDatabaseName("ix_duty_shifts_department_id");
+
+                    b.HasIndex("AccountId", "StartTime")
+                        .HasDatabaseName("idx_duty_shifts_account");
+
+                    b.ToTable("duty_shifts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_duty_time", "end_time > start_time");
+                        });
+                });
+
+            modelBuilder.Entity("HIS.Domain.InsuranceCard", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CardNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("card_number");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("InsurancePlanId")
+                        .HasColumnType("integer")
+                        .HasColumnName("insurance_plan_id");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsRegisteredHere")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_registered_here");
+
+                    b.Property<int>("PatientId")
+                        .HasColumnType("integer")
+                        .HasColumnName("patient_id");
+
+                    b.Property<string>("RegisteredFacility")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("registered_facility");
+
+                    b.Property<DateOnly>("ValidFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("valid_from");
+
+                    b.Property<DateOnly>("ValidTo")
+                        .HasColumnType("date")
+                        .HasColumnName("valid_to");
+
+                    b.HasKey("Id")
+                        .HasName("pk_insurance_cards");
+
+                    b.HasIndex("CardNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_insurance_cards_card_number");
+
+                    b.HasIndex("InsurancePlanId")
+                        .HasDatabaseName("ix_insurance_cards_insurance_plan_id");
+
+                    b.HasIndex("PatientId", "ValidTo")
+                        .HasDatabaseName("idx_insurance_cards_patient");
+
+                    b.ToTable("insurance_cards", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_insurance_dates", "valid_to >= valid_from");
                         });
                 });
 
@@ -634,7 +1046,7 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
 
                     b.Property<decimal>("CoveragePct")
                         .HasPrecision(5, 2)
@@ -668,21 +1080,26 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
 
                     b.Property<int>("AppointmentId")
                         .HasColumnType("integer")
                         .HasColumnName("appointment_id");
 
-                    b.Property<int?>("CashierId")
-                        .HasColumnType("integer")
-                        .HasColumnName("cashier_id");
+                    b.Property<decimal?>("CoveragePctApplied")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("coverage_pct_applied");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<int?>("InsuranceCardId")
+                        .HasColumnType("integer")
+                        .HasColumnName("insurance_card_id");
 
                     b.Property<decimal>("InsuranceCoveredAmount")
                         .ValueGeneratedOnAdd()
@@ -695,25 +1112,16 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("insurance_plan_id");
 
-                    b.Property<DateTime?>("PaidAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("paid_at");
-
-                    b.Property<int>("PatientId")
-                        .HasColumnType("integer")
-                        .HasColumnName("patient_id");
-
-                    b.Property<decimal>("PatientPaidAmount")
+                    b.Property<decimal>("PatientAmount")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)")
                         .HasDefaultValue(0m)
-                        .HasColumnName("patient_paid_amount");
+                        .HasColumnName("patient_amount");
 
-                    b.Property<string>("PaymentMethod")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("payment_method");
+                    b.Property<int>("PatientId")
+                        .HasColumnType("integer")
+                        .HasColumnName("patient_id");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -737,8 +1145,8 @@ namespace HIS.DAL.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_invoices_appointment_id");
 
-                    b.HasIndex("CashierId")
-                        .HasDatabaseName("ix_invoices_cashier_id");
+                    b.HasIndex("InsuranceCardId")
+                        .HasDatabaseName("ix_invoices_insurance_card_id");
 
                     b.HasIndex("InsurancePlanId")
                         .HasDatabaseName("ix_invoices_insurance_plan_id");
@@ -748,9 +1156,9 @@ namespace HIS.DAL.Migrations
 
                     b.ToTable("invoices", null, t =>
                         {
-                            t.HasCheckConstraint("ck_invoices_payment_method", "payment_method IS NULL OR payment_method IN ('CASH','BANK_TRANSFER')");
+                            t.HasCheckConstraint("ck_invoices_coverage_pct_applied", "coverage_pct_applied IS NULL OR coverage_pct_applied BETWEEN 0 AND 100");
 
-                            t.HasCheckConstraint("ck_invoices_status", "status IN ('UNPAID','PAID')");
+                            t.HasCheckConstraint("ck_invoices_status", "status IN ('UNPAID','PARTIALLY_PAID','PAID')");
                         });
                 });
 
@@ -761,7 +1169,7 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
 
                     b.Property<decimal>("Amount")
                         .HasPrecision(12, 2)
@@ -803,11 +1211,11 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("now()");
 
@@ -854,7 +1262,7 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
 
                     b.Property<int>("OrderId")
                         .HasColumnType("integer")
@@ -866,7 +1274,7 @@ namespace HIS.DAL.Migrations
 
                     b.Property<DateTime>("RecordedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("recorded_at")
                         .HasDefaultValueSql("now()");
 
@@ -894,7 +1302,7 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
 
                     b.Property<int>("AppointmentId")
                         .HasColumnType("integer")
@@ -910,7 +1318,7 @@ namespace HIS.DAL.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("now()");
 
@@ -938,7 +1346,7 @@ namespace HIS.DAL.Migrations
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("updated_at")
                         .HasDefaultValueSql("now()");
 
@@ -962,7 +1370,7 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
 
                     b.Property<string>("ActiveIngredient")
                         .HasMaxLength(150)
@@ -1005,6 +1413,57 @@ namespace HIS.DAL.Migrations
                     b.ToTable("medications", (string)null);
                 });
 
+            modelBuilder.Entity("HIS.Domain.Notification", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AccountId")
+                        .HasColumnType("integer")
+                        .HasColumnName("account_id");
+
+                    b.Property<int?>("AppointmentId")
+                        .HasColumnType("integer")
+                        .HasColumnName("appointment_id");
+
+                    b.Property<string>("Content")
+                        .HasColumnType("text")
+                        .HasColumnName("content");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<bool>("IsRead")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_read");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("title");
+
+                    b.HasKey("Id")
+                        .HasName("pk_notifications");
+
+                    b.HasIndex("AppointmentId")
+                        .HasDatabaseName("ix_notifications_appointment_id");
+
+                    b.HasIndex("AccountId", "IsRead")
+                        .HasDatabaseName("idx_notifications_account");
+
+                    b.ToTable("notifications", (string)null);
+                });
+
             modelBuilder.Entity("HIS.Domain.Nurse", b =>
                 {
                     b.Property<int>("Id")
@@ -1012,7 +1471,7 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
 
                     b.Property<int>("AccountId")
                         .HasColumnType("integer")
@@ -1048,11 +1507,7 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("AccountId")
-                        .HasColumnType("integer")
-                        .HasColumnName("account_id");
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Address")
                         .HasMaxLength(255)
@@ -1061,7 +1516,7 @@ namespace HIS.DAL.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("now()");
 
@@ -1080,11 +1535,6 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("character varying(10)")
                         .HasColumnName("gender");
 
-                    b.Property<string>("InsuranceCardNumber")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("insurance_card_number");
-
                     b.Property<string>("NationalId")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
@@ -1099,10 +1549,6 @@ namespace HIS.DAL.Migrations
                     b.HasKey("Id")
                         .HasName("pk_patients");
 
-                    b.HasIndex("AccountId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_patients_account_id");
-
                     b.HasIndex("NationalId")
                         .IsUnique()
                         .HasDatabaseName("ix_patients_national_id");
@@ -1113,6 +1559,79 @@ namespace HIS.DAL.Migrations
                         });
                 });
 
+            modelBuilder.Entity("HIS.Domain.Payment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<int?>("CashierId")
+                        .HasColumnType("integer")
+                        .HasColumnName("cashier_id");
+
+                    b.Property<int>("InvoiceId")
+                        .HasColumnType("integer")
+                        .HasColumnName("invoice_id");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("note");
+
+                    b.Property<DateTime>("PaidAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("paid_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("PaymentMethod")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("CASH")
+                        .HasColumnName("payment_method");
+
+                    b.Property<string>("PaymentType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(15)
+                        .HasColumnType("character varying(15)")
+                        .HasDefaultValue("PAYMENT")
+                        .HasColumnName("payment_type");
+
+                    b.Property<string>("ReceiptEmail")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("receipt_email");
+
+                    b.HasKey("Id")
+                        .HasName("pk_payments");
+
+                    b.HasIndex("CashierId")
+                        .HasDatabaseName("ix_payments_cashier_id");
+
+                    b.HasIndex("InvoiceId")
+                        .HasDatabaseName("idx_payments_invoice");
+
+                    b.ToTable("payments", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_payments_amount", "amount > 0");
+
+                            t.HasCheckConstraint("ck_payments_payment_method", "payment_method IN ('CASH','BANK_TRANSFER')");
+
+                            t.HasCheckConstraint("ck_payments_payment_type", "payment_type IN ('DEPOSIT','PAYMENT','REFUND')");
+                        });
+                });
+
             modelBuilder.Entity("HIS.Domain.Prescription", b =>
                 {
                     b.Property<int>("Id")
@@ -1120,7 +1639,7 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
 
                     b.Property<int>("MedicalRecordId")
                         .HasColumnType("integer")
@@ -1153,7 +1672,7 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Dosage")
                         .HasMaxLength(100)
@@ -1224,6 +1743,50 @@ namespace HIS.DAL.Migrations
                         .HasDatabaseName("ix_roles_code");
 
                     b.ToTable("roles", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Code = "ADMIN",
+                            Name = "Quản trị hệ thống"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Code = "DOCTOR",
+                            Name = "Bác sĩ"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Code = "NURSE",
+                            Name = "Y tá / Điều dưỡng"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Code = "RECEPTIONIST",
+                            Name = "Lễ tân / Tiếp đón"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Code = "CASHIER",
+                            Name = "Thu ngân"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Code = "DEPT_HEAD",
+                            Name = "Trưởng khoa"
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Code = "PATIENT",
+                            Name = "Bệnh nhân"
+                        });
                 });
 
             modelBuilder.Entity("HIS.Domain.ScheduleException", b =>
@@ -1233,10 +1796,10 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime?>("ApprovedAt")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("approved_at");
 
                     b.Property<int?>("ApprovedBy")
@@ -1245,7 +1808,7 @@ namespace HIS.DAL.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("now()");
 
@@ -1271,6 +1834,14 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("character varying(10)")
                         .HasColumnName("shift");
 
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("PENDING")
+                        .HasColumnName("status");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -1291,7 +1862,13 @@ namespace HIS.DAL.Migrations
 
                     b.ToTable("schedule_exceptions", null, t =>
                         {
+                            t.HasCheckConstraint("ck_exception_approved", "status <> 'APPROVED' OR (approved_by IS NOT NULL AND approved_at IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_exception_replacement", "replacement_doctor_id IS NULL OR replacement_doctor_id <> doctor_id");
+
                             t.HasCheckConstraint("ck_schedule_exceptions_shift", "shift IS NULL OR shift IN ('MORNING','AFTERNOON')");
+
+                            t.HasCheckConstraint("ck_schedule_exceptions_status", "status IN ('PENDING','APPROVED','REJECTED')");
 
                             t.HasCheckConstraint("ck_schedule_exceptions_type", "type IN ('LEAVE','TRAINING','SURGERY','SHIFT_SWAP')");
                         });
@@ -1304,7 +1881,7 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
@@ -1364,6 +1941,32 @@ namespace HIS.DAL.Migrations
                         .HasDatabaseName("ix_service_types_code");
 
                     b.ToTable("service_types", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Code = "EXAMINATION",
+                            Name = "Khám bệnh"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Code = "LAB_TEST",
+                            Name = "Xét nghiệm"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Code = "IMAGING",
+                            Name = "Chẩn đoán hình ảnh"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Code = "FUNCTIONAL",
+                            Name = "Thăm dò chức năng"
+                        });
                 });
 
             modelBuilder.Entity("HIS.Domain.VitalSigns", b =>
@@ -1373,7 +1976,7 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
 
                     b.Property<int>("AppointmentId")
                         .HasColumnType("integer")
@@ -1394,7 +1997,7 @@ namespace HIS.DAL.Migrations
 
                     b.Property<DateTime>("RecordedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("recorded_at")
                         .HasDefaultValueSql("now()");
 
@@ -1449,12 +2052,20 @@ namespace HIS.DAL.Migrations
                     b.HasOne("HIS.Domain.MedicalRecord", "MedicalRecord")
                         .WithMany("AccessLogs")
                         .HasForeignKey("MedicalRecordId")
-                        .OnDelete(DeleteBehavior.SetNull)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_access_logs_medical_records_medical_record_id");
+
+                    b.HasOne("HIS.Domain.Patient", "Patient")
+                        .WithMany("AccessLogs")
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_access_logs_patients_patient_id");
 
                     b.Navigation("Account");
 
                     b.Navigation("MedicalRecord");
+
+                    b.Navigation("Patient");
                 });
 
             modelBuilder.Entity("HIS.Domain.Account", b =>
@@ -1469,8 +2080,63 @@ namespace HIS.DAL.Migrations
                     b.Navigation("Role");
                 });
 
+            modelBuilder.Entity("HIS.Domain.AccountPatientProfile", b =>
+                {
+                    b.HasOne("HIS.Domain.Account", "Account")
+                        .WithMany("PatientLinks")
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_account_patient_profiles_accounts_account_id");
+
+                    b.HasOne("HIS.Domain.Account", "Creator")
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_account_patient_profiles_accounts_created_by");
+
+                    b.HasOne("HIS.Domain.Patient", "Patient")
+                        .WithMany("AccountLinks")
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_account_patient_profiles_patients_patient_id");
+
+                    b.HasOne("HIS.Domain.Account", "Verifier")
+                        .WithMany()
+                        .HasForeignKey("VerifiedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_account_patient_profiles_accounts_verified_by");
+
+                    b.Navigation("Account");
+
+                    b.Navigation("Creator");
+
+                    b.Navigation("Patient");
+
+                    b.Navigation("Verifier");
+                });
+
             modelBuilder.Entity("HIS.Domain.Appointment", b =>
                 {
+                    b.HasOne("HIS.Domain.Account", "BookedByAccount")
+                        .WithMany("BookedAppointments")
+                        .HasForeignKey("BookedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_appointments_accounts_booked_by");
+
+                    b.HasOne("HIS.Domain.Department", "Department")
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_appointments_departments_department_id");
+
+                    b.HasOne("HIS.Domain.Doctor", "Doctor")
+                        .WithMany()
+                        .HasForeignKey("DoctorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_appointments_doctors_doctor_id");
+
                     b.HasOne("HIS.Domain.Appointment", "ParentAppointment")
                         .WithMany("ChildAppointments")
                         .HasForeignKey("ParentAppointmentId")
@@ -1487,13 +2153,13 @@ namespace HIS.DAL.Migrations
                     b.HasOne("HIS.Domain.ClinicRoom", "Room")
                         .WithMany("Appointments")
                         .HasForeignKey("RoomId")
-                        .OnDelete(DeleteBehavior.SetNull)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_appointments_clinic_rooms_room_id");
 
                     b.HasOne("HIS.Domain.AppointmentSlot", "Slot")
                         .WithMany("Appointments")
                         .HasForeignKey("SlotId")
-                        .OnDelete(DeleteBehavior.SetNull)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_appointments_appointment_slots_slot_id");
 
                     b.HasOne("HIS.Domain.AppointmentStatus", "Status")
@@ -1502,6 +2168,12 @@ namespace HIS.DAL.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_appointments_appointment_statuses_status_id");
+
+                    b.Navigation("BookedByAccount");
+
+                    b.Navigation("Department");
+
+                    b.Navigation("Doctor");
 
                     b.Navigation("ParentAppointment");
 
@@ -1540,7 +2212,7 @@ namespace HIS.DAL.Migrations
                     b.HasOne("HIS.Domain.Appointment", "Appointment")
                         .WithMany("StatusHistories")
                         .HasForeignKey("AppointmentId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_appointment_status_history_appointments_appointment_id");
 
@@ -1554,13 +2226,13 @@ namespace HIS.DAL.Migrations
                     b.HasOne("HIS.Domain.AppointmentStatus", "OldStatus")
                         .WithMany("OldStatusHistories")
                         .HasForeignKey("OldStatusId")
-                        .OnDelete(DeleteBehavior.SetNull)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_appointment_status_history_appointment_statuses_old_status_");
 
                     b.HasOne("HIS.Domain.Account", "Performer")
                         .WithMany("PerformedAppointmentHistories")
                         .HasForeignKey("PerformedBy")
-                        .OnDelete(DeleteBehavior.SetNull)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_appointment_status_history_accounts_performed_by");
 
                     b.Navigation("Appointment");
@@ -1647,25 +2319,75 @@ namespace HIS.DAL.Migrations
                     b.Navigation("Room");
                 });
 
+            modelBuilder.Entity("HIS.Domain.DutyShift", b =>
+                {
+                    b.HasOne("HIS.Domain.Account", "Account")
+                        .WithMany("DutyShifts")
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_duty_shifts_accounts_account_id");
+
+                    b.HasOne("HIS.Domain.Account", "AssignedByAccount")
+                        .WithMany("AssignedDutyShifts")
+                        .HasForeignKey("AssignedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_duty_shifts_accounts_assigned_by");
+
+                    b.HasOne("HIS.Domain.Department", "Department")
+                        .WithMany("DutyShifts")
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_duty_shifts_departments_department_id");
+
+                    b.Navigation("Account");
+
+                    b.Navigation("AssignedByAccount");
+
+                    b.Navigation("Department");
+                });
+
+            modelBuilder.Entity("HIS.Domain.InsuranceCard", b =>
+                {
+                    b.HasOne("HIS.Domain.InsurancePlan", "InsurancePlan")
+                        .WithMany("InsuranceCards")
+                        .HasForeignKey("InsurancePlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_insurance_cards_insurance_plans_insurance_plan_id");
+
+                    b.HasOne("HIS.Domain.Patient", "Patient")
+                        .WithMany("InsuranceCards")
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_insurance_cards_patients_patient_id");
+
+                    b.Navigation("InsurancePlan");
+
+                    b.Navigation("Patient");
+                });
+
             modelBuilder.Entity("HIS.Domain.Invoice", b =>
                 {
                     b.HasOne("HIS.Domain.Appointment", "Appointment")
                         .WithOne("Invoice")
                         .HasForeignKey("HIS.Domain.Invoice", "AppointmentId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_invoices_appointments_appointment_id");
 
-                    b.HasOne("HIS.Domain.Account", "Cashier")
-                        .WithMany("CashierInvoices")
-                        .HasForeignKey("CashierId")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .HasConstraintName("fk_invoices_accounts_cashier_id");
+                    b.HasOne("HIS.Domain.InsuranceCard", "InsuranceCard")
+                        .WithMany("Invoices")
+                        .HasForeignKey("InsuranceCardId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_invoices_insurance_cards_insurance_card_id");
 
                     b.HasOne("HIS.Domain.InsurancePlan", "InsurancePlan")
                         .WithMany("Invoices")
                         .HasForeignKey("InsurancePlanId")
-                        .OnDelete(DeleteBehavior.SetNull)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_invoices_insurance_plans_insurance_plan_id");
 
                     b.HasOne("HIS.Domain.Patient", "Patient")
@@ -1677,7 +2399,7 @@ namespace HIS.DAL.Migrations
 
                     b.Navigation("Appointment");
 
-                    b.Navigation("Cashier");
+                    b.Navigation("InsuranceCard");
 
                     b.Navigation("InsurancePlan");
 
@@ -1689,7 +2411,7 @@ namespace HIS.DAL.Migrations
                     b.HasOne("HIS.Domain.Invoice", "Invoice")
                         .WithMany("InvoiceItems")
                         .HasForeignKey("InvoiceId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_invoice_items_invoices_invoice_id");
 
@@ -1701,7 +2423,7 @@ namespace HIS.DAL.Migrations
                     b.HasOne("HIS.Domain.MedicalRecord", "MedicalRecord")
                         .WithMany("LabOrders")
                         .HasForeignKey("MedicalRecordId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_lab_orders_medical_records_medical_record_id");
 
@@ -1722,14 +2444,14 @@ namespace HIS.DAL.Migrations
                     b.HasOne("HIS.Domain.LabOrder", "Order")
                         .WithOne("Result")
                         .HasForeignKey("HIS.Domain.LabResult", "OrderId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_lab_results_lab_orders_order_id");
 
                     b.HasOne("HIS.Domain.Account", "Performer")
                         .WithMany("PerformedLabResults")
                         .HasForeignKey("PerformedBy")
-                        .OnDelete(DeleteBehavior.SetNull)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_lab_results_accounts_performed_by");
 
                     b.Navigation("Order");
@@ -1742,7 +2464,7 @@ namespace HIS.DAL.Migrations
                     b.HasOne("HIS.Domain.Appointment", "Appointment")
                         .WithOne("MedicalRecord")
                         .HasForeignKey("HIS.Domain.MedicalRecord", "AppointmentId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_medical_records_appointments_appointment_id");
 
@@ -1758,6 +2480,26 @@ namespace HIS.DAL.Migrations
                     b.Navigation("Doctor");
                 });
 
+            modelBuilder.Entity("HIS.Domain.Notification", b =>
+                {
+                    b.HasOne("HIS.Domain.Account", "Account")
+                        .WithMany("Notifications")
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_notifications_accounts_account_id");
+
+                    b.HasOne("HIS.Domain.Appointment", "Appointment")
+                        .WithMany()
+                        .HasForeignKey("AppointmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_notifications_appointments_appointment_id");
+
+                    b.Navigation("Account");
+
+                    b.Navigation("Appointment");
+                });
+
             modelBuilder.Entity("HIS.Domain.Nurse", b =>
                 {
                     b.HasOne("HIS.Domain.Account", "Account")
@@ -1770,7 +2512,7 @@ namespace HIS.DAL.Migrations
                     b.HasOne("HIS.Domain.Department", "Department")
                         .WithMany("Nurses")
                         .HasForeignKey("DepartmentId")
-                        .OnDelete(DeleteBehavior.SetNull)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_nurses_departments_department_id");
 
                     b.Navigation("Account");
@@ -1778,16 +2520,24 @@ namespace HIS.DAL.Migrations
                     b.Navigation("Department");
                 });
 
-            modelBuilder.Entity("HIS.Domain.Patient", b =>
+            modelBuilder.Entity("HIS.Domain.Payment", b =>
                 {
-                    b.HasOne("HIS.Domain.Account", "Account")
-                        .WithOne("Patient")
-                        .HasForeignKey("HIS.Domain.Patient", "AccountId")
+                    b.HasOne("HIS.Domain.Account", "Cashier")
+                        .WithMany("Payments")
+                        .HasForeignKey("CashierId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_payments_accounts_cashier_id");
+
+                    b.HasOne("HIS.Domain.Invoice", "Invoice")
+                        .WithMany("Payments")
+                        .HasForeignKey("InvoiceId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
-                        .HasConstraintName("fk_patients_accounts_account_id");
+                        .HasConstraintName("fk_payments_invoices_invoice_id");
 
-                    b.Navigation("Account");
+                    b.Navigation("Cashier");
+
+                    b.Navigation("Invoice");
                 });
 
             modelBuilder.Entity("HIS.Domain.Prescription", b =>
@@ -1795,7 +2545,7 @@ namespace HIS.DAL.Migrations
                     b.HasOne("HIS.Domain.MedicalRecord", "MedicalRecord")
                         .WithMany("Prescriptions")
                         .HasForeignKey("MedicalRecordId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_prescriptions_medical_records_medical_record_id");
 
@@ -1814,7 +2564,7 @@ namespace HIS.DAL.Migrations
                     b.HasOne("HIS.Domain.Prescription", "Prescription")
                         .WithMany("PrescriptionItems")
                         .HasForeignKey("PrescriptionId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_prescription_items_prescriptions_prescription_id");
 
@@ -1828,7 +2578,7 @@ namespace HIS.DAL.Migrations
                     b.HasOne("HIS.Domain.Account", "Approver")
                         .WithMany("ApprovedScheduleExceptions")
                         .HasForeignKey("ApprovedBy")
-                        .OnDelete(DeleteBehavior.SetNull)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_schedule_exceptions_accounts_approved_by");
 
                     b.HasOne("HIS.Domain.Doctor", "Doctor")
@@ -1841,7 +2591,7 @@ namespace HIS.DAL.Migrations
                     b.HasOne("HIS.Domain.Doctor", "ReplacementDoctor")
                         .WithMany("ReplacementScheduleExceptions")
                         .HasForeignKey("ReplacementDoctorId")
-                        .OnDelete(DeleteBehavior.SetNull)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_schedule_exceptions_doctors_replacement_doctor_id");
 
                     b.Navigation("Approver");
@@ -1868,7 +2618,7 @@ namespace HIS.DAL.Migrations
                     b.HasOne("HIS.Domain.Appointment", "Appointment")
                         .WithOne("VitalSigns")
                         .HasForeignKey("HIS.Domain.VitalSigns", "AppointmentId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_vital_signs_appointments_appointment_id");
 
@@ -1890,15 +2640,23 @@ namespace HIS.DAL.Migrations
 
                     b.Navigation("ApprovedScheduleExceptions");
 
-                    b.Navigation("CashierInvoices");
+                    b.Navigation("AssignedDutyShifts");
+
+                    b.Navigation("BookedAppointments");
 
                     b.Navigation("DepartmentHead");
 
                     b.Navigation("Doctor");
 
+                    b.Navigation("DutyShifts");
+
+                    b.Navigation("Notifications");
+
                     b.Navigation("Nurse");
 
-                    b.Navigation("Patient");
+                    b.Navigation("PatientLinks");
+
+                    b.Navigation("Payments");
 
                     b.Navigation("PerformedAppointmentHistories");
 
@@ -1949,6 +2707,8 @@ namespace HIS.DAL.Migrations
 
                     b.Navigation("Doctors");
 
+                    b.Navigation("DutyShifts");
+
                     b.Navigation("Nurses");
                 });
 
@@ -1965,14 +2725,23 @@ namespace HIS.DAL.Migrations
                     b.Navigation("ScheduleExceptions");
                 });
 
+            modelBuilder.Entity("HIS.Domain.InsuranceCard", b =>
+                {
+                    b.Navigation("Invoices");
+                });
+
             modelBuilder.Entity("HIS.Domain.InsurancePlan", b =>
                 {
+                    b.Navigation("InsuranceCards");
+
                     b.Navigation("Invoices");
                 });
 
             modelBuilder.Entity("HIS.Domain.Invoice", b =>
                 {
                     b.Navigation("InvoiceItems");
+
+                    b.Navigation("Payments");
                 });
 
             modelBuilder.Entity("HIS.Domain.LabOrder", b =>
@@ -2001,7 +2770,13 @@ namespace HIS.DAL.Migrations
 
             modelBuilder.Entity("HIS.Domain.Patient", b =>
                 {
+                    b.Navigation("AccessLogs");
+
+                    b.Navigation("AccountLinks");
+
                     b.Navigation("Appointments");
+
+                    b.Navigation("InsuranceCards");
 
                     b.Navigation("Invoices");
                 });

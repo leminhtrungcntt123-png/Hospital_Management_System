@@ -26,7 +26,8 @@ public class AppointmentStatusConfiguration : IEntityTypeConfiguration<Appointme
             new AppointmentStatus { Id = (int)AppointmentStatusId.Completed, Code = "COMPLETED", Name = "Hoàn thành", SortOrder = 6, IsTerminal = true },
             new AppointmentStatus { Id = (int)AppointmentStatusId.Cancelled, Code = "CANCELLED", Name = "Đã hủy", SortOrder = 7, IsTerminal = true },
             new AppointmentStatus { Id = (int)AppointmentStatusId.NoShow, Code = "NO_SHOW", Name = "Không đến", SortOrder = 8, IsTerminal = true },
-            new AppointmentStatus { Id = (int)AppointmentStatusId.Expired, Code = "EXPIRED", Name = "Hết hạn giữ chỗ", SortOrder = 9, IsTerminal = true }
+            new AppointmentStatus { Id = (int)AppointmentStatusId.Expired, Code = "EXPIRED", Name = "Hết hạn giữ chỗ", SortOrder = 9, IsTerminal = true },
+            new AppointmentStatus { Id = (int)AppointmentStatusId.RescheduleRequired, Code = "RESCHEDULE_REQUIRED", Name = "Cần đặt lại lịch", SortOrder = 10, IsTerminal = false }
         );
     }
 }

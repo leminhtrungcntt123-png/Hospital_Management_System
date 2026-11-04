@@ -388,7 +388,17 @@ public class BookingController : Controller
         }
 
         // 3. Gọi BLL lưu lịch hẹn chính thức xuống Database (BLL gán StatusId, sinh mã)
-        var created = await _bookingService.CreateAppointmentAsync(patient.Id, dept.Id, date, shift.Key);
+        Appointment created;
+        try
+        {
+            created = await _bookingService.CreateAppointmentAsync(CurrentAccountId, patient.Id, dept.Id, date, shift.Key);
+        }
+        catch (InvalidOperationException blocked)
+        {
+            // Tài khoản bị chặn đặt lịch vì quá số lần vắng mặt: quay lại bước xác nhận kèm lý do.
+            TempData["Error"] = blocked.Message;
+            return RedirectToAction(nameof(XacNhan));
+        }
         var shiftVm = ToShiftVm(shift);
 
         bookedKeys.Add(key);

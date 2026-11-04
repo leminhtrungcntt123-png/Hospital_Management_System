@@ -17,8 +17,9 @@ public class PaymentConfiguration : IEntityTypeConfiguration<Payment>
 
         builder.HasKey(p => p.Id);
         builder.Property(p => p.Amount).HasPrecision(12, 2).IsRequired();
-        builder.Property(p => p.PaymentType).HasMaxLength(15).HasDefaultValue("PAYMENT").IsRequired();
-        builder.Property(p => p.PaymentMethod).HasMaxLength(20).HasDefaultValue("CASH").IsRequired();
+        builder.Property(p => p.PaymentType).HasMaxLength(15).HasDefaultValue(PaymentType.Payment).IsRequired();
+        builder.Property(p => p.PaymentMethod).HasMaxLength(20).HasDefaultValue(PaymentMethod.Cash).IsRequired();
+        builder.Property(p => p.ReceiptEmail).HasMaxLength(100);
         builder.Property(p => p.Note).HasMaxLength(255);
         builder.Property(p => p.PaidAt).HasDefaultValueSql("now()");
 

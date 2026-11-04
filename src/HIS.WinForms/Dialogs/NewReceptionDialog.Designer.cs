@@ -266,7 +266,7 @@ partial class NewReceptionDialog
         dtpDateOfBirth.Format = DateTimePickerFormat.Custom;
         dtpDateOfBirth.Location = new Point(14, 226);
         dtpDateOfBirth.Name = "dtpDateOfBirth";
-        dtpDateOfBirth.ShowCheckBox = true;
+        dtpDateOfBirth.ShowCheckBox = false;
         dtpDateOfBirth.Size = new Size(218, 24);
         dtpDateOfBirth.TabIndex = 10;
         // 
@@ -484,7 +484,7 @@ partial class NewReceptionDialog
         cboPriority.DropDownStyle = ComboBoxStyle.DropDownList;
         cboPriority.Font = new Font("Segoe UI", 9.5F);
         cboPriority.FormattingEnabled = true;
-        cboPriority.Items.AddRange(new object[] { "Bình thường", "Ưu tiên", "Người cao tuổi / trẻ em", "Cấp cứu" });
+        cboPriority.Items.AddRange(new object[] { "Bình thường", "Trẻ em / người cao tuổi", "Nhân viên chỉ định ưu tiên", "Cấp cứu (không bốc số)" });
         cboPriority.Location = new Point(14, 204);
         cboPriority.Name = "cboPriority";
         cboPriority.Size = new Size(328, 25);
@@ -525,7 +525,7 @@ partial class NewReceptionDialog
         lblProcessNote.Padding = new Padding(12, 10, 12, 10);
         lblProcessNote.Size = new Size(328, 92);
         lblProcessNote.TabIndex = 10;
-        lblProcessNote.Text = "Số thứ tự được cấp tự động sau khi lưu.\r\nBệnh nhân mới sẽ được tạo hồ sơ và tài khoản.\r\nVui lòng kiểm tra kỹ CCCD và thông tin BHYT.";
+        lblProcessNote.Text = "Số A = suất đã đặt web, số T = bốc tại quầy, cấp sau khi lưu.\r\nCấp cứu không bốc số, đưa thẳng vào buồng bệnh.\r\nBệnh nhân mới sẽ được tạo hồ sơ và tài khoản.\r\nVui lòng kiểm tra kỹ CCCD và thông tin BHYT.";
         // 
         // footerPanel
         // 
@@ -594,7 +594,7 @@ partial class NewReceptionDialog
         btnCancel.Name = "btnCancel";
         btnCancel.Size = new Size(80, 36);
         btnCancel.TabIndex = 3;
-        btnCancel.Text = "Hủy";
+        btnCancel.Text = "Xóa nhập";
         btnCancel.UseVisualStyleBackColor = false;
         // 
         // btnCloseFooter

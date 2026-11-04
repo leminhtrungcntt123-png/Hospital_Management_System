@@ -15,7 +15,7 @@ public class LabOrderConfiguration : IEntityTypeConfiguration<LabOrder>
 
         builder.HasKey(o => o.Id);
         builder.Property(o => o.Note).HasMaxLength(255);
-        builder.Property(o => o.Status).HasMaxLength(20).HasDefaultValue("PENDING").IsRequired();
+        builder.Property(o => o.Status).HasMaxLength(20).HasDefaultValue(LabOrderStatus.Pending).IsRequired();
         builder.Property(o => o.CreatedAt).HasDefaultValueSql("now()");
 
         builder.HasOne(o => o.MedicalRecord)

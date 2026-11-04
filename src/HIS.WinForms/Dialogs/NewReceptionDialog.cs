@@ -3,14 +3,19 @@ using System.Runtime.InteropServices;
 using HIS.BLL;
 using HIS.BLL.DTOs;
 using HIS.BLL.Interfaces;
+using HIS.Domain;
 
 namespace HIS.WinForms.Dialogs;
 
 public partial class NewReceptionDialog : Form
 {
     private const string LookupHint = "Nhập thông tin để tra cứu hồ sơ đã có, hoặc bỏ trống để tạo bệnh nhân mới.";
+    private static readonly DateTime DefaultDateOfBirth = DateTime.Today.AddYears(-30);
 
     private readonly IReceptionService? _receptionService;
+
+    /// <summary>Quầy mở lượt khám bằng tài khoản nào -> ghi vào appointments.booked_by.</summary>
+    private readonly int? _operatorAccountId;
 
     private List<DepartmentOptionDto> _departments = new();
     private List<DoctorOptionDto> _doctors = new();
@@ -26,19 +31,19 @@ public partial class NewReceptionDialog : Form
 
     public int CreatedAppointmentId { get; private set; }
 
-    public NewReceptionDialog() : this(null)
+    public NewReceptionDialog() : this(null, null)
     {
     }
 
-    public NewReceptionDialog(IReceptionService? receptionService)
+    public NewReceptionDialog(IReceptionService? receptionService, int? operatorAccountId = null)
     {
         _receptionService = receptionService;
+        _operatorAccountId = operatorAccountId;
 
         InitializeComponent();
 
         dtpDateOfBirth.MaxDate = DateTime.Today;
-        dtpDateOfBirth.Value = DateTime.Today.AddYears(-30);
-        dtpDateOfBirth.Checked = false;
+        dtpDateOfBirth.Value = DefaultDateOfBirth;
         cboGender.SelectedIndex = 0;
         cboPriority.SelectedIndex = 0;
 
@@ -198,7 +203,6 @@ public partial class NewReceptionDialog : Form
             txtInsurance.Text = patient.InsuranceCardNumber;
             txtAddress.Text = patient.Address;
             dtpDateOfBirth.Value = patient.DateOfBirth.ToDateTime(TimeOnly.MinValue);
-            dtpDateOfBirth.Checked = true;
             cboGender.SelectedIndex = patient.Gender switch
             {
                 "MALE" => 0,
@@ -297,8 +301,16 @@ public partial class NewReceptionDialog : Form
             InsuranceCardNumber = txtInsurance.Text.Trim(),
             DepartmentId = department.Id,
             DoctorId = doctor?.Id > 0 ? doctor.Id : null,
-            PriorityLevel = Math.Max(0, cboPriority.SelectedIndex),
-            Reason = txtReason.Text.Trim()
+            // Mức 1 hệ thống tự tính từ ngày sinh; ô này cho quầy đặt mức 2 hoặc báo cấp cứu.
+            PriorityLevel = cboPriority.SelectedIndex switch
+            {
+                1 => PriorityLevels.AgePriority,
+                2 => PriorityLevels.StaffPriority,
+                _ => PriorityLevels.Normal
+            },
+            IsEmergency = cboPriority.SelectedIndex == 3,
+            Reason = txtReason.Text.Trim(),
+            OperatorAccountId = _operatorAccountId
         };
     }
 
@@ -321,9 +333,9 @@ public partial class NewReceptionDialog : Form
             return false;
         }
 
-        if (!dtpDateOfBirth.Checked || dtpDateOfBirth.Value.Date > DateTime.Today)
+        if (dtpDateOfBirth.Value.Date > DateTime.Today)
         {
-            message = "Vui lòng chọn ngày sinh của bệnh nhân.";
+            message = "Ngày sinh không được lớn hơn ngày hiện tại.";
             focusControl = dtpDateOfBirth;
             return false;
         }
@@ -418,7 +430,7 @@ public partial class NewReceptionDialog : Form
         txtInsurance.Clear();
         txtAddress.Clear();
         cboGender.SelectedIndex = 0;
-        dtpDateOfBirth.Checked = false;
+        dtpDateOfBirth.Value = DefaultDateOfBirth;
     }
 
     private void SetIdentityReadOnly(bool readOnly)

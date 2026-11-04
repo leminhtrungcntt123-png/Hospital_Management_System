@@ -11,18 +11,16 @@ public class Invoice
     public InsurancePlan? InsurancePlan { get; set; }
     public int? InsuranceCardId { get; set; }
     public InsuranceCard? InsuranceCard { get; set; }
+
+    // Bản chụp tỉ lệ BHYT tại thời điểm tính tiền (BHYT chỉ áp dụng ở bước thanh toán)
+    public decimal? CoveragePctApplied { get; set; }
     public decimal TotalAmount { get; set; } = 0;
     public decimal InsuranceCoveredAmount { get; set; } = 0;
     public decimal PatientAmount { get; set; } = 0;
-    public decimal PatientPaidAmount { get => PatientAmount; set => PatientAmount = value; }
-    public string Status { get; set; } = "UNPAID";
-    public string? PaymentMethod { get; set; }
-    public int? CashierId { get; set; }
-    public Account? Cashier { get; set; }
+    public InvoiceStatus Status { get; set; } = InvoiceStatus.Unpaid;
     public DateTime CreatedAt { get; set; }
-    public DateTime? PaidAt { get; set; }
 
     // Navigation properties
-    public ICollection<InvoiceItem> InvoiceItems { get; set; } = new List<InvoiceItem>();
-    public ICollection<Payment> Payments { get; set; } = new List<Payment>();
+    public ICollection<InvoiceItem> InvoiceItems { get; set; } = [];
+    public ICollection<Payment> Payments { get; set; } = [];
 }

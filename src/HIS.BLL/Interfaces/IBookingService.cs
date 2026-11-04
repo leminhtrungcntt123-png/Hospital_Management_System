@@ -27,5 +27,17 @@ public interface IBookingService
     Task<decimal> GetExaminationFeeAsync(int departmentId);
 
     // Tạo mới lịch hẹn khám
-    Task<Appointment> CreateAppointmentAsync(int patientId, int departmentId, DateOnly date, string shiftKey);
+    Task<Appointment> CreateAppointmentAsync(
+        int accountId,
+        int patientId,
+        int departmentId,
+        DateOnly date,
+        string shiftKey,
+        CancellationToken cancellationToken = default);
+
+    // Bệnh nhân tự hủy lịch hẹn web của mình, có xét hạn mức hủy muộn trong tháng
+    Task<CancelAppointmentResult> CancelAppointmentAsync(
+        int appointmentId,
+        int accountId,
+        CancellationToken cancellationToken = default);
 }

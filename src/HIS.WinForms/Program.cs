@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using HIS.DAL;
 using HIS.BLL;
 using HIS.BLL.Interfaces;
+using HIS.BLL.Options;
 using HIS.BLL.Services;
 
 namespace HIS.WinForms;
@@ -30,6 +31,7 @@ static class Program
                     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found in configuration or environment variables.");
 
                 // Register DbContext with PostgreSQL & snake_case naming convention
+                services.AddSingleton(TimeProvider.System);
                 services.AddDbContext<AppDbContext>(options =>
                 {
                     options.UseNpgsql(connectionString)
@@ -37,6 +39,8 @@ static class Program
                 });
 
                 // Register BLL services
+                services.AddBookingOptions(context.Configuration);
+                services.AddScoped<QueuePositionAllocator>();
                 services.AddScoped<IBookingService, BookingService>();
                 services.AddScoped<IAdminService, AdminService>();
                 services.AddScoped<IDashboardService, DashboardService>();
@@ -48,6 +52,8 @@ static class Program
                 services.AddScoped<IDepartmentService, DepartmentService>();
                 services.AddScoped<IAuthService, AuthService>();
                 services.AddScoped<ISchedulingService, SchedulingService>();
+                services.AddScoped<IPatientProfileService, PatientProfileService>();
+                services.AddScoped<IPatientAccessService, PatientAccessService>();
 
                 // Register Session & Forms
                 services.AddScoped<UserSession>();

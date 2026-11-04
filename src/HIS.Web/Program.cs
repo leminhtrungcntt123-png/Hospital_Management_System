@@ -1,6 +1,7 @@
 using HIS.DAL;
 using HIS.BLL;
 using HIS.BLL.Interfaces;
+using HIS.BLL.Options;
 using HIS.BLL.Services;
 
 using Microsoft.EntityFrameworkCore;
@@ -20,8 +21,11 @@ builder.Services.AddSession(options =>
 });
 
 // Đăng ký DbContext với chuỗi kết nối
+// AppDbContext cần TimeProvider để ghi updated_at theo đồng hồ ứng dụng (spec init.md mục 4).
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")).UseSnakeCaseNamingConvention());
+builder.Services.AddBookingOptions(builder.Configuration);
 // Nguồn dữ liệu đặt lịch.
 // Khi nối database: tạo class mới implement  (gọi HIS.BLL) rồi thay dòng này.
 // Đăng ký các Service của BLL vào Web
@@ -30,6 +34,8 @@ builder.Services.AddScoped<IAppointmentService, AppointmentService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IPatientService, PatientService>();
 builder.Services.AddScoped<IDoctorService, DoctorService>();
+builder.Services.AddScoped<IPatientProfileService, PatientProfileService>();
+builder.Services.AddScoped<IPatientAccessService, PatientAccessService>();
 
 // Giữ nguyên cấu hình HttpClient gọi HIS.WebApi (phần của thành viên khác có thể dùng)
 builder.Services.AddHttpClient("HisWebApi", client =>

@@ -28,3 +28,10 @@ public class BookingShiftDto
     public string? DoctorTitle { get; set; }
     public string? RoomName { get; set; }
 }
+
+/// <summary>Kết quả hủy lịch hẹn trên web: báo cho bệnh nhân biết lần hủy có tính vào hạn mức tháng hay không.</summary>
+public sealed record CancelAppointmentResult(
+    bool Success,
+    string Message,
+    bool IsLateCancel = false,
+    int LateCancelsUsedThisMonth = 0);

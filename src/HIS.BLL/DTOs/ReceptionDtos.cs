@@ -27,7 +27,11 @@ public sealed record ReceptionItemDto(
     int PriorityLevel,
     string PriorityLabel,
     string QueueNumber,
-    string Reason);
+    string Reason,
+    // "Đặt bởi": tài khoản web của bệnh nhân hoặc tài khoản quầy đã mở ca.
+    string BookedByLabel,
+    // Bệnh nhân có liên kết hồ sơ đang chờ quầy xác nhận (account_patient_profiles.status = PENDING).
+    bool HasPendingLink);
 
 public sealed record ReceptionPatientDto(
     int PatientId,

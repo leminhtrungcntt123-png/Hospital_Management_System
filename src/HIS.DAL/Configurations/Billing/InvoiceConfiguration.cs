@@ -11,16 +11,15 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
         builder.ToTable("invoices", t =>
         {
             t.HasCheckConstraint("ck_invoices_status", "status IN ('UNPAID','PARTIALLY_PAID','PAID')");
-            t.HasCheckConstraint("ck_invoices_payment_method", "payment_method IS NULL OR payment_method IN ('CASH','BANK_TRANSFER')");
+            t.HasCheckConstraint("ck_invoices_coverage_pct_applied", "coverage_pct_applied IS NULL OR coverage_pct_applied BETWEEN 0 AND 100");
         });
 
         builder.HasKey(i => i.Id);
+        builder.Property(i => i.CoveragePctApplied).HasPrecision(5, 2);
         builder.Property(i => i.TotalAmount).HasPrecision(12, 2).HasDefaultValue(0m);
         builder.Property(i => i.InsuranceCoveredAmount).HasPrecision(12, 2).HasDefaultValue(0m);
         builder.Property(i => i.PatientAmount).HasPrecision(12, 2).HasDefaultValue(0m);
-        builder.Ignore(i => i.PatientPaidAmount);
-        builder.Property(i => i.Status).HasMaxLength(20).HasDefaultValue("UNPAID").IsRequired();
-        builder.Property(i => i.PaymentMethod).HasMaxLength(20);
+        builder.Property(i => i.Status).HasMaxLength(20).HasDefaultValue(InvoiceStatus.Unpaid).IsRequired();
         builder.Property(i => i.CreatedAt).HasDefaultValueSql("now()");
 
         builder.HasOne(i => i.Appointment)
@@ -43,11 +42,6 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
         builder.HasOne(i => i.InsuranceCard)
             .WithMany(ic => ic.Invoices)
             .HasForeignKey(i => i.InsuranceCardId)
-            .OnDelete(DeleteBehavior.SetNull);
-
-        builder.HasOne(i => i.Cashier)
-            .WithMany(a => a.CashierInvoices)
-            .HasForeignKey(i => i.CashierId)
             .OnDelete(DeleteBehavior.SetNull);
     }
 }

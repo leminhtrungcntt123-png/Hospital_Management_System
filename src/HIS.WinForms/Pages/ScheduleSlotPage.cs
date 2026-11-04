@@ -181,7 +181,6 @@ public partial class ScheduleSlotPage : UserControl
         string? shift = null;
         if (_cboSearchShift.SelectedIndex == 1) shift = "MORNING";
         else if (_cboSearchShift.SelectedIndex == 2) shift = "AFTERNOON";
-        else if (_cboSearchShift.SelectedIndex == 3) shift = "EVENING";
 
         _btnSearch.Enabled = false;
 

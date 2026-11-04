@@ -284,7 +284,7 @@ partial class ScheduleSlotPage
         // 
         _cboSearchShift.DropDownStyle = ComboBoxStyle.DropDownList;
         _cboSearchShift.Font = new Font("Segoe UI", 9F);
-        _cboSearchShift.Items.AddRange(new object[] { "Tất cả ca", "Ca sáng", "Ca chiều", "Ca tối" });
+        _cboSearchShift.Items.AddRange(new object[] { "Tất cả ca", "Ca sáng", "Ca chiều" });
         _cboSearchShift.Location = new Point(328, 27);
         _cboSearchShift.Name = "_cboSearchShift";
         _cboSearchShift.Size = new Size(135, 28);

@@ -1,20 +1,29 @@
 using System.Globalization;
 using HIS.BLL.DTOs;
 using HIS.BLL.Interfaces;
+using HIS.BLL.Options;
 using HIS.DAL;
 using HIS.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace HIS.BLL.Services;
 
 public class BookingService : IBookingService
 {
     private readonly AppDbContext _context;
+    private readonly BookingOptions _options;
+    private readonly TimeProvider _timeProvider;
 
-    public BookingService(AppDbContext context)
+    public BookingService(AppDbContext context, IOptions<BookingOptions> options, TimeProvider timeProvider)
     {
         _context = context;
+        _options = options.Value;
+        _timeProvider = timeProvider;
     }
+
+    // Cùng nguồn giờ với updated_at do AppDbContext ghi để hạn mức hủy theo tháng dương lịch tính đúng.
+    private DateTime Now => _timeProvider.GetLocalNow().DateTime;
 
     public async Task<List<BookingDepartmentDto>> GetActiveDepartmentsAsync()
     {
@@ -45,7 +54,9 @@ public class BookingService : IBookingService
             .Where(a => a.Slot != null
                         && a.Slot.StartTime >= fromDateTime
                         && a.Slot.StartTime <= toDateTime
-                        && a.Status.Code != "CANCELLED")
+                        && a.Status.Code != AppointmentStatus.Codes.Cancelled
+                        && a.Status.Code != AppointmentStatus.Codes.NoShow
+                        && a.Status.Code != AppointmentStatus.Codes.Expired)
             .GroupBy(a => new { a.Slot!.DoctorId, Date = DateOnly.FromDateTime(a.Slot.StartTime) })
             .Select(g => new { g.Key.DoctorId, g.Key.Date, Count = g.Count() })
             .ToListAsync();
@@ -59,8 +70,7 @@ public class BookingService : IBookingService
             var curDate = fromDate.AddDays(i);
             if (curDate.DayOfWeek == DayOfWeek.Sunday) continue;
 
-            int dayOfWeekInt = (int)curDate.DayOfWeek;
-            var daySchedules = schedules.Where(s => s.DayOfWeek == dayOfWeekInt
+            var daySchedules = schedules.Where(s => s.DayOfWeek == curDate.DayOfWeek
                                                  && s.EffectiveFrom <= curDate
                                                  && (s.EffectiveTo == null || s.EffectiveTo >= curDate));
 
@@ -125,8 +135,6 @@ public class BookingService : IBookingService
         if (date.DayOfWeek == DayOfWeek.Sunday)
             return new List<BookingShiftDto>();
 
-        int dayOfWeekInt = (int)date.DayOfWeek;
-
         var schedules = await _context.DoctorSchedules
             .AsNoTracking()
             .Include(s => s.Doctor)
@@ -135,7 +143,7 @@ public class BookingService : IBookingService
                         && s.IsActive
                         && s.EffectiveFrom <= date
                         && (s.EffectiveTo == null || s.EffectiveTo >= date)
-                        && s.DayOfWeek == dayOfWeekInt)
+                        && s.DayOfWeek == date.DayOfWeek)
             .ToListAsync();
 
         if (!schedules.Any())
@@ -152,7 +160,9 @@ public class BookingService : IBookingService
                         && doctorIds.Contains(a.Slot.DoctorId)
                         && a.Slot.StartTime >= startDateTime
                         && a.Slot.StartTime <= endDateTime
-                        && a.Status.Code != "CANCELLED")
+                        && a.Status.Code != AppointmentStatus.Codes.Cancelled
+                        && a.Status.Code != AppointmentStatus.Codes.NoShow
+                        && a.Status.Code != AppointmentStatus.Codes.Expired)
             .GroupBy(a => a.Slot!.DoctorId)
             .Select(g => new { DoctorId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(g => g.DoctorId, g => g.Count);
@@ -172,8 +182,8 @@ public class BookingService : IBookingService
 
             result.Add(new BookingShiftDto
             {
-                Key = schedule.Shift,
-                Label = schedule.Shift == "MORNING" ? "Ca sáng" : "Ca chiều",
+                Key = schedule.Shift.ToDatabaseCode(),
+                Label = schedule.Shift.ToLabel(),
                 TimeRange = $"{schedule.StartTime:hh\\:mm} – {schedule.EndTime:hh\\:mm}",
                 SlotsLeft = slotsLeft,
                 Status = slotsLeft > 0 ? "AVAILABLE" : "FULL",
@@ -212,27 +222,43 @@ public class BookingService : IBookingService
 
     public async Task<IEnumerable<Patient>> GetPatientsByAccountIdAsync(int accountId)
     {
-        return await _context.Patients
+        return await _context.AccountPatientProfiles
             .AsNoTracking()
-            .Where(p => p.AccountId == accountId)
+            .Where(l => l.AccountId == accountId && l.Status != LinkStatus.Revoked)
+            .Select(l => l.Patient)
             .ToListAsync();
     }
 
-    // Tạo mới hồ sơ bệnh nhân
+    // Tạo hồ sơ mới cho chính tài khoản: Patient + link SELF (ACTIVE, được xem hồ sơ) trong một transaction
     public async Task<Patient> CreatePatientAsync(int accountId, string fullName, DateOnly dateOfBirth, string? gender, string phone, CancellationToken cancellationToken = default)
     {
+        var now = DateTime.Now;
         var patient = new Patient
         {
-            AccountId = accountId,
             FullName = fullName,
             DateOfBirth = dateOfBirth,
-            Gender = gender,
+            Gender = EnumCodes.ParseDatabaseCode<Gender>(gender),
             PhoneNumber = phone,
-            CreatedAt = DateTime.Now
+            CreatedAt = now
         };
 
         _context.Patients.Add(patient);
         await _context.SaveChangesAsync(cancellationToken);
+
+        _context.AccountPatientProfiles.Add(new AccountPatientProfile
+        {
+            AccountId = accountId,
+            PatientId = patient.Id,
+            Relationship = PatientRelationship.Self,
+            Status = LinkStatus.Active,
+            CanViewRecords = true,
+            CreatedBy = accountId,
+            VerifiedBy = accountId,
+            VerifiedAt = now,
+            CreatedAt = now
+        });
+        await _context.SaveChangesAsync(cancellationToken);
+
         return patient;
     }
 
@@ -247,25 +273,151 @@ public class BookingService : IBookingService
     }
 
     // Tạo mới lịch hẹn khám
-    public async Task<Appointment> CreateAppointmentAsync(int patientId, int departmentId, DateOnly date, string shiftKey)
+    public async Task<Appointment> CreateAppointmentAsync(
+        int accountId,
+        int patientId,
+        int departmentId,
+        DateOnly date,
+        string shiftKey,
+        CancellationToken cancellationToken = default)
     {
         var status = await _context.AppointmentStatuses
-            .FirstAsync(s => s.Code == AppointmentStatus.Codes.Confirmed);
+            .FirstAsync(s => s.Code == AppointmentStatus.Codes.Confirmed, cancellationToken);
 
-        var now = DateTime.Now;
+        Patient patient = await _context.Patients
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == patientId, cancellationToken)
+            ?? throw new ArgumentException("Không tìm thấy hồ sơ bệnh nhân đã chọn.");
+
+        Account account = await _context.Accounts
+            .FirstOrDefaultAsync(a => a.Id == accountId, cancellationToken)
+            ?? throw new ArgumentException("Tài khoản đặt lịch không tồn tại.");
+
+        DateTime now = Now;
+
+        if (account.BookingBlockedUntil is DateTime blockedUntil && blockedUntil > now)
+        {
+            throw new InvalidOperationException(
+                $"Tài khoản đang bị chặn đặt lịch mới đến hết ngày {blockedUntil:dd/MM/yyyy} " +
+                $"do đã đủ {_options.MaxNoShowsBeforeBlock} lần vắng mặt. Đăng nhập và xem lịch sử vẫn bình thường.");
+        }
+
+        int priorityLevel = PatientAge.NeedsAgePriority(
+            patient.DateOfBirth,
+            DateOnly.FromDateTime(now),
+            _options.PriorityChildUnderAge,
+            _options.PrioritySeniorFromAge)
+            ? PriorityLevels.AgePriority
+            : PriorityLevels.Normal;
+
         var appointment = new Appointment
         {
             PatientId = patientId,
             StatusId = status.Id,
-            BookingChannel = "WEB",
-            VisitType = "SCHEDULED",
-            AppointmentCode = $"LH-{date.ToString("yyMMdd", CultureInfo.InvariantCulture)}-{Random.Shared.Next(1000, 10000)}",
+            BookingChannel = BookingChannel.Web,
+            VisitType = VisitType.Scheduled,
+            AppointmentCode = AppointmentCode.Generate(date),
+            PriorityLevel = priorityLevel,
+            BookedBy = accountId,
             CreatedAt = now,
             UpdatedAt = now
         };
 
         _context.Appointments.Add(appointment);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
         return appointment;
+    }
+
+    /// <summary>
+    /// Bệnh nhân tự hủy lịch hẹn web trên tài khoản của mình. Hủy trước FreeCancelHours giờ thì không
+    /// tính hạn mức; hủy muộn ghi is_late_cancel vào lịch sử và mỗi tháng dương lịch chỉ được
+    /// MaxLateCancelsPerMonth lần. Suất đang giữ trong khung giờ được trả lại ngay.
+    /// </summary>
+    public async Task<CancelAppointmentResult> CancelAppointmentAsync(
+        int appointmentId,
+        int accountId,
+        CancellationToken cancellationToken = default)
+    {
+        var appointment = await _context.Appointments
+            .Include(a => a.Slot)
+            .FirstOrDefaultAsync(a => a.Id == appointmentId, cancellationToken);
+
+        if (appointment is null || appointment.BookingChannel != BookingChannel.Web || appointment.BookedBy != accountId)
+        {
+            return new CancelAppointmentResult(false, "Không tìm thấy lịch hẹn của bạn.");
+        }
+
+        int cancelledStatusId = (await _context.AppointmentStatuses
+            .AsNoTracking()
+            .FirstAsync(s => s.Code == AppointmentStatus.Codes.Cancelled, cancellationToken)).Id;
+
+        var cancellableIds = await _context.AppointmentStatuses
+            .AsNoTracking()
+            .Where(s => s.Code == AppointmentStatus.Codes.Pending || s.Code == AppointmentStatus.Codes.Confirmed)
+            .Select(s => s.Id)
+            .ToListAsync(cancellationToken);
+
+        if (!cancellableIds.Contains(appointment.StatusId))
+        {
+            return new CancelAppointmentResult(
+                false,
+                $"Lượt {appointment.AppointmentCode} không còn ở trạng thái có thể hủy.");
+        }
+
+        DateTime now = Now;
+
+        // Chưa gắn khung giờ thì không có mốc để xét muộn, nên tính là hủy sớm và không trừ hạn mức.
+        bool isLate = appointment.Slot is { } slot
+                      && slot.StartTime - now < TimeSpan.FromHours(_options.FreeCancelHours);
+
+        int lateCancelsThisMonth = 0;
+        if (isLate)
+        {
+            DateTime monthStart = new DateTime(now.Year, now.Month, 1);
+            DateTime nextMonthStart = monthStart.AddMonths(1);
+
+            lateCancelsThisMonth = await _context.AppointmentStatusHistories
+                .AsNoTracking()
+                .CountAsync(h => h.PerformedBy == accountId
+                                && h.IsLateCancel
+                                && h.NewStatusId == cancelledStatusId
+                                && h.ChangedAt >= monthStart
+                                && h.ChangedAt < nextMonthStart, cancellationToken);
+
+            if (lateCancelsThisMonth >= _options.MaxLateCancelsPerMonth)
+            {
+                return new CancelAppointmentResult(
+                    false,
+                    $"Tháng này bạn đã dùng hết {_options.MaxLateCancelsPerMonth} lần hủy muộn (trong vòng " +
+                    $"{_options.FreeCancelHours} giờ trước giờ khám). Vui lòng đến quầy để hủy hoặc chọn ngày khám khác.",
+                    IsLateCancel: true,
+                    LateCancelsUsedThisMonth: lateCancelsThisMonth);
+            }
+        }
+
+        int oldStatusId = appointment.StatusId;
+        appointment.StatusId = cancelledStatusId;
+        appointment.UpdatedAt = now;
+
+        QueuePositionAllocator.ReleaseSeat(appointment);
+
+        _context.AppointmentStatusHistories.Add(new AppointmentStatusHistory
+        {
+            AppointmentId = appointment.Id,
+            OldStatusId = oldStatusId,
+            NewStatusId = cancelledStatusId,
+            PerformedBy = accountId,
+            ChangedAt = now,
+            IsLateCancel = isLate
+        });
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        int used = lateCancelsThisMonth + (isLate ? 1 : 0);
+        string message = isLate
+            ? $"Đã hủy lượt {appointment.AppointmentCode}. Đây là lần hủy muộn thứ {used}/{_options.MaxLateCancelsPerMonth} trong tháng."
+            : $"Đã hủy lượt {appointment.AppointmentCode}. Hủy trước giờ khám {_options.FreeCancelHours} giờ nên không tính vào hạn mức tháng.";
+
+        return new CancelAppointmentResult(true, message, isLate, used);
     }
 }

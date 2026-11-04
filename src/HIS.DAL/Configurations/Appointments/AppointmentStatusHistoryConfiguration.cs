@@ -13,6 +13,12 @@ public class AppointmentStatusHistoryConfiguration : IEntityTypeConfiguration<Ap
         builder.Property(h => h.OldStatusId);
         builder.Property(h => h.NewStatusId).IsRequired();
         builder.Property(h => h.ChangedAt).HasDefaultValueSql("now()");
+        builder.Property(h => h.IsLateCancel).HasDefaultValue(false);
+
+        // Đếm hạn mức hủy sát giờ theo tài khoản trong tháng dương lịch
+        builder.HasIndex(h => new { h.PerformedBy, h.ChangedAt })
+            .HasDatabaseName("idx_history_cancel")
+            .HasFilter("is_late_cancel");
 
         builder.HasOne(h => h.OldStatus)
             .WithMany(s => s.OldStatusHistories)

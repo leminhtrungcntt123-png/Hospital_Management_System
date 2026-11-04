@@ -19,11 +19,17 @@ public class AccessLogConfiguration : IEntityTypeConfiguration<AccessLog>
             .HasForeignKey(al => al.AccountId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(al => al.Patient)
+            .WithMany(p => p.AccessLogs)
+            .HasForeignKey(al => al.PatientId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasOne(al => al.MedicalRecord)
             .WithMany(m => m.AccessLogs)
             .HasForeignKey(al => al.MedicalRecordId)
             .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasIndex(al => al.AccountId).HasDatabaseName("idx_access_logs_account");
+        builder.HasIndex(al => al.PatientId).HasDatabaseName("idx_access_logs_patient");
     }
 }
