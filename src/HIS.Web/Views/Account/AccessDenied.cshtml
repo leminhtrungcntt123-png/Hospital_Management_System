@@ -1,2 +1,16 @@
-@{ ViewData["Title"] = "Từ chối truy cập"; }
-<h2>Từ chối truy cập</h2>
+@{
+    Layout = "_MediCareAuthLayout";
+    ViewData["Title"] = "Quyền truy cập";
+}
+
+<section class="mvc-auth-card card">
+    <span class="eyebrow">QUYỀN TRUY CẬP</span>
+    <h1>Bạn chưa có quyền vào trang này</h1>
+    <p class="mvc-auth-intro">
+        Vui lòng sử dụng tài khoản phù hợp hoặc liên hệ người quản trị để được hỗ trợ.
+    </p>
+
+    <a class="btn primary full" asp-area="" asp-controller="Home" asp-action="Index">
+        Về trang chủ
+    </a>
+</section>

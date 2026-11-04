@@ -1,2 +1,48 @@
-@{ ViewData["Title"] = "Đăng nhập"; }
-<h2>Đăng nhập</h2>
+@model HIS.Web.Models.LoginViewModel
+
+@{
+    Layout = "_MediCareAuthLayout";
+    ViewData["Title"] = "Đăng nhập";
+}
+
+<section class="mvc-auth-card card">
+    <span class="eyebrow">CHÀO MỪNG BẠN TRỞ LẠI</span>
+    <h1>Đăng nhập MediCare</h1>
+    <p class="mvc-auth-intro">Tiếp tục quản lý lịch khám và công việc của bạn.</p>
+    <form asp-area="" asp-controller="Account" asp-action="Login" method="post">
+        <div asp-validation-summary="ModelOnly" class="mvc-validation" role="alert"></div>
+        <input asp-for="ReturnUrl" type="hidden" />
+
+        <div class="field">
+            <label asp-for="Username"></label>
+            <input asp-for="Username"
+                   placeholder="Nhập tên đăng nhập"
+                   autocomplete="username"
+                   autofocus />
+            <span asp-validation-for="Username" class="mvc-validation"></span>
+        </div>
+
+        <div class="field">
+            <label asp-for="Password"></label>
+            <input asp-for="Password"
+                   placeholder="Nhập mật khẩu"
+                   autocomplete="current-password" />
+            <span asp-validation-for="Password" class="mvc-validation"></span>
+        </div>
+
+        <label class="check-line">
+            <input asp-for="RememberMe" />
+            <span>@Html.DisplayNameFor(m => m.RememberMe)</span>
+        </label>
+
+        <button type="submit" class="btn primary full large">Đăng nhập</button>
+    </form>
+    <p class="mvc-auth-switch">
+        Chưa có tài khoản?
+        <a asp-area="" asp-controller="Account" asp-action="Register">Đăng ký người khám</a>
+    </p>
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -1,0 +1,663 @@
+@media (max-width: 640px) {
+    .patient-nav {
+        display: none;
+    }
+    .patient-main {
+        padding: 23px 17px 31px;
+    }
+    .page-heading {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 14px;
+        margin-bottom: 20px;
+    }
+    .page-heading h1 {
+        font-size: 23px;
+    }
+    .page-heading p {
+        font-size: 11px;
+        line-height: 1.9;
+        margin-top: 6px;
+    }
+    .page-heading .eyebrow {
+        font-size: 8px;
+        letter-spacing: 1.2px;
+    }
+    .heading-actions {
+        width: 100%;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .heading-actions > .btn {
+        flex: 1;
+        font-size: 10px;
+        min-height: 38px;
+        padding: 9px 11px;
+    }
+    .booking-steps {
+        gap: 9px;
+        padding: 0 0 19px;
+        margin-bottom: 20px;
+    }
+    .booking-steps li {
+        flex-direction: column;
+        gap: 8px;
+        justify-content: flex-start;
+        text-align: center;
+    }
+    .booking-steps li:after {
+        display: none;
+    }
+    .booking-steps li > span {
+        width: 27px;
+        height: 27px;
+        font-size: 10px;
+    }
+    .booking-steps li > strong {
+        font-size: 9px;
+        line-height: 1.7;
+        font-weight: 500;
+    }
+    .booking-panel {
+        padding: 20px 17px;
+    }
+    .booking-section-head {
+        gap: 9px;
+        margin-bottom: 22px;
+        align-items: flex-start;
+    }
+    .booking-section-head > .section-icon {
+        height: 32px;
+        width: 32px;
+        border-radius: 8px;
+        flex-shrink: 0;
+    }
+    .booking-section-head > .section-icon .icon {
+        width: 17px;
+        height: 17px;
+    }
+    .booking-section-head h2 {
+        font-size: 17px;
+        letter-spacing: -0.4px;
+    }
+    .booking-section-head p {
+        font-size: 10px;
+        line-height: 1.9;
+        margin-top: 4px;
+    }
+    .profile-options {
+        grid-template-columns: 1fr;
+        gap: 11px;
+    }
+    .profile-option {
+        padding: 14px;
+        min-height: 76px;
+        gap: 11px;
+    }
+    .profile-option > .avatar {
+        width: 32px;
+        height: 32px;
+        font-size: 10px;
+    }
+    .profile-option strong {
+        font-size: 12px;
+    }
+    .profile-option > div > span:not(.badge) {
+        font-size: 10px;
+    }
+    .profile-option .badge {
+        font-size: 8px;
+    }
+    .booking-panel > .inline-actions {
+        gap: 13px;
+        margin: 18px 0;
+    }
+    .booking-panel .inline-actions .btn {
+        font-size: 10px;
+    }
+    .booking-panel .inline-actions .text-link {
+        font-size: 10px;
+    }
+    .notice {
+        font-size: 10px;
+        line-height: 1.9;
+        padding: 11px 12px;
+        gap: 8px;
+        margin: 16px 0;
+    }
+    .notice > .icon {
+        width: 15px;
+        height: 15px;
+    }
+    .booking-actions {
+        margin-top: 21px;
+        padding-top: 17px;
+        gap: 9px;
+        flex-wrap: wrap;
+    }
+    .booking-actions > .btn {
+        font-size: 10px;
+        padding: 8px 10px;
+        min-height: 37px;
+    }
+    .booking-actions .btn > .icon {
+        height: 13px;
+        width: 13px;
+    }
+    .booking-summary {
+        padding: 20px;
+        grid-template-columns: 1fr;
+        gap: 0;
+        order: 1;
+    }
+    .booking-summary > .mini-label {
+        font-size: 8px;
+    }
+    .summary-person {
+        padding: 16px 0;
+        border-bottom: 1px solid var(--line);
+    }
+    .summary-person strong {
+        font-size: 12px;
+    }
+    .summary-row {
+        padding-top: 17px;
+        gap: 10px;
+    }
+    .summary-row small {
+        font-size: 9px;
+    }
+    .summary-row strong {
+        font-size: 11px;
+    }
+    .summary-row span {
+        font-size: 10px;
+    }
+    .summary-price {
+        padding-top: 17px;
+        margin-top: 20px;
+    }
+    .summary-price > span {
+        font-size: 10px;
+    }
+    .summary-price strong {
+        font-size: 21px;
+    }
+    .summary-help {
+        font-size: 10px;
+        line-height: 1.9;
+        margin-top: 14px;
+    }
+    .booking-summary > .fine-print {
+        font-size: 10px;
+        margin-top: 14px;
+    }
+    .method-toggle {
+        flex-direction: column;
+        gap: 9px;
+        margin-bottom: 19px;
+    }
+    .method-toggle button {
+        font-size: 11px;
+        padding: 11px;
+        min-height: 43px;
+    }
+    .booking-doctors {
+        gap: 11px;
+    }
+    .booking-doctor {
+        padding: 13px 11px;
+        gap: 8px;
+        flex-wrap: wrap;
+        position: relative;
+    }
+    .booking-doctor .avatar {
+        width: 29px;
+        height: 29px;
+        font-size: 9px;
+    }
+    .booking-doctor > div {
+        flex: 1;
+        min-width: 165px;
+    }
+    .booking-doctor > div > strong {
+        font-size: 11px;
+    }
+    .booking-doctor > div > span {
+        font-size: 8px;
+    }
+    .booking-doctor > div > small {
+        font-size: 9px;
+        line-height: 1.8;
+    }
+    .booking-doctor .doctor-fee {
+        font-size: 11px;
+        margin: 0 0 0 37px;
+    }
+    .booking-doctor > .radio-mark {
+        position: absolute;
+        right: 12px;
+        top: 15px;
+    }
+    .date-options {
+        gap: 7px;
+        margin-bottom: 17px;
+    }
+    .date-option {
+        min-width: 64px;
+        padding: 9px;
+    }
+    .date-option small {
+        font-size: 8px;
+    }
+    .date-option strong {
+        font-size: 11px;
+    }
+    .shift-toggle {
+        gap: 8px;
+        margin-bottom: 18px;
+    }
+    .shift-toggle button {
+        font-size: 10px;
+        flex-wrap: wrap;
+        padding: 10px;
+        gap: 5px;
+    }
+    .shift-toggle button > small {
+        font-size: 8px;
+        margin-left: 0;
+        width: 100%;
+    }
+    .shift-toggle .icon {
+        width: 12px;
+        height: 12px;
+    }
+    .time-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+        margin-bottom: 21px;
+    }
+    .time-option {
+        padding: 8px 6px;
+        min-height: 35px;
+        font-size: 10px;
+    }
+    .hold-banner {
+        padding: 13px;
+        gap: 9px;
+    }
+    .hold-banner strong {
+        font-size: 11px;
+        line-height: 1.8;
+    }
+    .hold-banner span {
+        font-size: 10px;
+    }
+    .hold-banner b {
+        font-size: 14px;
+    }
+    .review-grid {
+        gap: 17px;
+        padding: 13px 0;
+    }
+    .review-grid small {
+        font-size: 9px;
+    }
+    .review-grid strong {
+        font-size: 11px;
+        line-height: 1.8;
+    }
+    .review-grid span {
+        font-size: 9px;
+        line-height: 1.9;
+    }
+    .appointment-cards {
+        padding: 0 15px;
+    }
+    .appointment-card {
+        gap: 12px;
+        padding: 18px 0;
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+    .appointment-card .date-chip {
+        width: 47px;
+        min-width: 47px;
+    }
+    .date-chip small {
+        font-size: 6px;
+        padding: 3px;
+    }
+    .date-chip strong {
+        font-size: 23px;
+    }
+    .appointment-card-main {
+        flex: 1;
+        min-width: 230px;
+    }
+    .appointment-card h3 {
+        font-size: 14px;
+        margin: 5px 0;
+    }
+    .appointment-card-main > .flex {
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+    .appointment-card .mini-label {
+        font-size: 10px;
+    }
+    .appointment-card .badge {
+        font-size: 8px;
+    }
+    .appointment-card p {
+        font-size: 10px;
+        line-height: 1.8;
+    }
+    .appointment-card small {
+        font-size: 8px;
+    }
+    .appointment-card-actions {
+        margin-left: 59px;
+        align-items: flex-start;
+        width: 100%;
+    }
+    .appointment-card-actions > .btn {
+        font-size: 9px;
+        min-height: 30px;
+    }
+    .appointment-card.attention {
+        margin: 0 -15px;
+        padding: 18px 15px;
+    }
+    .family-summary {
+        font-size: 10px;
+        gap: 10px;
+        flex-wrap: wrap;
+        padding: 12px 14px;
+        margin-bottom: 19px;
+    }
+    .family-summary > span {
+        line-height: 1.9;
+        gap: 6px;
+    }
+    .family-summary strong {
+        font-size: 10px;
+    }
+    .family-grid {
+        grid-template-columns: 1fr;
+        gap: 17px;
+    }
+    .family-card {
+        padding: 20px;
+    }
+    .family-card-top {
+        gap: 11px;
+        margin-bottom: 18px;
+    }
+    .family-card-top .avatar.large {
+        width: 42px;
+        height: 42px;
+        font-size: 14px;
+    }
+    .family-card h2 {
+        font-size: 16px;
+    }
+    .family-card-top > div {
+        min-width: 175px;
+    }
+    .family-card-top > .badge {
+        margin-left: 53px;
+    }
+    .family-card p {
+        font-size: 10px;
+    }
+    .family-card .mini-label {
+        font-size: 8px;
+    }
+    .family-card .info-grid {
+        padding-top: 14px;
+        gap: 15px;
+    }
+    .family-card .info-grid strong {
+        font-size: 11px;
+    }
+    .permission-line {
+        font-size: 10px;
+        margin-top: 9px;
+        padding: 10px 0;
+    }
+    .family-actions {
+        padding-top: 14px;
+        gap: 7px;
+    }
+    .family-actions .btn {
+        font-size: 9px;
+    }
+    .family-actions .text-link {
+        font-size: 9px;
+        margin: 7px 0 0;
+    }
+    .profile-selector {
+        gap: 10px;
+        margin-bottom: 19px;
+    }
+    .profile-selector button {
+        padding: 10px 12px;
+        min-width: 181px;
+        gap: 8px;
+    }
+    .profile-selector button > span:not(.avatar) {
+        font-size: 10px;
+    }
+    .profile-selector button small {
+        font-size: 8px;
+    }
+    .profile-selector .avatar {
+        height: 26px;
+        width: 26px;
+        font-size: 8px;
+    }
+    .patient-record-layout {
+        grid-template-columns: 1fr;
+        gap: 18px;
+    }
+    .record-identity {
+        position: static;
+        padding: 21px;
+    }
+    .record-identity > .avatar {
+        float: left;
+        margin-right: 13px;
+    }
+    .record-identity h2 {
+        margin-top: 4px;
+        font-size: 17px;
+    }
+    .record-identity > p {
+        font-size: 10px;
+        margin: 5px 0 20px;
+    }
+    .record-identity dl {
+        clear: both;
+        font-size: 10px;
+        gap: 13px;
+        margin: 20px 0 0;
+        padding-top: 16px;
+    }
+    .record-identity .permission-line {
+        font-size: 10px;
+        margin-top: 17px;
+        padding-top: 14px;
+    }
+    .record-preview {
+        padding: 19px;
+    }
+    .record-preview h3 {
+        font-size: 15px;
+    }
+    .record-preview > p {
+        font-size: 10px;
+        line-height: 1.9;
+    }
+    .record-tags {
+        gap: 12px;
+        flex-wrap: wrap;
+        margin: 13px 0;
+    }
+    .record-tags > span {
+        font-size: 9px;
+    }
+    .record-preview > .text-link {
+        font-size: 10px;
+    }
+    .notifications-list {
+        overflow: clip;
+    }
+    .notification-row {
+        padding: 18px 16px;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .notification-icon {
+        height: 29px;
+        width: 29px;
+        border-radius: 7px;
+    }
+    .notification-icon > .icon {
+        height: 15px;
+        width: 15px;
+    }
+    .notification-row > div:nth-child(2) {
+        min-width: 220px;
+    }
+    .notification-row h3 {
+        font-size: 11px;
+        line-height: 1.8;
+    }
+    .notification-row p {
+        font-size: 10px;
+        line-height: 2;
+    }
+    .notification-row small {
+        font-size: 9px;
+    }
+    .notification-row > div:last-child {
+        margin-left: 39px;
+    }
+    .notification-row .text-link {
+        font-size: 10px;
+    }
+    .patient-mobile-nav {
+        padding: 7px 9px calc(7px + env(safe-area-inset-bottom));
+        gap: 8px;
+    }
+    .patient-mobile-nav a {
+        flex-direction: column;
+        gap: 4px;
+        padding: 5px 14px;
+        font-size: 8px;
+    }
+    .patient-mobile-nav a .icon {
+        height: 18px;
+        width: 18px;
+    }
+    .public-app:has(.patient-mobile-nav) {
+        padding-bottom: 70px;
+    }
+    .auth-main {
+        padding: 25px 16px 31px;
+        min-height: 70vh;
+    }
+    .auth-card {
+        padding: 25px 21px;
+    }
+    .auth-card h1 {
+        font-size: 24px;
+    }
+    .auth-card > .eyebrow {
+        font-size: 8px;
+    }
+    .auth-card > p {
+        font-size: 11px;
+        line-height: 1.9;
+    }
+    .auth-demo {
+        font-size: 9px;
+        line-height: 1.9;
+    }
+    .auth-switch {
+        font-size: 10px;
+    }
+    .auth-card form > .btn {
+        font-size: 11px;
+    }
+    .access-card {
+        padding: 34px 21px;
+    }
+    .access-card h1,
+    .access-card h2 {
+        font-size: 19px;
+        line-height: 1.6;
+    }
+    .access-card p {
+        font-size: 11px;
+        line-height: 2;
+        margin-bottom: 18px;
+    }
+    .access-card .btn {
+        font-size: 10px;
+        margin: 5px;
+    }
+    .account-settings {
+        padding: 22px;
+    }
+    .staff-topbar {
+        height: 61px;
+        padding: 0 14px;
+        gap: 10px;
+    }
+    .staff-breadcrumb {
+        display: none;
+    }
+    .staff-topbar .demo-clock {
+        font-size: 8px;
+        gap: 4px;
+        display: flex;
+        margin: 0;
+    }
+    .demo-clock > .icon {
+        height: 11px;
+        width: 11px;
+    }
+    .topbar-right {
+        gap: 8px;
+        flex: 1;
+        justify-content: flex-end;
+    }
+    .topbar-right > .icon-btn {
+        height: 29px;
+        width: 29px;
+        min-height: 29px;
+    }
+    .topbar-right > .icon-btn .icon {
+        height: 14px;
+        width: 14px;
+    }
+    .staff-profile {
+        padding-left: 8px;
+        gap: 0;
+    }
+    .staff-profile > .avatar {
+        height: 29px;
+        width: 29px;
+        font-size: 9px;
+    }
+    .staff-profile > span:not(.avatar) {
+        display: none;
+    }
+    .staff-topbar > .mobile-only {
+        height: 31px;
+        width: 31px;
+        min-height: 31px;
+    }
+}

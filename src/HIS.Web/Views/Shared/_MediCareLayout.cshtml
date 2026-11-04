@@ -1,0 +1,59 @@
+@using System.Security.Claims
+@using System.Text.Json
+
+@{
+    string? dataError = null;
+
+    var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "ADMIN";
+    var home = role switch
+    {
+        "ADMIN" => "/Admin/Accounts",
+        "DEPARTMENT_HEAD" => "/Admin/Catalog",
+        "DOCTOR" => "/Staff/Consultation",
+        "NURSE" => "/Staff/Reception",
+        "PATIENT" => "/Patient/MyAppointments",
+        _ => "/Admin/Accounts"
+    };
+    var config = new
+    {
+        preview = true,
+        live = false,
+        role,
+        authenticated = true,
+        displayName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? "Quản trị viên",
+        initialRoute = ViewData["MediCareRoute"]?.ToString() ?? "admin/accounts",
+        pathBase = Context.Request.PathBase.ToString(),
+        assetBase = Url.Content("~/ui/assets/"),
+        apiBase = Url.Content("~/api/hospital/"),
+        home = Url.Content("~" + home),
+        login = Url.Action("Login", "Account", new { area = "" }),
+        changePassword = Url.Action("ChangePassword", "Account", new { area = "" }),
+        denied = Url.Action("AccessDenied", "Account", new { area = "" })
+    };
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#079bc9" />
+    <title>@ViewData["Title"] — MediCare HIS</title>
+    <partial name="MediCare/_Styles" />
+</head>
+<body>
+    @if (dataError != null)
+    {
+        <partial name="MediCare/_DataError" model="dataError" />
+    }
+    else
+    {
+        @RenderBody()
+    }
+    <partial name="MediCare/_Overlays" />
+    <partial name="MediCare/_SessionControls" />
+
+    <script id="his-ui-config" type="application/json">@Html.Raw(JsonSerializer.Serialize(config))</script>
+    <partial name="MediCare/_Scripts" />
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#079bc9" />
+    <title>@ViewData["Title"] — MediCare HIS</title>
+    <partial name="MediCare/_Styles" />
+</head>
+<body class="mvc-auth">
+    <partial name="MediCare/_AuthHeader" />
+
+    <main class="mvc-auth-main">
+        @RenderBody()
+    </main>
+
+    <partial name="MediCare/_AuthFooter" />
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

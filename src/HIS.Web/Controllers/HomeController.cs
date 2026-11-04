@@ -4,5 +4,6 @@ namespace HIS.Web.Controllers;
 
 public class HomeController : Controller
 {
-    public IActionResult Index() => View();
+    // Mặc định chuyển hướng thẳng vào màn hình Admin Accounts (Staff/Department/Doctor)
+    public IActionResult Index() => RedirectToAction("Index", "Accounts", new { area = "Admin" });
 }

@@ -35,6 +35,9 @@ public static class BusinessServiceCollectionExtensions
         services.AddScoped<IQueueService, QueueService>();
         services.AddScoped<IBillingService, BillingService>();
         services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<IDepartmentService, DepartmentService>();
+        services.AddScoped<IDoctorService, DoctorService>();
+        services.AddScoped<IStaffService, StaffService>();
 
         return services;
     }

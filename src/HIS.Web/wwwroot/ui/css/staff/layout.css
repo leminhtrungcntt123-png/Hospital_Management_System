@@ -1,0 +1,270 @@
+/* staff / layout */
+/* Internal staff workspace */
+.staff-app {
+    min-height: 100vh;
+    background: #f3f6fa;
+}
+.sidebar {
+    width: 224px;
+    background: #111f38;
+    color: #aabfd7;
+    position: fixed;
+    inset: 0 auto 0 0;
+    padding: 24px 14px 17px;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+.sidebar .brand {
+    color: #fff;
+    font-size: 24px;
+    padding: 0 9px;
+}
+.sidebar .brand-mark {
+    height: 34px;
+    width: 34px;
+    font-size: 30px;
+}
+.sidebar .brand sup {
+    color: #4ac0db;
+}
+.workspace {
+    display: flex;
+    gap: 9px;
+    align-items: center;
+    border-bottom: 1px solid #293951;
+    padding: 24px 10px 20px;
+    margin-bottom: 22px;
+}
+.workspace > .icon {
+    width: 17px;
+    height: 17px;
+    color: #596a7a;
+}
+.workspace strong {
+    font-size: 10px;
+    font-weight: 550;
+    display: block;
+    color: #d7e5f2;
+    line-height: 1.7;
+}
+.workspace small {
+    font-size: 9px;
+    color: #576a7c;
+    display: block;
+    margin-top: 3px;
+}
+.staff-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 23px;
+}
+.nav-group > span {
+    display: block;
+    font-size: 8px;
+    letter-spacing: 1.2px;
+    color: #718daa;
+    margin: 0 11px 10px;
+}
+.nav-group > a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11px;
+    border-radius: 7px;
+    padding: 11px 10px;
+    color: #adc1d8;
+    min-height: 41px;
+    margin-bottom: 4px;
+    white-space: nowrap;
+}
+.nav-group > a > .icon {
+    width: 17px;
+    height: 17px;
+    color: #91acc7;
+}
+.nav-group > a > span {
+    font-weight: 450;
+}
+.nav-group > a > b {
+    margin-left: auto;
+    min-width: 19px;
+    background: #2c405d;
+    color: #cbddef;
+    font-size: 9px;
+    text-align: center;
+    border-radius: 4px;
+    padding: 0 4px;
+    line-height: 17px;
+    font-weight: 600;
+}
+.nav-group > a:hover {
+    background: #1a2e4a;
+    color: #e4f0fa;
+}
+.nav-group > a.active {
+    background: #087fa9;
+    color: #fff;
+    border: 1px solid #0d90b7;
+    padding: 10px 9px;
+}
+.nav-group > a.active > .icon {
+    color: #dff6ff;
+}
+.nav-group > a.active > b {
+    background: #ffffff20;
+    color: #e3f5ff;
+}
+.sidebar-bottom {
+    margin-top: auto;
+    padding-top: 30px;
+}
+.portal-link {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 15px 10px;
+    border-top: 1px solid #2b3b52;
+    font-size: 10px;
+    color: #5e6a77;
+    width: 100%;
+}
+.portal-link .icon {
+    width: 16px;
+    height: 16px;
+}
+.sidebar-bottom > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 9px 10px 0;
+    font-size: 9px;
+    color: #7491ad;
+}
+.sidebar-bottom > div > span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.sidebar-bottom i {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #41b9d3;
+}
+.sidebar-bottom button {
+    color: #92b0ca;
+    font-size: 9px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+}
+.sidebar-bottom button .icon {
+    width: 11px;
+    height: 11px;
+}
+.staff-shell {
+    margin-left: 224px;
+    min-width: 0;
+}
+.staff-topbar {
+    height: 67px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 25px;
+    gap: 15px;
+    background: #fff;
+    border-bottom: 1px solid #e0e8f0;
+    position: sticky;
+    top: 0;
+    z-index: 35;
+}
+.staff-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 10px;
+    color: #5d6b7b;
+    white-space: nowrap;
+}
+.staff-breadcrumb i {
+    font-style: normal;
+    color: #61686e;
+}
+.staff-breadcrumb strong {
+    font-size: 11px;
+    color: #3e5c77;
+    font-weight: 500;
+}
+.topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.demo-clock {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    font-size: 10px;
+    color: #56697c;
+    white-space: nowrap;
+    margin-right: 5px;
+}
+.demo-clock > .icon {
+    width: 13px;
+    height: 13px;
+    color: #566a77;
+}
+.demo-clock small {
+    font-size: 8px;
+    padding: 2px 4px;
+    border-radius: 3px;
+    background: #edf4fa;
+    color: #5b6a79;
+}
+.staff-profile {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 0 0 0 12px;
+    border-left: 1px solid #e3ebf3;
+    text-align: left;
+}
+.staff-profile > .avatar {
+    height: 31px;
+    width: 31px;
+    font-size: 10px;
+}
+.staff-profile strong {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    color: #33526e;
+}
+.staff-profile small {
+    display: block;
+    font-size: 9px;
+    color: #5c6a77;
+    margin-top: 1px;
+}
+.staff-profile > .icon {
+    height: 12px;
+    width: 12px;
+    color: #596877;
+    margin-left: 4px;
+}
+.staff-main {
+    max-width: 1600px;
+    padding: 25px;
+    margin: 0 auto;
+}
+.staff-main .page-heading h1 {
+    font-size: 25px;
+}
+.staff-main .page-heading p {
+    font-size: 10px;
+}

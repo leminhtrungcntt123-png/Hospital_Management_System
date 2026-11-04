@@ -1,0 +1,79 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\BTLonWeb\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{4AAA5137-B501-41E4-89CA-D2377980AF46}|src\\HIS.Web\\HIS.Web.csproj|c:\\btlonweb\\src\\his.web\\views\\shared\\_medicarelayout.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{4AAA5137-B501-41E4-89CA-D2377980AF46}|src\\HIS.Web\\HIS.Web.csproj|solutionrelative:src\\his.web\\views\\shared\\_medicarelayout.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4AAA5137-B501-41E4-89CA-D2377980AF46}|src\\HIS.Web\\HIS.Web.csproj|c:\\btlonweb\\src\\his.web\\views\\home\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{4AAA5137-B501-41E4-89CA-D2377980AF46}|src\\HIS.Web\\HIS.Web.csproj|solutionrelative:src\\his.web\\views\\home\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4AAA5137-B501-41E4-89CA-D2377980AF46}|src\\HIS.Web\\HIS.Web.csproj|c:\\btlonweb\\src\\his.web\\views\\home\\privacy.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{4AAA5137-B501-41E4-89CA-D2377980AF46}|src\\HIS.Web\\HIS.Web.csproj|solutionrelative:src\\his.web\\views\\home\\privacy.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 2,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "_MediCareLayout.cshtml",
+              "DocumentMoniker": "C:\\BTLonWeb\\src\\HIS.Web\\Views\\Shared\\_MediCareLayout.cshtml",
+              "RelativeDocumentMoniker": "src\\HIS.Web\\Views\\Shared\\_MediCareLayout.cshtml",
+              "ToolTip": "C:\\BTLonWeb\\src\\HIS.Web\\Views\\Shared\\_MediCareLayout.cshtml",
+              "RelativeToolTip": "src\\HIS.Web\\Views\\Shared\\_MediCareLayout.cshtml",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAoAAAAuAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-11-04T15:16:33.407Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Index.cshtml",
+              "DocumentMoniker": "C:\\BTLonWeb\\src\\HIS.Web\\Views\\Home\\Index.cshtml",
+              "RelativeDocumentMoniker": "src\\HIS.Web\\Views\\Home\\Index.cshtml",
+              "ToolTip": "C:\\BTLonWeb\\src\\HIS.Web\\Views\\Home\\Index.cshtml",
+              "RelativeToolTip": "src\\HIS.Web\\Views\\Home\\Index.cshtml",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-11-04T15:15:56.936Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "Privacy.cshtml",
+              "DocumentMoniker": "C:\\BTLonWeb\\src\\HIS.Web\\Views\\Home\\Privacy.cshtml",
+              "RelativeDocumentMoniker": "src\\HIS.Web\\Views\\Home\\Privacy.cshtml",
+              "ToolTip": "C:\\BTLonWeb\\src\\HIS.Web\\Views\\Home\\Privacy.cshtml",
+              "RelativeToolTip": "src\\HIS.Web\\Views\\Home\\Privacy.cshtml",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-11-04T15:15:58.021Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
