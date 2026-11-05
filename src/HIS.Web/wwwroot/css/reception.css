@@ -1,0 +1,130 @@
+.reception-desk {
+    max-width: 1320px;
+    margin: 0 auto;
+    color: #15334d;
+}
+
+.reception-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    margin: 20px 0;
+}
+
+.reception-heading h1 {
+    font-size: 28px;
+    font-weight: 750;
+    margin: 8px 0;
+}
+.reception-heading p,
+.reception-panel > p {
+    color: #435e73;
+}
+.reception-eyebrow {
+    color: #006b91;
+    font-size: 12px;
+    font-weight: 700;
+}
+.reception-shortcuts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+.reception-shortcuts a {
+    padding: 10px 16px;
+    background: #e2f2f8;
+    color: #005f83;
+    border: 1px solid #aacbdc;
+    border-radius: 8px;
+    font-weight: 650;
+    text-decoration: none;
+}
+.reception-search,
+.reception-panel {
+    padding: 22px;
+    margin-bottom: 22px;
+    background: white;
+    border: 1px solid #b7cbd8;
+    border-radius: 10px;
+}
+.reception-search label,
+.reception-field label {
+    display: block;
+    margin-bottom: 7px;
+    font-weight: 650;
+}
+.reception-search small,
+.reception-field small {
+    display: block;
+    margin-top: 7px;
+    color: #4c6478;
+}
+.reception-panel h2 {
+    font-size: 21px;
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+.reception-panel h2 span {
+    font-size: 14px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: #e2f2f8;
+    color: #00678b;
+}
+.reception-panel th {
+    background: #e9f1f7;
+    color: #15334d;
+    white-space: nowrap;
+}
+.reception-panel td {
+    font-size: 14px;
+    min-width: 100px;
+}
+.reception-desk .btn-primary {
+    background: #006f98;
+    border-color: #006f98;
+}
+.reception-desk .btn-primary:hover {
+    background: #005574;
+}
+.reception-number {
+    color: #00678b;
+    font-size: 21px;
+    font-weight: 750;
+}
+.reception-verify {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    margin: 12px 0;
+}
+.reception-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+}
+.reception-wide {
+    grid-column: 1 / -1;
+}
+.reception-empty {
+    text-align: center;
+    padding: 24px !important;
+    color: #52697b;
+}
+
+@media (max-width: 700px) {
+    .reception-heading {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+    .reception-form-grid {
+        grid-template-columns: 1fr;
+    }
+    .reception-search,
+    .reception-panel {
+        padding: 16px;
+    }
+}
