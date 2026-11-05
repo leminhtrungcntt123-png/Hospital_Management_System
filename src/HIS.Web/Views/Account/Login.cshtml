@@ -1,0 +1,48 @@
+@* Trang đăng nhập demo cho riêng luồng đặt lịch web.
+   Module đăng nhập chính thức do một thành viên khác phụ trách; trang này chỉ gọi IAuthService
+   rồi giữ Id tài khoản trong Session, không tự viết lại bước kiểm mật khẩu. *@
+@model LoginViewModel
+@{
+    ViewData["Title"] = "Đăng nhập";
+}
+
+<main>
+    <section class="booking-content">
+        <div class="content-head">
+            <div>
+                <div class="eyebrow">TÀI KHOẢN BỆNH NHÂN</div>
+                <div class="page-title">Đăng nhập để đặt lịch</div>
+                <p>Sau khi đăng nhập, bạn có thể đặt lịch cho mình và những hồ sơ đã liên kết trong tài khoản.</p>
+            </div>
+        </div>
+
+        <div class="card-section">
+            <form asp-action="Login" asp-route-returnUrl="@Model.ReturnUrl" method="post">
+                <div asp-validation-summary="ModelOnly" class="alert error" role="alert"></div>
+
+                <div class="form-grid">
+                    <label class="wide">
+                        <span>Tên đăng nhập <b>*</b></span>
+                        <input asp-for="Username" autocomplete="username" placeholder="Nhập tên đăng nhập" />
+                        <span asp-validation-for="Username"></span>
+                    </label>
+                    <label class="wide">
+                        <span>Mật khẩu <b>*</b></span>
+                        <input asp-for="Password" type="password" autocomplete="current-password" placeholder="Nhập mật khẩu" />
+                        <span asp-validation-for="Password"></span>
+                    </label>
+                </div>
+
+                <div class="modal-actions">
+                    <a class="btn btn-outline" asp-controller="Booking" asp-action="Index">Hủy</a>
+                    <button type="submit" class="btn btn-primary">Đăng nhập <i data-lucide="log-in"></i></button>
+                </div>
+            </form>
+        </div>
+
+        <div class="privacy-note">
+            <i data-lucide="shield-check"></i>
+            <span>Mật khẩu được lưu dạng băm BCrypt; nhập sai 5 lần tài khoản sẽ bị khóa tạm theo quy định của module đăng nhập.</span>
+        </div>
+    </section>
+</main>

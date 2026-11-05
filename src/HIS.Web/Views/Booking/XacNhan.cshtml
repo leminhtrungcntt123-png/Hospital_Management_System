@@ -1,19 +1,20 @@
-@* Bước 4: Kiểm tra và xác nhận lịch khám *@
+@* Bước 5: Kiểm tra và xác nhận lịch khám *@
 @model XacNhanViewModel
 @{
     Layout = "_BookingLayout";
     ViewData["Title"] = "Xác nhận lịch khám";
-    ViewData["Step"] = 4;
+    ViewData["Step"] = 5;
     ViewData["BackUrl"] = Url.Action("ChonNguoiKham", "Booking");
 
     var shift = Model.Shift;
+    var slot = Model.Slot;
 }
 
 <form asp-action="XacNhan" method="post" id="xacnhan-form">
     <section class="booking-content">
         <div class="content-head">
             <div>
-                <div class="eyebrow">BƯỚC 4 / 4</div>
+                <div class="eyebrow">BƯỚC 5 / 5</div>
                 <div class="page-title">Kiểm tra và xác nhận lịch khám</div>
                 <p>Vui lòng kiểm tra kỹ thông tin trước khi gửi yêu cầu đặt lịch.</p>
             </div>
@@ -35,7 +36,14 @@
                             <span>@Model.Patient.Relationship · @VietnameseFormat.ShortDate(Model.Patient.DateOfBirth)</span>
                             <span>@Model.Patient.Code</span>
                         </div>
-                        <span class="badge badge-green"><i data-lucide="shield-check"></i> Đã xác minh</span>
+                        @if (Model.Patient.IsVerified)
+                        {
+                            <span class="badge badge-green"><i data-lucide="shield-check"></i> Đã xác minh</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-yellow"><i data-lucide="clock-3"></i> Chờ quầy duyệt giấy tờ</span>
+                        }
                     </div>
                 </div>
 
@@ -65,18 +73,19 @@
                 <div class="summary-row"><span>Chuyên khoa</span><strong>@Model.Department.Name</strong></div>
                 <div class="summary-row"><span>Ngày khám</span><strong>@VietnameseFormat.FullDate(Model.Date)</strong></div>
                 <div class="summary-row"><span>Ca khám</span><strong>@shift.Label · @shift.TimeRange</strong></div>
-                @if (shift.Doctor is not null)
+                <div class="summary-row"><span>Khung giờ</span><strong>@slot.Label</strong></div>
+                @if (slot.Doctor is not null)
                 {
                     <div class="summary-doctor">
-                        <div class="doctor-avatar">@shift.Doctor.Initials</div>
+                        <div class="doctor-avatar">@slot.Doctor.Initials</div>
                         <div>
                             <span>Bác sĩ phụ trách</span>
-                            <strong>@shift.Doctor.FullName</strong>
-                            <button type="button" data-doctor-open="@shift.Doctor.ToModalJson(shift.TimeRange, shift.Room, Model.Date)">Xem thông tin bác sĩ</button>
+                            <strong>@slot.Doctor.FullName</strong>
+                            <button type="button" data-doctor-open="@slot.Doctor.ToModalJson(slot.Label, slot.Room, Model.Date)">Xem thông tin bác sĩ</button>
                         </div>
                     </div>
                 }
-                <div class="summary-row"><span>Địa điểm</span><strong>@shift.Room</strong></div>
+                <div class="summary-row"><span>Địa điểm</span><strong>@slot.Room</strong></div>
                 <div class="summary-divider"></div>
                 <div class="summary-row"><span>Chi phí dự kiến</span><strong>@VietnameseFormat.Money(Model.Fee)</strong></div>
                 <small>Chưa bao gồm xét nghiệm và dịch vụ phát sinh.</small>

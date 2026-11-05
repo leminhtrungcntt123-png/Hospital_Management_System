@@ -3,9 +3,10 @@
    Mỗi khối bên dưới chỉ chạy khi trang hiện tại có phần tử tương ứng:
      Bước 1  #khoa-form      chọn chuyên khoa + tìm kiếm
      Bước 2  #ngay-form      chọn ngày, tải ca khám bằng fetch, chọn ca
-     Bước 3  #nguoi-form     chọn hồ sơ + modal thêm hồ sơ
-     Bước 4  #xacnhan-form   đồng ý + chống gửi nhiều lần
-     Bước 5  [data-print]    lưu / in phiếu hẹn
+     Bước 3  #gio-form       chọn khung giờ trong ca
+     Bước 4  #nguoi-form     chọn hồ sơ + modal thêm hồ sơ
+     Bước 5  #xacnhan-form   đồng ý + chống gửi nhiều lần
+     Bước 6  [data-print]    lưu / in phiếu hẹn
      Chung   modal thông tin bác sĩ
    ========================================================= */
 (function () {
@@ -159,7 +160,28 @@
         ngayForm.addEventListener('submit', (e) => { if (!hiddenShift.value) e.preventDefault(); });
     }
 
-    // ------------------------------------------------------------------ Bước 3: Chọn người khám
+    // ------------------------------------------------------------------ Bước 3: Chọn khung giờ
+
+    const gioForm = $('#gio-form');
+    if (gioForm) {
+        const hidden = $('#field-slot');
+        const next = $('#gio-next');
+        const label = $('#gio-selected-label');
+
+        gioForm.addEventListener('click', (e) => {
+            const btn = e.target.closest('.slot-select');
+            if (!btn || btn.disabled) return;
+            const card = btn.closest('.shift-card');
+            $$('.shift-card', gioForm).forEach((c) => c.classList.toggle('selected', c === card));
+            hidden.value = card.dataset.slot;
+            label.textContent = card.dataset.label;
+            next.disabled = false;
+        });
+
+        gioForm.addEventListener('submit', (e) => { if (!hidden.value) e.preventDefault(); });
+    }
+
+    // ------------------------------------------------------------------ Bước 4: Chọn người khám
 
     const nguoiForm = $('#nguoi-form');
     if (nguoiForm) {
@@ -174,9 +196,9 @@
             $$('.profile-select', nguoiForm).forEach((c) => c.classList.toggle('selected', c === card));
             hidden.value = card.dataset.id;
             label.textContent = card.dataset.name;
-            const verified = card.dataset.verified === 'true';
-            warn.hidden = verified;          // hồ sơ chưa xác minh: hiện cảnh báo và khóa nút Tiếp tục
-            next.disabled = !verified;
+            const bookable = card.dataset.bookable === 'true';
+            warn.hidden = bookable;          // hồ sơ bị thu hồi quyền: hiện cảnh báo và khóa nút Tiếp tục
+            next.disabled = !bookable;
         });
     }
 
@@ -213,7 +235,7 @@
         });
     }
 
-    // ------------------------------------------------------------------ Bước 4: Xác nhận
+    // ------------------------------------------------------------------ Bước 5: Xác nhận
 
     const xacNhanForm = $('#xacnhan-form');
     if (xacNhanForm) {

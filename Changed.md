@@ -463,3 +463,76 @@ Chạy bằng ADO.NET trên chính connection + transaction của `AppDbContext`
 * `TreatWarningsAsErrors` vẫn tắt theo yêu cầu; các knob `HoldMinutes`, `MaxLinkRequestsPerDay`, `PendingLinkExpiryDays`, `SlotGenerationDaysAhead`, `CheckInEarlyMinutes` trong spec **chưa có trong code** (đánh dấu rõ trong `init.md` mục 7, chờ Mẻ 4–5).
 * `backup/` (gate, seed, slotgen, dump) đang gitignore ⇒ không vào git; `ix_appointment_status_history_performed_by` bị EF xóa ở một lần chạy trước, đã được gate kiểm tra lại.
 * **Mẻ 1 → 3b vẫn chưa commit** trên `main`.
+
+## 7. MẺ 4–5 — WEB CHỌN GIỜ + ĐĂNG NHẬP DEMO + NHIỀU HỒ SƠ, TEST/CI/TÀI LIỆU (05/11/2026)
+
+Phạm vi: `HIS.BLL`, `HIS.Web`, `HIS.WebApi`, `tests/`, `.github/workflows/ci.yml`, `docs/` và CSDL thật `hospital_his`.
+File tracked thay đổi: **27 file, +932/−395 dòng** (`git diff --stat`), cộng 12 path mới (controllers, views, docs, tests).
+
+### 7.1 `HIS.Web` — wizard 5 bước, đăng nhập demo, trang lịch khám
+
+| File | Nội dung |
+| --- | --- |
+| `Helpers/DemoSession.cs` *(mới)* | lưu tài khoản đăng nhập vào `HttpContext.Session` key `DemoAccount`. **Chủ đích không dùng Cookie Authentication** — module đăng nhập thuộc thành viên khác (xem `docs/DECISIONS.md` #8) |
+| `Controllers/AccountController.cs` *(mới)* | `Login` GET/POST (`[ValidateAntiForgeryToken]`, gọi `AuthService.LoginAsync` thật: BCrypt + khóa sau 5 lần sai), `Logout`. Redirect chỉ nhận `Url.IsLocalUrl(returnUrl)` |
+| `Controllers/PatientPageController.cs` *(mới)* | base class: `AccountId` đọc từ session, `RequireAccount()` đưa về trang login kèm `returnUrl`. Mọi controller bệnh nhân chỉ xin `AccountId` từ đây |
+| `Controllers/BookingController.cs` | bỏ hẳn `CurrentAccountId = 1` và 2 key session tạm (`ExtraProfilesKey`, `BookedKeysKey`); chuyển sang wizard 5 bước `ChonKhoa → ChonNgayCa → ChonGio → ChonNguoiKham → XacNhan`; `Guard(state, throughStep)` chặn nhảy bước; hồ sơ lấy từ `IPatientProfileService.GetLinksForAccountAsync(AccountId)` (lọc `REVOKED`), `IsBookable` = link `ACTIVE`/`PENDING`; nhãn quan hệ lấy từ enum thay vì hardcode |
+| `Views/Booking/ChonGio.cshtml` *(mới)* | bước chọn **giờ cụ thể** (7:00, 7:30, 8:00 …) thay vì chỉ chọn ca; mỗi khung hiện số ghế web còn lại |
+| `Controllers/LichKhamController.cs` *(mới)* | danh sách lịch theo `booked_by` + nút hủy; `ThanhCong.cshtml:65` hết `href="#"` chết, trỏ về `/LichKham` |
+| `Program.cs` | `AddSession`, `AddSingleton(TimeProvider.System)`, đăng ký `IAuthService` + `QueuePositionAllocator` |
+
+### 7.2 `HIS.BLL` — một nguồn chỗ trống duy nhất
+
+* `CreateAppointmentAsync(accountId, patientId, slotId)`: **xóa** thuật toán tự tính sức chứa bằng `COUNT(appointments)`; nguồn chỗ trống duy nhất là `ISchedulingService.GetAvailableSlotsAsync`. Trừ ghế nguyên tử `UPDATE appointment_slots … WHERE booked_count < capacity AND version = @version`, kiểm tra số dòng bị ảnh hưởng rồi mới ghi lượt khám trong cùng transaction.
+* `CancelAppointmentAsync(appointmentId, accountId)`: nhả `booked_count`/`online_booked`, trả `slot_position` về `NULL`, ghi `appointment_status_history`.
+* `GetAppointmentsByAccountAsync(accountId)`: lịch theo tài khoản đặt (kèm hồ sơ link `ACTIVE`/`PENDING`).
+* `AppointmentStateMachine.cs` *(mới)* + test: hàm thuần định nghĩa các bước chuyển trạng thái hợp lệ theo `init.md:584-590`.
+
+### 7.3 Kiểm chứng bằng chuột thật trên CSDL thật (`hospital_his`, không mock)
+
+| Bước | Kết quả quan sát được |
+| --- | --- |
+| Mở `/LichKham` khi chưa đăng nhập | tự redirect về trang Đăng nhập (guard `RequireAccount`) — hết cảnh trang bệnh nhân mở tự do |
+| Đăng nhập `patient.nguyena` | vào được wizard; `accounts.id = 7` |
+| Đặt cho hồ sơ **mới tạo** (vợ, `patients.id = 40`) | link `SPOUSE / ACTIVE / can_view_records=true` — đúng "cách A": hồ sơ mới tạo thì dùng ngay, không phải chờ quầy |
+| Đặt khung 08:30 ngày 06/11 | `HIS-20261106-SG1RN3`, `slot_position=1`, số **`A05`** = tổng `capacity` khung đi trước (07:30 = 4) + 1 ✓ |
+| Đặt cùng hồ sơ, cùng khung đã đặt | bị chặn (`uq_patient_slot_active`), web báo không đặt trùng được |
+| Ghế web tụt theo | khung 08:30: `capacity=4, online_quota=2, booked_count=1, online_booked=1` ✓ |
+| Hủy `HIS-20261106-JRSB7S` (khung 09:30) trên `/LichKham` | `status_id 2→7`, `is_late_cancel=false`, `performed_by=7`; khung 09:30 về `booked_count=0, online_booked=0`, `slot_position` bị nhả ✓ |
+| Trang Lịch khám | hiện đúng 4 lượt của tài khoản 7 (bao gồm cả `HIS-SEED-*`), đủ giờ/phòng/bác sĩ/trạng thái |
+| Đăng xuất rồi mở lại `/Booking` | bị chặn về login ✓ |
+
+Ràng buộc kiểm bằng psql: `account_patient_profiles` có 8 link, trong đó tài khoản 7 = `SELF(patient 1)` + `SPOUSE(patient 40)` — một tài khoản hai hồ sơ, đúng thứ mà `patients.account_id UNIQUE` trước đây chặn.
+
+### 7.4 Mẻ 5 — test, CI, tài liệu
+
+* `dotnet build HIS.sln` → **0 Warning, 0 Error**.
+* `dotnet test --filter "Category!=Integration"` → **56/56 pass** (unit, không cần DB).
+* `dotnet test --filter "Category=Integration"` → **11/11 pass** trên DB Postgres thật (`his_ci`) qua `HIS_REHEARSAL_CONNECTION`.
+* `bash backup/ci_local.sh` (mô phỏng đúng job `integration`): dựng `docs/database/ci/schema.sql` → seed `demo_master.sql` + `demo_day.sql` → gate `schema_checks.sql` → **16/16 đạt**.
+* `dotnet ef migrations has-pending-model-changes` → **không drift** (model == migration snapshot).
+* `.github/workflows/ci.yml`: tách 2 job — `build` (windows-latest, unit) và `integration` (ubuntu-latest + service `postgres:16`: schema → seed → gate 16 check → integration → `has-pending-model-changes`).
+* Tài liệu mới: `docs/ARCHITECTURE.md` (sơ đồ project thật, quy tắc BẤT BIẾN, từng tầng, DB/migration, test, CI), `docs/DECISIONS.md` (16 quyết định, ⚠️ đánh dấu 7 chỗ lệch `init.md` có chủ đích), `docs/database/erd.md` (Mermaid 32 entity / 60 quan hệ / 34 CHECK, sinh từ dump của `his_ci`), `docs/database/schema-reference.sql` (DDL tham chiếu chép từ `init.md` mục 5 + 3 delta), `global.json` (SDK 10, `rollForward: latestFeature`).
+
+### 7.5 Còn treo sau Mẻ 4–5
+
+* Nhãn số sau khi giải phóng suất A vẫn giữ `A##` cũ tới lúc check-in (xem mục "Chưa kiểm chứng" của đợt 3b) — cần nhóm quyết hiển thị.
+* WinForms mới xác minh bằng build + harness, **chưa bấm chuột thật** trên lưới 14 cột.
+* Trang `LichKham` chỉ hiện lịch sử khám + trạng thái theo quyết định #11; `CanViewRecordsAsync` và `access_logs.patient_id` đã có nhưng chưa màn nào dùng.
+* `hold_until` + 3 `BackgroundService`, `Notification` UI, màn bác sĩ gọi số, trang Thu ngân: mẻ sau (`docs/DECISIONS.md` #15).
+* `src/HIS.Web/appsettings.json` và `src/HIS.WebApi/appsettings.json` đang tracked và chứa mật khẩu Postgres dev — chưa sửa vì làm gãy máy đồng nghiệp, cần cả nhóm chốt (`docs/DECISIONS.md` #16).
+
+### 7.6 Dọn `backup/` (24 file thừa đã xóa)
+
+`backup/` là đồ nghề local (đang gitignore, không vào git). Đã xóa hết thứ **chỉ dùng một lần** hoặc **đã bị bản đã commit thay thế**:
+
+| Đã xóa | Lý do |
+| --- | --- |
+| `db_*.txt`, `inv_*.txt`, `pre_align_*.txt` (11 file) | output kiểm kê schema/trạng thái trước align; `information_schema` + 3 file `.dump` cùng thời điểm đã chứa đúng dữ liệu đó |
+| `fresh_schema.sql`, `ci_static.raw.sql`, `ci_static.err` | bản nháp của DDL, nay đã là `docs/database/ci/schema.sql` (bản thật) |
+| `snapshot_before_sanity.cs` | copy `AppDbContextModelSnapshot.cs` để so diff một lần |
+| `plan_rename.js`, `rename_constraints.sql`, `rename_report.txt` | kết quả rename ràng buộc đã nằm trong migration `AlignToGroupSpec` và `backup/sql/` |
+| `check_mile4.sql`, `.gate_summary.sql`, `.schema_inventory.sql` | câu truy vấn/chẩn đoán tạm khi kiểm Mẻ 4 |
+| `demologin/*/bin`, `slotgen/*/bin`, `winforms-smoke/*/bin` (+ `obj`) | build artifact, dựng lại bằng `dotnet run` |
+
+**Còn giữ** (và là thứ đồng nghiệp có thể dùng luôn): `db.sh` (psql không lộ mật khẩu), `dump.sh` (dump/restore), `ci_local.sh` (mô phỏng job `integration`), `gate_align.sql` (16 check trên DB thật), `baseline_history.sql` + `sql/A…G*.sql` (các bước align, được `AlignToGroupSpec.cs` dẫn lại), `seed_demo_*` / `seed_rehearsal_day` / `unseed_demo` (nạp & dọn dữ liệu demo), `demologin.sh` (đặt lại mật khẩu tài khoản demo), `slotgen.sh` + `winforms-smoke/` (2 harness đã được Changed.md dẫn làm bằng chứng), 3 file `hospital_his_*.dump` (đường lùi). `align_plan.js` / `build_migration.js` giữ vì là nguồn sinh ra SQL của migration viết tay.

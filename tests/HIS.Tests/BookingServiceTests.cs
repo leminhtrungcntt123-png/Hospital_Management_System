@@ -21,7 +21,11 @@ public class BookingServiceTests
         using var context = new AppDbContext(dbOptions, TimeProvider.System);
 
         // Act
-        var service = new BookingService(context, Options.Create(new BookingOptions()), TimeProvider.System);
+        var service = new BookingService(
+            context,
+            new QueuePositionAllocator(context, Options.Create(new BookingOptions()), TimeProvider.System),
+            Options.Create(new BookingOptions()),
+            TimeProvider.System);
 
         // Assert
         Assert.NotNull(service);

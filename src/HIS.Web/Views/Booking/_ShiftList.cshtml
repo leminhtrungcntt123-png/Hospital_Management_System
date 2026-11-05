@@ -16,7 +16,7 @@
             </div>
             @if (total > 0)
             {
-                <span class="badge badge-green">Còn @total chỗ</span>
+                <span class="badge badge-green">Còn @total suất đặt online</span>
             }
             else
             {
@@ -47,7 +47,7 @@
                                 @switch (s.Status)
                                 {
                                     case "AVAILABLE":
-                                        <span class="badge badge-green">Còn @s.SlotsLeft chỗ</span>
+                                        <span class="badge badge-green">Còn @s.SlotsLeft suất</span>
                                         break;
                                     case "FULL":
                                         <span class="badge badge-red">Hết chỗ</span>

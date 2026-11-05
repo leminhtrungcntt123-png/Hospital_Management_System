@@ -62,7 +62,7 @@ public class BookingPolicyPathTests
         new(ctx, NewAllocator(ctx, day), Booking, Clock(day));
 
     private static BookingService NewBooking(AppDbContext ctx, DateTime day) =>
-        new(ctx, Booking, Clock(day));
+        new(ctx, NewAllocator(ctx, day), Booking, Clock(day));
 
     /// <summary>
     /// Phòng test riêng cho các khung giờ dựng lên. Cấp số luôn quét giải phóng suất A đã quá mốc cắt
@@ -259,10 +259,9 @@ public class BookingPolicyPathTests
                 Assert.Equal(now.AddDays(BookingBlockDays), account.BookingBlockedUntil!.Value);
                 Assert.Equal(now, account.NoShowResetAt!.Value);
 
-                // Chặn chỉ áp dụng cho việc đặt lịch web mới.
-                DateOnly future = DateOnly.FromDateTime(now.AddDays(3));
+                // Chặn chỉ áp dụng cho việc đặt lịch web mới, và xét trước khi đọc khung giờ.
                 var blockedException = await Assert.ThrowsAsync<InvalidOperationException>(
-                    () => booking.CreateAppointmentAsync(blockedAccountId, patients[0].Id, 1, future, "MORNING"));
+                    () => booking.CreateAppointmentAsync(blockedAccountId, patients[0].Id, 1));
                 _out.WriteLine($"CreateAppointmentAsync bị chặn: {blockedException.Message}");
                 Assert.Contains("bị chặn đặt lịch", blockedException.Message);
             }

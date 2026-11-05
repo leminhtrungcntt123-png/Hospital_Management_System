@@ -10,6 +10,7 @@ public sealed record PatientProfileLinkDto(
     int PatientId,
     string PatientCode,
     string PatientFullName,
+    string PatientPhone,
     DateOnly DateOfBirth,
     string GenderLabel,
     string RelationshipCode,

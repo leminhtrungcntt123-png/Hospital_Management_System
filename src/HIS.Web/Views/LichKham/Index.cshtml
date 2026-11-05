@@ -1,0 +1,81 @@
+@* Màn "Lịch khám của tôi": danh sách lượt hẹn web do tài khoản đang đăng nhập đặt. *@
+@model MyAppointmentsViewModel
+@{
+    ViewData["Title"] = "Lịch khám của tôi";
+}
+
+<main>
+    <section class="booking-content">
+        <div class="content-head">
+            <div>
+                <div class="eyebrow">TÀI KHOẢN CỦA TÔI</div>
+                <div class="page-title">Lịch khám của tôi</div>
+                <p>Các lượt hẹn bạn đã đặt trên website, mới nhất trước. Có thể hủy nếu còn trên 24 giờ so với giờ khám.</p>
+            </div>
+            <a class="btn btn-primary" asp-controller="Booking" asp-action="ChonKhoa"><i data-lucide="calendar-plus"></i> Đặt lịch mới</a>
+        </div>
+
+        @if (TempData["Message"] is string ok && !string.IsNullOrWhiteSpace(ok))
+        {
+            <div class="alert info">
+                <i data-lucide="circle-check"></i>
+                <div><strong>Đã ghi nhận</strong><p>@ok</p></div>
+            </div>
+        }
+
+        <partial name="_ErrorAlert" />
+
+        @if (Model.Appointments.Count == 0)
+        {
+            <div class="empty-state">
+                <i data-lucide="calendar-days"></i>
+                <strong>Chưa có lịch hẹn nào</strong>
+                <p>Bắt đầu đặt lịch để hồ sơ của bạn xuất hiện tại đây.</p>
+            </div>
+        }
+        else
+        {
+            @foreach (var a in Model.Appointments)
+            {
+                <div class="card-section">
+                    <div class="card-head">
+                        <strong>@a.DepartmentName</strong>
+                        <span class="badge @(a.IsCancellable ? "badge-green" : "badge-gray")">@a.StatusLabel</span>
+                    </div>
+                    <div class="detail-grid">
+                        <label><span>Mã lịch hẹn</span><strong>@a.Code</strong></label>
+                        <label><span>Người khám</span><strong>@a.PatientName</strong></label>
+                        <label><span>Thời gian</span><strong>@a.DateLabel@(string.IsNullOrEmpty(a.TimeLabel) ? "" : $" · {a.TimeLabel}")</strong></label>
+                        @* Số A chỉ còn ý nghĩa khi lượt khám chưa diễn ra; lịch đã hủy/chưa cấp số hiển thị dấu "-".*@
+                        <label>
+                            <span>Số thứ tự</span>
+                            <strong>
+                                @if (string.IsNullOrEmpty(a.QueueNumber) || a.Status is "CANCELLED" or "NO_SHOW" or "EXPIRED")
+                                {
+                                    <text>-</text>
+                                }
+                                else
+                                {
+                                    <text>@a.QueueNumber</text>
+                                }
+                            </strong>
+                        </label>
+                        <label><span>Bác sĩ</span><strong>@a.DoctorName</strong></label>
+                        <label><span>Địa điểm</span><strong>@a.Room</strong></label>
+                    </div>
+
+                    @if (a.IsCancellable)
+                    {
+                        <form asp-action="HuyLich" method="post" onsubmit="return confirm('Bạn chắc chắn muốn hủy lịch hẹn @a.Code?');">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="appointmentId" value="@a.Id" />
+                            <div class="modal-actions">
+                                <button type="submit" class="btn btn-outline"><i data-lucide="x"></i> Hủy lịch</button>
+                            </div>
+                        </form>
+                    }
+                </div>
+            }
+        }
+    </section>
+</main>

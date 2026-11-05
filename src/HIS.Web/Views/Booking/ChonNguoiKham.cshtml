@@ -1,10 +1,10 @@
-@* Bước 3: Chọn người khám (kèm modal thêm hồ sơ mới) *@
+@* Bước 4: Chọn người khám (kèm modal thêm hồ sơ mới) *@
 @model ChonNguoiKhamViewModel
 @{
     Layout = "_BookingLayout";
     ViewData["Title"] = "Chọn người khám";
-    ViewData["Step"] = 3;
-    ViewData["BackUrl"] = Url.Action("ChonNgayCa", "Booking");
+    ViewData["Step"] = 4;
+    ViewData["BackUrl"] = Url.Action("ChonGio", "Booking");
 
     var selected = Model.Patients.FirstOrDefault(p => p.Id == Model.SelectedPatientId);
 }
@@ -15,9 +15,9 @@
     <section class="booking-content">
         <div class="content-head">
             <div>
-                <div class="eyebrow">BƯỚC 3 / 4</div>
+                <div class="eyebrow">BƯỚC 4 / 5</div>
                 <div class="page-title">Ai sẽ là người đến khám?</div>
-                <p>Chọn một hồ sơ đã lưu. Mỗi lịch hẹn chỉ liên kết với một người khám.</p>
+                <p>Chọn một hồ sơ đã lưu trong tài khoản của bạn. Mỗi lịch hẹn chỉ liên kết với một người khám.</p>
             </div>
             <button type="button" class="btn btn-outline" data-open-add-profile>
                 <i data-lucide="plus"></i> Thêm hồ sơ mới
@@ -31,12 +31,12 @@
             {
                 var isSelected = p.Id == Model.SelectedPatientId;
                 <button type="button" class="profile-select @(isSelected ? "selected" : "")"
-                        data-id="@p.Id" data-name="@p.FullName" data-verified="@(p.IsVerified ? "true" : "false")">
+                        data-id="@p.Id" data-name="@p.FullName" data-bookable="@(p.IsBookable ? "true" : "false")">
                     <div class="profile-avatar">@p.Initials</div>
                     <div class="profile-body">
                         <div>
                             <strong>@p.FullName</strong>
-                            <span class="badge @(p.Relationship == "Bản thân" ? "badge-blue" : "badge-gray")">@p.Relationship</span>
+                            <span class="badge @(p.RelationshipCode == "SELF" ? "badge-blue" : "badge-gray")">@p.Relationship</span>
                         </div>
                         <p>Mã người bệnh: @p.Code</p>
                         <p>Ngày sinh: @VietnameseFormat.ShortDate(p.DateOfBirth)</p>
@@ -44,9 +44,13 @@
                         {
                             <span class="verified"><i data-lucide="shield-check"></i> Đã xác minh</span>
                         }
+                        else if (p.NeedsApproval)
+                        {
+                            <span class="needs-verify"><i data-lucide="clock-3"></i> Chờ quầy xác nhận giấy tờ khi tới khám</span>
+                        }
                         else
                         {
-                            <span class="needs-verify"><i data-lucide="circle-alert"></i> Cần bổ sung thông tin</span>
+                            <span class="needs-verify"><i data-lucide="circle-alert"></i> Không còn quyền đặt lịch</span>
                         }
                     </div>
                     <div class="check-mark"><i data-lucide="check"></i></div>
@@ -58,8 +62,8 @@
         <div class="alert warning" id="unverified-alert" hidden>
             <i data-lucide="circle-alert"></i>
             <div>
-                <strong>Hồ sơ cần được bổ sung trước khi đặt lịch</strong>
-                <p>Vui lòng cập nhật giấy tờ định danh của người khám hoặc chọn hồ sơ khác để tiếp tục.</p>
+                <strong>Hồ sơ này không đặt lịch được</strong>
+                <p>Liên kết hồ sơ đã bị thu hồi. Vui lòng chọn hồ sơ khác hoặc thêm hồ sơ mới để tiếp tục.</p>
             </div>
         </div>
 
@@ -83,7 +87,7 @@
     <div class="modal-icon profile"><i data-lucide="user-round"></i></div>
     <button type="button" class="icon-button modal-close" data-modal-close aria-label="Đóng"><i data-lucide="x"></i></button>
     <div class="modal-title" id="add-profile-title">Thêm hồ sơ người khám</div>
-    <p>Thông tin chuyên khoa, ngày và ca khám hiện tại sẽ được giữ nguyên.</p>
+    <p>Thông tin chuyên khoa, ngày, ca và khung giờ hiện tại sẽ được giữ nguyên.</p>
 
     <form asp-action="ThemHoSo" method="post" id="add-profile-form" novalidate>
         <div class="form-grid">
@@ -110,6 +114,7 @@
                 <span>Mối quan hệ</span>
                 <select name="Relationship">
                     <option value="OTHER">Người thân</option>
+                    <option value="SIBLING">Anh/Chị/Em</option>
                     <option value="PARENT">Cha/Mẹ</option>
                     <option value="CHILD">Con</option>
                     <option value="SPOUSE">Vợ/Chồng</option>
@@ -121,10 +126,15 @@
                 <input name="Phone" type="tel" placeholder="Nhập số điện thoại" autocomplete="off" />
                 <small hidden>Số điện thoại không hợp lệ (10 đến 11 chữ số, bắt đầu bằng 0).</small>
             </label>
+            <label class="wide">
+                <span>CCCD / Định danh cá nhân</span>
+                <input name="NationalId" maxlength="12" placeholder="Để trống với trẻ nhỏ chưa có CCCD" autocomplete="off" />
+                <small hidden>CCCD không được vượt quá 12 ký tự.</small>
+            </label>
         </div>
         <div class="duplicate-note">
             <i data-lucide="info"></i>
-            <span>Hệ thống sẽ kiểm tra hồ sơ có khả năng trùng trước khi lưu.</span>
+            <span>Hồ sơ có CCCD đã tồn tại trong hệ thống sẽ bị từ chối; khi đó bạn cần xin liên kết hồ sơ ở quầy tiếp nhận.</span>
         </div>
         <div class="modal-actions">
             <button type="button" class="btn btn-outline" data-modal-close>Hủy</button>

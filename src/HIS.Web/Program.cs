@@ -29,6 +29,8 @@ builder.Services.AddBookingOptions(builder.Configuration);
 // Nguồn dữ liệu đặt lịch.
 // Khi nối database: tạo class mới implement  (gọi HIS.BLL) rồi thay dòng này.
 // Đăng ký các Service của BLL vào Web
+// QueuePositionAllocator cấp vị trí + số A/T khi đặt lịch web nên BookingService cần nó.
+builder.Services.AddScoped<QueuePositionAllocator>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddScoped<IAppointmentService, AppointmentService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
@@ -36,6 +38,8 @@ builder.Services.AddScoped<IPatientService, PatientService>();
 builder.Services.AddScoped<IDoctorService, DoctorService>();
 builder.Services.AddScoped<IPatientProfileService, PatientProfileService>();
 builder.Services.AddScoped<IPatientAccessService, PatientAccessService>();
+// Trang đăng nhập demo của web gọi thẳng IAuthService (module của thành viên khác) để kiểm mật khẩu.
+builder.Services.AddScoped<IAuthService, AuthService>();
 
 // Giữ nguyên cấu hình HttpClient gọi HIS.WebApi (phần của thành viên khác có thể dùng)
 builder.Services.AddHttpClient("HisWebApi", client =>

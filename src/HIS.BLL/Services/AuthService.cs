@@ -19,7 +19,11 @@ public class AuthService : IAuthService
         _context = context;
     }
 
-    public async Task<LoginResult> LoginAsync(string username, string password, CancellationToken cancellationToken = default)
+    public async Task<LoginResult> LoginAsync(
+        string username,
+        string password,
+        LoginSurface surface = LoginSurface.Staff,
+        CancellationToken cancellationToken = default)
     {
         username = (username ?? string.Empty).Trim();
 
@@ -88,10 +92,15 @@ public class AuthService : IAuthService
             return LoginResult.Fail($"Tên đăng nhập hoặc mật khẩu không đúng. Còn {remaining} lần thử.");
         }
 
-        // Phân quyền: Ứng dụng Desktop WinForms chỉ dành cho nhân sự (Admin, Bác sĩ, Tiếp đón, Y tá...)
-        if (string.Equals(account.Role?.Code, "PATIENT", StringComparison.OrdinalIgnoreCase))
+        // Phân quyền theo nơi đăng nhập: WinForms/WebApi chỉ nhân sự, trang đặt lịch web chỉ bệnh nhân.
+        bool isPatient = string.Equals(account.Role?.Code, "PATIENT", StringComparison.OrdinalIgnoreCase);
+        if (surface == LoginSurface.Staff && isPatient)
         {
             return LoginResult.Fail("Tài khoản bệnh nhân không dùng cho ứng dụng quản trị. Vui lòng đăng nhập tại cổng web.");
+        }
+        if (surface == LoginSurface.PatientPortal && !isPatient)
+        {
+            return LoginResult.Fail("Trang đặt lịch chỉ dành cho tài khoản bệnh nhân. Nhân viên vui lòng dùng phần mềm tiếp nhận.");
         }
 
         // Đăng nhập thành công -> Reset số lần đăng nhập sai

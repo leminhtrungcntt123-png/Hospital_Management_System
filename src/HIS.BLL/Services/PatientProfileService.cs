@@ -366,6 +366,7 @@ public class PatientProfileService : IPatientProfileService
             link.PatientId,
             link.PatientId.ToPatientCode(),
             link.Patient.FullName,
+            link.Patient.PhoneNumber ?? string.Empty,
             link.Patient.DateOfBirth,
             link.Patient.Gender.ToLabel(),
             link.Relationship.ToDatabaseCode(),

@@ -1,4 +1,4 @@
-@* Bước 5: Đặt lịch thành công. Không đặt ViewData["Step"] nên _BookingLayout ẩn thanh trên và stepper. *@
+@* Trang kết thúc quy trình (bước 6). Không đặt ViewData["Step"] nên _BookingLayout ẩn thanh trên và stepper. *@
 @model ThanhCongViewModel
 @{
     Layout = "_BookingLayout";
@@ -32,6 +32,15 @@
             <small>Vui lòng cung cấp mã này khi làm thủ tục</small>
         </div>
 
+        @if (!string.IsNullOrEmpty(Model.QueueNumber))
+        {
+            <div class="booking-code">
+                <span>SỐ THỨ TỰ KHÁM</span>
+                <strong>@Model.QueueNumber</strong>
+                <small>Số A dành cho bệnh nhân đặt online; theo dõi màn gọi tại phòng @(Model.Room)</small>
+            </div>
+        }
+
         <div class="success-details">
             <div><i data-lucide="user-round"></i><span>Người khám<strong>@Model.Patient.FullName</strong></span></div>
             <div><i data-lucide="stethoscope"></i><span>Chuyên khoa<strong>@Model.DepartmentName</strong></span></div>
@@ -61,8 +70,7 @@
         </div>
 
         <div class="success-actions">
-            @* TODO: trang "Lịch khám của tôi" (nhóm C1) do người khác phụ trách. Nối đường dẫn vào đây khi có. *@
-            <a class="btn btn-primary" href="#">Xem lịch hẹn của tôi</a>
+            <a class="btn btn-primary" asp-controller="LichKham" asp-action="Index">Xem lịch hẹn của tôi</a>
             <button type="button" class="btn btn-outline" data-print><i data-lucide="download"></i> Lưu phiếu hẹn</button>
         </div>
         <a class="text-button" asp-action="Index">Quay lại trang chủ</a>

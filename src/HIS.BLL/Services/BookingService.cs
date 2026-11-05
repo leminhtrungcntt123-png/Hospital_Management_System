@@ -14,16 +14,25 @@ public class BookingService : IBookingService
     private readonly AppDbContext _context;
     private readonly BookingOptions _options;
     private readonly TimeProvider _timeProvider;
+    private readonly QueuePositionAllocator _allocator;
 
-    public BookingService(AppDbContext context, IOptions<BookingOptions> options, TimeProvider timeProvider)
+    public BookingService(
+        AppDbContext context,
+        QueuePositionAllocator allocator,
+        IOptions<BookingOptions> options,
+        TimeProvider timeProvider)
     {
         _context = context;
+        _allocator = allocator;
         _options = options.Value;
         _timeProvider = timeProvider;
     }
 
     // Cùng nguồn giờ với updated_at do AppDbContext ghi để hạn mức hủy theo tháng dương lịch tính đúng.
     private DateTime Now => _timeProvider.GetLocalNow().DateTime;
+
+    // Màn đặt lịch luôn báo số chỗ của 7 ngày, bắt đầu từ ngày mai.
+    private const int DaysInWeek = 7;
 
     public async Task<List<BookingDepartmentDto>> GetActiveDepartmentsAsync()
     {
@@ -35,60 +44,23 @@ public class BookingService : IBookingService
         if (departments.Count == 0) return new List<BookingDepartmentDto>();
 
         var fromDate = DateOnly.FromDateTime(DateTime.Today).AddDays(1);
-        var toDate = fromDate.AddDays(6);
-        var fromDateTime = fromDate.ToDateTime(TimeOnly.MinValue);
-        var toDateTime = toDate.ToDateTime(TimeOnly.MaxValue);
+        DateTime fromDateTime = fromDate.ToDateTime(TimeOnly.MinValue);
+        DateTime afterLastDate = fromDate.AddDays(DaysInWeek).ToDateTime(TimeOnly.MinValue);
 
-        // Lấy lịch làm việc của bác sĩ trong 7 ngày tới
-        var schedules = await _context.DoctorSchedules
+        // Một lượt tải khung giờ cho cả tuần, thay vì đi từ lịch trực rồi COUNT lượt hẹn.
+        var frames = await _context.AppointmentSlots
             .AsNoTracking()
-            .Include(s => s.Doctor)
-            .Where(s => s.IsActive
-                        && s.EffectiveFrom <= toDate
-                        && (s.EffectiveTo == null || s.EffectiveTo >= fromDate))
+            .Where(s => s.StartTime >= fromDateTime && s.StartTime < afterLastDate
+                        && s.Status != SlotStatus.Blocked)
+            .Select(s => new { s.StartTime, s.OnlineQuota, s.OnlineBooked, DepartmentId = s.Doctor.DepartmentId })
             .ToListAsync();
 
-        // Thống kê số lượng lịch hẹn đã đặt trong tuần theo bác sĩ và ngày
-        var bookedList = await _context.Appointments
-            .AsNoTracking()
-            .Where(a => a.Slot != null
-                        && a.Slot.StartTime >= fromDateTime
-                        && a.Slot.StartTime <= toDateTime
-                        && a.Status.Code != AppointmentStatus.Codes.Cancelled
-                        && a.Status.Code != AppointmentStatus.Codes.NoShow
-                        && a.Status.Code != AppointmentStatus.Codes.Expired)
-            .GroupBy(a => new { a.Slot!.DoctorId, Date = DateOnly.FromDateTime(a.Slot.StartTime) })
-            .Select(g => new { g.Key.DoctorId, g.Key.Date, Count = g.Count() })
-            .ToListAsync();
-
-        var bookedMap = bookedList.ToDictionary(x => (x.DoctorId, x.Date), x => x.Count);
-
-        var deptSlots = departments.ToDictionary(d => d.Id, _ => 0);
-
-        for (int i = 0; i < 7; i++)
-        {
-            var curDate = fromDate.AddDays(i);
-            if (curDate.DayOfWeek == DayOfWeek.Sunday) continue;
-
-            var daySchedules = schedules.Where(s => s.DayOfWeek == curDate.DayOfWeek
-                                                 && s.EffectiveFrom <= curDate
-                                                 && (s.EffectiveTo == null || s.EffectiveTo >= curDate));
-
-            foreach (var schedule in daySchedules)
-            {
-                if (schedule.Doctor == null) continue;
-
-                int booked = bookedMap.GetValueOrDefault((schedule.DoctorId, curDate), 0);
-                int totalMinutes = (int)(schedule.EndTime - schedule.StartTime).TotalMinutes;
-                int maxCapacity = schedule.SlotDurationMinutes > 0 ? totalMinutes / schedule.SlotDurationMinutes : 15;
-                int slotsLeft = Math.Max(0, maxCapacity - booked);
-
-                if (deptSlots.ContainsKey(schedule.Doctor.DepartmentId))
-                {
-                    deptSlots[schedule.Doctor.DepartmentId] += slotsLeft;
-                }
-            }
-        }
+        var deptSlots = frames
+            .Where(f => DateOnly.FromDateTime(f.StartTime).DayOfWeek != DayOfWeek.Sunday)
+            .GroupBy(f => f.DepartmentId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Sum(f => Math.Max(0, f.OnlineQuota - f.OnlineBooked)));
 
         return departments.Select(d => new BookingDepartmentDto
         {
@@ -116,85 +88,136 @@ public class BookingService : IBookingService
         };
     }
 
-    // Tính tổng số chỗ còn trống trong 7 ngày tới theo chuyên khoa
+    // Tính tổng số suất đặt online còn trống trong 7 ngày tới theo chuyên khoa
     private async Task<int> CountSlotsThisWeekAsync(int departmentId)
     {
-        var from = DateOnly.FromDateTime(DateTime.Today).AddDays(1);
-        int total = 0;
-        for (int i = 0; i < 7; i++)
-        {
-            var shifts = await GetShiftsAsync(departmentId, from.AddDays(i));
-            total += shifts.Sum(s => s.SlotsLeft);
-        }
-        return total;
+        var fromDate = DateOnly.FromDateTime(DateTime.Today).AddDays(1);
+        var frames = await LoadFramesAsync(departmentId, fromDate, DaysInWeek);
+
+        return frames.Sum(f => f.OnlineLeft);
+    }
+
+    /// <summary>
+    /// Khung giờ của một chuyên khoa trong vài ngày tới, kèm số suất A còn lại.
+    /// Chỗ trống đọc thẳng từ appointment_slots (online_quota − online_booked) vì đó là con số
+    /// QueuePositionAllocator giữ khi cấp/thu hồi chỗ; đếm lượt hẹn sẽ tính lệch suất T và suất đã giải phóng.
+    /// Khung đã qua giờ bắt đầu và chủ nhật bị loại vì web không đặt được.
+    /// </summary>
+    private async Task<List<BookingFrame>> LoadFramesAsync(int departmentId, DateOnly fromDate, int dayCount)
+    {
+        var fromDateTime = fromDate.ToDateTime(TimeOnly.MinValue);
+        var afterLastDate = fromDate.AddDays(dayCount).ToDateTime(TimeOnly.MinValue);
+        DateTime now = Now;
+
+        var rows = await _context.AppointmentSlots
+            .AsNoTracking()
+            .Where(s => s.StartTime >= fromDateTime
+                        && s.StartTime < afterLastDate
+                        && s.Status != SlotStatus.Blocked
+                        && s.Doctor.DepartmentId == departmentId)
+            .OrderBy(s => s.StartTime)
+            .ThenBy(s => s.Id)
+            .Select(s => new
+            {
+                s.Id,
+                s.DoctorId,
+                DoctorName = s.Doctor.FullName,
+                DoctorSpecialty = s.Doctor.Specialty,
+                RoomName = s.Room.RoomName,
+                s.StartTime,
+                s.EndTime,
+                s.Capacity,
+                s.OnlineQuota,
+                s.OnlineBooked
+            })
+            .ToListAsync();
+
+        return rows
+            .Where(r => DateOnly.FromDateTime(r.StartTime).DayOfWeek != DayOfWeek.Sunday
+                        && r.StartTime > now
+                        && r.OnlineQuota > 0)
+            .Select(r => new BookingFrame(
+                r.Id,
+                r.DoctorId,
+                r.DoctorName,
+                r.DoctorSpecialty,
+                r.RoomName,
+                r.StartTime,
+                r.EndTime,
+                r.Capacity,
+                r.OnlineQuota,
+                Math.Max(0, r.OnlineQuota - r.OnlineBooked)))
+            .ToList();
     }
 
     // Lấy danh sách ca khám và số chỗ trống theo chuyên khoa và ngày
     public async Task<List<BookingShiftDto>> GetShiftsAsync(int departmentId, DateOnly date)
     {
-        if (date.DayOfWeek == DayOfWeek.Sunday)
-            return new List<BookingShiftDto>();
+        var frames = await LoadFramesAsync(departmentId, date, 1);
 
-        var schedules = await _context.DoctorSchedules
-            .AsNoTracking()
-            .Include(s => s.Doctor)
-            .Include(s => s.Room)
-            .Where(s => s.Doctor.DepartmentId == departmentId
-                        && s.IsActive
-                        && s.EffectiveFrom <= date
-                        && (s.EffectiveTo == null || s.EffectiveTo >= date)
-                        && s.DayOfWeek == date.DayOfWeek)
-            .ToListAsync();
-
-        if (!schedules.Any())
-            return new List<BookingShiftDto>();
-
-        var startDateTime = date.ToDateTime(TimeOnly.MinValue);
-        var endDateTime = date.ToDateTime(TimeOnly.MaxValue);
-        var doctorIds = schedules.Select(s => s.DoctorId).Distinct().ToList();
-
-        // Đếm số lịch hẹn đã đặt theo từng bác sĩ trong ngày
-        var bookedCounts = await _context.Appointments
-            .AsNoTracking()
-            .Where(a => a.Slot != null
-                        && doctorIds.Contains(a.Slot.DoctorId)
-                        && a.Slot.StartTime >= startDateTime
-                        && a.Slot.StartTime <= endDateTime
-                        && a.Status.Code != AppointmentStatus.Codes.Cancelled
-                        && a.Status.Code != AppointmentStatus.Codes.NoShow
-                        && a.Status.Code != AppointmentStatus.Codes.Expired)
-            .GroupBy(a => a.Slot!.DoctorId)
-            .Select(g => new { DoctorId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(g => g.DoctorId, g => g.Count);
-
-        var result = new List<BookingShiftDto>();
-
-        foreach (var schedule in schedules)
-        {
-            int bookedCount = bookedCounts.GetValueOrDefault(schedule.DoctorId, 0);
-
-            // Tính số lượng chỗ khám tối đa của ca làm việc
-            int totalMinutes = (int)(schedule.EndTime - schedule.StartTime).TotalMinutes;
-            int maxCapacity = schedule.SlotDurationMinutes > 0 ? totalMinutes / schedule.SlotDurationMinutes : 15;
-
-            int slotsLeft = maxCapacity - bookedCount;
-            if (slotsLeft < 0) slotsLeft = 0;
-
-            result.Add(new BookingShiftDto
+        var grouped = frames
+            .GroupBy(f => (f.DoctorId, Shift: ExamShifts.For(f.StartTime)))
+            .Select(g => new
             {
-                Key = schedule.Shift.ToDatabaseCode(),
-                Label = schedule.Shift.ToLabel(),
-                TimeRange = $"{schedule.StartTime:hh\\:mm} – {schedule.EndTime:hh\\:mm}",
-                SlotsLeft = slotsLeft,
-                Status = slotsLeft > 0 ? "AVAILABLE" : "FULL",
-                DoctorId = schedule.DoctorId,
-                DoctorName = schedule.Doctor?.FullName,
-                DoctorTitle = schedule.Doctor?.Specialty,
-                RoomName = schedule.Room?.RoomName
-            });
+                g.Key.Shift,
+                g.Key.DoctorId,
+                First = g.First(),
+                StartTime = g.Min(f => f.StartTime),
+                EndTime = g.Max(f => f.EndTime),
+                SlotsLeft = g.Sum(f => f.OnlineLeft)
+            })
+            .OrderBy(x => x.StartTime)
+            .ThenBy(x => x.DoctorId)
+            .ToList();
+
+        return grouped.Select(x => new BookingShiftDto
+        {
+            Key = x.Shift.ToDatabaseCode(),
+            Label = x.Shift.ToLabel(),
+            TimeRange = $"{x.StartTime:HH\\:mm} – {x.EndTime:HH\\:mm}",
+            SlotsLeft = x.SlotsLeft,
+            Status = x.SlotsLeft > 0 ? "AVAILABLE" : "FULL",
+            DoctorId = x.DoctorId,
+            DoctorName = x.First.DoctorName,
+            DoctorTitle = x.First.DoctorSpecialty,
+            RoomName = x.First.RoomName
+        }).ToList();
+    }
+
+    // Lấy danh sách khung giờ còn suất đặt online trong một ca của chuyên khoa
+    public async Task<List<BookingSlotDto>> GetSlotsAsync(
+        int departmentId,
+        DateOnly date,
+        string shiftKey,
+        CancellationToken cancellationToken = default)
+    {
+        ExamShift? wantedShift = EnumCodes.ParseDatabaseCode<ExamShift>(shiftKey);
+        if (wantedShift is null)
+        {
+            return new List<BookingSlotDto>();
         }
 
-        return result;
+        var frames = await LoadFramesAsync(departmentId, date, 1);
+
+        return frames
+            .Where(f => ExamShifts.For(f.StartTime) == wantedShift.Value)
+            .Select(f => new BookingSlotDto
+            {
+                Id = f.SlotId,
+                Label = $"{f.StartTime:HH\\:mm} – {f.EndTime:HH\\:mm}",
+                ShiftLabel = wantedShift.Value.ToLabel(),
+                StartTime = f.StartTime,
+                EndTime = f.EndTime,
+                Capacity = f.Capacity,
+                OnlineQuota = f.OnlineQuota,
+                SlotsLeft = f.OnlineLeft,
+                Status = f.OnlineLeft > 0 ? "AVAILABLE" : "FULL",
+                DoctorId = f.DoctorId,
+                DoctorName = f.DoctorName,
+                DoctorTitle = f.DoctorSpecialty,
+                RoomName = f.RoomName
+            })
+            .ToList();
     }
 
     // Lấy trạng thái khả dụng của các ngày trong tuần
@@ -220,48 +243,6 @@ public class BookingService : IBookingService
         return days;
     }
 
-    public async Task<IEnumerable<Patient>> GetPatientsByAccountIdAsync(int accountId)
-    {
-        return await _context.AccountPatientProfiles
-            .AsNoTracking()
-            .Where(l => l.AccountId == accountId && l.Status != LinkStatus.Revoked)
-            .Select(l => l.Patient)
-            .ToListAsync();
-    }
-
-    // Tạo hồ sơ mới cho chính tài khoản: Patient + link SELF (ACTIVE, được xem hồ sơ) trong một transaction
-    public async Task<Patient> CreatePatientAsync(int accountId, string fullName, DateOnly dateOfBirth, string? gender, string phone, CancellationToken cancellationToken = default)
-    {
-        var now = DateTime.Now;
-        var patient = new Patient
-        {
-            FullName = fullName,
-            DateOfBirth = dateOfBirth,
-            Gender = EnumCodes.ParseDatabaseCode<Gender>(gender),
-            PhoneNumber = phone,
-            CreatedAt = now
-        };
-
-        _context.Patients.Add(patient);
-        await _context.SaveChangesAsync(cancellationToken);
-
-        _context.AccountPatientProfiles.Add(new AccountPatientProfile
-        {
-            AccountId = accountId,
-            PatientId = patient.Id,
-            Relationship = PatientRelationship.Self,
-            Status = LinkStatus.Active,
-            CanViewRecords = true,
-            CreatedBy = accountId,
-            VerifiedBy = accountId,
-            VerifiedAt = now,
-            CreatedAt = now
-        });
-        await _context.SaveChangesAsync(cancellationToken);
-
-        return patient;
-    }
-
     // Lấy chi phí khám bệnh của chuyên khoa
     public async Task<decimal> GetExaminationFeeAsync(int departmentId)
     {
@@ -272,13 +253,16 @@ public class BookingService : IBookingService
         return service?.Price ?? 300000m;
     }
 
-    // Tạo mới lịch hẹn khám
+    /// <summary>
+    /// Tạo lịch hẹn web và giữ một suất A của khung giờ bệnh nhân đã chọn.
+    /// Khung giờ là nguồn chân lý về chỗ trống nên mọi kiểm tra (còn mở, còn suất A, trùng ngày khám)
+    /// đều làm ở đây thay vì để UI tự tính. Cấp số qua QueuePositionAllocator để số A và booked_count
+    /// tăng trong cùng một lần ghi, và uq_slot_position từ chối lượt đặt trúng tranh chấp.
+    /// </summary>
     public async Task<Appointment> CreateAppointmentAsync(
         int accountId,
         int patientId,
-        int departmentId,
-        DateOnly date,
-        string shiftKey,
+        int slotId,
         CancellationToken cancellationToken = default)
     {
         var status = await _context.AppointmentStatuses
@@ -295,11 +279,50 @@ public class BookingService : IBookingService
 
         DateTime now = Now;
 
+        // Xét chặn trước khi đọc khung giờ: tài khoản bị chặn thì thông báo phải là lý do chặn.
         if (account.BookingBlockedUntil is DateTime blockedUntil && blockedUntil > now)
         {
             throw new InvalidOperationException(
                 $"Tài khoản đang bị chặn đặt lịch mới đến hết ngày {blockedUntil:dd/MM/yyyy} " +
                 $"do đã đủ {_options.MaxNoShowsBeforeBlock} lần vắng mặt. Đăng nhập và xem lịch sử vẫn bình thường.");
+        }
+
+        AppointmentSlot slot = await _context.AppointmentSlots
+            .AsNoTracking()
+            .Include(s => s.Doctor)
+            .FirstOrDefaultAsync(s => s.Id == slotId, cancellationToken)
+            ?? throw new ArgumentException("Không tìm thấy khung giờ đã chọn.");
+
+        if (slot.Status == SlotStatus.Blocked)
+        {
+            throw new InvalidOperationException("Khung giờ này đã ngừng nhận bệnh nhân. Vui lòng chọn khung khác.");
+        }
+
+        if (slot.StartTime <= now)
+        {
+            throw new InvalidOperationException("Khung giờ vừa tới giờ khám nên không đặt được nữa. Vui lòng chọn khung khác.");
+        }
+
+        DateOnly date = DateOnly.FromDateTime(slot.StartTime);
+
+        // Một người chỉ một lượt khám trong ngày, tính trên ngày của khung giờ chứ không phải ngày đặt.
+        var dayStart = slot.StartTime.Date;
+        bool alreadyBooked = await _context.Appointments
+            .AsNoTracking()
+            .AnyAsync(a => a.PatientId == patientId
+                           && a.Slot != null
+                           && a.Slot.StartTime >= dayStart
+                           && a.Slot.StartTime < dayStart.AddDays(1)
+                           && a.Status.Code != AppointmentStatus.Codes.Cancelled
+                           && a.Status.Code != AppointmentStatus.Codes.NoShow
+                           && a.Status.Code != AppointmentStatus.Codes.Expired,
+                        cancellationToken);
+
+        if (alreadyBooked)
+        {
+            throw new InvalidOperationException(
+                $"{patient.FullName} đã có lịch khám trong ngày {date:dd/MM/yyyy}. " +
+                "Vui lòng chọn ngày khác hoặc xem lại lịch hẹn.");
         }
 
         int priorityLevel = PatientAge.NeedsAgePriority(
@@ -323,8 +346,39 @@ public class BookingService : IBookingService
             UpdatedAt = now
         };
 
-        _context.Appointments.Add(appointment);
-        await _context.SaveChangesAsync(cancellationToken);
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+
+        try
+        {
+            _context.Appointments.Add(appointment);
+
+            QueuePlacement? placement = await _allocator.AssignOnlineAsync(appointment, slotId, cancellationToken);
+
+            if (placement is null)
+            {
+                throw new InvalidOperationException("Khung giờ này vừa hết suất đặt online. Vui lòng chọn khung khác.");
+            }
+
+            // Bác sĩ, phòng và chuyên khoa lấy từ khung giờ thật sự giữ chỗ để màn danh sách không trống cột.
+            appointment.RoomId = placement.Slot.RoomId;
+            appointment.DoctorId = placement.Slot.DoctorId;
+            appointment.DepartmentId = slot.Doctor.DepartmentId;
+
+            await _context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (DbUpdateException race)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw new InvalidOperationException(
+                "Khung giờ vừa có người đặt trước nên chỗ đã kín. Vui lòng chọn khung khác.", race);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+
         return appointment;
     }
 
@@ -420,4 +474,59 @@ public class BookingService : IBookingService
 
         return new CancelAppointmentResult(true, message, isLate, used);
     }
+
+    /// <summary>
+    /// Lịch hẹn web do chính tài khoản này đặt, cho màn "Lịch khám của tôi".
+    /// Hủy muộn hay bị chặn đều tính trên booked_by nên danh sách phải lọc theo cùng cột đó.
+    /// </summary>
+    public async Task<List<BookingAppointmentDto>> GetAppointmentsByAccountAsync(
+        int accountId,
+        CancellationToken cancellationToken = default)
+    {
+        DateTime now = Now;
+
+        var rows = await _context.Appointments
+            .AsNoTracking()
+            .Include(a => a.Patient)
+            .Include(a => a.Status)
+            .Include(a => a.Department)
+            .Include(a => a.Slot).ThenInclude(s => s!.Room)
+            .Include(a => a.Slot).ThenInclude(s => s!.Doctor)
+            .Where(a => a.BookedBy == accountId && a.BookingChannel == BookingChannel.Web)
+            .OrderByDescending(a => a.CreatedAt)
+            .Take(50)
+            .ToListAsync(cancellationToken);
+
+        return rows.Select(a => new BookingAppointmentDto
+        {
+            Id = a.Id,
+            Code = a.AppointmentCode,
+            Status = a.Status.Code,
+            StatusLabel = a.Status.Name,
+            PatientId = a.PatientId,
+            PatientName = a.Patient.FullName,
+            DepartmentName = a.Department?.Name ?? string.Empty,
+            DoctorName = a.Slot?.Doctor?.FullName ?? string.Empty,
+            RoomName = a.Slot?.Room?.RoomName ?? string.Empty,
+            QueueNumber = a.QueueNumber ?? string.Empty,
+            SlotStartTime = a.Slot?.StartTime,
+            SlotEndTime = a.Slot?.EndTime,
+            IsCancellable = (a.Status.Code == AppointmentStatus.Codes.Pending
+                             || a.Status.Code == AppointmentStatus.Codes.Confirmed)
+                            && (a.Slot is null || a.Slot.StartTime > now)
+        }).ToList();
+    }
+
+    // Một khung giờ kèm số suất A còn lại, dùng chung cho màn ca khám, màn khung giờ và đếm chỗ trong tuần.
+    private sealed record BookingFrame(
+        int SlotId,
+        int DoctorId,
+        string DoctorName,
+        string? DoctorSpecialty,
+        string? RoomName,
+        DateTime StartTime,
+        DateTime EndTime,
+        int Capacity,
+        int OnlineQuota,
+        int OnlineLeft);
 }

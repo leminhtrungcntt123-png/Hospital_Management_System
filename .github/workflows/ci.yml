@@ -6,9 +6,19 @@ on:
   pull_request:
     branches: [ "main", "master", "develop" ]
 
+# Một PR đang chạy mà push thêm thì hủy lượt cũ, khỏi xếp hàng chờ runner.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
 jobs:
+  # Windows vì HIS.WinForms là net10.0-windows: build cả solution trên Linux runner không qua được.
   build:
-    name: Build and Test Solution
+    name: Build & unit tests (Windows)
     runs-on: windows-latest
 
     steps:
@@ -19,6 +29,7 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+          cache: 'nuget'
 
       - name: Restore dependencies
         run: dotnet restore HIS.sln
@@ -26,5 +37,71 @@ jobs:
       - name: Build solution
         run: dotnet build HIS.sln --configuration Release --no-restore
 
+      # Category=Integration chạy ở job "integration" (cần PostgreSQL); tách ra để không có test
+      # nào "đỗ giả" vì thiếu biến môi trường kết nối.
       - name: Run unit tests
-        run: dotnet test tests/HIS.Tests/HIS.Tests.csproj --configuration Release --no-build --verbosity normal
+        run: dotnet test tests/HIS.Tests/HIS.Tests.csproj --configuration Release --no-build --verbosity normal --filter "Category!=Integration"
+
+  integration:
+    name: Schema gate & integration tests (PostgreSQL)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hospital_his_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      PGPASSWORD: postgres
+      # Test integration đọc biến này; AppDbContextFactory đọc biến kia khi chạy dotnet ef.
+      HIS_REHEARSAL_CONNECTION: "Host=localhost;Port=5432;Database=hospital_his_ci;Username=postgres;Password=postgres"
+      ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=hospital_his_ci;Username=postgres;Password=postgres"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          cache: 'nuget'
+
+      - name: Install psql client
+        run: command -v psql >/dev/null || (sudo apt-get update && sudo apt-get install -y postgresql-client)
+
+      - name: Install dotnet-ef
+        run: dotnet tool install --global dotnet-ef --version 10.0.13
+
+      # Chỉ build HIS.Tests (+ Domain/DAL/BLL): WinForms không build được trên Linux và test không cần nó.
+      - name: Build test project
+        run: dotnet build tests/HIS.Tests/HIS.Tests.csproj --configuration Release
+
+      - name: Apply schema from model
+        run: psql -h localhost -U postgres -d hospital_his_ci -v ON_ERROR_STOP=1 -q -f docs/database/ci/schema.sql
+
+      - name: Load demo data
+        run: |
+          psql -h localhost -U postgres -d hospital_his_ci -v ON_ERROR_STOP=1 -q -f docs/database/ci/demo_master.sql
+          psql -h localhost -U postgres -d hospital_his_ci -v ON_ERROR_STOP=1 -q -f docs/database/ci/demo_day.sql
+
+      # File tự RAISE EXCEPTION khi còn check failed => ON_ERROR_STOP làm step đỏ, không cần đếm kết quả.
+      - name: Structure gate (16 checks)
+        run: psql -h localhost -U postgres -d hospital_his_ci -v ON_ERROR_STOP=1 -P pager=off -f docs/database/ci/schema_checks.sql
+
+      - name: Run integration tests
+        run: dotnet test tests/HIS.Tests/HIS.Tests.csproj --configuration Release --no-build --verbosity normal --filter "Category=Integration"
+
+      # Sửa entity/configuration mà quên tạo migration thì schema.sql và migration chain lệch khỏi model.
+      - name: Fail when model has no matching migration
+        run: dotnet ef migrations has-pending-model-changes --project src/HIS.DAL

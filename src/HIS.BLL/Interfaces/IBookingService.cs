@@ -17,22 +17,17 @@ public interface IBookingService
     // Lấy danh sách ca khám và số chỗ trống theo chuyên khoa và ngày
     Task<List<BookingShiftDto>> GetShiftsAsync(int departmentId, DateOnly date);
 
-    // Lấy danh sách hồ sơ bệnh nhân theo tài khoản
-    Task<IEnumerable<Patient>> GetPatientsByAccountIdAsync(int accountId);
-
-    // Tạo mới hồ sơ bệnh nhân
-    Task<Patient> CreatePatientAsync(int accountId, string fullName, DateOnly dateOfBirth, string? gender, string phone, CancellationToken cancellationToken = default);
+    // Lấy danh sách khung giờ còn suất đặt online (A) trong một ca của chuyên khoa
+    Task<List<BookingSlotDto>> GetSlotsAsync(int departmentId, DateOnly date, string shiftKey, CancellationToken cancellationToken = default);
 
     // Lấy chi phí khám bệnh của chuyên khoa
     Task<decimal> GetExaminationFeeAsync(int departmentId);
 
-    // Tạo mới lịch hẹn khám
+    // Tạo mới lịch hẹn khám và giữ một suất A (đặt online) của khung giờ đã chọn
     Task<Appointment> CreateAppointmentAsync(
         int accountId,
         int patientId,
-        int departmentId,
-        DateOnly date,
-        string shiftKey,
+        int slotId,
         CancellationToken cancellationToken = default);
 
     // Bệnh nhân tự hủy lịch hẹn web của mình, có xét hạn mức hủy muộn trong tháng
@@ -40,4 +35,7 @@ public interface IBookingService
         int appointmentId,
         int accountId,
         CancellationToken cancellationToken = default);
+
+    // Lịch hẹn web do tài khoản này đặt, mới nhất trước, dùng cho màn "Lịch khám của tôi"
+    Task<List<BookingAppointmentDto>> GetAppointmentsByAccountAsync(int accountId, CancellationToken cancellationToken = default);
 }

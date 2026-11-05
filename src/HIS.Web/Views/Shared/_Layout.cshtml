@@ -1,4 +1,8 @@
-﻿<!DOCTYPE html>
+﻿@{
+    // Phiên demo của web (xem Helpers/DemoSession.cs): chỉ cần Id tài khoản để hiện tên và nút Đăng xuất.
+    var account = ViewContext.HttpContext.Account();
+}
+<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="utf-8" />
@@ -23,12 +27,8 @@
                 <nav class="nav">
                     <a asp-controller="Booking" asp-action="Index">Trang chủ</a>
                     <a asp-controller="Booking" asp-action="ChonKhoa">Đặt lịch khám</a>
-                    <a href="#">Lịch khám</a>
-                    <a href="#">Hồ sơ người khám</a>
-                    <a href="#">Lịch sử khám</a>
-                    <a href="#">Hàng đợi</a>
+                    <a asp-controller="LichKham" asp-action="Index">Lịch khám</a>
                     @* TODO (người phụ trách từng phần bật lên khi hoàn thành):
-                    <a href="#">Lịch khám</a>
                     <a href="#">Hồ sơ người khám</a>
                     <a href="#">Lịch sử khám</a>
                     <a href="#">Hàng đợi</a>
@@ -36,7 +36,19 @@
                 </nav>
 
                 <div class="header-actions">
-                    @* TODO: chuông thông báo (nhóm D) và avatar đăng nhập (thành viên khác phụ trách) *@
+                    @if (account is null)
+                    {
+                        <a class="btn btn-outline" asp-controller="Account" asp-action="Login">
+                            <i data-lucide="log-in"></i> Đăng nhập
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="save-note"><i data-lucide="user-round"></i> @account.DisplayName</span>
+                        <form asp-controller="Account" asp-action="Logout" method="post">
+                            <button type="submit" class="btn btn-outline"><i data-lucide="log-out"></i> Đăng xuất</button>
+                        </form>
+                    }
                     <a class="btn btn-primary" asp-controller="Booking" asp-action="ChonKhoa">
                         <i data-lucide="calendar-days"></i> Đặt lịch khám
                     </a>

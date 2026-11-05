@@ -57,6 +57,27 @@ public class DayVm
     public string State { get; set; } = "off";
 }
 
+/// <summary>
+/// Một khung giờ khám ở bước "chọn giờ". SlotsLeft là số suất A (đặt online) còn lại,
+/// không phải tổng chỗ của khung vì phần còn lại dành cho bệnh nhân đến quầy lấy số T.
+/// </summary>
+public class SlotVm
+{
+    public int Id { get; set; }
+    public string Label { get; set; } = string.Empty;
+
+    /// <summary>AVAILABLE | FULL</summary>
+    public string Status { get; set; } = "FULL";
+
+    public int SlotsLeft { get; set; }
+    public int OnlineQuota { get; set; }
+
+    public DoctorVm? Doctor { get; set; }
+    public string Room { get; set; } = string.Empty;
+
+    public bool IsSelectable => Status == "AVAILABLE" && SlotsLeft > 0;
+}
+
 public class PatientVm
 {
     public int Id { get; set; }
@@ -64,10 +85,21 @@ public class PatientVm
 
     /// <summary>Nhãn hiển thị: Bản thân, Mẹ, Con, Người thân...</summary>
     public string Relationship { get; set; } = string.Empty;
+
+    /// <summary>Mã quan hệ theo DB (SELF, PARENT...) để mặc định chọn hồ sơ của chính mình.</summary>
+    public string RelationshipCode { get; set; } = string.Empty;
     public string Code { get; set; } = string.Empty;
     public DateOnly DateOfBirth { get; set; }
     public string Phone { get; set; } = string.Empty;
+
+    /// <summary>ACTIVE = hồ sơ đã được xác minh giấy tờ.</summary>
     public bool IsVerified { get; set; }
+
+    /// <summary>ACTIVE hoặc PENDING: spec cho phép đặt lịch với hồ sơ chờ quầy duyệt giấy tờ.</summary>
+    public bool IsBookable { get; set; }
+
+    /// <summary>PENDING: hiển thị note "chờ quầy xác nhận giấy tờ khi bệnh nhân tới".</summary>
+    public bool NeedsApproval { get; set; }
 
     public string Initials => PersonName.Initials(FullName);
 }
@@ -78,6 +110,10 @@ public class BookingState
     public int? DepartmentId { get; set; }
     public DateOnly? Date { get; set; }
     public string? Shift { get; set; }
+
+    /// <summary>Khung giờ đã chọn ở bước 3; chính là suất A sẽ bị giữ khi xác nhận.</summary>
+    public int? SlotId { get; set; }
+
     public int? PatientId { get; set; }
 }
 

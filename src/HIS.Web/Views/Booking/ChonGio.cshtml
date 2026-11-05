@@ -1,0 +1,108 @@
+@* Bước 3: Chọn khung giờ trong ca đã chọn. Mỗi khung hiển thị số suất đặt online (chữ A) còn lại. *@
+@model ChonGioViewModel
+@{
+    Layout = "_BookingLayout";
+    ViewData["Title"] = "Chọn khung giờ khám";
+    ViewData["Step"] = 3;
+    ViewData["BackUrl"] = Url.Action("ChonNgayCa", "Booking");
+
+    var picked = Model.Slots.FirstOrDefault(s => s.Id == Model.SelectedSlotId);
+    var totalLeft = Model.Slots.Sum(s => s.SlotsLeft);
+}
+
+<form asp-action="ChonGio" method="post" id="gio-form">
+    <input type="hidden" name="slotId" id="field-slot" value="@Model.SelectedSlotId" />
+
+    <section class="booking-content">
+        <div class="content-head">
+            <div>
+                <div class="eyebrow">BƯỚC 3 / 5</div>
+                <div class="page-title">Chọn khung giờ khám</div>
+                <p>@Model.Shift.Label · @VietnameseFormat.FullDate(Model.Date) — chuyên khoa <b>@Model.Department.Name</b>.</p>
+            </div>
+            <span class="badge @(totalLeft > 0 ? "badge-green" : "badge-red")">
+                @(totalLeft > 0 ? $"Còn {totalLeft} suất đặt online" : "Hết suất online")
+            </span>
+        </div>
+
+        <partial name="_ErrorAlert" />
+
+        <div class="subhead">
+            <div>
+                <strong>Chọn một khung giờ</strong>
+                <span>Phần mềm chỉ mở một phần chỗ của mỗi khung cho bệnh nhân đặt online.</span>
+            </div>
+        </div>
+
+        @if (Model.Slots.Count == 0)
+        {
+            <div class="empty-state">
+                <i data-lucide="clock-3"></i>
+                <strong>Khung giờ này chưa mở đặt online</strong>
+                <p>Vui lòng chọn ca khác hoặc quay lại chọn ngày.</p>
+            </div>
+        }
+        else
+        {
+            <div class="shift-grid">
+                @foreach (var slot in Model.Slots)
+                {
+                    var isSelected = slot.Id == Model.SelectedSlotId;
+                    <div class="shift-card @(isSelected ? "selected" : "") @(slot.IsSelectable ? "" : "disabled")"
+                         data-slot="@slot.Id" data-label="@slot.Label">
+                        <button type="button" class="shift-select slot-select" disabled="@(!slot.IsSelectable)">
+                            <div class="shift-card-head">
+                                <div><i data-lucide="clock-3"></i><span>@slot.Label</span></div>
+                                @if (slot.IsSelectable)
+                                {
+                                    <span class="badge badge-green">Còn @slot.SlotsLeft suất</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-red">Hết suất online</span>
+                                }
+                            </div>
+                            @if (slot.Doctor is not null)
+                            {
+                                <div class="doctor-inline">
+                                    <div class="doctor-avatar">@slot.Doctor.Initials</div>
+                                    <div><b>@slot.Doctor.FullName</b><small>@slot.Doctor.Title</small></div>
+                                </div>
+                                <div class="doctor-room"><i data-lucide="map-pin"></i> @slot.Room</div>
+                            }
+                            <div class="selected-shift"><i data-lucide="check"></i> Đã chọn</div>
+                        </button>
+                        @if (slot.Doctor is not null)
+                        {
+                            <button type="button" class="doctor-link"
+                                    data-doctor-open="@slot.Doctor.ToModalJson(slot.Label, slot.Room, Model.Date)">
+                                Xem thông tin bác sĩ <i data-lucide="chevron-right"></i>
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="alert info">
+                <i data-lucide="info"></i>
+                <div>
+                    <strong>Số thứ tự của bạn là chữ A</strong>
+                    <p>Bệnh nhân đặt online nhận số A theo thứ tự khung giờ; chỗ còn lại của mỗi khung dành cho bệnh nhân đến lấy số T tại quầy.</p>
+                </div>
+            </div>
+        }
+
+        <div class="booking-footer">
+            <span>Đã chọn: <strong id="gio-selected-label">@(picked is null ? "chưa chọn" : $"{picked.Label} · còn {picked.SlotsLeft} suất")</strong></span>
+            <button type="submit" class="btn btn-primary" id="gio-next" disabled="@(picked is null || !picked.IsSelectable)">
+                Tiếp tục <i data-lucide="chevron-right"></i>
+            </button>
+        </div>
+    </section>
+</form>
+
+<partial name="_DoctorModal" />
+
+@section Scripts {
+    <script src="~/js/booking.js" asp-append-version="true"></script>
+}

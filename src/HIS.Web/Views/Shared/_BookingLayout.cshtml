@@ -1,11 +1,11 @@
 @{
     // Mỗi view đặt:
-    //   ViewData["Step"]    = 1..4  (không đặt ở trang thành công -> ẩn thanh trên và stepper)
+    //   ViewData["Step"]    = 1..5  (không đặt ở trang thành công -> ẩn thanh trên và stepper)
     //   ViewData["BackUrl"] = đường dẫn nút quay lại
     int? step = ViewData["Step"] as int?;
     string backUrl = ViewData["BackUrl"] as string ?? Url.Action("Index", "Booking")!;
     string backText = step == 1 ? "Thoát đặt lịch" : "Quay lại";
-    string[] labels = { "Chuyên khoa", "Ngày & ca khám", "Người khám", "Xác nhận" };
+    string[] labels = { "Chuyên khoa", "Ngày & ca khám", "Khung giờ", "Người khám", "Xác nhận" };
 }
 <!DOCTYPE html>
 <html lang="vi">

@@ -32,6 +32,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // 3. Đăng ký các BLL Services
 builder.Services.AddBookingOptions(builder.Configuration);
+// BookingService giữ suất A của khung giờ khi tạo lịch hẹn nên cần allocator.
+builder.Services.AddScoped<QueuePositionAllocator>();
 builder.Services.AddScoped<IAppointmentService, AppointmentService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 
