@@ -462,7 +462,7 @@ Chạy bằng ADO.NET trên chính connection + transaction của `AppDbContext`
 * Toàn bộ thay đổi WinForms mới xác minh bằng build, **chưa bấm chuột thật** trên lưới 14 cột.
 * `TreatWarningsAsErrors` vẫn tắt theo yêu cầu; các knob `HoldMinutes`, `MaxLinkRequestsPerDay`, `PendingLinkExpiryDays`, `SlotGenerationDaysAhead`, `CheckInEarlyMinutes` trong spec **chưa có trong code** (đánh dấu rõ trong `init.md` mục 7, chờ Mẻ 4–5).
 * `backup/` (gate, seed, slotgen, dump) đang gitignore ⇒ không vào git; `ix_appointment_status_history_performed_by` bị EF xóa ở một lần chạy trước, đã được gate kiểm tra lại.
-* **Mẻ 1 → 3b vẫn chưa commit** trên `main`.
+* **Mẻ 1 → 3b đã commit** `5c2ff9f`, Mẻ 4–5 commit `e930ada` — cả hai **chưa push** lên `origin/main`.
 
 ## 7. MẺ 4–5 — WEB CHỌN GIỜ + ĐĂNG NHẬP DEMO + NHIỀU HỒ SƠ, TEST/CI/TÀI LIỆU (05/11/2026)
 
