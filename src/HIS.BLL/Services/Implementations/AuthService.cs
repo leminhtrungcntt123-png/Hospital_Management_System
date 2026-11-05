@@ -149,8 +149,8 @@ public class AuthService : IAuthService
         }
 
         var now = _timeProvider.GetLocalNow().DateTime;
-        var dob = request.DateOfBirth == default 
-            ? DateOnly.FromDateTime(DateTime.Today.AddYears(-20)) 
+        var dob = request.DateOfBirth == default
+            ? DateOnly.FromDateTime(DateTime.Today.AddYears(-20))
             : request.DateOfBirth;
 
         // 4. Tạo Account
