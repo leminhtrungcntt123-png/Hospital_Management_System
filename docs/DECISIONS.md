@@ -2,7 +2,7 @@
 
 Mỗi mục: **Bối cảnh → Quyết định → Hệ quả**. Đánh dấu ⚠️ là chỗ **lệch `init.md` có chủ đích** — ai định "sửa cho đúng spec" phải đọc mục đó trước.
 
-Trạng thái cập nhật: Mẻ 5 (05/11/2026).
+Trạng thái cập nhật: đợt nghiệm thu yêu cầu người dùng (05/11/2026) — 21 quyết định.
 
 ---
 
@@ -69,7 +69,62 @@ Trạng thái cập nhật: Mẻ 5 (05/11/2026).
 
 **Bối cảnh**: module bệnh án (`medical_records`, cận lâm sàng, đơn thuốc) thuộc người khác.
 **Quyết định**: trang `LichKham` chỉ liệt kê ngày/giờ/phòng/bác sĩ/trạng thái + nút hủy. Không hiển thị chẩn đoán hay kết quả.
-**Hệ quả**: `IPatientAccessService.CanViewRecordsAsync` đã có nhưng chưa có màn nào dùng — viết `access_logs` khi đọc hồ sơ người khác là việc mẻ sau.
+**Hệ quả**: `IPatientAccessService.CanViewRecordsAsync` đã có nhưng chưa có màn nào dùng — viết `access_logs` khi đọc hồ sơ người khác là việc mẻ sau. *(Cập nhật 05/11/2026: `/HoSo/Chitiet` đã ghi `access_logs` qua `PatientAccessService`; vẫn chỉ hiển thị lịch sử khám + trạng thái, không có chẩn đoán.)*
+
+## 17. Đồng bộ realtime bằng WebSocket thô, không SignalR và không polling
+
+**Bối cảnh**: người dùng báo "đặt trên web mà không thấy hiện ở WinForms để check-in". Nguyên nhân thật là lưới quầy lọc theo **ngày hôm nay** còn lịch web luôn từ ngày mai (`FirstBookableDate()` = today+1), nhưng yêu cầu được chốt là phải có đồng bộ push.
+**Quyết định**: `app.UseWebSockets()` + middleware riêng `/ws/quay` trong HIS.Web, `QueueChangeNotifier` (singleton) broadcast sự kiện `{kind, at}`; WinForms dùng `ClientWebSocket` (BCL) tự nối lại sau 3s và reload lưới qua `BeginInvoke`. Không thêm package, không dùng SignalR (phải thêm `Microsoft.AspNetCore.SignalR.*` ở cả hai phía, và WinForms phải mang theo `Client.Core`), không polling (mỗi 30s một lệnh SELECT cho từng máy quầy).
+**Hệ quả**: kênh chỉ chạy khi HIS.Web bật; quầy mất kết nối thì im lặng và tự thử lại, dữ liệu vẫn luôn đọc từ DB nên không có trạng thái sai. BLL **không** biết gì về WebSocket (controller web gọi thẳng `QueueChangeNotifier`, giữ đúng quy tắc bất biến #2). Muốn nhiều máy chủ web thì phải thay broadcaster in-memory bằng redis/pub-sub — chưa cần.
+
+## 18. Hồ sơ là trang riêng; wizard đặt lịch chỉ chọn, nút Back thay cho "Chỉnh sửa"
+
+**Bối cảnh**: người dùng muốn tạo/xem hồ sơ theo từng folder riêng và quay lại chỉnh bước đã qua mà không phải hủy lượt đặt.
+**Quyết định**: thêm `HoSoController` + Views `HoSo/` (danh sách, tạo hồ sơ, chi tiết kèm lịch sử khám, xin liên kết) và mục "Hồ sơ" trên menu; wizard bỏ hẳn nút "Thêm hồ sơ mới", bỏ link "Chỉnh sửa" và dòng "Chi phí dự kiến" ở bước xác nhận, thay bằng nút Back ở chân **và** đầu mọi bước (`ViewData["BackUrl"]` trong `_BookingLayout`).
+**Hệ quả**: trạng thái chọn lịch vẫn chỉ nằm trong `Session["BookingState"]`; Back đơn thuần là redirect về bước trước nên không cần API mới. Chi phí dự kiến bỏ vì bảng giá thuộc module thu ngân (người khác phụ trách), hiển thị số giả định dễ gây hiểu nhầm.
+
+## 19. Bỏ hẳn cơ chế phạt (hủy trễ / vắng mặt), đổi sang cửa sổ đặt 30 ngày + hạn mức ngày
+
+**Bối cảnh**: yêu cầu mới chốt các mốc nghiệp vụ: đặt trước tối đa 30 ngày và trước 15:00 ngày liền trước, hủy đến 23:59 ngày liền trước, mỗi ngày tối đa 3 người thân / 6 lượt đăng ký, mỗi tài khoản (và mỗi SĐT chủ tài khoản) tối đa 5 hồ sơ. Người dùng quyết định "đến trễ thì hủy cho bắt số lại", không giữ hình thức phạt nào.
+**Quyết định**: bỏ `FreeCancelHours`, `MaxLateCancelsPerMonth`, `BookingBlockDays`, `MaxNoShowsBeforeBlock`, `NoShowWindowDays` khỏi `BookingOptions`; `CreateAppointmentAsync` thêm `EnsureDailyLimitsAsync` (đếm lượt còn hiệu lực trong 00:00–23:59 theo `booked_by`) và chặn theo `MaxAdvanceDays` + cutoff 15:00; `CancelAppointmentAsync` chỉ còn một luật là `IsCancelAllowed` (trước 00:00 ngày khám); `ReceptionService` thôi ghi `booking_blocked_until`; `PatientProfileService.ValidateProfileQuotaAsync` áp 5 hồ sơ/tài khoản, 5 hồ sơ/SĐT chủ và chống trùng SĐT giữa hai tài khoản.
+**Hệ quả**: cột `accounts.booking_blocked_until`, `accounts.no_show_reset_at`, `appointment_status_history.is_late_cancel` **vẫn nằm trong DB** (không ALTER để_drop) nhưng code không đọc/ghi — ai đọc schema tưởng còn dùng sẽ nhầm, nên ghi rõ ở ARCHITECTURE §5.1. Hủy lượt nào là hoàn chỉ tiêu lượt đó ngay trong ngày, vì bộ đếm loại trạng thái CANCELLED. SĐT chủ tài khoản lấy từ hồ sơ `SELF` (`patients.phone_number`) vì `accounts` không có cột phone và module đăng nhập không thuộc phạm vi.
+
+## 20. Một màn "Tạo hồ sơ" hai nhánh, bỏ màn "Xin liên kết"
+
+**Bối cảnh**: yêu cầu nghiệp vụ mô tả người dùng phải tự khai báo "người này đã khám ở bệnh viện chưa" ngay khi thêm hồ sơ — đã khám thì chỉ cần CCCD, chưa khám thì khai đầy đủ (họ tên, ngày sinh, giới tính, quan hệ, SĐT, CCCD; trẻ nhỏ không có CCCD thì dùng CCCD người thân kèm quan hệ, địa chỉ chọn hoặc nhập, hotline `08080808`). Repo đang có hai màn tách rời `HoSo/Them` và `HoSo/LienKet`, người dùng phải tự đoán mình thuộc màn nào.
+**Quyết định**: gộp thành **một** màn `HoSo/Them` với radio `Branch=seen|new`; xóa `LienKet.cshtml` + action `LienKet` + `LienKetHoSoRequest`. Nhánh `seen` gọi thẳng `RequestLinkAsync` (vẫn `PENDING` cho tới khi quầy duyệt — tự động `ACTIVE` sau OTP để dành Mẻ 4); nhánh `new` gọi `CreateProfileAsync` với thêm `Address` + `InsuranceCardNumber` + `GuardianNationalId`. Thêm `BookingOptions.OwnIdFromAge=14` và `ValidateIdentityDocumentsAsync` trong BLL; hotline đổi thành `0808 0808` ở footer/ChonKhoa/Error.
+**Hệ quả**: không cần ALTER cho mẻ này — "CCCD người thân" chỉ là **điều kiện chặn** được kiểm tra trong BLL rồi tái lập qua liên kết `account_patient_profiles` (cha mẹ ↔ con suy ra từ quan hệ của hai hồ sơ với cùng tài khoản), không lưu thành cột. Số thẻ BHYT đi vào `insurance_cards` sẵn có. Địa chỉ chỉ là một ô text + `datalist` tỉnh thành vì `patients.address` là một cột varchar, làm cascading quận/xã phải thêm bảng.
+
+## 21. Hai khai báo bảo hiểm nằm trên `appointments`, không phải `insurance_cards`
+
+**Bối cảnh**: người bệnh cần tick "có BHYT" / "có bảo hiểm tư nhân" ngay khi đặt lịch để quầy nhắc mang thẻ và làm thủ tục viện phí. Hệ thống đã có bảng `insurance_cards` (số thẻ thật, ngày hiệu lực, plan) nhưng nó là hồ sơ bảo hiểm của **người bệnh**, còn hai ô này là khai báo cho **từng lượt khám** — một người có thể hôm nay mang thẻ, hôm sau không.
+**Quyết định**: thêm hai cột `boolean NOT NULL DEFAULT false` trên `appointments` (`has_health_insurance`, `has_private_insurance`), backup pg_dump trước khi ALTER và chạy ALTER in-place trên cả `hospital_his` lẫn `his_ci`, migration `20261105131631_AppointmentInsuranceDeclaration` chỉ để ghi lại lịch sử. Cờ đi từ bước 4 của wizard qua `BookingState` (Session) vào `CreateAppointmentAsync(..., hasHealthInsurance, hasPrivateInsurance)`; BLL **không** validate và không đổi giá; `ReceptionItemDto.InsuranceDeclaration` sinh nhãn cho lưới quầy.
+**Hệ quả**: `schema.sql` phải sinh lại và gate thêm kiểm tra thứ **17**; `init.md` mục 5 + `schema-reference.sql` + `erd.md` cùng có hai cột này. Hai cột không liên lạc gì với `insurance_cards`: quầy thấy "BHYT + tư nhân" nhưng bệnh nhân chưa từng nhập thẻ thì vẫn phải tra giấy tờ ở quầy. Quầy chưa sửa được khai báo (chỉ bệnh nhân đổi trước cutoff) và đây là điểm treo đã ghi ở `Changed.md` 11.4.
+
+## 22. OTP xác thực hồ sơ: email lấy theo từng nhánh, chỉ tìm hồ sơ bằng mã BN, mã chỉ sống trong Session
+
+**Bối cảnh**: thêm hồ sơ trên web là chỗ duy nhất cần chặn kẻ gian liên kết bừa hồ sơ của người khác, nên nghiệp vụ chốt "chỉ xác thực khi thêm hồ sơ". Câu hỏi còn lại là **gửi mã cho ai** và **tìm hồ sơ bằng gì**. Phương án ban đầu (thử rồi bỏ) là để người dùng gõ email ngay trên form: nó mở cửa tự tay chỉ định hộp thư nhận mã, và cho phép tìm hồ sơ bằng CCCD/SĐT/tên nên một người lạ dò đúng số CCCD là xin liên kết được.
+**Quyết định**: form **không thu thập email nào cả**, và mỗi nhánh lấy một nguồn cố định, không cho ghi đè:
+* nhánh *chưa từng khám* → tạo hồ sơ mới, mã gửi về `accounts.email` của tài khoản đang đăng nhập, rồi **sao chép** email đó sang `patients.email` của hồ sơ mới (để lần sau hồ sơ này còn có mail mà nhận mã);
+* nhánh *đã từng khám* → ô tìm kiếm chỉ chấp nhận **mã bệnh nhân** `BN######` in trên phiếu khám, mã gửi về `patients.email` **đã lưu trong hồ sơ**; không được ghi đè từ form. Liên kết tạo trước ở trạng thái `PENDING`, nhập đúng mã mới `ACTIVE` (giữ nguyên thứ tự `VerifyLinkAsync` vốn có);
+* thiếu email ở nguồn nào thì báo lỗi tiếng Việt đúng nguyên nhân (kèm hotline 0808 0808) chứ không im lặng: "Tài khoản đăng nhập chưa có email…" / "Hồ sơ … chưa có email trong hệ thống…".
+`OtpService` (BLL) sinh mã bằng `RandomNumberGenerator`, 6 số, 5 phút, 5 lần nhập, cách lần gửi lại 60 giây; mã **chỉ nằm trong Session** của trình duyệt, không có cột/bảng mới. Mỗi lần cấp mã ghi một dòng `notifications` (`title = "Mã xác thực hồ sơ"`) làm dấu vết đối chiếu — nội dung giữ nguyên như bản trước. Gửi thật/ghi log nằm ở `IOtpDelivery` phía HIS.Web (`SmtpOtpDelivery` / `DemoOtpDelivery`), BLL không biết SMTP.
+
+**Hệ quả**: cấu trúc DB chỉ phải thêm một cột `patients.email varchar(200) NULL` (backup `hospital_his_pre_otp_20261105_211043.dump`, ALTER in-place trên `hospital_his` + `his_ci`, migration `20261105141229_PatientEmail`), gate thêm kiểm tra thứ **18**. `FindByKeywordAsync` đổi thành `FindByPatientCodeAsync` (hàm private, duy nhất `RequestLinkAsync` gọi — WinForms không gọi nên quầy vẫn tìm hồ sơ bằng các trường riêng của nó). Người quên mã BN phải gọi hotline hoặc chọn nhánh *chưa từng khám*, đó là đánh đổi đã chốt để không lộ "hồ sơ này có tồn tại hay không" qua ô tìm kiếm. SMTP Gmail đặt ở `src/HIS.Web/appsettings.Otp.local.json` (**đã `.gitignore` qua `*.local.json`**), không bao giờ bỏ vào `appsettings.json` đang tracked. Bản demo này tắt `Otp:RevealCodeOnScreen` nên mã không hiện trên màn hình; muốn tự kiểm tra luồng mà không có mail thì bật lại cờ đó.
+
+## 23. Ba lối vào đặt khám hội tụ về một `slotId`; bỏ hẳn bước "chọn ca"
+
+**Bối cảnh**: người dùng mô tả portal theo app UMC Care, nơi bệnh nhân bắt đầu từ ba tình huống khác nhau — "khám theo chuyên khoa", "khám theo ngày" (đã biết hôm nào rảnh), "khám theo bác sĩ" (đã tin một người). Bản cũ chỉ có một đường duy nhất (khoa → ca → ngày → giờ → người), nên người đã biết bác sĩ vẫn phải đi qua ba màn không liên quan, và "ca" là một bước thật sự trong khi người bệnh chỉ quan tâm khung giờ.
+**Quyết định**: `BookingState.Mode` (`khoa` / `ngay` / `bacsi`) quyết định **thứ tự** các bước, không quyết định nghiệp vụ:
+* `khoa` = Chuyên khoa → Bác sĩ → Ngày & giờ → Người khám → Xác nhận (5 bước);
+* `ngay` = Ngày khám → Chuyên khoa → Bác sĩ & khung giờ → Người khám → Xác nhận (5 bước);
+* `bacsi` = Bác sĩ → Ngày & giờ → Người khám → Xác nhận (4 bước).
+Cả ba chỉ khác nhau ở màn nào hiện trước; bước cuối luôn gửi đúng một `slotId` vào `CreateAppointmentAsync`, nên mọi quy tắc (cutoff 15:00 hôm trước, cửa sổ 30 ngày, chặn Chủ nhật, hạn mức 3 người thân/6 lượt, suất A) chỉ có **một** chỗ thực hiện trong BLL. `Guard` + `Wizard` trong `BookingController` suy ra bước hợp lệ và stepper động; `ModeHasStep` quyết định màn "Đổi" nào được phép quay lại.
+Ca khám **không còn là một bước**: `ExamShifts.For(...)` chỉ sinh nhãn nhóm chip "Ca sáng / Ca chiều" trong `_SlotChips.cshtml`. Xóa `ChonNgayCa.cshtml`, `ChonGio.cshtml`, `_ShiftList.cshtml`, action `CaKham`, `BookingShiftDto`, `ShiftVm`, `BookingState.Shift`, `IBookingService.GetShiftsAsync`. Khung đã kín vẫn trả về `Status = "FULL"` để hiện chữ "Đã đầy" thay vì ẩn đi — người bệnh thấy vì sao hết chỗ.
+Khai báo bảo hiểm dịch từ bước "Người khám" sang bước "Xác nhận" vì nó là một phần của phiếu khám cùng chi phí; bước chọn hồ sơ chỉ còn danh sách hồ sơ + nút "Thêm hồ sơ mới".
+
+**Hệ quả**: DB **không đổi cấu trúc** (chỉ thêm truy vấn đọc: `GetDepartmentsOnDateAsync`, `GetDoctorsAsync(dept, date)`, `GetDoctorSlotsAsync`, `GetDaysAsync(from, count, dept, doctor)`, `GetSlotByIdAsync`). Link "Đặt lịch khám" ở header và nút "Đặt lịch mới" nay vào `Booking/Index` (màn chọn lối vào) thay vì nhảy thẳng vào `ChonKhoa`, vì GET `ChonKhoa` không còn nghĩa khi chưa có mode. Giao diện degrade trung thực theo dữ liệu thật: chưa có cột ảnh nên avatar là tên viết tắt, chưa có rating/số lượt khám nên thẻ bác sĩ hiện **số suất online còn lại + ngày gần nhất còn chỗ** (đọc từ `appointment_slots`), chưa có bảng nghỉ lễ nên chỉ chặn Chủ nhật, chưa có module thanh toán nên bước 5 ghi "phí khám dự kiến + đóng tại quầy viện phí" chứ không bày thẻ ATM/QR/ví điện tử, và modal bác sĩ **ẩn** dòng Chuyên khoa/Ngày trực khi dữ liệu đổ về từ khung giờ không mang theo chúng. Test mới `tests/HIS.Tests/BookingEntryPathTests.cs` (3 test) không giả định dữ liệu mà **so chiếu chéo** ba đường đọc với nhau: số suất trên thẻ khoa = tổng suất từng bác sĩ của khoa đó, danh sách khung của khoa = gộp danh sách khung từng bác sĩ, lịch một bác sĩ không bao giờ mở ngày Chủ nhật, và `GetSlotByIdAsync` đọc lại đúng khung vừa chọn.
+
 
 ## 12. ⚠️ Chưa bật `TreatWarningsAsErrors`, chưa có CPM, chưa `dotnet format`
 

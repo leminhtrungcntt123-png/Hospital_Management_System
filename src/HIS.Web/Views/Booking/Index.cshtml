@@ -1,12 +1,33 @@
-﻿@* A1. Trang bắt đầu đặt lịch (dùng _Layout mặc định: có Header + Footer) *@
+@* A1. Trang bắt đầu đặt lịch (dùng _Layout mặc định: có Header + Footer).
+   Ba lối vào của Mẻ 3: theo chuyên khoa / theo ngày / theo bác sĩ. Mỗi thẻ bấm là vào thẳng
+   wizard của luồng đó (Booking/Start?mode=...), không còn một đường "Bắt đầu đặt lịch" duy nhất. *@
 @{
     ViewData["Title"] = "Đặt lịch khám";
 
+    var entries = new[]
+    {
+        (
+            Mode: "khoa", Icon: "stethoscope", Title: "Khám theo chuyên khoa",
+            Text: "Chọn chuyên khoa trước, sau đó chọn bác sĩ và khung giờ phù hợp.",
+            Steps: "Chuyên khoa · Bác sĩ · Ngày & giờ · Người khám · Xác nhận"
+        ),
+        (
+            Mode: "ngay", Icon: "calendar-days", Title: "Khám theo ngày",
+            Text: "Bạn đã biết ngày rảnh? Chọn ngày, hệ thống liệt kê khoa và bác sĩ trực hôm đó.",
+            Steps: "Ngày khám · Chuyên khoa · Bác sĩ & giờ · Người khám · Xác nhận"
+        ),
+        (
+            Mode: "bacsi", Icon: "user-round-search", Title: "Khám theo bác sĩ",
+            Text: "Tìm bác sĩ theo tên hoặc chuyên môn, rồi chọn ngày trong lịch trực của người đó.",
+            Steps: "Bác sĩ · Ngày & giờ · Người khám · Xác nhận"
+        ),
+    };
+
     var steps = new[]
     {
-        (Icon: "search", No: "01", Title: "Chọn chuyên khoa", Text: "Tìm chuyên khoa phù hợp với nhu cầu thăm khám."),
-        (Icon: "calendar-days", No: "02", Title: "Chọn ngày và giờ", Text: "Chọn ngày, ca và khung giờ còn suất đặt online."),
-        (Icon: "user-round", No: "03", Title: "Chọn người khám", Text: "Sử dụng hồ sơ đã lưu hoặc tạo hồ sơ mới."),
+        (Icon: "search", No: "01", Title: "Chọn lối vào", Text: "Theo chuyên khoa, theo ngày hoặc theo bác sĩ."),
+        (Icon: "calendar-days", No: "02", Title: "Chọn ngày và giờ", Text: "Chỉ hiện các khung giờ còn suất đặt online."),
+        (Icon: "user-round", No: "03", Title: "Chọn người khám", Text: "Chọn hồ sơ đã có trong mục Hồ sơ của bạn."),
         (Icon: "circle-check", No: "04", Title: "Xác nhận lịch", Text: "Kiểm tra thông tin và nhận mã lịch hẹn."),
     };
 }
@@ -19,13 +40,33 @@
             Đặt lịch khám tại Bệnh viện Đa khoa HIS chỉ trong vài phút. Không chờ đợi lâu,
             thông tin minh bạch và luôn được hỗ trợ.
         </p>
-        <div class="hero-actions">
-            <a class="btn btn-primary" asp-action="ChonKhoa"><i data-lucide="calendar-days"></i> Bắt đầu đặt lịch</a>
-        </div>
         <div class="trust-row">
             <div><i data-lucide="circle-check"></i><span>Miễn phí đặt lịch</span></div>
             <div><i data-lucide="circle-check"></i><span>Bảo mật thông tin</span></div>
             <div><i data-lucide="circle-check"></i><span>Hỗ trợ 24/7</span></div>
+        </div>
+    </section>
+
+    <section class="entries section" id="cach-dat">
+        <div class="section-intro">
+            <div>
+                <div class="eyebrow">BẮT ĐẦU TỪ ĐÂU?</div>
+                <div class="section-title">Bạn muốn đặt khám theo cách nào?</div>
+            </div>
+            <p>Chọn một cách bên dưới. Cả ba đều dẫn tới cùng một phiếu khám và không bắt buộc nhập lại thông tin đã lưu.</p>
+        </div>
+
+        <div class="entry-grid">
+            @foreach (var e in entries)
+            {
+                <a class="entry-card" asp-action="Start" asp-route-mode="@e.Mode">
+                    <div class="entry-icon"><i data-lucide="@e.Icon"></i></div>
+                    <strong>@e.Title</strong>
+                    <p>@e.Text</p>
+                    <span class="entry-steps">@e.Steps</span>
+                    <span class="entry-go">Chọn <i data-lucide="arrow-right"></i></span>
+                </a>
+            }
         </div>
     </section>
 

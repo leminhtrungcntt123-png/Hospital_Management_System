@@ -16,6 +16,9 @@ public class Patient
     public string? NationalId { get; set; }
     public string PhoneNumber { get; set; } = string.Empty;
     public string? Address { get; set; }
+
+    /// <summary>Email nhận mã OTP lúc thêm hồ sơ; NULL với hồ sơ do quầy tạo.</summary>
+    public string? Email { get; set; }
     public DateTime CreatedAt { get; set; }
 
     // Navigation properties

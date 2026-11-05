@@ -1,6 +1,6 @@
-using HIS.BLL.DTOs;
 using HIS.BLL.Interfaces;
 using HIS.Web.Helpers;
+using HIS.Web.Realtime;
 using HIS.Web.ViewModels.Booking;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,10 +14,12 @@ namespace HIS.Web.Controllers;
 public class LichKhamController : PatientPageController
 {
     private readonly IBookingService _bookingService;
+    private readonly QueueChangeNotifier _realtime;
 
-    public LichKhamController(IBookingService bookingService)
+    public LichKhamController(IBookingService bookingService, QueueChangeNotifier realtime)
     {
         _bookingService = bookingService;
+        _realtime = realtime;
     }
 
     [HttpGet]
@@ -29,7 +31,7 @@ public class LichKhamController : PatientPageController
 
         return View(new MyAppointmentsViewModel
         {
-            Appointments = appointments.Select(ToVm).ToList()
+            Appointments = appointments.Select(a => a.ToVm()).ToList()
         });
     }
 
@@ -41,22 +43,12 @@ public class LichKhamController : PatientPageController
         var result = await _bookingService.CancelAppointmentAsync(appointmentId, AccountId);
         TempData[result.Success ? "Message" : "Error"] = result.Message;
 
+        if (result.Success)
+        {
+            // Suất vừa nhả ra và số thứ tự đổi chỗ -> báo quầy nạp lại.
+            _realtime.Publish(QueueChangeKinds.AppointmentCancelled);
+        }
+
         return RedirectToAction(nameof(Index));
     }
-
-    private static AppointmentVm ToVm(BookingAppointmentDto a) => new()
-    {
-        Id = a.Id,
-        Code = a.Code,
-        Status = a.Status,
-        StatusLabel = a.StatusLabel,
-        IsCancellable = a.IsCancellable,
-        PatientName = a.PatientName,
-        DepartmentName = a.DepartmentName,
-        DateLabel = a.SlotStartTime is { } start ? VietnameseFormat.FullDate(DateOnly.FromDateTime(start)) : "Chưa xác định",
-        TimeLabel = a.SlotStartTime is { } s && a.SlotEndTime is { } e ? $"{s:HH:mm} – {e:HH:mm}" : string.Empty,
-        DoctorName = a.DoctorName,
-        Room = a.RoomName,
-        QueueNumber = a.QueueNumber
-    };
 }

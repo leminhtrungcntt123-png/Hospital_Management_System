@@ -536,3 +536,328 @@ Ràng buộc kiểm bằng psql: `account_patient_profiles` có 8 link, trong đ
 | `demologin/*/bin`, `slotgen/*/bin`, `winforms-smoke/*/bin` (+ `obj`) | build artifact, dựng lại bằng `dotnet run` |
 
 **Còn giữ** (và là thứ đồng nghiệp có thể dùng luôn): `db.sh` (psql không lộ mật khẩu), `dump.sh` (dump/restore), `ci_local.sh` (mô phỏng job `integration`), `gate_align.sql` (16 check trên DB thật), `baseline_history.sql` + `sql/A…G*.sql` (các bước align, được `AlignToGroupSpec.cs` dẫn lại), `seed_demo_*` / `seed_rehearsal_day` / `unseed_demo` (nạp & dọn dữ liệu demo), `demologin.sh` (đặt lại mật khẩu tài khoản demo), `slotgen.sh` + `winforms-smoke/` (2 harness đã được Changed.md dẫn làm bằng chứng), 3 file `hospital_his_*.dump` (đường lùi). `align_plan.js` / `build_migration.js` giữ vì là nguồn sinh ra SQL của migration viết tay.
+
+---
+
+## 8. ĐỢT UI PORTAL BỆNH NHÂN + ĐỒNG BỘ REALTIME WEBSOCKET (05/11/2026)
+
+### 8.1 Sáu yêu cầu của đợt này
+
+| # | Yêu cầu | Kết quả |
+| --- | --- | --- |
+| 1 | Nút Back để chọn lại trước khi xác nhận | Back ở **đầu** và **chân** cả 5 bước wizard (`ViewData["BackUrl"]` + `_BookingLayout`); Back chỉ redirect về bước trước, không đụng `BookingState` |
+| 2 | Bỏ "Thêm hồ sơ mới" trong wizard; hồ sơ có trang riêng | wizard bước 4 chỉ **chọn** hồ sơ đã liên kết + link "Hồ sơ của tôi"; màn Hồ sơ mới lo tạo/xem/liên kết |
+| 3 | Bỏ link "Chỉnh sửa" ở bước xác nhận | đã xóa, người dùng quay lại bằng nút Back |
+| 4 | Bỏ "Chi phí dự kiến 150.000 đ" | đã xóa khỏi `XacNhan.cshtml` + model (giá thật thuộc module thu ngân) |
+| 5 | Thêm mục "Hồ sơ" vào menu chính | `_Layout.cshtml` nav: Trang chủ · Đặt lịch · Lịch khám · **Hồ sơ** |
+| 6 | Web ↔ WinForms chưa đồng bộ, đặt xong không thấy ở quầy | chẩn đoán mục 8.4 + kênh WebSocket mục 8.2 |
+
+### 8.2 File mới
+
+* `src/HIS.Web/Realtime/QueueChangeNotifier.cs` — singleton broadcast `{kind, at}` tới mọi socket đang mở (`Publish` fire-and-forget, client lỗi bị gỡ), `QueueChangeKinds` (`appointment.created`, `appointment.cancelled`, `profile.link_requested`) và middleware `UseQueueChangeSocket("/ws/quay")`.
+* `src/HIS.Web/Controllers/HoSoController.cs` — `Index` (danh sách hồ sơ + lịch sử gần nhất), `Them` GET/POST (tạo hồ sơ mới → link `ACTIVE`/`can_view_records=true`), `Chitiet?patientId=` (thông tin + lịch sử khám theo từng hồ sơ, ghi `access_logs`), `LienKet` (xin liên kết hồ sơ đã có → `PENDING`/`false`, broadcast `profile.link_requested`). Hồ sơ chưa liên kết thì không mở được `Chitiet`.
+* `src/HIS.Web/ViewModels/HoSo/HoSoViewModels.cs`, `Views/HoSo/{Index,Them,Chitiet}.cshtml`, `wwwroot/js/hoso.js`.
+* `src/HIS.WinForms/Services/QueueChangeClient.cs` — `ClientWebSocket` + vòng reconnect 3s, sự kiện `Received`, `Dispose` dừng nền; không thêm NuGet package nào.
+
+### 8.3 File chỉnh
+
+* `src/HIS.Web/Program.cs`: `AddSingleton<QueueChangeNotifier>()` và `app.UseQueueChangeSocket()` đặt **trước** `UseHttpsRedirection` (quầy nối `ws://` trên cổng http 5044; đặt sau thì request upgrade bị chuyển hướng sang https).
+* `BookingController` / `LichKhamController` / `HoSoController`: nhận thêm `QueueChangeNotifier` qua constructor, `Publish(...)` **sau** khi BLL trả thành công — BLL vẫn không biết gì về ASP.NET (giữ quy tắc bất biến mục 2 của `docs/ARCHITECTURE.md`).
+* `Views/Booking/{Index,ChonKhoa,ChonNgayCa,ChonGio,ChonNguoiKham,XacNhan}.cshtml` + `Shared/_Layout.cshtml` + `wwwroot/js/booking.js` + `wwwroot/css/booking.css`: Back, dồn hồ sơ sang trang riêng, xóa Chỉnh sửa/Chi phí dự kiến, dọn CSS modal đã chết.
+* `src/HIS.WinForms/Program.cs` / `MainForm.cs` / `Pages/ReceptionPage.cs`: đọc `Realtime:WebSocketUrl` + `Realtime:Enabled` từ `appsettings.json` (gitignored), `MainForm` khởi tạo và dispose client, `ReceptionPage` subscribe/unsubscribe và `OnRealtimeChanged()` marshal về UI thread bằng `BeginInvoke` rồi `ReloadAsync()`.
+
+### 8.4 Vì sao "đặt trên web mà quầy không thấy" — không phải lỗi đồng bộ
+
+* Portal **không cho đặt hôm nay**: `BookingController.FirstBookableDate()` = `Today + 1`, nên mọi lượt đặt web mang ngày 06/11 trở đi.
+* Lưới quầy lọc theo **ngày hôm nay**: `ReceptionService.InDay()` giới hạn tab *Chờ tiếp nhận / Đã tiếp nhận / Đã hủy* trong `check_in_date = hôm nay`; các lượt tương lai nằm ở tab **Lịch hẹn** và tab đó không có nút check-in (đúng nghiệp vụ: chưa đến ngày thì chưa bốc số).
+* Kiểm DB lúc 13:29 ngày 05/11: hôm nay chỉ còn 4 khung sáng (id 54–57, đều đã qua giờ) và đúng 2 dòng hẹn mang ngày hôm nay — 1 `CHECKED_IN`, 1 `EXPIRED`. Vì vậy tab *Chờ tiếp nhận* trống là **đúng**, không phải mất dữ liệu.
+* Hệ quả còn lại: bệnh nhân không thể check-in *ngay sau khi đặt*; muốn demo thì đặt cho ngày mai rồi kiểm bằng tab Lịch hẹn, hoặc dùng walk-in tại quầy.
+
+### 8.5 Kiểm chứng thật
+
+| Kiểm | Bằng chứng |
+| --- | --- |
+| `GET /HoSo/Them` khi tài khoản đã có hồ sơ `SELF` | select quan hệ **không còn** "Bản thân" (`SPOUSE, CHILD, PARENT, SIBLING, OTHER`) — đã bắt `RelationshipCode` so với `PatientRelationship.Self.ToDatabaseCode()` (UPPER_SNAKE), trước đó so với `"Self"` nên không bao giờ loại |
+| `POST /HoSo/Them` hồ sơ "Nguyễn Thị Con Test" (quan hệ Con) | `302 → /HoSo/Chitiet?patientId=42`; DB: `patients.id=42` + `account_patient_profiles(7,42,CHILD,ACTIVE,can_view_records=t)`; `od -c` trên output psql cho thấy chuỗi lưu **đúng UTF-8** (`ễ` = `E1 BB 85`) |
+| Back trên 5 bước | bấm thật bằng chuột (browser): mỗi bước có link về bước trước, wizard giữ lựa chọn |
+| Bước xác nhận | không còn "Chỉnh sửa", không còn "Chi phí dự kiến" |
+| WebSocket | listener Node nối `ws://localhost:5044/ws/quay` nhận `{"kind":"appointment.created",…13:27:05…}` rồi `{"kind":"appointment.cancelled",…13:28:04…}`; **2 client đồng thời** cùng nhận; probe compile đúng `QueueChangeClient.cs` in ra `PROBE Received -> reload reception grid` |
+| Nghiệp vụ bị chặn | đặt hồ sơ đã có lịch cùng ngày+cùng khoa → báo lỗi thật "Nguyễn Văn An đã có lịch khám trong ngày 06/11/2026." (`TempData["Error"]` + `_ErrorAlert`) |
+| Dọn dẹp | 2 hồ sơ test (id 41 mang lỗi encode của *công cụ gửi request*, không phải của app; id 42) đã xóa kèm `access_logs` + link; DB trở lại sạch |
+
+### 8.6 Build / test sau đợt này
+
+* `dotnet build src/HIS.Web` → **0 Warning, 0 Error**; `dotnet build src/HIS.WinForms` → **0 Warning, 0 Error**.
+* `dotnet build HIS.sln` → xanh; warning `MSB3026` chỉ là DLL trong `bin` bị tiến trình `HIS.WinForms.exe`/Visual Studio đang chạy khóa, không phải warning code.
+* `dotnet test --filter "Category!=Integration"` → **56/56 pass**.
+
+### 8.7 Lưu ý khi chạy thử
+
+* Phải **khởi động HIS.Web trước** rồi mới mở quầy; `QueueChangeClient` thử lại mỗi 3s nên mở sau cũng tự bắt được kết nối.
+* Bản `HIS.WinForms.exe` đang chạy từ trước đợt này **chưa có** code realtime — tắt và chạy lại từ build mới.
+* Muốn quầy không nối WebSocket: đặt `"Realtime": { "Enabled": false }` trong `src/HIS.WinForms/appsettings.json`; hành vi quay về như cũ (chỉ tải lại khi bấm nút).
+
+## 9. MẺ 1 — CỬA SỔ ĐẶT 30 NGÀY, CUTOFF 15:00, HẠN MỨC NGÀY, BỎ MỌI CHẾ TÀI PHẠT (05/11/2026)
+
+Nghiệm thu 5 yêu cầu của đợt "kiểm tra nền tảng Web": (1) 5 hồ sơ/tài khoản, (2) đặt trước tối đa 30 ngày + chỉ đặt trước 15:00 ngày liền trước, (3) thông tin người bệnh, (4) 3 người thân/ngày + 6 lượt/ngày, (5) giao diện hiện đủ ngày–giờ–phòng. Người dùng chốt thêm: **hủy đến 23:59 ngày liền trước**, **bỏ hẳn phạt hủy trễ và chặn vì vắng mặt** ("đến trễ thì hủy cho bắt số lại"), chỉ tính **lượt đặt thành công** và **hủy là hoàn lượt**.
+
+### 9.1 Thông số mới trong `BookingOptions`
+
+| Knob | Giá trị | Ý nghĩa |
+|---|---|---|
+| `MaxAdvanceDays` | 30 | ngày khám xa nhất còn đặt được |
+| `BookingCutoffHour` | 15 | ngày D chỉ đặt được trước 15:00 của D−1 |
+| `MaxProfilesPerAccount` | 5 | số hồ sơ gắn với một tài khoản |
+| `MaxProfilesPerOwnerPhone` | 5 | số hồ sơ tính theo SĐT chủ tài khoản (SĐT hồ sơ `SELF`) |
+| `MaxRelativesPerDay` | 3 | hồ sơ khác nhau được đặt trong 00:00–23:59 |
+| `MaxBookingsPerDay` | 6 | lượt đăng ký trong 00:00–23:59 |
+
+**Đã xóa**: `FreeCancelHours`, `MaxLateCancelsPerMonth`, `BookingBlockDays`, `MaxNoShowsBeforeBlock`, `NoShowWindowDays` (kèm 5 `Validate` tương ứng). `ValidateOnStart` thay bằng các kiểm tra mới, trong đó `MaxBookingsPerDay >= MaxRelativesPerDay`.
+
+### 9.2 Sửa code
+
+* `src/HIS.BLL/Options/BookingOptions.cs`: thay bảng knob trên.
+* `src/HIS.BLL/Services/BookingService.cs`:
+  + `FirstBookableDate` / `LastBookableDate` / `BookableDayCount` / `IsBookableDate(date)` là **nguồn duy nhất** về cửa sổ đặt; `BookingDeadline(D)` = 15:00 ngày D−1; `IsFrameBookable` loại chủ nhật + khung đã qua giờ + ngày đã đóng cutoff.
+  + `CreateAppointmentAsync`: bỏ kiểm tra `booking_blocked_until`; thêm chặn vượt `MaxAdvanceDays`, chặn sau cutoff, rồi `EnsureDailyLimitsAsync` (đếm `appointments` có `booked_by = tài khoản`, `created_at` trong hôm nay, trạng thái ≠ CANCELLED → quá 6 lượt hoặc quá 3 hồ sơ khác nhau thì ném số liệu tiếng Việt).
+  + `CancelAppointmentAsync`: một luật duy nhất `IsCancelAllowed` = trước 00:00 ngày khám (tức hết 23:59 D−1); bỏ entire bộ đếm hủy muộn theo tháng; `is_late_cancel` không còn được ghi.
+  + `GetAppointmentsByAccountAsync.IsCancellable` dùng `IsCancelAllowed`, nên nút Hủy biến mất đúng hạn.
+  + `GetDaysAsync` trả `state="closed"` cho ngày ngoài cửa sổ; `GetActiveDepartmentsAsync` / `CountBookableSlotsAsync` đếm trên cả cửa sổ 30 ngày (DTO đổi `SlotsThisWeek` → `SlotsInWindow`).
+* `src/HIS.BLL/Services/ReceptionService.cs`: **xóa `ApplyBookingBlockAsync`** và lời gọi trong `ExpireOverdueAppointmentsAsync` — vẫn đánh NO_SHOW sau 30 phút từ lần gọi số đầu, nhưng không còn đặt `booking_blocked_until` / `no_show_reset_at`.
+* `src/HIS.BLL/Services/PatientProfileService.cs`: thêm `IOptions<BookingOptions>` vào ctor + `ValidateProfileQuotaAsync` (5 hồ sơ/tài khoản → 5 hồ sơ/SĐT chủ → chống trùng SĐT giữa hai tài khoản, thông báo "Số điện thoại … đã được đăng ký. Vui lòng đăng nhập bằng tài khoản đó hoặc dùng Quên mật khẩu."). `OwnerPhoneAsync` đọc SĐT từ hồ sơ `SELF` vì `accounts` không có cột phone.
+* `src/HIS.BLL/Interfaces/IBookingService.cs`, `DTOs/BookingDtos.cs`: bổ sung 4 thành viên cửa sổ đặt; `CancelAppointmentResult` bỏ `IsLateCancel`/`LateCancelsUsedThisMonth`.
+* `src/HIS.Web/Controllers/BookingController.cs`: xóa `DaysToShow = 7` và hai hàm `FirstBookableDate`/`IsBookableDate` tự tính; mọi bước hỏi `_bookingService` (`BookableDayCount` khi vẽ lịch, `IsBookableDate` khi POST `CaKham`/`ChonNgayCa` nên ngày ngoài hạn bị chặn ngay phía server).
+* `src/HIS.Web/Views/Booking/ChonNgayCa.cshtml`: lịch 29–30 ngày (grid 7 cột tự cuộn thành 5 hàng), ngày `closed` disable + nhãn "Ngưng nhận", thêm dòng "Khung đặt được từ … đến … / trước 15:00 ngày liền trước / 3 người thân – 6 lượt".
+* `src/HIS.Web/Views/Booking/ChonKhoa.cshtml`: nhãn "Còn N lịch đặt được".
+* `src/HIS.Domain/Entities/Identity/Account.cs`: `BookingBlockedUntil`/`NoShowResetAt` đánh dấu không còn dùng (giữ cột để **không phải ALTER**).
+* Test: `tests/HIS.Tests/BookingPolicyPathTests.cs` viết lại 2 bài cũ + thêm 1 bài mới; `PatientProfileFlowTests.cs` cập nhật ctor.
+
+### 9.3 Bằng chứng trên CSDL thật (`his_ci`, integration 12/12 pass)
+
+| Tình huống | Kết quả quan sát được |
+|---|---|
+| `Huy_chi_duoc_den_23h59_ngay_lien_truoc_va_tra_lai_suot_A` | Lượt khám **trong hôm nay** → `Success=False`, "Lượt HIS-TEST-… khám ngày 05/11/2026 đã quá hạn hủy trên web (chỉ hủy đến 23:59 ngày hôm trước)…", `slot_position` và `booked_count` **không đổi**. Lượt khám **ngày mai** → `Success=True`, `slot_position = NULL`, `booked_count` giảm 1, `online_booked` về 0, lịch sử có `is_late_cancel = false`. |
+| `Vang_mat_nhieu_lan_van_duoc_dat_lich_khong_bi_chan` | 3 lượt quá 30 phút từ lần gọi → `ExpireOverdueAppointmentsAsync` trả 3, tất cả thành NO_SHOW, nhưng `booking_blocked_until` và `no_show_reset_at` vẫn **NULL**. |
+| `Han_muc_ngay_chan_3_nguoi_than_6_luot_va_huy_la_hoan_luot` | 3 hồ sơ đầu đặt thành công (có số A##), hồ sơ thứ 4 bị từ chối "Mỗi tài khoản chỉ đăng ký được tối đa 3 người thân trong một ngày. Hôm nay đã đăng ký cho 3 người."; **hủy lượt đầu** rồi đặt lại → hồ sơ thứ 4 thành công, chứng minh hủy là hoàn chỉ tiêu. |
+| `gate` + unit | `docs/database/ci/schema_checks.sql` → **16/16 đạt**; `dotnet test --filter "Category!=Integration"` → **56/56 pass**; `dotnet build HIS.sln` → **0 Warning, 0 Error**. |
+
+### 9.4 Bằng chứng trên portal thật (HIS.Web, 05/11/2026 18:06 — đã qua 15:00)
+
+* `POST /Booking/ChonKhoa` rồi `GET /Booking/ChonNgayCa`: **29 ngày** được render, ngày đầu `2026-11-07`, ngày cuối `2026-12-05` (= hôm nay + 30). Ngày `2026-11-06` **không xuất hiện** vì cutoff 15:00 hôm nay đã qua — đúng luật "chỉ đặt trước 15:00 ngày liền trước".
+* Ghi chú mới trên màn hình: `Khung đặt được từ 07/11/2026 đến 05/12/2026.`
+* `POST /Booking/ChonNgayCa` với `date=2026-12-31` (ngoài 30 ngày) → quay lại bước 2 kèm "Ngày khám không hợp lệ. Vui lòng chọn lại."
+* Tài khoản `patient.tranb` (đang có 3 hồ sơ): tạo hồ sơ thứ 4 và thứ 5 thành công (`account_patient_profiles` thêm 2 dòng ACTIVE), hồ sơ **thứ 6** bị chặn — "Mỗi tài khoản chỉ được quản lý tối đa 5 hồ sơ. Tài khoản này đã có 5 hồ sơ."
+* Tài khoản tạm `test.me1.check` tạo `SELF` với SĐT `0912345678` (đã là SĐT chủ của `patient.tranb`) → "Số điện thoại 0912345678 đã được đăng ký. Vui lòng đăng nhập bằng tài khoản đó hoặc dùng Quên mật khẩu."
+* Dọn dẹp: toàn bộ dữ liệu kiểm thử (7 `patients`, liên kết, `access_logs`, tài khoản tạm id 24) đã xóa; DB về trạng thái 8 bệnh nhân / 22 tài khoản / 8 liên kết.
+
+### 9.5 Việc còn treo của đợt yêu cầu này
+
+* **Đã làm ở Mẻ 2 (xem mục 10)**: một màn *Tạo hồ sơ* duy nhất với hai nhánh "đã khám / chưa khám", ô "Số thẻ BHYT", bắt buộc CCCD người thân khớp hồ sơ ACTIVE của tài khoản, đổi hotline thành `0808 0808`.
+* **Chưa làm (Mẻ 3)**: ba đường vào đặt khám (chuyên khoa / theo ngày / theo bác sĩ), tìm bác sĩ theo chuyên khoa–tên, khung giờ hết hiện nhãn "hết".
+* **Đã làm ở Mẻ 4 (xem mục 11)**: hai khai báo bảo hiểm trên lượt đặt — ALTER `appointments.has_health_insurance` + `has_private_insurance` đã được duyệt và chạy trên `hospital_his` lẫn `his_ci`.
+* OTP chỉ gửi **khi thêm hồ sơ**; phương án không tốn phí là `IOtpDelivery` bản demo ghi vào `notifications` + hiện mã trên màn hình (DB hiện **không** có địa chỉ email nào của tài khoản bệnh nhân và solution **không** có package mail, nên chưa thể gửi mail thật).
+* Luồng "đã thanh toán 100% qua app → bỏ qua quầy thu ngân" chưa làm được vì portal chưa có module thanh toán.
+
+## 10. MẺ 2 — MỘT MÀN "TẠO HỒ SƠ" HAI NHÁNH + QUY TẮC GIẤY TỜ (05/11/2026)
+
+Yêu cầu (3) của đợt nghiệm thu: người dùng khai báo **đã từng khám** hay **chưa từng khám** ngay khi thêm hồ sơ. Bản cũ bắt người dùng tự đoán giữa hai màn `HoSo/Them` (tạo mới) và `HoSo/LienKet` (xin liên kết) — này gộp về một màn, xóa hẳn đường "Xin liên kết" riêng. **Không đụng cấu trúc DB**: mọi thứ đi vào cột đã có.
+
+### 10.1 Hai nhánh trên một màn
+
+| Nhánh | Nhập | Kết quả |
+|---|---|---|
+| `seen` — "Đã từng khám tại bệnh viện" | MỘT thông tin định danh (`Keyword`: CCCD / SĐT / mã BN / số thẻ BHYT) + quan hệ | `RequestLinkAsync` → link `PENDING`, `can_view_records=false`, quầy duyệt khi tới khám; broadcast `profile.link_requested` |
+| `new` — "Chưa từng khám" | họ tên, ngày sinh, giới tính, quan hệ, SĐT, CCCD **hoặc** CCCD người thân, địa chỉ, **số thẻ BHYT** | `CreateProfileAsync` → link `ACTIVE` + `can_view_records=true`, đặt lịch ngay; BHYT lưu vào `insurance_cards` |
+
+### 10.2 Thông số và quy tắc mới
+
+| Knob | Giá trị | Ý nghĩa |
+|---|---|---|
+| `BookingOptions.OwnIdFromAge` | 14 | tuổi tối thiểu phải có CCCD của chính mình (mốc được cấp CCCD) |
+
+`PatientProfileService.ValidateIdentityDocumentsAsync` (chạy **sau** `ValidateProfileQuotaAsync`), 4 luật:
+
+1. CCCD đã tồn tại trong `patients` → từ chối, bảo chuyển sang nhánh "Đã từng khám" và nhập đúng CCCD đó.
+2. Đủ 14 tuổi mà bỏ trống CCCD → "Người từ 14 tuổi bắt buộc phải khai CCCD / số định danh cá nhân."
+3. Dưới 14, chưa có CCCD, không khai người thân → "Trẻ dưới 14 tuổi chưa có CCCD thì phải nhập CCCD của người thân kèm quan hệ."
+4. Dưới 14 khai CCCD người thân nhưng số đó **không khớp** `national_id` một hồ sơ `ACTIVE` của đúng tài khoản → "CCCD người thân … không khớp với hồ sơ nào đang hoạt động của tài khoản này…".
+
+Quan hệ cha mẹ ↔ con **không** lưu thành cột mới: nó tái lập được qua `account_patient_profiles` (hồ sơ con gắn `CHILD`, hồ sơ người thân gắn `SELF`/`PARENT`… cùng một tài khoản), nên `CreateProfileRequest.GuardianNationalId` chỉ là **điều kiện chặn** lúc tạo.
+
+### 10.3 Sửa code
+
+* `src/HIS.BLL/Options/BookingOptions.cs`: thêm `OwnIdFromAge` + `Validate(o => o.OwnIdFromAge is >= 0 and <= 60)`.
+* `src/HIS.BLL/Interfaces/IPatientProfileService.cs`: `CreateProfileRequest` thêm `GuardianNationalId`.
+* `src/HIS.BLL/Services/PatientProfileService.cs`: thêm `ValidateIdentityDocumentsAsync` (dùng `PatientAge.YearsOn` có sẵn), bỏ đoạn kiểm tra CCCD trùng từng nằm rời rạc trong `CreateProfileAsync`; sửa 3 thông báo còn tham chiếu màn "Xin liên kết" cũ; hotline trong thông báo đổi thành `0808 0808`.
+* `src/HIS.Web/ViewModels/HoSo/HoSoViewModels.cs`: `ThemHoSoRequest` thành form hai nhánh (`Branch`, `Keyword`, thêm `GuardianNationalId`, `Address`, `InsuranceCardNumber`), **bỏ hết `[Required]`/`[RegularExpression]`** vì trường của nhánh kia luôn rỗng khi submit — xóa `LienKetHoSoRequest`.
+* `src/HIS.Web/Controllers/HoSoController.cs`: `Them` POST phân nhánh sang `LinkExistingAsync` / `CreateNewAsync` (mỗi hàm tự đặt `ViewData` quan hệ cho đúng panel); xóa 2 action `LienKet`; `profile.link_requested` giờ publish từ nhánh `seen`; thành công thì nhảy thẳng `Chitiet?patientId=`.
+* `src/HIS.Web/Views/HoSo/Them.cshtml`: radio hai card + hai `branch-panel`; panel không chọn bị `hidden` và `disabled` từ JS; ô địa chỉ dùng `datalist` 10 tỉnh thành (chọn hoặc tự nhập); chú thích vàng tự hiện khi ngày sinh < 14 tuổi. **Xóa** `Views/HoSo/LienKet.cshtml`.
+* `src/HIS.Web/Views/HoSo/Index.cshtml`: một nút "Tạo hồ sơ" thay hai nút.
+* `src/HIS.Web/wwwroot/js/hoso.js`: toggle nhánh (disable input panel kia, đổi nhãn nút submit, gợi ý trẻ nhỏ) + validation chỉ chạy trên nhánh đang chọn.
+* `src/HIS.Web/wwwroot/css/booking.css`: `.branch-choice`, `.branch(.selected)`, `.branch-panel[hidden]`, `.child-note`.
+* Hotline: `Views/Shared/_Layout.cshtml`, `Views/Booking/ChonKhoa.cshtml`, `Views/Shared/Error.cshtml` đổi `1900 6868` → `0808 0808`.
+* Test: `tests/HIS.Tests/PatientProfileFlowTests.cs` thêm `Cccd_dang_dinh_va_cccd_nguoi_than_khi_tao_ho_so` (5 tình huống, đọc CCCD `SELF` ACTIVE thật của tài khoản 7 từ DB, có guard bỏ qua khi tài khoản đã hết chỉ tiêu).
+
+### 10.4 Bằng chứng CI (`his_ci`)
+
+* `dotnet build HIS.sln` → **0 Warning, 0 Error**; unit `Category!=Integration` → **56/56**; integration → **13/13** (thêm 1 bài mới); gate `schema_checks.sql` → **16/16 đạt**.
+* Bài mới in ra đúng chuỗi tiếng Việt của từng luật, và xác nhận hồ sơ trẻ tạo xong có `national_id IS NULL`, `address = 'Thành phố Hồ Chí Minh'`, `insurance_cards` có 1 dòng.
+
+### 10.5 Bằng chứng trên portal thật (HIS.Web, tài khoản `patient.nguyena` — id 7, CCCD chủ `001090001234`)
+
+| # | Tình huống | Kết quả |
+|---|---|---|
+| 1 | `GET /HoSo/Them` | Hai nhãn "Đã từng khám tại bệnh viện" / "Chưa từng khám" cùng xuất hiện trên một màn. |
+| 2 | Trường mới | "CCCD người thân", "Địa chỉ", "Số thẻ BHYT" đều có trên form. |
+| 3 | `GET /HoSo/LienKet` | **404** — đường cũ đã xóa. |
+| 4 | Hotline | `0808 0808` hiện ở footer trang chủ và màn Tạo hồ sơ. |
+| 5 | Người lớn (1990) bỏ CCCD | "Người từ 14 tuổi bắt buộc phải khai CCCD / số định danh cá nhân." |
+| 6 | Trẻ 2021, không khai người thân | "Trẻ dưới 14 tuổi chưa có CCCD thì phải nhập CCCD của người thân kèm quan hệ." |
+| 7 | Trẻ 2021, CCCD người thân `991234567890` | "CCCD người thân 991234567890 không khớp với hồ sơ nào đang hoạt động của tài khoản này…" |
+| 8 | Nhánh `seen`, CCCD `079098001234` (hồ sơ Lê Minh Phúc, chưa thuộc tài khoản 7) | Redirect `/HoSo/Chitiet?patientId=39`; `account_patient_profiles` = `SIBLING / PENDING / can_view_records=false`. |
+| 9 | Nhánh `new`, trẻ khai CCCD người thân `001090001234` + địa chỉ + BHYT | Redirect `/HoSo/Chitiet?patientId=50`; `patients.id=50` có `national_id NULL`, `address 'Thành phố Hồ Chí Minh'`, 1 dòng `insurance_cards`; link `CHILD / ACTIVE / true`. |
+| 10 | Nhánh `new` với CCCD đã tồn tại | "CCCD 001090001234 đã có trong hệ thống. Ở màn Tạo hồ sơ, hãy chọn \"Đã từng khám\" và nhập đúng CCCD này để liên kết hồ sơ đó." |
+
+Dọn dẹp: `access_logs` (2), `insurance_cards` (1), `account_patient_profiles` (2), `patients` id 50 (1) đã xóa — DB về 8 bệnh nhân / 22 tài khoản / 8 liên kết, không còn bản ghi `Check Me2%`.
+
+### 10.6 Việc còn treo
+
+* Nhánh `seen` vẫn là `PENDING` chờ quầy. Phương án đã chốt: OTP khi thêm hồ sơ sẽ tự đẩy lên `ACTIVE` + `can_view_records` (Mẻ 4, `IOtpDelivery` demo), kiểm tra giấy tờ ở quầy giữ làm fallback.
+* "Địa chỉ chọn hoặc nhập" mới là `datalist` tỉnh thành + ô tự do, vì `patients.address` chỉ là một cột varchar; cascading quận/phường phải thêm bảng (chưa xin ALTER).
+
+## 11. MẺ 4 — HAI KHAI BÁO BẢO HIỂM TRÊN LƯỢT ĐẶT LỊCH (05/11/2026)
+
+Người bệnh tick "có BHYT" / "có bảo hiểm tư nhân" ở **bước 4** (nhập thông tin người khám) để quầy nhắc mang thẻ và làm thủ tục viện phí đúng quyền lợi. Đây là **khai báo**, không phải hồ sơ bảo hiểm: không validate, không ảnh hưởng giá, không liên quan `insurance_cards` (số thẻ thật vẫn lưu ở bảng đó, đã làm ở Mẻ 2).
+
+### 11.1 Cấu trúc DB — ALTER đã được duyệt và chạy in-place
+
+| Bước | Chi tiết |
+|---|---|
+| Backup | `backup/hospital_his_pre_insurance_20261105_201510.dump` (pg_dump 124K, trước khi đổi) |
+| ALTER | `appointments ADD COLUMN has_health_insurance boolean NOT NULL DEFAULT false, ADD COLUMN has_private_insurance boolean NOT NULL DEFAULT false` — chạy trên **cả `hospital_his` và `his_ci`** |
+| Migration | `20261105131631_AppointmentInsuranceDeclaration` (EF sinh, `AddColumn<bool>` defaultValue `false`, đúng bằng ALTER đã chạy tay) |
+| Ảnh hưởng dữ liệu | bảng có sẵn 22 cột; 20 lượt đang tồn tại nhận `false`, không phải vá lại dòng nào |
+| Snapshot CI | `docs/database/ci/schema.sql` sinh lại từ model (`appointments` 296–297), phần lịch sử ghi đủ **5** migration đã commit |
+| Gate | thêm kiểm tra số **17** vào `docs/database/ci/schema_checks.sql` (đủ 2 cột, `boolean`, NOT NULL, default false) → mọi chỗ ghi "16 kiểm tra" đã đổi thành 17 |
+
+### 11.2 Sửa code
+
+* `HIS.Domain`: `Appointment.HasHealthInsurance` / `HasPrivateInsurance` (kèm ghi chú "chỉ để quầy phân luồng").
+* `HIS.DAL/AppointmentConfiguration`: `HasDefaultValue(false)` cho hai cột.
+* `HIS.BLL/BookingService`: `CreateAppointmentAsync(accountId, patientId, slotId, hasHealthInsurance = false, hasPrivateInsurance = false, ct)` — hai cờ ghi thẳng vào entity, **không** thêm luật chặn nào; `GetAppointmentsByAccountAsync` trả hai cờ trong `BookingAppointmentDto`.
+* `HIS.BLL/ReceptionService`: `ReceptionItemDto` thêm `InsuranceDeclaration` (sinh nhãn "BHYT" / "Tư nhân" / "BHYT + tư nhân" / rỗng).
+* `HIS.Web`: `BookingState` giữ hai cờ trong Session nên bấm *Quay lại* từ bước 5 về bước 4 vẫn còn khai báo; `ChonNguoiKham.cshtml` thêm hai thẻ checkbox (`.declare`), `booking.js` bật/tắt nền xanh theo checkbox, `XacNhan.cshtml` hiển thị "Bảo hiểm đã khai", `LichKham/Index.cshtml` + `HoSo/Chitiet.cshtml` hiển thị dòngเดียวกัน. Nhãn gộp trong `InsuranceDeclarations.Summary(...)` để ba màn không lệch cách diễn đạt.
+* `HIS.WinForms/ReceptionPage`: cột mới **"KHAI BẢO HIỂM"** đặt cạnh "SỐ BHYT" (lưới + tệp CSV), rỗng hiện "-".
+
+### 11.3 Bằng chứng chạy thật
+
+* Build `HIS.sln`: 0 warning / 0 error. Test: **70/70** (56 unit + 14 integration, `his_ci`). CI local: `schema.sql` nạp sạch, gate **17/17**, `dotnet ef migrations has-pending-model-changes` → "No changes".
+* Test integration mới `BookingPolicyPathTests.Hai_khai_bao_bao_hiem_duoc_luu_va_hien_o_danh_sach_quay`: đặt lịch qua `BookingService` với hai cờ = true → đọc lại `appointments` thấy `t/t` → `ReceptionService.GetReceptionListAsync(Scheduled)` trả `"BHYT + tư nhân"`; dữ liệu test tự xóa trong `finally`.
+* Chuột thật trên portal (DB `hospital_his`, `patient.nguyena`), 9 bước: hai checkbox có trên bước 4; chỉ tick BHYT → bước 5 hiện "Bảo hiểm đã khai **BHYT**"; lùi về bước 4 thì ô BHYT vẫn `checked`, ô tư nhân vẫn trống; lượt `HIS-20261205-TEWZNS` tạo ra có `has_health_insurance = t`, `has_private_insurance = f`; màn *Lịch khám* hiện dòng khai báo.
+* Dọn dẹp: đã xóa lượt test, `appointment_slots` id 888 về `booked_count=0 / online_booked=0`, `hospital_his` trở lại **20 lượt** như trước khi kiểm thử.
+* Chưa kiểm thử **bằng mắt** trên WinForms (app GUI, chạy manual): cột mới chỉ được xác minh qua build + DTO trong test integration.
+
+### 11.4 Việc còn treo
+
+* OTP khi thêm hồ sơ (`IOtpDelivery` bản demo ghi vào `notifications` + hiện mã trên màn hình) — đã làm xong, xem mục 12.
+* Mẻ 3: ba đường vào đặt khám (chuyên khoa / theo ngày / theo bác sĩ), tìm bác sĩ, nhãn "hết" cho khung kín.
+* Quầy chưa có cách **sửa** hai khai báo khi bệnh nhân khai sai; hiện chỉ bệnh nhân đổi được trên web trước giờ cutoff.
+
+## 12. MẺ OTP — MÃ XÁC THỰC KHI THÊM HỒ SƠ, GỬI MAIL THẬT QUA SMTP (05/11/2026)
+
+Chỉ một nghiệp vụ cần chặn: **thêm hồ sơ**. Người đã từng khám phải chứng minh mình là người đứng tên hồ sơ đó, người chưa từng khám phải chứng minh mình sở hữu hộp thư của tài khoản đang đăng nhập. Email nhận mã lấy từ dữ liệu đã có trong hệ thống theo từng nhánh, không cho người dùng tự chỉ định hộp thư, và hồ sơ đã có chỉ tìm được bằng **mã bệnh nhân**.
+
+### 12.1 Cấu trúc DB — ALTER đã duyệt và chạy in-place
+
+| Bước | Chi tiết |
+|---|---|
+| Backup | `backup/hospital_his_pre_otp_20261105_211043.dump` (pg_dump, trước khi đổi) |
+| ALTER | `patients ADD COLUMN email character varying(200) NULL` — chạy trên **cả `hospital_his` và `his_ci`**. Không tạo bảng/cột chứa mã: mã chỉ sống trong Session |
+| Migration | `20261105141229_PatientEmail` (EF sinh, `AddColumn<string>` nullable) — **migration thứ 6** trong chain |
+| Snapshot CI | `docs/database/ci/schema.sql` sinh lại (cột `email` trong `patients`), `dotnet ef migrations has-pending-model-changes` → "No changes" |
+| Gate | thêm kiểm tra số **18** vào `docs/database/ci/schema_checks.sql` (cột `email`, `character varying(200)`, NULL được) → mọi chỗ ghi "17 kiểm tra" đã đổi thành 18 |
+| Seed demo | `accounts.email` (id 7) và `patients.email` (id 39) được nạp bằng `UPDATE` để test mail thật; các tài khoản/hồ sơ khác vẫn để trống để dọa đường báo lỗi |
+
+### 12.2 Sửa code
+
+* `HIS.BLL/Interfaces/IOtpService.cs`: `IssueProfileOtpAsync(accountId, patientId, ProfileOtpSource source, ct)` + enum `ProfileOtpSource { NewProfile, ExistingProfile }`. Nguồn email là tham số, **không phải** dữ liệu người dùng nhập.
+* `HIS.BLL/Services/OtpService.cs`: `NewProfile` đọc `accounts.email`, `ExistingProfile` đọc `patients.email`; không bao giờ ghi đè `patients.email`. Thiếu email → trả thất bại với câu tiếng Việt chỉ đúng nguyên nhân + hotline 0808 0808. Mã 6 số từ `RandomNumberGenerator.GetInt32`, hết hạn 5 phút, 5 lần nhập, gửi lại cách 60 giây; mỗi lần cấp ghi một dòng `notifications` (`title = "Mã xác thực hồ sơ"`, nội dung giữ nguyên như bản thử trước). BLL không biết SMTP.
+* `HIS.BLL/Services/ProfileEmail.cs`: `IsUsable` chặn chuỗi rỗng/khoảng trắng và cả `ArgumentException`; thêm `NormalizeUsable` trả `null` khi email không dùng được để OtpService khỏi phân nhánh.
+* `HIS.BLL/Services/PatientProfileService.cs`: `FindByKeywordAsync` → `FindByPatientCodeAsync` (chỉ `BN` + 6 số, hàm private và `RequestLinkAsync` là nơi duy nhất gọi); `CreateProfileAsync` lấy `email ??= ProfileEmail.NormalizeUsable(account.Email)` nên hồ sơ mới thừa email của tài khoản; câu "không tìm thấy" đổi thành hướng dẫn nhập mã BN in trên phiếu khám.
+* `HIS.Web/Controllers/HoSoController.cs`: `StartOtpAsync(patientId, source)` là bước duy nhất xin mã; nhánh *seen* gọi với `ExistingProfile` sau khi liên kết đã tạo `PENDING`, nhánh *new* gọi với `NewProfile` sau khi lưu hồ sơ; `GuiLaiOtp` gửi lại theo `pending.Source` đã lưu trong Session chứ không đoán lại; lỗi OTP trả về **đúng nhánh vừa khai** (`?branch=seen|new`) để không phải chọn lại từ đầu.
+* `HIS.Web/ViewModels/HoSo/HoSoViewModels.cs`: **bỏ `ThemHoSoRequest.Email`**; `Keyword` giới hạn 20 ký tự; `PendingOtp` thêm `Source`.
+* `HIS.Web/Views/HoSo/Them.cshtml`: bỏ hoàn toàn ô Email, nhãn ô tìm kiếm thành "Mã bệnh nhân *" + `placeholder="BN000123"`, mỗi nhánh có ghi chú riêng nói mã về email nào và chuyện gì xảy ra khi email trống.
+* `HIS.Web/wwwroot/js/hoso.js`: bỏ rule `Email`, rule `Keyword` thành `/^BN\d{1,6}$/i`, nhánh *seen* chỉ validate `Keyword`.
+* `src/HIS.Web/appsettings.Otp.local.json` (**đã `.gitignore`**, không commit): `Otp:Smtp` trỏ `smtp.gmail.com:587` + `Otp:RevealCodeOnScreen = false`. `Program.cs` đăng ký `SmtpOtpDelivery` khi có User/Password thật, ngược lại `DemoOtpDelivery`.
+
+### 12.3 Bằng chứng chạy thật
+
+* Build `HIS.sln`: 0 warning / 0 error. `dotnet test HIS.sln` (có `HIS_REHEARSAL_CONNECTION`): **90/90** (73 unit + 17 integration). `bash backup/ci_local.sh`: dựng lại `his_ci` → gate **18/18** → integration **17/17**.
+* Test mới/đổi trong `tests/HIS.Tests/OtpProfileFlowTests.cs` (3 test integration, chạy thật trên `his_ci`, không skip):
+  1. `Ho_so_moi_nhan_ma_theo_email_tai_khoan_va_chep_vao_ho_so` — form không gửi email, hồ sơ mới vẫn nhận `accounts.email`, người nhận đúng bằng email tài khoản, gửi lại không đổi email và không ghi đè;
+  2. `Thieu_email_thi_khong_cap_ma_va_bao_ro_ly_do` — hai câu lỗi tiếng Việt, kênh gửi **không** được gọi lần nào (`Assert.Empty(channel.Sent)`);
+  3. `Ho_so_da_tung_kham_tim_theo_ma_bn_va_nhan_ma_email_ho_so` — xin liên kết bằng CCCD bị từ chối, bằng `BN000039` thì `PENDING`, mã về `patients.email`, `OtpCodes.Matches` chấp nhận khoảng trắng nhưng chặn `000000` và mã thừa chữ số, xác nhận xong thành `ACTIVE`.
+  `PatientProfileFlowTests` cũng đổi sang tìm bằng mã BN thay vì CCCD.
+* Chuột thật qua HTTP trên portal `hospital_his` (`patient.nguyena`, SMTP Gmail thật, 5 lần gửi mail thật):
+  * `/HoSo/Them` không còn `<input name="Email">` nào (0 trường), ô tìm kiếm là "Mã bệnh nhân" + `placeholder="BN000123"`;
+  * nhập CCCD `079098001234` và nhập họ tên "Lê Minh Phúc" → cùng bị từ chối kèm hướng dẫn mã BN, **không** sinh liên kết rác (`account_id=7 AND patient_id=39` = 0 dòng);
+  * nhập `" bn000039 "` (thường + khoang trắng) → liên kết `PENDING` trước, màn nhập mã hiện "Mã gồm 6 số đã gửi tới **trile…+hoso39@gmail.com**" đúng bằng `patients.email`, không hiện mã (đã tắt `RevealCodeOnScreen`), không có lỗi SMTP;
+  * nhập `000000` → "Mã không đúng. Còn 4 lần nhập."; bấm *Gửi lại mã* ngay → "chờ thêm 60 giây"; nhập đúng `896895` (kèm khoảng trắng hai bên) → `ACTIVE/false/verified_by=7`, chuyển về trang chi tiết hồ sơ;
+  * nhánh *chưa từng khám* khai không có email → màn nhập mã hiện email **của tài khoản** (`…+taikhoan@gmail.com`), `patients.email` của hồ sơ vừa tạo tự có đúng giá trị đó, nhập mã xong link `ACTIVE/OTHER`;
+  * đăng nhập `patient.tranb` (email NULL) → báo "Tài khoản đăng nhập chưa có email nên hệ thống không gửi được mã xác thực… hotline 0808 0808"; nhánh *seen* với `BN000038` (email NULL) → báo "Hồ sơ Kim Ji Won chưa có email trong hệ thống…", liên kết vẫn `PENDING` để quầy xét giấy tờ, và **không** ghi dòng `notifications` nào cho lần thất bại;
+  * sau khi xác nhận xong, `GET /HoSo/XacOtp` → "Không còn mã xác thực nào đang chờ" (mã đã xóa khỏi Session);
+  * DB: `notifications` có đúng 2 dòng "Mã 896895 xác thực hồ sơ Lê Minh Phúc gửi tới …, có hiệu lực đến 22:36 ngày 05/11/2026." / "Mã 976073 …"; `access_logs` phát sinh `LINK_REQUEST/39`, `LINK_VERIFY/39`, `CREATE_PROFILE/55`, `CREATE_PROFILE/56` (tài khoản 8), `LINK_REQUEST/38`; số cột chứa `otp`/`verification` trong schema = **0**.
+* Dọn dẹp: đã xóa toàn bộ notifications, access_logs, liên kết và 2 hồ sơ test; `hospital_his` trở lại **8 hồ sơ**, tài khoản 7 = `1/ACTIVE, 40/ACTIVE` như trước. Riêng hai email seed (id 7, id 39) được **giữ lại** làm dữ liệu demo.
+* Còn chờ: xác nhận bằng mắt rằng hai mail nằm trong hộp thư Gmail (SMTP đã nhận và không báo lỗi, nhưng chỉ người sở hữu hộp thư mới kết luận được mail vào inbox hay spam). WinForms quầy không đổi nên chưa bấm lại.
+
+### 12.4 Việc còn treo
+
+* ~~Mẻ 3: ba đường vào đặt khám (chuyên khoa / theo ngày / theo bác sĩ), tìm bác sĩ theo chuyên khoa, nhãn "hết" cho khung kín, chặn ngày bác sĩ không làm việc~~ — đã làm xong, xem mục **13**.
+* Quầy chưa có cách **sửa** hai khai báo bảo hiểm khi bệnh nhân khai sai.
+* Bản production phải thay `notifications` (đang là dấu vết đối chiếu) bằng thông báo đẩy cho người dùng, và cân nhắc khóa `+alias`/email cá nhân trùng với email nhân viên.
+
+---
+
+## 13. MẺ 3 — BA LỐI VÀO ĐẶT KHÁM + LÀM LẠI GIAO DIỆN LUỒNG ĐẶT LỊCH (06/11/2026)
+
+Bệnh nhân bắt đầu từ ba tình huống khác nhau nhưng cả ba phải đổ về **cùng một `slotId`** để mọi quy tắc chỉ cài đặt một lần trong BLL. Chi tiết quyết định ở `docs/DECISIONS.md` mục **23**.
+
+### 13.1 Cấu trúc DB — không thay đổi
+
+Mẻ này **không** đụng schema: chỉ thêm đường đọc mới trên các bảng đã có (`departments`, `doctors`, `doctor_schedules`, `appointment_slots`, `clinic_rooms`). Không cần backup/ALTER, `dotnet ef migrations has-pending-model-changes` vẫn "No changes", gate vẫn **18** kiểm tra.
+
+### 13.2 Sửa code
+
+**HIS.BLL** (`DTOs/BookingDtos.cs`, `Interfaces/IBookingService.cs`, `Services/BookingService.cs`):
+* Xóa `BookingShiftDto` + `IBookingService.GetShiftsAsync` — ca không còn là một bước.
+* Thêm `GetDepartmentsOnDateAsync(date)`, `GetDoctorsAsync(departmentId?, date?)`, `GetDoctorSlotsAsync(departmentId, date)`, `GetDaysAsync(from, count, departmentId?, doctorId?)`, `GetSlotByIdAsync(slotId)`; `BookingSlotDto` mang thêm `ShiftLabel`, `DepartmentId`, `DoctorId/DoctorName/DoctorTitle`, `RoomName` và `IsSelectable => SlotsLeft > 0`.
+* `LoadFramesAsync` gom mọi truy vấn khung giờ về **một** lần đọc cửa sổ ngày (lọc khoa/bác sĩ tùy chọn) nên lịch 30 ngày không sinh N query; chỗ trống tính thẳng `online_quota − online_booked`; `FewLeftThreshold = 6` cho nhãn "Sắp hết"; `FormatDutyDays` in "T2 · T5 · T7" từ `doctor_schedules` đang hiệu lực.
+
+**HIS.Web** (`Controllers/BookingController.cs`, `ViewModels/Booking/*`):
+* `BookingState` đổi từ tuyến tính sang `Mode` (`khoa`/`ngay`/`bacsi`) + `BookingModes.IsValid`; `Wizard` khai báo thứ tự bước theo mode, `Guard` dựng `ViewData["Steps"]/["Step"]/["StepLabel"]/["BackUrl"]` cho stepper động, `ModeHasStep` quyết định link "Đổi" nào hiện, `SlotStepOf` đưa người dùng về đúng màn khung giờ của mode đang đi.
+* `DoctorVm` tự mang nhãn và factory `From(BookingDoctorDto)` / `From(BookingSlotDto)` (một `DoctorVm` dựng từ khung giờ chỉ có những cột khung giờ đem theo), `AnyDoctorName = "Bác sĩ bất kỳ"`, `Initials`; `DepartmentIcons.For(tên)` tra khóa → icon Lucide (tim mạch `heart-pulse`, nhi `baby`, xét nghiệm `flask-conical`, ngoại `syringe`, …); `ToModalJson(timeRange, room, date, department)` cho phép màn sau điền thêm chuyên khoa/phòng mà khung giờ không mang.
+* View mới `ChonNgay.cshtml`, `ChonBacsi.cshtml`, `ChonNgayGio.cshtml`, `_SlotChips.cshtml`, `_SlotList.cshtml`; **xóa** `ChonNgayCa.cshtml`, `ChonGio.cshtml`, `_ShiftList.cshtml`; `Index.cshtml` thành màn ba thẻ lối vào; `ChonNguoiKham.cshtml` bỏ khai báo bảo hiểm + thêm nút "Thêm hồ sơ mới"; `XacNhan.cshtml` nhận hai checkbox bảo hiểm và cụm "Chi phí và thanh toán"; `_DoctorModal.cshtml` ẩn dòng Chuyên khoa/Ngày trực khi không có dữ liệu.
+* `booking.js` viết lại theo khối `#khoa-form`/`#ngay-form`/`#bacsi-form`/`#ngaygio-form`/`#nguoi-form`/`#xacnhan-form`: tìm kiếm không phân biệt dấu (`filterCards` + `normalize`), `loadSlots(date)` fetch partial `KhungGio` có chống race bằng `requestId` và nút thử lại; `booking.css` thêm `.entry-*`, `.slot-layout`, `.picked-context`, `.doctor-grid/.doctor-list/.doctor-block`, `.slot-group/.slot-chips/.slot-chip/.chip-doctor`, `.cost-*` và breakpoint 760px.
+* Header/`LichKham`/`HoSo`: mọi nút vào đặt lịch nay trỏ `Booking/Index` (màn chọn lối vào) vì GET `ChonKhoa` không còn nghĩa khi chưa có mode.
+
+### 13.3 Bằng chứng chạy thật
+
+* Build `HIS.sln` **0 warning / 0 error**. `dotnet test` toàn bộ: **93/93** (73 unit + 20 integration). `bash backup/ci_local.sh`: dựng lại `his_ci` → gate **18/18** → integration **20/20**.
+* Test mới `tests/HIS.Tests/BookingEntryPathTests.cs` (3 test integration, chạy trên DB thật, so chiếu chéo chứ không giả định dữ liệu) — log thật từ `hospital_his`:
+  * `cửa sổ 29 ngày từ 07/11 tới 05/12, ngày mở đầu tiên = 07/11`; `BS. Hoàng Duy Khánh @ Phòng khám Ngoại 2: 4 khung, còn 4`;
+  * `BS. Đặng Thu Hà: 21 ngày mở, 152 suất, kiểm lại khung 07:30 – 08:30 OK` (khớp `GetSlotByIdAsync` từng cột: Id/Label/Room/DoctorName/SlotsLeft);
+  * `7 BS. Hoàng Duy Khánh | T3 · T5 · T7 | còn 75 | sớm nhất 07/11` + `6 BS. Vũ Quốc Bảo | T2 · T4 · T6 | còn 96 | sớm nhất 09/11` — tổng suất từng bác sĩ khớp đúng con số trên thẻ khoa, và số của Khánh tụt 76 → 75 ngay sau lượt đặt bên dưới.
+* Chuột thật ba luồng trên `https://localhost:7024` (đăng nhập `patient.nguyena`, dữ liệu `hospital_his`):
+  * **khoa**: `ChonKhoa` 5 thẻ khoa kèm icon + `Còn 581 suất đặt online` → tìm "khanh" khớp "Hoàng Duy Khánh" (không phân biệt dấu) → `ChonBacsi` hiện "Bác sĩ bất kỳ" + thẻ bác sĩ (avatar viết tắt, học vị trong tên, chuyên môn, ngày trực, suất còn) → `ChonNgayGio` lịch 29 ngày (08/11 CN = `off` disabled, 07/11 `few`), bấm 10/11 fetch về **7 chip chia Ca sáng/Ca chiều**, tự xóa lựa chọn khung và disable nút Tiếp tục → `ChonNguoiKham` 2 hồ sơ + "Thêm hồ sơ mới" → `XacNhan` BƯỚC 5/5 (bHYT + bảo hiểm tư nhân, phí 150.000 đ, "đóng tại quầy viện phí") → **`HIS-20261110-W44JG1`, số A01**;
+  * **ngay**: `ChonNgay` BƯỚC 1/5 (29 ô ngày, mọi Chủ nhật disabled, chú giải Còn lịch / Sắp hết / Nghỉ – hết chỗ) → `ChonKhoa` ghi "Những chuyên khoa có ca trực ngày Thứ Năm, 12/11/2026", Nội 30 suất / Xét nghiệm "Chưa có lịch khả dụng", có link **Đổi ngày** → `ChonBacsi` màn **Bác sĩ & khung giờ** (3 block, chip `07:30 – 08:30 Còn 2 suất` … `15:00 – 16:00`, nhãn `Ca sáng 8 suất còn lại`) → chọn hồ sơ **Trần Thị Bích** (vợ/chồng) → **`HIS-20261112-R2V14E`, số A01**;
+  * **bacsi**: `ChonBacsi` BƯỚC 1/4 với ô tìm "Tìm theo tên bác sĩ hoặc chuyên môn…", 13 thẻ bác sĩ kèm badge khoa; tìm "than kinh" khớp BS. Trần Minh → `ChonNgayGio` lịch **chỉ của bác sĩ đó**: 13/29 ngày mở, đúng các thứ T2/T4/T6 (`openWeekdays [2,4,6]`), chỉ còn link "Đổi" về `ChonBacsi` → **`HIS-20261107-QMS6QH`, số A01**.
+* DB đối chiếu `appointments` (id 70/71/72): đúng bác sĩ–phòng–ngày của màn hình, và hai cờ bảo hiểm lưu đúng như đã tick (`t/t`, `f/f`, `t/f`).
+* Modal bác sĩ trên màn "Bác sĩ & khung giờ" giờ mang cả phòng thật: `{"name":"BS. Lê Văn Cường","specialty":"Nội tim mạch","department":"Khoa Nội tổng hợp","room":"Phòng khám Nội 1","duty":""}` — dòng "Ngày trực" tự ẩn vì khung giờ không đem theo dữ liệu đó.
+* Dọn dẹp: mật khẩu demo của `patient.nguyena` đổi tạm để test tự động, đã chạy lại `backup/demologin.sh` để khôi phục; ba lượt hẹn trên **giữ lại** làm dữ liệu demo cho quầy (hủy giúp nếu muốn).
+
+### 13.4 Việc còn treo
+
+* Quầy tiếp nhận vẫn chưa có cách **sửa** hai khai báo bảo hiểm khi bệnh nhân khai sai (người dùng chốt để sau).
+* Thanh toán thật (thẻ ATM/QR/ví) chưa có module nên bước 5 chỉ ghi phí dự kiến + hướng dẫn đóng tại quầy; ảnh bác sĩ, điểm đánh giá, số lượt khám, ngày nghỉ lễ cũng chưa có cột trong DB nên UI hiện số thật thay vì bịa.
+
+

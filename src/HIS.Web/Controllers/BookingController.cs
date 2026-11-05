@@ -1,8 +1,8 @@
 using System.Diagnostics;
 using System.Globalization;
-using System.Text.RegularExpressions;
 using HIS.Domain;
 using HIS.Web.Helpers;
+using HIS.Web.Realtime;
 using HIS.Web.ViewModels;
 using HIS.Web.ViewModels.Booking;
 using Microsoft.AspNetCore.Mvc;
@@ -15,253 +15,404 @@ namespace HIS.Web.Controllers;
 // Controller chỉ điều hướng và lưu lựa chọn vào Session; dữ liệu và quy tắc nghiệp vụ nằm ở HIS.BLL
 // nên WinForms (quầy tiếp nhận) dùng chung cùng một logic.
 //
-// Các bước: Index -> ChonKhoa -> ChonNgayCa -> ChonGio -> ChonNguoiKham -> XacNhan -> ThanhCong
+// Ba đường vào cùng hội tụ về một slotId:
+//   theo chuyên khoa: ChonKhoa -> ChonBacsi -> ChonNgayGio -> ChonNguoiKham -> XacNhan
+//   theo ngày:        ChonNgay -> ChonKhoa  -> ChonBacsi (kèm khung giờ) -> ChonNguoiKham -> XacNhan
+//   theo bác sĩ:      ChonBacsi -> ChonNgayGio -> ChonNguoiKham -> XacNhan
 public class BookingController : PatientPageController
 {
-    private const int DaysToShow = 7;
-
     // Session keys để lưu trạng thái đặt lịch (BookingState) và kết quả đặt lịch thành công (ThanhCongViewModel).
     private const string StateKey = "BookingState";
     private const string LastBookingKey = "LastBooking";
 
-    private static readonly Regex PhoneRegex = new(@"^0\d{9,10}$", RegexOptions.Compiled);
-
-    // Mã quan hệ chấp nhận từ form "Thêm hồ sơ"; BLL tự chuyển sang nhãn tiếng Việt.
-    private static readonly HashSet<string> RelationshipCodes =
-        new(StringComparer.OrdinalIgnoreCase) { "SELF", "PARENT", "CHILD", "SPOUSE", "SIBLING", "OTHER" };
+    /// <summary>
+    /// Thứ tự bước của từng luồng, kèm nhãn hiển thị trên stepper. Một chỗ duy nhất quyết định
+    /// bước nào nối tiếp bước nào nên thêm/bớt bước không phải sửa từng view.
+    /// </summary>
+    private static readonly Dictionary<string, (string Action, string Label)[]> Wizard = new()
+    {
+        [BookingModes.ByDepartment] = new[]
+        {
+            (nameof(ChonKhoa), "Chuyên khoa"),
+            (nameof(ChonBacsi), "Bác sĩ"),
+            (nameof(ChonNgayGio), "Ngày & giờ"),
+            (nameof(ChonNguoiKham), "Người khám"),
+            (nameof(XacNhan), "Xác nhận"),
+        },
+        [BookingModes.ByDate] = new[]
+        {
+            (nameof(ChonNgay), "Ngày khám"),
+            (nameof(ChonKhoa), "Chuyên khoa"),
+            (nameof(ChonBacsi), "Bác sĩ & giờ"),
+            (nameof(ChonNguoiKham), "Người khám"),
+            (nameof(XacNhan), "Xác nhận"),
+        },
+        [BookingModes.ByDoctor] = new[]
+        {
+            (nameof(ChonBacsi), "Bác sĩ"),
+            (nameof(ChonNgayGio), "Ngày & giờ"),
+            (nameof(ChonNguoiKham), "Người khám"),
+            (nameof(XacNhan), "Xác nhận"),
+        },
+    };
 
     private readonly IBookingService _bookingService;
     private readonly IPatientProfileService _profileService;
     private readonly IPatientAccessService _accessService;
+    private readonly QueueChangeNotifier _realtime;
 
     public BookingController(
         IBookingService bookingService,
         IPatientProfileService profileService,
-        IPatientAccessService accessService)
+        IPatientAccessService accessService,
+        QueueChangeNotifier realtime)
     {
         _bookingService = bookingService;
         _profileService = profileService;
         _accessService = accessService;
+        _realtime = realtime;
     }
 
-    // ------------------------------------------------------------ A1: Trang bắt đầu
+    // ------------------------------------------------------------ A1: Trang bắt đầu, ba lối vào
 
     public IActionResult Index() => View();
 
-    // ------------------------------------------------------------ Bước 1: Chọn chuyên khoa
+    /// <summary>Bắt đầu một luồng. Đổi luồng thì mọi lựa chọn lịch cũ bị bỏ (hồ sơ vẫn giữ).</summary>
+    public IActionResult Start(string mode)
+    {
+        if (!BookingModes.IsValid(mode)) return RedirectToAction(nameof(Index));
+
+        var state = GetState();
+        if (state.Mode != mode)
+        {
+            SaveState(new BookingState { Mode = mode, PatientId = state.PatientId });
+            return RedirectToAction(StepsOf(mode)[0].Action);
+        }
+
+        return RedirectToAction(FirstUnfinishedStep(state)?.Action ?? nameof(ChonNguoiKham));
+    }
+
+    // ------------------------------------------------------------ Bước "chọn ngày" (luồng theo ngày)
+
+    [HttpGet]
+    public async Task<IActionResult> ChonNgay()
+    {
+        var state = GetState();
+        if (Guard(state, nameof(ChonNgay)) is { } redirect) return redirect;
+
+        var from = _bookingService.FirstBookableDate;
+        var days = (await _bookingService.GetDaysAsync(from, _bookingService.BookableDayCount))
+            .Select(d => new DayVm { Date = d.Date, State = d.State })
+            .ToList();
+
+        var selected = PickDate(days, state.Date);
+        if (selected is null)
+        {
+            TempData["Error"] = $"Bệnh viện chưa mở ngày nào còn chỗ đặt online trong {WindowText}.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        return View(new ChonNgayViewModel
+        {
+            Days = days,
+            SelectedDate = selected.Value,
+            MonthLabel = FormatMonth(selected.Value)
+        });
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> ChonNgay(string? date)
+    {
+        var state = GetState();
+        if (Guard(state, nameof(ChonNgay)) is { } redirect) return redirect;
+
+        if (!TryParseDate(date, out var d) || !_bookingService.IsBookableDate(d))
+        {
+            TempData["Error"] = "Ngày khám không còn đặt được. Vui lòng chọn ngày khác.";
+            return RedirectToAction(nameof(ChonNgay));
+        }
+
+        // Đổi ngày thì khoa/bác sĩ/giờ đã chọn trước đó không còn đúng.
+        state.Date = d;
+        state.DepartmentId = null;
+        state.DoctorId = null;
+        state.DoctorChosen = false;
+        state.SlotId = null;
+        SaveState(state);
+
+        return RedirectToAction(nameof(ChonKhoa));
+    }
+
+    // ------------------------------------------------------------ Bước "chọn chuyên khoa"
 
     [HttpGet]
     public async Task<IActionResult> ChonKhoa()
     {
-        if (RequireAccount() is { } signIn) return signIn;
-
         var state = GetState();
-        // Nhận DTOs từ BookingService (BLL) rồi map sang ViewModels để trả về View.
-        var departments = await _bookingService.GetActiveDepartmentsAsync();
+        if (Guard(state, nameof(ChonKhoa)) is { } redirect) return redirect;
 
-        // Map DTO (BLL) sang ViewModel để trả về View.
+        // Luồng theo ngày: số chỗ chỉ tính trong ngày đã chọn, khoa nghỉ hôm đó hiện "Chưa có lịch".
+        var departments = state.Mode == BookingModes.ByDate && state.Date is { } day
+            ? await _bookingService.GetDepartmentsOnDateAsync(day)
+            : await _bookingService.GetActiveDepartmentsAsync();
+
         var departmentVms = departments.Select(ToDepartmentVm).ToList();
-
-        var selected = departmentVms.FirstOrDefault(d => d.Id == state.DepartmentId && d.SlotsThisWeek > 0);
+        var selected = departmentVms.FirstOrDefault(d => d.Id == state.DepartmentId && d.SlotsAvailable > 0);
 
         return View(new ChonKhoaViewModel
         {
             Departments = departmentVms,
-            SelectedDepartmentId = selected?.Id
+            SelectedDepartmentId = selected?.Id,
+            OnDate = state.Mode == BookingModes.ByDate ? state.Date : null
         });
     }
 
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> ChonKhoa(int departmentId)
     {
-        if (RequireAccount() is { } signIn) return signIn;
-
-        // Nhận DTOs từ BookingService (BLL) rồi map sang ViewModels để kiểm tra số chỗ còn.
-        var dept = await _bookingService.GetDepartmentByIdAsync(departmentId);
-        if (dept is null || dept.SlotsThisWeek == 0)
-        {
-            TempData["Error"] = "Chuyên khoa này chưa có lịch khả dụng. Vui lòng chọn chuyên khoa khác.";
-            return RedirectToAction(nameof(ChonKhoa));
-        }
-
         var state = GetState();
+        if (Guard(state, nameof(ChonKhoa)) is { } redirect) return redirect;
+
+        var dept = await LoadDepartmentAsync(state, departmentId);
+        if (dept is null) return RedirectToAction(nameof(ChonKhoa));
+
         if (state.DepartmentId != departmentId)
         {
-            // Đổi chuyên khoa thì lịch cũ không còn đúng; hồ sơ người khám vẫn giữ lại.
-            state.Date = null;
-            state.Shift = null;
+            state.DoctorId = null;
+            state.DoctorChosen = false;
             state.SlotId = null;
         }
         state.DepartmentId = departmentId;
         SaveState(state);
 
-        return RedirectToAction(nameof(ChonNgayCa));
+        return RedirectToAction(nameof(ChonBacsi));
     }
 
-    // ------------------------------------------------------------ Bước 2: Chọn ngày và ca
+    // ------------------------------------------------------------ Bước "chọn bác sĩ" (+ khung giờ nếu đã chốt ngày)
 
     [HttpGet]
-    public async Task<IActionResult> ChonNgayCa()
+    public async Task<IActionResult> ChonBacsi(string? q)
     {
-        if (RequireAccount() is { } signIn) return signIn;
-
         var state = GetState();
-        // Kiểm tra DepartmentId trong Session trước để lấy ra biến deptId
-        if (state.DepartmentId is not int deptId)
-            return RedirectToAction(nameof(ChonKhoa));
+        if (Guard(state, nameof(ChonBacsi)) is { } redirect) return redirect;
 
-        // Sau khi đã có deptId mới truyền vào BLL và lấy DTOs
-        var dept = await _bookingService.GetDepartmentByIdAsync(deptId);
-        if (dept is null)
-            return RedirectToAction(nameof(ChonKhoa));
-
-        var from = FirstBookableDate();
-        // Lấy trạng thái khả dụng của các ngày từ BookingService (BLL) rồi map sang ViewModels.
-        var days = await _bookingService.GetDaysAsync(dept.Id, from, DaysToShow);
-        var dayVms = days.Select(d => new DayVm { Date = d.Date, State = d.State }).ToList();
-
-        var pickable = dayVms.Where(d => d.State != "off").ToList();
-        if (pickable.Count == 0)
+        var vm = new ChonBacsiViewModel
         {
-            TempData["Error"] = "Chuyên khoa này chưa mở lịch trong tuần tới. Vui lòng chọn chuyên khoa khác.";
-            return RedirectToAction(nameof(ChonKhoa));
+            Date = state.Mode == BookingModes.ByDate ? state.Date : null,
+            ShowAnyDoctor = state.Mode == BookingModes.ByDepartment,
+            // "Bác sĩ bất kỳ" không lưu doctorId, nên thẻ đó cần một giá trị để tô trạng thái đã chọn.
+            SelectedDoctorId = state.DoctorChosen
+                ? state.DoctorId ?? (state.Mode == BookingModes.ByDepartment ? BookingModes.AnyDoctorId : null)
+                : null,
+            SelectedSlotId = state.SlotId
+        };
+
+        if (state.Mode == BookingModes.ByDate && state.Date is { } day)
+        {
+            vm.Department = ToDepartmentVm(await RequireDepartmentAsync(state));
+            vm.DoctorSlots = (await _bookingService.GetDoctorSlotsAsync(state.DepartmentId!.Value, day))
+                .Select(ToDoctorSlotsVm)
+                .ToList();
+
+            if (vm.DoctorSlots.Count == 0)
+            {
+                TempData["Error"] = $"Chuyên khoa {vm.Department.Name} không còn ca trực nào ngày {VietnameseFormat.ShortDate(day)}. Vui lòng chọn ngày khác.";
+                return RedirectToAction(nameof(ChonNgay));
+            }
+        }
+        else
+        {
+            // Luồng theo chuyên khoa giới hạn trong khoa; luồng theo bác sĩ tìm trong toàn viện.
+            int? departmentFilter = state.Mode == BookingModes.ByDepartment ? state.DepartmentId : null;
+            if (departmentFilter is int deptFilter) vm.Department = ToDepartmentVm(await RequireOrEmptyAsync(deptFilter));
+
+            vm.Doctors = (await _bookingService.GetDoctorsAsync(departmentFilter))
+                .Select(DoctorVm.From)
+                .ToList();
         }
 
-        DateOnly selected = state.Date is { } saved && pickable.Any(d => d.Date == saved)
-            ? saved
-            : (pickable.FirstOrDefault(d => d.State != "full") ?? pickable[0]).Date;
-
-        return View(new ChonNgayCaViewModel
-        {
-            Department = ToDepartmentVm(dept),
-            Days = dayVms,
-            MonthLabel = $"Tháng {selected.ToString("MM/yyyy", CultureInfo.InvariantCulture)}",
-            ShiftList = await BuildShiftListAsync(dept.Id, dept.Name, selected, state.Date == selected ? state.Shift : null)
-        });
-    }
-
-    // Trả về HTML danh sách ca khám của một ngày (booking.js gọi bằng fetch).
-    [HttpGet]
-    public async Task<IActionResult> CaKham(string? date)
-    {
-        var state = GetState();
-        if (state.DepartmentId is not int deptId)
-            return BadRequest();
-
-        // gọi BLL lấy thông tin khoa
-        var dept = await _bookingService.GetDepartmentByIdAsync(deptId);
-        if (dept is null)
-            return BadRequest();
-
-        // Kiểm tra ngày hợp lệ
-        if (!TryParseDate(date, out var d) || !IsBookableDate(d))
-            return BadRequest();
-
-        // Gọi BuildShiftListAsync (bất đồng bộ) để lấy danh sách ca từ BLL
-        var shiftListVm = await BuildShiftListAsync(dept.Id, dept.Name, d, state.Date == d ? state.Shift : null);
-
-        return PartialView("_ShiftList", shiftListVm);
+        return View(vm);
     }
 
     [HttpPost, ValidateAntiForgeryToken]
-    public async Task<IActionResult> ChonNgayCa(string? date, string? shift)
+    public async Task<IActionResult> ChonBacsi(int doctorId, string? slotId)
     {
-        if (RequireAccount() is { } signIn) return signIn;
-
         var state = GetState();
-        if (state.DepartmentId is not int deptId)
-            return RedirectToAction(nameof(ChonKhoa));
+        if (Guard(state, nameof(ChonBacsi)) is { } redirect) return redirect;
 
-        if (!TryParseDate(date, out var d) || !IsBookableDate(d))
+        // "Bác sĩ bất kỳ": bệnh nhân để hệ thống phân công theo lịch trực (chỉ luồng theo chuyên khoa).
+        if (doctorId == BookingModes.AnyDoctorId && state.Mode == BookingModes.ByDepartment)
         {
-            TempData["Error"] = "Ngày khám không hợp lệ. Vui lòng chọn lại.";
-            return RedirectToAction(nameof(ChonNgayCa));
+            state.DoctorId = null;
+            state.DoctorChosen = true;
+            state.SlotId = null;
+            SaveState(state);
+            return RedirectToAction(nameof(ChonNgayGio));
         }
 
-        // Gọi BLL lấy danh sách ca khám thực tế trong DB
-        var shifts = await _bookingService.GetShiftsAsync(deptId, d);
-        var chosen = shifts.FirstOrDefault(s => s.Key == shift);
-
-        // Kiểm tra ca khám có hợp lệ và còn suất đặt online (Status == "AVAILABLE") không
-        if (chosen is null || !chosen.IsSelectable)
+        var departmentId = state.DepartmentId;
+        if (state.Mode == BookingModes.ByDoctor)
         {
-            TempData["Error"] = "Ca khám này không còn chỗ trống. Vui lòng chọn ca khác.";
-            return RedirectToAction(nameof(ChonNgayCa));
+            // Chưa biết khoa của bác sĩ cho tới khi đọc danh sách toàn viện.
+            var known = await _bookingService.GetDoctorsAsync(null);
+            var picked = known.FirstOrDefault(d => d.Id == doctorId);
+            if (picked is null)
+            {
+                TempData["Error"] = "Không tìm thấy bác sĩ vừa chọn. Vui lòng chọn lại.";
+                return RedirectToAction(nameof(ChonBacsi));
+            }
+            departmentId = picked.DepartmentId;
+            state.DepartmentId = departmentId;
         }
 
-        // Đổi ngày hoặc đổi ca thì khung giờ đã chọn ở bước trước không còn đúng.
-        if (state.Date != d || state.Shift != chosen.Key) state.SlotId = null;
+        if (departmentId is not int deptId) return RedirectToAction(nameof(ChonKhoa));
 
-        state.Date = d;
-        state.Shift = chosen.Key;
+        var doctors = await _bookingService.GetDoctorsAsync(deptId, state.Date);
+        if (doctors.All(d => d.Id != doctorId))
+        {
+            TempData["Error"] = "Bác sĩ này không trực trong phạm vi đã chọn. Vui lòng chọn bác sĩ khác.";
+            return RedirectToAction(nameof(ChonBacsi));
+        }
+
+        state.DoctorId = doctorId;
+        state.DoctorChosen = true;
+
+        // Luồng theo ngày chốt luôn khung giờ ở màn này vì ngày đã cố định từ bước 1.
+        if (state.Mode == BookingModes.ByDate && state.Date is { } day)
+        {
+            if (!int.TryParse(slotId, out var chosenSlotId))
+            {
+                TempData["Error"] = "Vui lòng chọn một khung giờ còn trống của bác sĩ.";
+                return RedirectToAction(nameof(ChonBacsi));
+            }
+
+            var slots = await _bookingService.GetSlotsAsync(day, deptId, doctorId);
+            var chosen = slots.FirstOrDefault(s => s.Id == chosenSlotId);
+            if (chosen is null || !chosen.IsSelectable)
+            {
+                TempData["Error"] = "Khung giờ này vừa hết suất đặt online. Vui lòng chọn khung khác.";
+                return RedirectToAction(nameof(ChonBacsi));
+            }
+
+            state.SlotId = chosen.Id;
+            SaveState(state);
+            return RedirectToAction(nameof(ChonNguoiKham));
+        }
+
         SaveState(state);
-
-        return RedirectToAction(nameof(ChonGio));
+        return RedirectToAction(nameof(ChonNgayGio));
     }
 
-    // ------------------------------------------------------------ Bước 3: Chọn khung giờ
+    // ------------------------------------------------------------ Bước "ngày & khung giờ" (gộp, không còn chọn ca)
 
     [HttpGet]
-    public async Task<IActionResult> ChonGio()
+    public async Task<IActionResult> ChonNgayGio()
     {
         var state = GetState();
-        if (Guard(state, throughStep: 2) is { } redirect) return redirect;
+        if (Guard(state, nameof(ChonNgayGio)) is { } redirect) return redirect;
 
-        var slotList = await BuildSlotListAsync(state);
-        if (slotList is null)
+        var from = _bookingService.FirstBookableDate;
+        var days = (await _bookingService.GetDaysAsync(from, _bookingService.BookableDayCount, state.DepartmentId, state.DoctorId))
+            .Select(d => new DayVm { Date = d.Date, State = d.State })
+            .ToList();
+
+        var selected = PickDate(days, state.Date);
+        if (selected is null)
         {
-            TempData["Error"] = "Ca khám này vừa hết chỗ. Vui lòng chọn ngày hoặc ca khác.";
-            return RedirectToAction(nameof(ChonNgayCa));
+            TempData["Error"] = $"{StateScopeLabel(state)} chưa mở ngày nào còn chỗ đặt online trong {WindowText}. Vui lòng chọn bác sĩ hoặc chuyên khoa khác.";
+            return RedirectToAction(nameof(ChonBacsi));
         }
 
-        int? selectedId = state.SlotId is { } saved && slotList.Slots.Any(s => s.Id == saved && s.IsSelectable)
-            ? saved
-            : slotList.Slots.FirstOrDefault(s => s.IsSelectable)?.Id;
+        var slots = await _bookingService.GetSlotsAsync(selected.Value, state.DepartmentId, state.DoctorId);
 
-        return View(new ChonGioViewModel
+        // Ngày cũ không còn lịch (vừa đổi bác sĩ) -> xóa lựa chọn khung giờ đang giữ.
+        int? selectedSlot = slots.Any(s => s.Id == state.SlotId && s.IsSelectable) ? state.SlotId : null;
+        if (selectedSlot != state.SlotId)
         {
-            Department = slotList.Department,
-            Date = state.Date!.Value,
-            Shift = slotList.Shift,
-            Slots = slotList.Slots,
-            SelectedSlotId = selectedId
-        });
+            state.SlotId = null;
+            state.Date = selected.Value;
+            SaveState(state);
+        }
+
+        var vm = new ChonNgayGioViewModel
+        {
+            Department = state.DepartmentId is { } deptId ? ToDepartmentVm(await RequireOrEmptyAsync(deptId)) : null,
+            Doctor = await LoadDoctorAsync(state),
+            Days = days,
+            SelectedDate = selected.Value,
+            MonthLabel = FormatMonth(selected.Value),
+            Slots = slots.Select(ToSlotVm).ToList(),
+            SelectedSlotId = selectedSlot,
+            CanChangeDepartment = ModeHasStep(state, nameof(ChonKhoa)),
+            CanChangeDoctor = ModeHasStep(state, nameof(ChonBacsi))
+        };
+
+        return View(vm);
     }
 
     [HttpPost, ValidateAntiForgeryToken]
-    public async Task<IActionResult> ChonGio(string? slotId)
+    public async Task<IActionResult> ChonNgayGio(string? date, string? slotId)
     {
         var state = GetState();
-        if (Guard(state, throughStep: 2) is { } redirect) return redirect;
+        if (Guard(state, nameof(ChonNgayGio)) is { } redirect) return redirect;
+
+        if (!TryParseDate(date, out var d) || !_bookingService.IsBookableDate(d))
+        {
+            TempData["Error"] = "Ngày khám không còn đặt được. Vui lòng chọn ngày khác.";
+            return RedirectToAction(nameof(ChonNgayGio));
+        }
 
         if (!int.TryParse(slotId, out var chosenSlotId))
         {
             TempData["Error"] = "Vui lòng chọn một khung giờ khám.";
-            return RedirectToAction(nameof(ChonGio));
+            return RedirectToAction(nameof(ChonNgayGio));
         }
 
-        // Kiểm tra lại từ DB: khung giờ này thuộc đúng ca/ngày đã chọn và còn suất online.
-        var slots = await _bookingService.GetSlotsAsync(state.DepartmentId!.Value, state.Date!.Value, state.Shift!);
+        // Đối chiếu lại từ DB: khung giờ phải thuộc đúng ngày và đúng phạm vi đã chọn.
+        var slots = await _bookingService.GetSlotsAsync(d, state.DepartmentId, state.DoctorId);
         var chosen = slots.FirstOrDefault(s => s.Id == chosenSlotId);
         if (chosen is null || !chosen.IsSelectable)
         {
             TempData["Error"] = "Khung giờ này vừa hết suất đặt online. Vui lòng chọn khung khác.";
-            return RedirectToAction(nameof(ChonGio));
+            return RedirectToAction(nameof(ChonNgayGio));
         }
 
+        state.Date = d;
         state.SlotId = chosen.Id;
         SaveState(state);
 
         return RedirectToAction(nameof(ChonNguoiKham));
     }
 
-    // ------------------------------------------------------------ Bước 4: Chọn người khám
+    // Trả về HTML khối khung giờ của một ngày (booking.js gọi bằng fetch khi bấm ngày khác).
+    [HttpGet]
+    public async Task<IActionResult> KhungGio(string? date)
+    {
+        var state = GetState();
+        if (state.Mode is null) return BadRequest();
+
+        if (!TryParseDate(date, out var d) || !_bookingService.IsBookableDate(d))
+            return BadRequest();
+
+        var slots = await _bookingService.GetSlotsAsync(d, state.DepartmentId, state.DoctorId);
+        int? selected = slots.Any(s => s.Id == state.SlotId && s.IsSelectable) ? state.SlotId : null;
+
+        return PartialView("_SlotList", new SlotListViewModel
+        {
+            Date = d,
+            Slots = slots.Select(ToSlotVm).ToList(),
+            SelectedSlotId = selected,
+            ShowDoctor = state.DoctorId is null
+        });
+    }
+
+    // ------------------------------------------------------------ Bước "chọn người khám"
 
     [HttpGet]
     public async Task<IActionResult> ChonNguoiKham()
     {
         var state = GetState();
-        if (Guard(state, throughStep: 3) is { } redirect) return redirect;
+        if (Guard(state, nameof(ChonNguoiKham)) is { } redirect) return redirect;
 
         var profiles = await GetProfilesAsync();
 
@@ -269,14 +420,18 @@ public class BookingController : PatientPageController
             ? state.PatientId
             : profiles.FirstOrDefault(p => p.RelationshipCode == "SELF" && p.IsBookable)?.Id;
 
-        return View(new ChonNguoiKhamViewModel { Patients = profiles, SelectedPatientId = selectedId });
+        return View(new ChonNguoiKhamViewModel
+        {
+            Patients = profiles,
+            SelectedPatientId = selectedId
+        });
     }
 
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> ChonNguoiKham(int patientId)
     {
         var state = GetState();
-        if (Guard(state, throughStep: 3) is { } redirect) return redirect;
+        if (Guard(state, nameof(ChonNguoiKham)) is { } redirect) return redirect;
 
         var patient = (await GetProfilesAsync()).FirstOrDefault(p => p.Id == patientId);
 
@@ -296,112 +451,58 @@ public class BookingController : PatientPageController
         return RedirectToAction(nameof(XacNhan));
     }
 
-    // Thêm hồ sơ mới ngay trong quy trình đặt lịch; giữ nguyên khoa, ngày, ca, giờ đã chọn.
-    [HttpPost, ValidateAntiForgeryToken]
-    public async Task<IActionResult> ThemHoSo(ThemHoSoRequest request)
-    {
-        var state = GetState();
-        if (Guard(state, throughStep: 3) is { } redirect) return redirect;
-
-        // 1. Kiểm tra Form Validation (ViewModel đảm nhận qua Data Annotations)
-        if (!ModelState.IsValid)
-        {
-            TempData["Error"] = ModelState.Values
-                .SelectMany(v => v.Errors)
-                .FirstOrDefault()?.ErrorMessage ?? "Dữ liệu nhập vào không hợp lệ.";
-            return RedirectToAction(nameof(ChonNguoiKham));
-        }
-
-        var name = request.FullName?.Trim() ?? string.Empty;
-        var phone = (request.Phone ?? string.Empty).Replace(" ", "");
-        if (!PhoneRegex.IsMatch(phone))
-        {
-            TempData["Error"] = "Số điện thoại phải từ 10-11 số và bắt đầu bằng 0.";
-            return RedirectToAction(nameof(ChonNguoiKham));
-        }
-
-        // Ngày sinh phải parse được (ModelState đã ràng buộc định dạng dd/MM/yyyy)
-        if (!DateOnly.TryParseExact(request.DateOfBirth?.Trim(), "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dob))
-        {
-            TempData["Error"] = "Ngày sinh không hợp lệ. Vui lòng nhập lại.";
-            return RedirectToAction(nameof(ChonNguoiKham));
-        }
-
-        var relationship = request.Relationship is { } rel && RelationshipCodes.Contains(rel)
-            ? rel.ToUpperInvariant()
-            : "OTHER";
-
-        // 2. Lưu hồ sơ + liên kết xuống CSDL qua BLL. BLL chặn CCCD đã tồn tại và trả lý do bằng tiếng Việt.
-        var created = await _profileService.CreateProfileAsync(AccountId, new CreateProfileRequest
-        {
-            FullName = name,
-            DateOfBirth = dob,
-            Gender = string.IsNullOrWhiteSpace(request.Gender) ? "OTHER" : request.Gender.ToUpperInvariant(),
-            PhoneNumber = phone,
-            NationalId = string.IsNullOrWhiteSpace(request.NationalId) ? null : request.NationalId.Trim(),
-            Relationship = relationship
-        });
-
-        if (!created.Success)
-        {
-            TempData["Error"] = created.Message;
-            return RedirectToAction(nameof(ChonNguoiKham));
-        }
-
-        state.PatientId = created.PatientId;
-        SaveState(state);
-        return RedirectToAction(nameof(ChonNguoiKham));
-    }
-
-    // ------------------------------------------------------------ Bước 5: Xác nhận
+    // ------------------------------------------------------------ Bước cuối: xác nhận
 
     [HttpGet]
     public async Task<IActionResult> XacNhan()
     {
         var state = GetState();
-        if (Guard(state, throughStep: 4) is { } redirect) return redirect;
+        if (Guard(state, nameof(XacNhan)) is { } redirect) return redirect;
 
-        var dept = await _bookingService.GetDepartmentByIdAsync(state.DepartmentId!.Value);
+        var slot = await FindSelectedSlotAsync(state);
+        if (slot is null) return RedirectToAction(SlotStepOf(state));
+
+        var dept = await LoadDepartmentForSlotAsync(state, slot);
         if (dept is null) return RedirectToAction(nameof(ChonKhoa));
 
         var patient = (await GetProfilesAsync()).FirstOrDefault(p => p.Id == state.PatientId);
         if (patient is null) return RedirectToAction(nameof(ChonNguoiKham));
-
-        // Kiểm tra lần cuối khung giờ từ BLL; hết suất thì đưa về bước chọn giờ, dữ liệu khác vẫn giữ.
-        var slot = await FindSelectedSlotAsync(state);
-        if (slot is null)
-        {
-            TempData["Error"] = "Khung giờ vừa hết suất. Vui lòng chọn lại giờ, các thông tin còn lại vẫn được giữ.";
-            return RedirectToAction(nameof(ChonGio));
-        }
-
-        var shift = await GetSelectedShiftAsync(state);
-        if (shift is null) return RedirectToAction(nameof(ChonNgayCa));
-
-        var fee = await _bookingService.GetExaminationFeeAsync(dept.Id);
 
         return View(new XacNhanViewModel
         {
             Patient = patient,
             Department = ToDepartmentVm(dept),
-            Date = state.Date!.Value,
-            Shift = ToShiftVm(shift),
+            Date = DateOnly.FromDateTime(slot.StartTime),
             Slot = ToSlotVm(slot),
-            Fee = fee
+            Fee = await _bookingService.GetExaminationFeeAsync(dept.Id),
+            HasHealthInsurance = state.HasHealthInsurance,
+            HasPrivateInsurance = state.HasPrivateInsurance
         });
     }
 
     [HttpPost, ValidateAntiForgeryToken]
-    public async Task<IActionResult> XacNhan(bool agreed)
+    public async Task<IActionResult> XacNhan(
+        bool agreed,
+        bool hasHealthInsurance = false,
+        bool hasPrivateInsurance = false)
     {
         var state = GetState();
-        if (Guard(state, throughStep: 4) is { } redirect) return redirect;
+        if (Guard(state, nameof(XacNhan)) is { } redirect) return redirect;
 
         var patient = (await GetProfilesAsync()).FirstOrDefault(p => p.Id == state.PatientId);
         if (patient is null) return RedirectToAction(nameof(ChonNguoiKham));
 
-        var dept = await _bookingService.GetDepartmentByIdAsync(state.DepartmentId!.Value);
+        var slot = await FindSelectedSlotAsync(state);
+        if (slot is null)
+        {
+            TempData["Error"] = "Khung giờ vừa hết suất trước khi bạn xác nhận. Vui lòng chọn lại giờ.";
+            return RedirectToAction(SlotStepOf(state));
+        }
+
+        var dept = await LoadDepartmentForSlotAsync(state, slot);
         if (dept is null) return RedirectToAction(nameof(ChonKhoa));
+
+        var visitDate = DateOnly.FromDateTime(slot.StartTime);
 
         if (!agreed)
         {
@@ -416,26 +517,27 @@ public class BookingController : PatientPageController
             return RedirectToAction(nameof(ChonNguoiKham));
         }
 
-        // Kiểm tra lần cuối từ Database: khung giờ còn suất online không?
-        var slot = await FindSelectedSlotAsync(state);
-        if (slot is null)
-        {
-            TempData["Error"] = "Khung giờ vừa hết suất trước khi bạn xác nhận. Vui lòng chọn lại giờ.";
-            return RedirectToAction(nameof(ChonGio));
-        }
+        state.HasHealthInsurance = hasHealthInsurance;
+        state.HasPrivateInsurance = hasPrivateInsurance;
 
         // BLL giữ một suất A của khung giờ, sinh số thứ tự và kiểm tra hạn mức trong cùng một giao dịch.
         Appointment created;
         try
         {
-            created = await _bookingService.CreateAppointmentAsync(AccountId, patient.Id, slot.Id);
+            created = await _bookingService.CreateAppointmentAsync(
+                AccountId, patient.Id, slot.Id,
+                hasHealthInsurance: hasHealthInsurance,
+                hasPrivateInsurance: hasPrivateInsurance);
         }
         catch (InvalidOperationException blocked)
         {
-            // Tài khoản bị chặn vì quá số lần vắng mặt, hoặc ca vừa có người đặt trước.
+            // Vượt hạn mức trong ngày, trùng lịch, hoặc ca vừa có người đặt trước.
             TempData["Error"] = blocked.Message;
+            SaveState(state);
             return RedirectToAction(nameof(XacNhan));
         }
+
+        var slotVm = ToSlotVm(slot);
 
         HttpContext.Session.SetObject(LastBookingKey, new ThanhCongViewModel
         {
@@ -443,21 +545,24 @@ public class BookingController : PatientPageController
             Status = "CONFIRMED",
             Patient = patient,
             DepartmentName = dept.Name,
-            Date = state.Date!.Value,
-            ShiftLabel = slot.ShiftLabel,
-            TimeRange = slot.Label,
+            Date = visitDate,
+            ShiftLabel = slotVm.ShiftLabel,
+            TimeRange = slotVm.Label,
             QueueNumber = created.QueueNumber ?? string.Empty,
-            Doctor = ToSlotVm(slot).Doctor,
-            Room = slot.RoomName ?? string.Empty
+            Doctor = slotVm.Doctor,
+            Room = slotVm.Room
         });
 
         // Đặt thành công -> reset trạng thái chọn lịch (vẫn giữ PatientId cho lần sau)
-        SaveState(new BookingState { PatientId = state.PatientId });
+        SaveState(new BookingState { Mode = state.Mode, PatientId = state.PatientId });
+
+        // Báo quầy tiếp nhận (WinForms) nạp lại danh sách ngay khi có lượt hẹn mới.
+        _realtime.Publish(QueueChangeKinds.AppointmentCreated);
 
         return RedirectToAction(nameof(ThanhCong));
     }
 
-    // ------------------------------------------------------------ Bước 6: Thành công
+    // ------------------------------------------------------------ Bước cuối: thành công
 
     [HttpGet]
     public IActionResult ThanhCong()
@@ -472,13 +577,172 @@ public class BookingController : PatientPageController
     public IActionResult Error()
         => View("Error", new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
 
-    // ------------------------------------------------------------ Helpers
+    // ------------------------------------------------------------ Điều hướng theo luồng
+
+    private static (string Action, string Label)[] StepsOf(string mode) => Wizard[mode];
+
+    /// <summary>Bước có nằm trong luồng hiện hành không (quyết định màn hình được phép "Đổi" lựa chọn đó).</summary>
+    private static bool ModeHasStep(BookingState state, string action) =>
+        state.Mode is string mode && StepsOf(mode).Any(s => s.Action == action);
+
+    /// <summary>
+    /// Bước sớm nhất bệnh nhân còn thiếu trong luồng đang đi; null khi đã chọn đủ.
+    /// </summary>
+    private static (string Action, string Label)? FirstUnfinishedStep(BookingState state)
+    {
+        if (state.Mode is not string mode) return null;
+
+        foreach (var step in StepsOf(mode))
+        {
+            if (!IsDone(state, step.Action)) return step;
+        }
+        return null;
+    }
+
+    private static bool IsDone(BookingState state, string step) => step switch
+    {
+        nameof(ChonNgay) => state.Date is not null,
+        nameof(ChonKhoa) => state.DepartmentId is not null,
+        // Màn "Bác sĩ & giờ" của luồng theo ngày chốt luôn khung giờ nên bước chỉ hoàn thành khi có slotId.
+        nameof(ChonBacsi) => state.DoctorChosen && (state.Mode != BookingModes.ByDate || state.SlotId is not null),
+        nameof(ChonNgayGio) => state.SlotId is not null,
+        nameof(ChonNguoiKham) => state.PatientId is not null,
+        _ => true
+    };
+
+    /// <summary>
+    /// Chặn nhảy bước: đưa về bước sớm nhất còn thiếu, đồng thời nạp nhãn stepper và nút Quay lại
+    /// của bước hiện tại theo đúng luồng đang đi.
+    /// </summary>
+    private IActionResult? Guard(BookingState state, string action)
+    {
+        if (RequireAccount() is { } signIn) return signIn;
+        if (state.Mode is not string mode) return RedirectToAction(nameof(Index));
+
+        if (FirstUnfinishedStep(state) is { } missing && missing.Action != action)
+            return RedirectToAction(missing.Action);
+
+        var steps = StepsOf(mode);
+        int index = Array.FindIndex(steps, s => s.Action == action);
+        ViewData["Steps"] = steps.Select(s => s.Label).ToArray();
+        ViewData["Step"] = index + 1;
+        ViewData["StepLabel"] = $"BƯỚC {index + 1} / {steps.Length}";
+        ViewData["BackUrl"] = index <= 0
+            ? Url.Action(nameof(Index), "Booking")!
+            : Url.Action(steps[index - 1].Action, "Booking")!;
+
+        return null;
+    }
+
+    /// <summary>Bước quyết định khung giờ của luồng hiện hành (màn "Bác sĩ & giờ" hoặc "Ngày & giờ").</summary>
+    private static string SlotStepOf(BookingState state) =>
+        state.Mode == BookingModes.ByDate ? nameof(ChonBacsi) : nameof(ChonNgayGio);
+
+    /// <summary>
+    /// Ngày đang chọn vẫn còn lịch thì giữ, không thì lấy ngày đầu tiên còn chỗ.
+    /// null khi phạm vi đang xét (toàn viện / khoa / bác sĩ) không còn ngày nào mở đặt online.
+    /// </summary>
+    private static DateOnly? PickDate(List<DayVm> days, DateOnly? saved)
+    {
+        var pickable = days.Where(d => d.State is not ("off" or "closed")).ToList();
+        if (pickable.Count == 0) return null;
+
+        return saved is { } savedDate && pickable.Any(d => d.Date == savedDate)
+            ? savedDate
+            : (pickable.FirstOrDefault(d => d.State != "full") ?? pickable[0]).Date;
+    }
+
+    private string WindowText =>
+        $"{_bookingService.FirstBookableDate:dd/MM/yyyy} – {_bookingService.LastBookableDate:dd/MM/yyyy}";
+
+    private static string StateScopeLabel(BookingState state) => state switch
+    {
+        { DoctorId: not null } => "Bác sĩ đã chọn",
+        { DepartmentId: not null } => "Chuyên khoa này",
+        _ => "Bệnh viện"
+    };
+
+    private static string FormatMonth(DateOnly date)
+        => $"Tháng {date.ToString("MM/yyyy", CultureInfo.InvariantCulture)}";
+
+    // ------------------------------------------------------------ Helpers dữ liệu
 
     private BookingState GetState()
         => HttpContext.Session.GetObject<BookingState>(StateKey) ?? new BookingState();
 
     private void SaveState(BookingState state)
         => HttpContext.Session.SetObject(StateKey, state);
+
+    /// <summary>
+    /// Khoa vừa chọn còn mở đặt online hay không. Luồng theo ngày chỉ tính chỗ của đúng ngày đã chọn,
+    /// nên một khoa đầy lịch hôm đó bị từ chối ngay cả khi tuần sau còn trống.
+    /// </summary>
+    private async Task<BookingDepartmentDto?> LoadDepartmentAsync(BookingState state, int departmentId)
+    {
+        BookingDepartmentDto? dept;
+
+        if (state.Mode == BookingModes.ByDate && state.Date is { } day)
+        {
+            dept = (await _bookingService.GetDepartmentsOnDateAsync(day)).FirstOrDefault(d => d.Id == departmentId);
+            if (dept is null || dept.SlotsAvailable == 0)
+            {
+                TempData["Error"] = $"Chuyên khoa này không còn chỗ ngày {VietnameseFormat.ShortDate(day)}. Vui lòng chọn chuyên khoa khác.";
+                return null;
+            }
+            return dept;
+        }
+
+        dept = await _bookingService.GetDepartmentByIdAsync(departmentId);
+        if (dept is null || dept.SlotsAvailable == 0)
+        {
+            TempData["Error"] = "Chuyên khoa này chưa có lịch khả dụng. Vui lòng chọn chuyên khoa khác.";
+            return null;
+        }
+        return dept;
+    }
+
+    private async Task<BookingDepartmentDto> RequireDepartmentAsync(BookingState state) =>
+        await RequireOrEmptyAsync(state.DepartmentId!.Value);
+
+    private async Task<BookingDepartmentDto> RequireOrEmptyAsync(int departmentId) =>
+        await _bookingService.GetDepartmentByIdAsync(departmentId) ?? EmptyDepartment(departmentId);
+
+    private static BookingDepartmentDto EmptyDepartment(int id) => new() { Id = id, Name = "chuyên khoa đã chọn" };
+
+    /// <summary>Bác sĩ đã chọn trong Session, để màn "Ngày & giờ" ghi tên và chuyên môn bác sĩ.</summary>
+    private async Task<DoctorVm?> LoadDoctorAsync(BookingState state)
+    {
+        if (state.DoctorId is not int doctorId) return null;
+
+        var doctor = (await _bookingService.GetDoctorsAsync(state.DepartmentId))
+            .FirstOrDefault(d => d.Id == doctorId);
+
+        return doctor is null ? null : DoctorVm.From(doctor);
+    }
+
+    /// <summary>
+    /// Khoa của lượt khám: ưu tiên khoa bệnh nhân đã chọn, nếu đi thẳng từ bác sĩ thì lấy theo khung giờ.
+    /// null khi cả hai đều không đọc được -> controller đưa về bước chọn chuyên khoa.
+    /// </summary>
+    private async Task<BookingDepartmentDto?> LoadDepartmentForSlotAsync(BookingState state, BookingSlotDto slot)
+    {
+        var dept = await _bookingService.GetDepartmentByIdAsync(state.DepartmentId ?? slot.DepartmentId);
+        return dept ?? await _bookingService.GetDepartmentByIdAsync(slot.DepartmentId);
+    }
+
+    // Khung giờ đang chọn, đối chiếu lại với DB (còn tồn tại, còn trong cửa sổ đặt được, còn suất online).
+    private async Task<BookingSlotDto?> FindSelectedSlotAsync(BookingState state)
+    {
+        if (state.SlotId is not int slotId) return null;
+
+        var slot = await _bookingService.GetSlotByIdAsync(slotId);
+        if (slot is null || !slot.IsSelectable) return null;
+
+        if (state.DoctorId is { } doctorId && slot.DoctorId != doctorId) return null;
+        if (state.DepartmentId is { } departmentId && slot.DepartmentId != departmentId) return null;
+
+        return slot;
+    }
 
     // Hồ sơ của tài khoản đang đăng nhập, kèm nhãn quan hệ và trạng thái liên kết từ DB.
     private async Task<List<PatientVm>> GetProfilesAsync()
@@ -501,113 +765,39 @@ public class BookingController : PatientPageController
             .ThenBy(p => p.FullName)
             .ToList();
 
-    // Nếu người dùng nhảy bước khi chưa chọn đủ thì đưa về bước còn thiếu.
-    private IActionResult? Guard(BookingState state, int throughStep)
-    {
-        if (RequireAccount() is { } signIn) return signIn;
-        if (throughStep >= 1 && state.DepartmentId is null) return RedirectToAction(nameof(ChonKhoa));
-        if (throughStep >= 2 && (state.Date is null || string.IsNullOrEmpty(state.Shift))) return RedirectToAction(nameof(ChonNgayCa));
-        if (throughStep >= 3 && state.SlotId is null) return RedirectToAction(nameof(ChonGio));
-        if (throughStep >= 4 && state.PatientId is null) return RedirectToAction(nameof(ChonNguoiKham));
-        return null;
-    }
-
-    // Khung giờ đang chọn, đối chiếu lại với DB (đúng khoa + ngày + ca và còn suất online).
-    private async Task<BookingSlotDto?> FindSelectedSlotAsync(BookingState state)
-    {
-        if (state.SlotId is not int slotId) return null;
-        var slots = await _bookingService.GetSlotsAsync(state.DepartmentId!.Value, state.Date!.Value, state.Shift!);
-        return slots.FirstOrDefault(s => s.Id == slotId && s.IsSelectable);
-    }
-
-    private async Task<BookingShiftDto?> GetSelectedShiftAsync(BookingState state)
-    {
-        var shifts = await _bookingService.GetShiftsAsync(state.DepartmentId!.Value, state.Date!.Value);
-        return shifts.FirstOrDefault(s => s.Key == state.Shift);
-    }
-
     private static DepartmentVm ToDepartmentVm(BookingDepartmentDto d) => new()
     {
         Id = d.Id,
         Name = d.Name,
         Description = d.Description ?? string.Empty,
-        SlotsThisWeek = d.SlotsThisWeek
+        Icon = DepartmentIcons.For(d.Name),
+        SlotsAvailable = d.SlotsAvailable
     };
 
-    private static ShiftVm ToShiftVm(BookingShiftDto s) => new()
+    private static DoctorSlotsVm ToDoctorSlotsVm(BookingDoctorSlotsDto d) => new()
     {
-        Key = s.Key,
-        Label = s.Label,
-        TimeRange = s.TimeRange,
-        SlotsLeft = s.SlotsLeft,
-        Status = s.Status,
-        Doctor = s.DoctorId is { } docId
-            ? new DoctorVm
-            {
-                Id = docId,
-                FullName = s.DoctorName ?? string.Empty,
-                Title = s.DoctorTitle ?? string.Empty,
-                Specialty = s.DoctorTitle ?? string.Empty
-            }
-            : null,
-        Room = s.RoomName ?? string.Empty
+        Doctor = new DoctorVm
+        {
+            Id = d.DoctorId,
+            FullName = d.DoctorName,
+            Specialty = d.Specialty,
+            DutyDays = string.Empty
+        },
+        Room = d.RoomName,
+        Slots = d.Slots.Select(ToSlotVm).ToList()
     };
 
     private static SlotVm ToSlotVm(BookingSlotDto s) => new()
     {
         Id = s.Id,
         Label = s.Label,
+        ShiftLabel = s.ShiftLabel,
         Status = s.Status,
         SlotsLeft = s.SlotsLeft,
         OnlineQuota = s.OnlineQuota,
         Room = s.RoomName ?? string.Empty,
-        Doctor = new DoctorVm
-        {
-            Id = s.DoctorId,
-            FullName = s.DoctorName ?? string.Empty,
-            Title = s.DoctorTitle ?? string.Empty,
-            Specialty = s.DoctorTitle ?? string.Empty
-        }
+        Doctor = DoctorVm.From(s)
     };
-
-    private async Task<SlotListViewModel?> BuildSlotListAsync(BookingState state)
-    {
-        var dept = await _bookingService.GetDepartmentByIdAsync(state.DepartmentId!.Value);
-        var shift = await GetSelectedShiftAsync(state);
-        if (dept is null || shift is null) return null;
-
-        var slots = await _bookingService.GetSlotsAsync(dept.Id, state.Date!.Value, shift.Key);
-        if (slots.Count == 0) return null;
-
-        return new SlotListViewModel
-        {
-            Department = ToDepartmentVm(dept),
-            Shift = ToShiftVm(shift),
-            Slots = slots.Select(ToSlotVm).ToList()
-        };
-    }
-
-    private async Task<ShiftListViewModel> BuildShiftListAsync(int departmentId, string departmentName, DateOnly date, string? selectedShift)
-    {
-        var shifts = await _bookingService.GetShiftsAsync(departmentId, date);
-        var vms = shifts.Select(ToShiftVm).ToList();
-        var valid = vms.Any(s => s.Key == selectedShift && s.IsSelectable) ? selectedShift : null;
-        return new ShiftListViewModel
-        {
-            DepartmentName = departmentName,
-            Date = date,
-            Shifts = vms,
-            SelectedShift = valid
-        };
-    }
-
-    private static DateOnly FirstBookableDate() => DateOnly.FromDateTime(DateTime.Today).AddDays(1);
-
-    private static bool IsBookableDate(DateOnly d)
-    {
-        var from = FirstBookableDate();
-        return d >= from && d < from.AddDays(DaysToShow);
-    }
 
     private static bool TryParseDate(string? text, out DateOnly date)
         => DateOnly.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out date);

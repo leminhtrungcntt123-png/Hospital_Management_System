@@ -24,26 +24,35 @@ public class BookingOptions
     /// <summary>Một lượt hẹn bị chen lên trước tối đa bấy nhiêu lần thì không bị chen thêm.</summary>
     public int MaxTimesOvertaken { get; set; } = 3;
 
-    /// <summary>Hủy trước bấy nhiêu giờ thì không tính là hủy trễ.</summary>
-    public int FreeCancelHours { get; set; } = 24;
+    /// <summary>Chỉ đặt được trước giờ này của ngày liền trước ngày khám (15 = trước 15:00).</summary>
+    public int BookingCutoffHour { get; set; } = 15;
 
-    /// <summary>Số lần hủy trễ cho phép trong một tháng dương lịch.</summary>
-    public int MaxLateCancelsPerMonth { get; set; } = 1;
+    /// <summary>Đặt khám tối đa bao nhiêu ngày kể từ hôm nay.</summary>
+    public int MaxAdvanceDays { get; set; } = 30;
 
-    /// <summary>Số ngày chặn đặt lịch web khi vượt hạn mức.</summary>
-    public int BookingBlockDays { get; set; } = 45;
+    /// <summary>Số hồ sơ tối đa gắn với một tài khoản; REVOKED không đếm.</summary>
+    public int MaxProfilesPerAccount { get; set; } = 5;
+
+    /// <summary>Số hồ sơ tối đa tính theo SĐT chủ tài khoản (SĐT của hồ sơ "Bản thân").</summary>
+    public int MaxProfilesPerOwnerPhone { get; set; } = 5;
+
+    /// <summary>
+    /// Người dưới độ tuổi này (chưa đến tuổi được cấp CCCD) bắt buộc phải khai CCCD của một người thân
+    /// đã có hồ sơ ACTIVE thuộc chính tài khoản. Từ độ tuổi này trở lên thì bắt buộc có CCCD của chính mình.
+    /// </summary>
+    public int OwnIdFromAge { get; set; } = 14;
+
+    /// <summary>Số hồ sơ người bệnh khác nhau được đặt trong một ngày (00:00-23:59).</summary>
+    public int MaxRelativesPerDay { get; set; } = 3;
+
+    /// <summary>Số lượt đăng ký tối đa trong một ngày (00:00-23:59), chỉ tính lượt đặt thành công.</summary>
+    public int MaxBookingsPerDay { get; set; } = 6;
 
     /// <summary>Trẻ dưới độ tuổi này được xếp ưu tiên mức 1.</summary>
     public int PriorityChildUnderAge { get; set; } = 6;
 
     /// <summary>Người từ độ tuổi này trở lên được xếp ưu tiên mức 1.</summary>
     public int PrioritySeniorFromAge { get; set; } = 70;
-
-    /// <summary>Số lần NO_SHOW/EXPIRED trong cửa sổ khiến tài khoản bị chặn đặt web.</summary>
-    public int MaxNoShowsBeforeBlock { get; set; } = 3;
-
-    /// <summary>Cửa sổ ngày dùng để đếm NO_SHOW/EXPIRED.</summary>
-    public int NoShowWindowDays { get; set; } = 90;
 }
 
 public static class BookingOptionsRegistration
@@ -57,13 +66,16 @@ public static class BookingOptionsRegistration
             .Validate(o => o.ReleaseCutoffMinutes >= 0, "ReleaseCutoffMinutes không được âm.")
             .Validate(o => o.MaxOvertakeAhead >= 1, "MaxOvertakeAhead phải >= 1.")
             .Validate(o => o.MaxTimesOvertaken >= 1, "MaxTimesOvertaken phải >= 1.")
-            .Validate(o => o.FreeCancelHours >= 0, "FreeCancelHours không được âm.")
-            .Validate(o => o.MaxLateCancelsPerMonth >= 1, "MaxLateCancelsPerMonth phải >= 1.")
-            .Validate(o => o.BookingBlockDays >= 1, "BookingBlockDays phải >= 1.")
+            .Validate(o => o.BookingCutoffHour is >= 0 and <= 23, "BookingCutoffHour phải nằm trong 0..23.")
+            .Validate(o => o.MaxAdvanceDays >= 1, "MaxAdvanceDays phải >= 1.")
+            .Validate(o => o.MaxProfilesPerAccount >= 1, "MaxProfilesPerAccount phải >= 1.")
+            .Validate(o => o.MaxProfilesPerOwnerPhone >= 1, "MaxProfilesPerOwnerPhone phải >= 1.")
+            .Validate(o => o.OwnIdFromAge is >= 0 and <= 60, "OwnIdFromAge phải nằm trong 0..60.")
+            .Validate(o => o.MaxRelativesPerDay >= 1, "MaxRelativesPerDay phải >= 1.")
+            .Validate(o => o.MaxBookingsPerDay >= o.MaxRelativesPerDay,
+                      "MaxBookingsPerDay phải >= MaxRelativesPerDay vì một người thân có thể đặt nhiều lượt.")
             .Validate(o => o.PriorityChildUnderAge >= 0, "PriorityChildUnderAge không được âm.")
             .Validate(o => o.PrioritySeniorFromAge > o.PriorityChildUnderAge, "PrioritySeniorFromAge phải lớn hơn PriorityChildUnderAge.")
-            .Validate(o => o.MaxNoShowsBeforeBlock >= 1, "MaxNoShowsBeforeBlock phải >= 1.")
-            .Validate(o => o.NoShowWindowDays >= 1, "NoShowWindowDays phải >= 1.")
             .ValidateOnStart();
 
         return services;

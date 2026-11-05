@@ -1,7 +1,7 @@
 -- Gate kiểm chứng align theo init.md mục 5 + mô hình đánh số A/T theo vị trí.
 -- Chạy trên DB được chỉ định: backup/db.sh <dbname> docs/database/ci/schema_checks.sql
--- CI chạy file này sau khi nạp docs/database/ci/schema.sql; cả 16 cột ok phải TRUE.
--- File in ra 16 dòng rồi DỪNG BẰNG LỖI nếu còn dòng ok = false: chỉ cần ON_ERROR_STOP,
+-- CI chạy file này sau khi nạp docs/database/ci/schema.sql; cả 18 cột ok phải TRUE.
+-- File in ra 18 dòng rồi DỪNG BẰNG LỖI nếu còn dòng ok = false: chỉ cần ON_ERROR_STOP,
 -- không phải đếm kết quả bằng shell (xem DO $$ ở cuối file).
 CREATE TEMPORARY VIEW gate AS
 SELECT '1. so bang (khong ke __EFMigrationsHistory)' AS check,
@@ -104,7 +104,19 @@ SELECT '16. du lieu slot khong vi pham quota',
          || ' / booked>cap=' || (SELECT count(*)::text FROM appointment_slots WHERE booked_count > capacity),
        (SELECT count(*) FROM appointment_slots WHERE online_quota > capacity) = 0
          AND (SELECT count(*) FROM appointment_slots WHERE online_booked > online_quota) = 0
-         AND (SELECT count(*) FROM appointment_slots WHERE booked_count > capacity) = 0;
+         AND (SELECT count(*) FROM appointment_slots WHERE booked_count > capacity) = 0
+UNION ALL
+SELECT '17. hai cot khai bao bao hiem in appointments',
+       string_agg(column_name || '/' || is_nullable || '/' || coalesce(column_default, 'khong co default'), ',' ORDER BY column_name),
+       count(*) = 2 AND bool_and(data_type = 'boolean' AND is_nullable = 'NO' AND column_default LIKE '%false%')
+FROM information_schema.columns
+WHERE table_name = 'appointments' AND column_name IN ('has_health_insurance', 'has_private_insurance')
+UNION ALL
+SELECT '18. cot patients.email dung kieu de nhan OTP',
+       string_agg(column_name || '/' || data_type || '(' || character_maximum_length || ')/' || is_nullable, ',' ORDER BY column_name),
+       count(*) = 1 AND bool_and(data_type = 'character varying' AND character_maximum_length = 200 AND is_nullable = 'YES')
+FROM information_schema.columns
+WHERE table_name = 'patients' AND column_name = 'email';
 
 SELECT * FROM gate;
 
@@ -113,7 +125,7 @@ DECLARE n integer;
 BEGIN
     SELECT count(*) INTO n FROM gate WHERE NOT ok;
     IF n > 0 THEN
-        RAISE EXCEPTION '% / 16 check cau truc khong dat - xem bang ket qua o tren', n;
+        RAISE EXCEPTION '% / 18 check cau truc khong dat - xem bang ket qua o tren', n;
     END IF;
-    RAISE NOTICE 'gate cau truc: 16/16 dat';
+    RAISE NOTICE 'gate cau truc: 18/18 dat';
 END $$;

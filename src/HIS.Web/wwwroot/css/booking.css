@@ -2,8 +2,8 @@
    booking.css - CSS riêng cho quy trình đặt lịch khám
    Tách từ index.css của Figma. Dùng kèm site.css.
    Gồm: trang bắt đầu (A1), 4 bước đặt lịch, trang thành công,
-   modal thông tin bác sĩ, form thêm hồ sơ.
-   Chưa gồm CSS của: lịch hẹn, hồ sơ, lịch sử, hàng đợi, thông báo
+   modal thông tin bác sĩ, màn Hồ sơ (danh sách, tạo hồ sơ, chi tiết).
+   Chưa gồm CSS của: lịch sử, hàng đợi, thông báo
    (người phụ trách các phần đó tự thêm).
    ========================================================= */
 
@@ -354,6 +354,14 @@
         gap: 6px;
     }
 
+/* Nút phụ (Quay lại / Hồ sơ của tôi) đứng cạnh nút chính trong đầu trang và chân trang. */
+.head-actions,
+.footer-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
 .empty-state {
     text-align: center;
     padding: 45px;
@@ -587,7 +595,7 @@
         background: #a9b2bd;
     }
 
-.shift-layout {
+.slot-layout {
     display: grid;
     grid-template-columns: 1fr 265px;
     gap: 26px;
@@ -614,81 +622,120 @@
         margin-top: 3px;
     }
 
-.shift-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 11px;
+/* Ngữ cảnh đã chọn (khoa / bác sĩ) hiện trên lịch ngày của màn "Ngày & giờ". */
+.picked-context {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 9px 16px;
+    border: 1px solid var(--line);
+    border-radius: 11px;
+    background: #f8fafc;
+    padding: 12px 15px;
+    margin-bottom: 24px;
 }
 
-.shift-card {
+    .picked-context > div {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    .picked-context svg {
+        width: 16px;
+        height: 16px;
+        color: var(--blue);
+    }
+
+    .picked-context a {
+        color: var(--blue);
+        font-size: 10px;
+        font-weight: 750;
+        text-decoration: underline;
+    }
+
+    .picked-context .text-button {
+        margin-left: auto;
+    }
+
+/* ---------- Màn chọn bác sĩ ---------- */
+.doctor-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.doctor-card {
     position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
     border: 1px solid var(--line);
     border-radius: 11px;
     background: white;
-    overflow: hidden;
+    padding: 16px;
+    text-align: left;
+    min-height: 132px;
+    width: 100%;
     transition: .18s ease;
 }
 
-    .shift-card:hover {
+    .doctor-card:hover:not(:disabled) {
         border-color: #9ab6dd;
         box-shadow: 0 6px 18px rgba(23,78,166,.08);
     }
 
-    .shift-card.selected {
+    .doctor-card.selected {
         border: 2px solid var(--blue);
         background: #fbfdff;
+        padding: 15px;
     }
 
-    .shift-card.disabled {
-        opacity: .6;
+    .doctor-card:disabled {
+        opacity: .55;
+        cursor: not-allowed;
     }
 
-.shift-select {
-    width: 100%;
-    border: 0;
-    background: transparent;
-    padding: 15px;
-    text-align: left;
-    color: var(--ink);
+.doctor-card-body {
+    flex: 1;
 }
 
-.shift-card-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 11px;
-}
+    .doctor-card-body > strong {
+        display: block;
+        font-size: 13px;
+    }
 
-    .shift-card-head > div {
+    .doctor-card-body > span {
+        display: block;
+        color: var(--muted);
+        font-size: 10px;
+        margin-top: 4px;
+    }
+
+    .doctor-card-body > .badge {
+        margin-top: 7px;
+        align-self: start;
+    }
+
+    .doctor-card-body > small {
         display: flex;
         align-items: center;
-        gap: 6px;
-        color: var(--blue);
+        gap: 5px;
+        color: var(--muted);
+        font-size: 9.5px;
+        margin-top: 8px;
     }
 
-        .shift-card-head > div svg {
-            width: 17px;
-            height: 17px;
+        .doctor-card-body > small svg {
+            width: 13px;
+            height: 13px;
         }
 
-        .shift-card-head > div span {
-            font-size: 11px;
-            font-weight: 750;
-        }
-
-.shift-select > strong {
-    display: block;
-    font-size: 14px;
-    margin-bottom: 14px;
-}
-
-.doctor-inline {
-    display: flex;
-    gap: 9px;
-    align-items: center;
-    border-top: 1px solid var(--line);
-    padding-top: 12px;
-}
+    .doctor-card-body > .available, .doctor-card-body > .unavailable {
+        margin-top: 8px;
+    }
 
 .doctor-avatar {
     width: 37px;
@@ -709,73 +756,190 @@
         font-size: 17px;
     }
 
-.doctor-inline b, .doctor-inline small {
-    display: block;
-}
-
-.doctor-inline b {
-    font-size: 10px;
-}
-
-.doctor-inline small {
-    color: var(--muted);
-    font-size: 8px;
-    margin-top: 3px;
-}
-
-.doctor-room {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    color: var(--muted);
-    font-size: 9px;
-    margin-top: 10px;
-}
-
-    .doctor-room svg {
-        width: 14px;
-        height: 14px;
+    .doctor-avatar.any {
+        background: #eef2f7;
+        color: #7f8b9c;
     }
 
-.selected-shift {
-    position: absolute;
-    right: 9px;
-    bottom: 43px;
-    display: none;
-    align-items: center;
-    gap: 3px;
-    color: var(--blue);
-    font-size: 8px;
-    font-weight: 700;
+    .doctor-avatar svg {
+        width: 17px;
+        height: 17px;
+    }
+
+/* Màn "Bác sĩ & khung giờ" (luồng theo ngày): mỗi bác sĩ một khối, chip giờ nằm trong khối. */
+.doctor-list {
+    display: grid;
+    gap: 13px;
 }
 
-    .selected-shift svg {
+.doctor-block {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: white;
+    padding: 15px 16px 16px;
+    transition: .18s ease;
+}
+
+    .doctor-block.selected {
+        border: 2px solid var(--blue);
+        background: #fbfdff;
+        padding: 14px 15px 15px;
+    }
+
+.doctor-block-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 15px;
+}
+
+.doctor-block-info {
+    flex: 1;
+}
+
+    .doctor-block-info > strong {
+        display: block;
+        font-size: 13px;
+    }
+
+    .doctor-block-info > span {
+        display: block;
+        color: var(--muted);
+        font-size: 10px;
+        margin-top: 3px;
+    }
+
+    .doctor-block-info small {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        color: var(--muted);
+        font-size: 9.5px;
+        margin-top: 4px;
+    }
+
+        .doctor-block-info small svg {
+            width: 13px;
+            height: 13px;
+        }
+
+.doctor-link {
+    border: 0;
+    background: transparent;
+    color: var(--blue);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 9.5px;
+    font-weight: 750;
+    padding: 0;
+    white-space: nowrap;
+}
+
+    .doctor-link svg {
         width: 13px;
         height: 13px;
     }
 
-.shift-card.selected .selected-shift {
-    display: flex;
+/* ---------- Chip khung giờ, nhóm theo Ca sáng / Ca chiều ---------- */
+.slot-group + .slot-group {
+    margin-top: 16px;
 }
 
-.doctor-link {
-    width: 100%;
-    border: 0;
-    border-top: 1px solid var(--line);
-    background: #f8fafc;
-    color: var(--blue);
-    min-height: 37px;
-    padding: 0 13px;
+.slot-group-head {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    font-size: 9px;
-    font-weight: 700;
+    gap: 7px;
+    color: var(--blue);
+    font-size: 11px;
+    font-weight: 750;
+    margin-bottom: 10px;
 }
 
-    .doctor-link svg {
-        width: 14px;
-        height: 14px;
+    .slot-group-head svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .slot-group-head small {
+        color: var(--muted);
+        font-size: 9px;
+        font-weight: 600;
+    }
+
+.slot-chips {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 9px;
+}
+
+.slot-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.slot-chip {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: white;
+    padding: 10px 11px;
+    text-align: left;
+    color: var(--ink);
+    transition: .16s ease;
+}
+
+    .slot-chip:hover:not(:disabled) {
+        border-color: #9ab6dd;
+        box-shadow: 0 5px 14px rgba(23,78,166,.07);
+    }
+
+    .slot-chip strong {
+        display: block;
+        font-size: 11.5px;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .slot-chip .slot-left {
+        display: block;
+        color: #1c8a5f;
+        font-size: 9px;
+        font-weight: 750;
+        margin-top: 4px;
+    }
+
+    .slot-chip .slot-full {
+        display: block;
+        color: #a4553f;
+        font-size: 9px;
+        font-weight: 750;
+        margin-top: 4px;
+    }
+
+.slot-item.full .slot-chip {
+    opacity: .62;
+    background: #f6f8fb;
+}
+
+.slot-item.selected .slot-chip {
+    border: 2px solid var(--blue);
+    background: var(--blue-light);
+    padding: 9px 10px;
+}
+
+.chip-doctor {
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font-size: 8.5px;
+    text-align: left;
+    padding: 0 2px;
+    text-decoration: underline;
+}
+
+    .chip-doctor:hover {
+        color: var(--blue);
     }
 
 .selection-summary, .appointment-summary {
@@ -1283,25 +1447,7 @@
     margin-top: 17px;
 }
 
-/* ---------- Modal bác sĩ + form thêm hồ sơ ---------- */
-.field-label {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    font-size: 10px;
-    font-weight: 650;
-    margin-top: 18px;
-}
-
-    .field-label textarea {
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        min-height: 80px;
-        padding: 10px;
-        resize: none;
-        font-size: 10px;
-    }
-
+/* ---------- Modal bác sĩ ---------- */
 .doctor-modal {
     width: min(560px, calc(100% - 30px));
 }
@@ -1389,10 +1535,6 @@
         height: 16px;
     }
 
-.profile-modal {
-    width: min(570px, calc(100% - 30px));
-}
-
 .form-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1454,6 +1596,287 @@
     .duplicate-note svg {
         width: 16px;
         height: 16px;
+    }
+
+/* ---------- Màn nhập mã OTP sau khi thêm hồ sơ ---------- */
+.otp-meta {
+    margin-top: 12px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-wrap: wrap;
+    color: var(--muted);
+    font-size: 9px;
+}
+
+    .otp-meta svg {
+        width: 16px;
+        height: 16px;
+    }
+
+.otp-resend {
+    margin-top: 10px;
+    display: flex;
+    justify-content: center;
+}
+
+.otp-form input[name="code"] {
+    letter-spacing: 6px;
+    text-align: center;
+    font-weight: 700;
+}
+
+/* ---------- Màn Tạo hồ sơ: hai nhánh trên một màn ---------- */
+.branch-choice {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 13px;
+    margin-top: 19px;
+}
+
+.branch {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    border: 1px solid #cfd8e3;
+    border-radius: 10px;
+    background: white;
+    padding: 13px;
+    cursor: pointer;
+}
+
+    .branch input {
+        width: 15px;
+        height: 15px;
+        accent-color: var(--blue);
+    }
+
+    .branch strong {
+        font-size: 10px;
+        color: var(--ink);
+    }
+
+    .branch small {
+        font-size: 9px;
+        color: #536278;
+        line-height: 1.45;
+    }
+
+    .branch.selected {
+        border-color: var(--blue);
+        background: var(--blue-light);
+    }
+
+.branch-panel[hidden] {
+    display: none;
+}
+
+.child-note {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    margin: 0;
+    padding: 10px;
+    border-radius: 8px;
+    background: #fff8e6;
+    color: #7a5a12;
+    font-size: 9px;
+    line-height: 1.5;
+}
+
+    .child-note svg {
+        width: 16px;
+        height: 16px;
+        flex: none;
+    }
+
+    .child-note b {
+        font-weight: 700;
+    }
+
+@media (max-width: 760px) {
+    .branch-choice {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ---------- Bước 4: khai báo bảo hiểm (chỉ để quầy phân luồng) ---------- */
+.declare-choice {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 13px;
+    margin-top: 13px;
+}
+
+.declare {
+    display: flex;
+    align-items: start;
+    gap: 9px;
+    border: 1px solid #cfd8e3;
+    border-radius: 10px;
+    background: white;
+    padding: 13px;
+    cursor: pointer;
+}
+
+    .declare input {
+        width: 15px;
+        height: 15px;
+        margin-top: 1px;
+        accent-color: var(--blue);
+        flex: none;
+    }
+
+    .declare.selected {
+        border-color: var(--blue);
+        background: var(--blue-light);
+    }
+
+    .declare strong {
+        display: block;
+        font-size: 10px;
+        color: var(--ink);
+    }
+
+    .declare small {
+        display: block;
+        font-size: 9px;
+        color: #536278;
+        line-height: 1.45;
+    }
+
+@media (max-width: 760px) {
+    .declare-choice {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ---------- Trang bắt đầu: ba lối vào đặt khám ---------- */
+.entries {
+    padding: 6px 28px 8px;
+}
+
+.entry-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+.entry-card {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: white;
+    padding: 24px;
+    color: var(--ink);
+    box-shadow: 0 7px 25px rgba(24,49,83,.05);
+    transition: .18s ease;
+}
+
+    .entry-card:hover {
+        border-color: var(--blue);
+        box-shadow: 0 12px 30px rgba(23,78,166,.13);
+        transform: translateY(-2px);
+    }
+
+.entry-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    background: var(--blue-light);
+    color: var(--blue);
+    display: grid;
+    place-items: center;
+    margin-bottom: 15px;
+}
+
+    .entry-icon svg {
+        width: 23px;
+        height: 23px;
+    }
+
+.entry-card > strong {
+    font-size: 16px;
+}
+
+.entry-card p {
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.6;
+    margin: 8px 0 14px;
+    flex: 1;
+}
+
+.entry-steps {
+    display: block;
+    color: #7f8b9c;
+    font-size: 9.5px;
+    line-height: 1.55;
+    border-top: 1px dashed var(--line);
+    padding-top: 11px;
+}
+
+.entry-go {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--blue);
+    font-size: 11.5px;
+    font-weight: 750;
+    margin-top: 13px;
+}
+
+    .entry-go svg {
+        width: 15px;
+        height: 15px;
+    }
+
+/* ---------- Bước xác nhận: chi phí và thanh toán ---------- */
+.cost-rows > div {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 0;
+    font-size: 11.5px;
+    color: var(--muted);
+}
+
+    .cost-rows > div + div {
+        border-top: 1px dashed var(--line);
+    }
+
+    .cost-rows strong {
+        color: var(--ink);
+        font-variant-numeric: tabular-nums;
+    }
+
+.cost-total {
+    font-size: 12.5px !important;
+    color: var(--ink) !important;
+    font-weight: 700;
+}
+
+.cost-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    background: var(--blue-light);
+    color: var(--blue);
+    border-radius: 9px;
+    padding: 11px 13px;
+    font-size: 10px;
+    line-height: 1.55;
+    margin: 6px 0 0;
+}
+
+    .cost-note svg {
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+        margin-top: 1px;
     }
 
 /* ---------- Responsive ---------- */
@@ -1548,7 +1971,8 @@
             display: none;
         }
 
-    .specialty-grid, .profile-select-grid, .confirmation-layout, .shift-layout, .success-details {
+    .specialty-grid, .profile-select-grid, .confirmation-layout, .slot-layout,
+    .doctor-grid, .success-details {
         grid-template-columns: 1fr;
     }
 
@@ -1556,7 +1980,11 @@
         grid-template-columns: repeat(4, 1fr);
     }
 
-    .shift-grid {
+    .slot-chips {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .entry-grid {
         grid-template-columns: 1fr;
     }
 

@@ -1,8 +1,10 @@
 using HIS.BLL.DTOs;
 using HIS.BLL.Interfaces;
+using HIS.BLL.Options;
 using HIS.DAL;
 using HIS.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace HIS.BLL.Services;
 
@@ -16,11 +18,134 @@ namespace HIS.BLL.Services;
 public class PatientProfileService : IPatientProfileService
 {
     private readonly AppDbContext _context;
+    private readonly BookingOptions _options;
 
-    public PatientProfileService(AppDbContext context)
+    public PatientProfileService(AppDbContext context, IOptions<BookingOptions> options)
     {
         _context = context;
+        _options = options.Value;
     }
+
+    /// <summary>
+    /// Hạn mức hồ sơ phía portal: MaxProfilesPerAccount hồ sơ gắn với một tài khoản,
+    /// MaxProfilesPerOwnerPhone hồ sơ tính theo SĐT chủ tài khoản (SĐT của hồ sơ "Bản thân")
+    /// và một SĐT chỉ được làm chủ một tài khoản.
+    /// REVOKED không đếm nên thu hồi liên kết là giải phóng chỉ tiêu.
+    /// </summary>
+    private async Task<string?> ValidateProfileQuotaAsync(
+        int accountId, string phone, PatientRelationship relationship, CancellationToken cancellationToken)
+    {
+        int linkedProfiles = await _context.AccountPatientProfiles.AsNoTracking()
+            .CountAsync(l => l.AccountId == accountId && l.Status != LinkStatus.Revoked, cancellationToken);
+
+        if (linkedProfiles >= _options.MaxProfilesPerAccount)
+        {
+            return $"Mỗi tài khoản chỉ được quản lý tối đa {_options.MaxProfilesPerAccount} hồ sơ. " +
+                   $"Tài khoản này đã có {linkedProfiles} hồ sơ.";
+        }
+
+        string? ownerPhone = await OwnerPhoneAsync(accountId, cancellationToken);
+
+        if (ownerPhone is null && relationship != PatientRelationship.Self)
+        {
+            // Chưa có hồ sơ "Bản thân" thì chưa biết SĐT chủ tài khoản là gì nên chỉ giới hạn theo tài khoản.
+            return null;
+        }
+
+        string effectiveOwnerPhone = ownerPhone ?? phone;
+
+        if (relationship == PatientRelationship.Self)
+        {
+            bool phoneTakenByOtherAccount = await _context.AccountPatientProfiles.AsNoTracking()
+                .AnyAsync(l => l.AccountId != accountId
+                               && l.Relationship == PatientRelationship.Self
+                               && l.Status != LinkStatus.Revoked
+                               && l.Patient.PhoneNumber == effectiveOwnerPhone, cancellationToken);
+
+            if (phoneTakenByOtherAccount)
+            {
+                return $"Số điện thoại {effectiveOwnerPhone} đã được đăng ký. " +
+                       "Vui lòng đăng nhập bằng tài khoản đó hoặc dùng Quên mật khẩu.";
+            }
+        }
+
+        var accountIdsWithOwnerPhone = await _context.AccountPatientProfiles.AsNoTracking()
+            .Where(l => l.Relationship == PatientRelationship.Self
+                        && l.Status != LinkStatus.Revoked
+                        && l.Patient.PhoneNumber == effectiveOwnerPhone)
+            .Select(l => l.AccountId)
+            .ToListAsync(cancellationToken);
+
+        accountIdsWithOwnerPhone.Add(accountId);
+
+        int profilesUnderOwnerPhone = await _context.AccountPatientProfiles.AsNoTracking()
+            .CountAsync(l => l.Status != LinkStatus.Revoked
+                             && accountIdsWithOwnerPhone.Contains(l.AccountId), cancellationToken);
+
+        if (profilesUnderOwnerPhone >= _options.MaxProfilesPerOwnerPhone)
+        {
+            return $"SĐT chủ tài khoản {effectiveOwnerPhone} đã quản lý đủ {_options.MaxProfilesPerOwnerPhone} hồ sơ. " +
+                   "Thu hồi hồ sơ không dùng hoặc liên hệ hotline 0808 0808.";
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Quy tắc giấy tờ khi tạo hồ sơ mới: CCCD đã có trong hệ thống thì phải dùng nhánh "Đã từng khám"
+    /// để liên kết; người từ OwnIdFromAge tuổi bắt buộc có CCCD của chính mình; trẻ nhỏ chưa có CCCD
+    /// thì bắt buộc CCCD của một người thân đang có hồ sơ ACTIVE thuộc chính tài khoản.
+    /// </summary>
+    private async Task<string?> ValidateIdentityDocumentsAsync(
+        int accountId,
+        DateOnly dateOfBirth,
+        string? nationalId,
+        string? guardianNationalId,
+        CancellationToken cancellationToken)
+    {
+        if (nationalId != null && await _context.Patients.AnyAsync(p => p.NationalId == nationalId, cancellationToken))
+        {
+            return $"CCCD {nationalId} đã có trong hệ thống. Ở màn Tạo hồ sơ, hãy chọn \"Đã từng khám\" và nhập đúng CCCD này để liên kết hồ sơ đó.";
+        }
+
+        int age = PatientAge.YearsOn(dateOfBirth, DateOnly.FromDateTime(DateTime.Today));
+
+        if (age >= _options.OwnIdFromAge)
+        {
+            return nationalId is null
+                ? $"Người từ {_options.OwnIdFromAge} tuổi bắt buộc phải khai CCCD / số định danh cá nhân."
+                : null;
+        }
+
+        if (nationalId != null)
+        {
+            return null;
+        }
+
+        if (guardianNationalId is null)
+        {
+            return $"Trẻ dưới {_options.OwnIdFromAge} tuổi chưa có CCCD thì phải nhập CCCD của người thân kèm quan hệ.";
+        }
+
+        bool guardianIsOwnProfile = await _context.AccountPatientProfiles.AsNoTracking()
+            .AnyAsync(l => l.AccountId == accountId
+                           && l.Status == LinkStatus.Active
+                           && l.Patient.NationalId == guardianNationalId,
+                cancellationToken);
+
+        return guardianIsOwnProfile
+            ? null
+            : $"CCCD người thân {guardianNationalId} không khớp với hồ sơ nào đang hoạt động của tài khoản này. " +
+              "Hãy liên kết hồ sơ của người đó trước hoặc nhập CCCD của người đã có hồ sơ trong danh sách.";
+    }
+
+    private async Task<string?> OwnerPhoneAsync(int accountId, CancellationToken cancellationToken) =>
+        await _context.AccountPatientProfiles.AsNoTracking()
+            .Where(l => l.AccountId == accountId
+                        && l.Relationship == PatientRelationship.Self
+                        && l.Status != LinkStatus.Revoked)
+            .Select(l => l.Patient.PhoneNumber)
+            .FirstOrDefaultAsync(cancellationToken);
 
     public async Task<ProfileLinkResult> CreateProfileAsync(
         int accountId,
@@ -30,6 +155,7 @@ public class PatientProfileService : IPatientProfileService
         string fullName = (request.FullName ?? string.Empty).Trim();
         string phone = NormalizePhone(request.PhoneNumber);
         string? nationalId = NullIfWhiteSpace(request.NationalId);
+        string? email = ProfileEmail.Normalize(request.Email);
         PatientRelationship relationship = ParseRelationship(request.Relationship);
 
         string? validationError = Validate(fullName, request.DateOfBirth, request.Gender, phone, nationalId);
@@ -38,21 +164,38 @@ public class PatientProfileService : IPatientProfileService
             return new ProfileLinkResult(false, validationError);
         }
 
+        if (email is not null && !ProfileEmail.IsUsable(email))
+        {
+            return new ProfileLinkResult(false, $"Email \"{email}\" không hợp lệ. Vui lòng kiểm tra lại.");
+        }
+
         Account account = await _context.Accounts
             .FirstOrDefaultAsync(a => a.Id == accountId, cancellationToken)
             ?? throw new ArgumentException("Tài khoản đăng nhập không tồn tại.");
+
+        // Màn Tạo hồ sơ không thu email nữa, nên hồ sơ mới mang email của tài khoản tạo ra nó.
+        // Nhờ vậy lần sau người khác liên kết lại hồ sơ này (nhánh "đã từng khám") vẫn gửi được mã OTP.
+        email ??= ProfileEmail.NormalizeUsable(account.Email);
+
+        string? quotaError = await ValidateProfileQuotaAsync(accountId, phone, relationship, cancellationToken);
+        if (quotaError != null)
+        {
+            return new ProfileLinkResult(false, quotaError);
+        }
+
+        string? identityError = await ValidateIdentityDocumentsAsync(
+            accountId, request.DateOfBirth, nationalId, NullIfWhiteSpace(request.GuardianNationalId), cancellationToken);
+        if (identityError != null)
+        {
+            return new ProfileLinkResult(false, identityError);
+        }
 
         if (relationship == PatientRelationship.Self
             && await _context.AccountPatientProfiles.AnyAsync(
                 l => l.AccountId == accountId && l.Relationship == PatientRelationship.Self && l.Status != LinkStatus.Revoked,
                 cancellationToken))
         {
-            return new ProfileLinkResult(false, "Tài khoản này đã có hồ sơ \"Bản thân\". Hãy dùng chức năng xin liên kết hồ sơ khác.");
-        }
-
-        if (nationalId != null && await _context.Patients.AnyAsync(p => p.NationalId == nationalId, cancellationToken))
-        {
-            return new ProfileLinkResult(false, $"CCCD {nationalId} đã có trong hệ thống. Bấm \"Xin liên kết hồ sơ\" để quầy xác nhận.");
+            return new ProfileLinkResult(false, "Tài khoản này đã có hồ sơ \"Bản thân\". Nếu muốn thêm người đã khám, hãy chọn nhánh \"Đã từng khám\".");
         }
 
         DateTime now = DateTime.Now;
@@ -65,6 +208,7 @@ public class PatientProfileService : IPatientProfileService
             NationalId = nationalId,
             PhoneNumber = phone,
             Address = NullIfWhiteSpace(request.Address),
+            Email = email,
             CreatedAt = now
         };
 
@@ -114,16 +258,23 @@ public class PatientProfileService : IPatientProfileService
         string relationship,
         CancellationToken cancellationToken = default)
     {
-        Patient? patient = await FindByKeywordAsync(keyword, cancellationToken);
+        Patient? patient = await FindByPatientCodeAsync(keyword, cancellationToken);
 
         if (patient == null)
         {
             return new ProfileLinkResult(
                 false,
-                "Không tìm thấy hồ sơ phù hợp. Hãy tạo hồ sơ mới nếu đây là người nhà chưa từng khám tại bệnh viện.");
+                "Không tìm thấy hồ sơ với mã bệnh nhân vừa nhập. Mã gồm chữ BN và 6 số in trên phiếu khám (ví dụ BN000123); " +
+                "quên mã thì gọi 0808 0808. Nếu người này chưa từng khám tại bệnh viện, hãy chọn nhánh \"Chưa từng khám\".");
         }
 
         PatientRelationship parsed = ParseRelationship(relationship);
+
+        string? linkQuotaError = await ValidateProfileQuotaAsync(accountId, patient.PhoneNumber, parsed, cancellationToken);
+        if (linkQuotaError != null)
+        {
+            return new ProfileLinkResult(false, linkQuotaError);
+        }
 
         if (parsed == PatientRelationship.Self
             && await _context.AccountPatientProfiles.AnyAsync(
@@ -397,39 +548,24 @@ public class PatientProfileService : IPatientProfileService
         });
     }
 
-    private async Task<Patient?> FindByKeywordAsync(string keyword, CancellationToken cancellationToken)
+    /// <summary>
+    /// Nhánh "đã từng khám" chỉ chấp nhận MÃ BỆNH NHÂN (BN######) in trên phiếu khám.
+    /// Không tra bằng CCCD/SĐT/thẻ BHYT nữa để người dùng không dò được hồ sơ người khác;
+    /// quên mã thì màn hình đã có hướng dẫn liên hệ bệnh viện.
+    /// </summary>
+    private async Task<Patient?> FindByPatientCodeAsync(string keyword, CancellationToken cancellationToken)
     {
         string normalized = (keyword ?? string.Empty).Trim();
-        if (normalized.Length == 0)
+
+        if (!normalized.StartsWith("BN", StringComparison.OrdinalIgnoreCase)
+            || !int.TryParse(normalized.AsSpan(2), out int patientId)
+            || patientId <= 0)
         {
             return null;
         }
 
-        if (normalized.StartsWith("BN", StringComparison.OrdinalIgnoreCase)
-            && int.TryParse(normalized.AsSpan(2), out int patientId))
-        {
-            Patient? byId = await _context.Patients.AsNoTracking().FirstOrDefaultAsync(p => p.Id == patientId, cancellationToken);
-            if (byId != null)
-            {
-                return byId;
-            }
-        }
-
-        Patient? exact = await _context.Patients.AsNoTracking()
-            .FirstOrDefaultAsync(p =>
-                p.PhoneNumber == normalized ||
-                p.NationalId == normalized ||
-                p.InsuranceCards.Any(c => c.CardNumber == normalized),
-                cancellationToken);
-
-        if (exact != null)
-        {
-            return exact;
-        }
-
-        // Họ tên chỉ khớp nguyên văn, giống quy tắc tra cứu ở quầy để tránh nhận nhầm hồ sơ.
         return await _context.Patients.AsNoTracking()
-            .FirstOrDefaultAsync(p => EF.Functions.ILike(p.FullName, normalized), cancellationToken);
+            .FirstOrDefaultAsync(p => p.Id == patientId, cancellationToken);
     }
 
     private async Task TrackInsuranceCardAsync(Patient patient, string? cardNumber, DateTime now, CancellationToken cancellationToken)

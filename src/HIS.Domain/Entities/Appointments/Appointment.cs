@@ -31,6 +31,11 @@ public class Appointment
 
     public string? QueueNumber { get; set; }
     public string? Reason { get; set; }
+
+    // Hai khai báo của người bệnh lúc đặt lịch, CHỈ để quầy phân luồng (nhắc mang thẻ / xuất viện phí
+    // theo quyền lợi bảo hiểm). Không validate và không ảnh hưởng giá — thẻ thật vẫn nằm ở insurance_cards.
+    public bool HasHealthInsurance { get; set; }
+    public bool HasPrivateInsurance { get; set; }
     public DateTime? HoldUntil { get; set; }
     public DateTime? CheckedInAt { get; set; }
     public DateTime? CalledAt { get; set; }

@@ -12,11 +12,9 @@ public class Account
     public int FailedLoginCount { get; set; } = 0;
     public DateTime? LockedUntil { get; set; }
 
-    // Đủ MaxNoShowsBeforeBlock lần NO_SHOW/EXPIRED trong NoShowWindowDays -> chặn đặt lịch web mới.
-    // Không chặn đăng nhập, xem lịch sử, bệnh án hay thông báo.
+    // Không còn dùng: nghiệp vụ mới bỏ hẳn cơ chế chặn đặt lịch vì vắng mặt (đến trễ thì bỏ lượt, bắt số lại).
+    // Hai cột vẫn tồn tại trong DB vì giữ entity tránh phải ALTER; không có code nào đọc/ghi chúng.
     public DateTime? BookingBlockedUntil { get; set; }
-
-    // Mốc bắt đầu đếm lại số lần vắng mặt; dời về now khi vừa áp chặn để hết chặn không bị chặn lại ngay.
     public DateTime? NoShowResetAt { get; set; }
 
     public DateTime CreatedAt { get; set; }

@@ -591,86 +591,8 @@ public class ReceptionService : IReceptionService
             });
         }
 
-        var missedStatusIds = ResolveIds(statusMap, new[] { AppointmentStatus.Codes.NoShow, AppointmentStatus.Codes.Expired });
-        await ApplyBookingBlockAsync(overdueAppointments, missedStatusIds, now, cancellationToken);
-
         await _context.SaveChangesAsync(cancellationToken);
         return overdueAppointments.Count;
-    }
-
-    /// <summary>
-    /// Đủ MaxNoShowsBeforeBlock lần vắng mặt (NO_SHOW/EXPIRED) trong NoShowWindowDays ngày thì chặn đặt lịch
-    /// web mới trong BookingBlockDays ngày, đồng thời dời no_show_reset_at về now để vừa hết chặn không bị
-    /// chặn lại ngay bởi chính những lượt cũ. Chỉ tính lượt bệnh nhân tự đặt qua web: lượt do quầy mở không
-    /// quy trách nhiệm cho tài khoản nhân viên. Chặn đặt lịch không chặn đăng nhập, xem lịch sử hay bệnh án.
-    /// </summary>
-    private async Task ApplyBookingBlockAsync(
-        IReadOnlyCollection<Appointment> justMissed,
-        List<int> missedStatusIds,
-        DateTime now,
-        CancellationToken cancellationToken)
-    {
-        if (missedStatusIds.Count == 0)
-        {
-            return;
-        }
-
-        var accountIds = justMissed
-            .Where(a => a.BookingChannel == BookingChannel.Web && a.BookedBy != null)
-            .Select(a => a.BookedBy!.Value)
-            .Distinct()
-            .ToList();
-
-        if (accountIds.Count == 0)
-        {
-            return;
-        }
-
-        var accounts = await _context.Accounts
-            .Where(a => accountIds.Contains(a.Id))
-            .ToListAsync(cancellationToken);
-
-        if (accounts.Count == 0)
-        {
-            return;
-        }
-
-        var justMissedIds = justMissed.Select(a => a.Id).ToList();
-
-        // Lô vừa đánh NO_SHOW chưa được lưu nên phải đọc riêng các lần vắng mặt đã ghi trong CSDL.
-        var previousMisses = await _context.Appointments
-            .AsNoTracking()
-            .Where(a => a.BookedBy != null
-                        && accountIds.Contains(a.BookedBy.Value)
-                        && a.BookingChannel == BookingChannel.Web
-                        && missedStatusIds.Contains(a.StatusId)
-                        && !justMissedIds.Contains(a.Id))
-            .Select(a => new { a.BookedBy, a.UpdatedAt })
-            .ToListAsync(cancellationToken);
-
-        DateTime windowFloor = now.AddDays(-_options.NoShowWindowDays);
-
-        foreach (var account in accounts)
-        {
-            if (account.BookingBlockedUntil is DateTime blockedUntil && blockedUntil > now)
-            {
-                continue;
-            }
-
-            DateTime windowStart = account.NoShowResetAt is DateTime reset && reset > windowFloor ? reset : windowFloor;
-
-            int misses = previousMisses.Count(m => m.BookedBy == account.Id && m.UpdatedAt >= windowStart)
-                         + justMissed.Count(a => a.BookedBy == account.Id);
-
-            if (misses < _options.MaxNoShowsBeforeBlock)
-            {
-                continue;
-            }
-
-            account.BookingBlockedUntil = now.AddDays(_options.BookingBlockDays);
-            account.NoShowResetAt = now;
-            account.UpdatedAt = now;
-        }
     }
 
     public async Task<ReceptionActionResult> ConvertToWalkInAsync(
@@ -1114,8 +1036,19 @@ public class ReceptionService : IReceptionService
             appointment.QueueNumber ?? string.Empty,
             appointment.Reason ?? string.Empty,
             BookedByName(appointment.BookedByAccount),
-            hasPendingLink);
+            hasPendingLink,
+            InsuranceDeclarationLabel(appointment));
     }
+
+    // Quầy nhắc người bệnh mang thẻ và làm thủ tục viện phí theo đúng khai báo, không phải theo số thẻ đã lưu.
+    private static string InsuranceDeclarationLabel(Appointment a) =>
+        (a.HasHealthInsurance, a.HasPrivateInsurance) switch
+        {
+            (true, true) => "BHYT + tư nhân",
+            (true, false) => "BHYT",
+            (false, true) => "Tư nhân",
+            _ => string.Empty
+        };
 
     // Quầy cần phân biệt ai mở ca: bệnh nhân tự đặt trên web hay nhân viên nhập hộ.
     private static string BookedByName(Account? account) =>

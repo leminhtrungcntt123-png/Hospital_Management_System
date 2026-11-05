@@ -5,7 +5,7 @@ namespace HIS.Web.Controllers;
 
 /// <summary>
 /// Lớp chung cho các trang web cần biết đang làm việc với tài khoản bệnh nhân nào
-/// (đặt lịch, xem lịch hẹn, thêm hồ sơ). Chưa đăng nhập thì đưa về trang demo rồi quay lại
+/// (đặt lịch, xem lịch hẹn, quản lý hồ sơ). Chưa đăng nhập thì đưa về trang demo rồi quay lại
 /// đúng trang đang làm; trang giới thiệu (Booking/Index) không cần đăng nhập.
 /// </summary>
 public abstract class PatientPageController : Controller

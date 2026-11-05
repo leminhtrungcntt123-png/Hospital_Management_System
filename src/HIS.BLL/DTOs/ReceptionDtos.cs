@@ -31,7 +31,9 @@ public sealed record ReceptionItemDto(
     // "Đặt bởi": tài khoản web của bệnh nhân hoặc tài khoản quầy đã mở ca.
     string BookedByLabel,
     // Bệnh nhân có liên kết hồ sơ đang chờ quầy xác nhận (account_patient_profiles.status = PENDING).
-    bool HasPendingLink);
+    bool HasPendingLink,
+    // Hai khai báo bảo hiểm người bệnh tick khi đặt lịch: "BHYT", "Tư nhân", "BHYT + tư nhân" hoặc rỗng.
+    string InsuranceDeclaration);
 
 public sealed record ReceptionPatientDto(
     int PatientId,

@@ -5,6 +5,7 @@ using HIS.BLL.DTOs;
 using HIS.BLL.Interfaces;
 using HIS.Domain;
 using HIS.WinForms.Dialogs;
+using HIS.WinForms.Services;
 
 namespace HIS.WinForms.Pages;
 
@@ -19,6 +20,7 @@ public partial class ReceptionPage : UserControl
 
     private readonly IReceptionService? _receptionService;
     private readonly IPatientProfileService? _profileService;
+    private readonly QueueChangeClient? _realtime;
 
     /// <summary>Tài khoản đăng nhập đang thao tác, ghi vào appointments.booked_by khi quầy mở hoặc check-in hộ.</summary>
     private readonly int? _operatorAccountId;
@@ -41,11 +43,13 @@ public partial class ReceptionPage : UserControl
     public ReceptionPage(
         IReceptionService? receptionService,
         IPatientProfileService? profileService = null,
-        int? operatorAccountId = null)
+        int? operatorAccountId = null,
+        QueueChangeClient? realtime = null)
     {
         _receptionService = receptionService;
         _profileService = profileService;
         _operatorAccountId = operatorAccountId;
+        _realtime = realtime;
 
         InitializeComponent();
         ApplyTabVisual();
@@ -53,6 +57,32 @@ public partial class ReceptionPage : UserControl
 
         Load += async (_, _) => await ReloadAsync();
         Disposed += (_, _) => _autoRefreshTimer.Dispose();
+
+        if (_realtime is not null)
+        {
+            _realtime.Received += OnRealtimeChanged;
+            Disposed += (_, _) => _realtime.Received -= OnRealtimeChanged;
+        }
+    }
+
+    /// <summary>
+    /// HIS.Web báo có lượt hẹn mới / lượt hủy / hồ sơ chờ duyệt: nạp lại danh sách và số trên tab.
+    /// Sự kiện nhảy ra từ luồng nền của WebSocket nên phải đưa về UI thread trước khi chạm grid.
+    /// </summary>
+    private void OnRealtimeChanged()
+    {
+        if (IsDisposed || !IsHandleCreated)
+        {
+            return;
+        }
+
+        BeginInvoke(new Action(() =>
+        {
+            if (!IsDisposed)
+            {
+                _ = ReloadAsync();
+            }
+        }));
     }
 
     public void OpenNewReception()
@@ -420,6 +450,7 @@ public partial class ReceptionPage : UserControl
                 item.Gender,
                 item.DateOfBirth.ToString("dd/MM/yyyy"),
                 DisplayOrDash(item.InsuranceCardNumber),
+                DisplayOrDash(item.InsuranceDeclaration),
                 item.DepartmentName,
                 DisplayOrDash(item.DoctorName),
                 FormatAppointmentTime(item.AppointmentTime),
@@ -568,7 +599,7 @@ public partial class ReceptionPage : UserControl
         try
         {
             var content = new StringBuilder();
-            content.AppendLine("Mã lượt khám,Mã BN,Họ và tên,Giới tính,Ngày sinh,Số BHYT,Chuyên khoa,Bác sĩ,Thời gian,Số thứ tự,Ưu tiên,Đặt bởi,Trạng thái,Đặt qua");
+            content.AppendLine("Mã lượt khám,Mã BN,Họ và tên,Giới tính,Ngày sinh,Số BHYT,Khai bảo hiểm,Chuyên khoa,Bác sĩ,Thời gian,Số thứ tự,Ưu tiên,Đặt bởi,Trạng thái,Đặt qua");
 
             foreach (ReceptionItemDto item in _items)
             {
@@ -579,6 +610,7 @@ public partial class ReceptionPage : UserControl
                     Csv(item.Gender),
                     Csv(item.DateOfBirth.ToString("dd/MM/yyyy")),
                     Csv(item.InsuranceCardNumber),
+                    Csv(item.InsuranceDeclaration),
                     Csv(item.DepartmentName),
                     Csv(item.DoctorName),
                     Csv(item.AppointmentTime.ToString("dd/MM/yyyy HH:mm")),

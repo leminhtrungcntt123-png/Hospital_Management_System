@@ -53,7 +53,7 @@ public class PatientProfileFlowTests
         {
             await using (var ctx = NewContext(cs))
             {
-                var profiles = new PatientProfileService(ctx);
+                var profiles = new PatientProfileService(ctx, Options.Create(new BookingOptions()));
 
                 // Tài khoản 7 đã có hồ sơ "Bản thân" (ràng buộc uq_link_self_account),
                 // nên phần tạo mới kiểm chứng bằng hồ sơ con do chính tài khoản khai.
@@ -75,7 +75,8 @@ public class PatientProfileFlowTests
                 newPatientId = created.PatientId;
 
                 // Người thân xin liên kết đúng hồ sơ vừa tạo => PENDING, chưa được xem hồ sơ.
-                ProfileLinkResult linked = await profiles.RequestLinkAsync(RelativeAccountId, nationalId, "SIBLING");
+                // Nhánh "đã từng khám" chỉ tra được bằng mã bệnh nhân, không dùng CCCD.
+                ProfileLinkResult linked = await profiles.RequestLinkAsync(RelativeAccountId, created.PatientCode, "SIBLING");
                 _out.WriteLine($"RequestLinkAsync: {linked.Success} | {linked.Message} | status={linked.LinkStatus} | view={linked.CanViewRecords}");
                 Assert.True(linked.Success, linked.Message);
                 Assert.Equal("PENDING", linked.LinkStatus);
@@ -132,6 +133,129 @@ public class PatientProfileFlowTests
         }
     }
 
+    /// <summary>
+    /// Nhân chứng cho quy tắc giấy tờ trên màn "Tạo hồ sơ" (trên CSDL thật):
+    /// người từ 14 tuổi bắt buộc có CCCD; trẻ nhỏ chưa có CCCD thì CCCD người thân phải khớp một hồ sơ
+    /// ACTIVE của chính tài khoản; CCCD đã tồn tại thì bị đẩy sang nhánh "Đã từng khám".
+    /// </summary>
+    [Fact]
+    public async Task Cccd_dang_dinh_va_cccd_nguoi_than_khi_tao_ho_so()
+    {
+        var cs = Connection;
+        if (cs is null) { _out.WriteLine("Bỏ qua: chưa đặt HIS_REHEARSAL_CONNECTION"); return; }
+
+        var bookingOptions = new BookingOptions();
+        int createdPatientId = 0;
+
+        try
+        {
+            await using (var ctx = NewContext(cs))
+            {
+                var profiles = new PatientProfileService(ctx, Options.Create(bookingOptions));
+
+                string? ownerCccd = await ctx.AccountPatientProfiles.AsNoTracking()
+                    .Where(l => l.AccountId == OwnerAccountId
+                                && l.Relationship == PatientRelationship.Self
+                                && l.Status == LinkStatus.Active)
+                    .Select(l => l.Patient.NationalId)
+                    .FirstOrDefaultAsync();
+
+                int existingLinks = await ctx.AccountPatientProfiles.AsNoTracking()
+                    .CountAsync(l => l.AccountId == OwnerAccountId && l.Status != LinkStatus.Revoked);
+
+                if (ownerCccd is null || existingLinks >= bookingOptions.MaxProfilesPerAccount)
+                {
+                    _out.WriteLine($"Bỏ qua: tài khoản #{OwnerAccountId} chưa có CCCD \"Bản thân\" hoặc đã dùng hết {existingLinks} hồ sơ.");
+                    return;
+                }
+
+                DateOnly childDob = DateOnly.FromDateTime(DateTime.Today).AddYears(-5);
+
+                // 1) Người lớn (>= OwnIdFromAge) mà bỏ trống CCCD thì không tạo được.
+                var adultWithoutId = await profiles.CreateProfileAsync(OwnerAccountId, new CreateProfileRequest
+                {
+                    FullName = "Test Nguoi Lon Khong CCCD",
+                    DateOfBirth = new DateOnly(1990, 5, 5),
+                    Gender = "MALE",
+                    PhoneNumber = "0987654001",
+                    Relationship = "OTHER"
+                });
+                _out.WriteLine($"Người lớn không CCCD: {adultWithoutId.Message}");
+                Assert.False(adultWithoutId.Success);
+                Assert.Contains("bắt buộc phải khai CCCD", adultWithoutId.Message);
+
+                // 2) Trẻ 5 tuổi, chưa có CCCD, cũng không khai CCCD người thân.
+                var childWithoutGuardian = await profiles.CreateProfileAsync(OwnerAccountId, new CreateProfileRequest
+                {
+                    FullName = "Test Tre Thieu CCCD Nguoi Than",
+                    DateOfBirth = childDob,
+                    Gender = "FEMALE",
+                    PhoneNumber = "0987654002",
+                    Relationship = "CHILD"
+                });
+                _out.WriteLine($"Trẻ thiếu CCCD người thân: {childWithoutGuardian.Message}");
+                Assert.False(childWithoutGuardian.Success);
+                Assert.Contains("CCCD của người thân", childWithoutGuardian.Message);
+
+                // 3) CCCD người thân không thuộc hồ sơ ACTIVE của tài khoản này.
+                var strangerGuardian = await profiles.CreateProfileAsync(OwnerAccountId, new CreateProfileRequest
+                {
+                    FullName = "Test Tre CCCD Nguoi Than La",
+                    DateOfBirth = childDob,
+                    Gender = "MALE",
+                    PhoneNumber = "0987654003",
+                    Relationship = "CHILD",
+                    GuardianNationalId = $"99{Random.Shared.Next(1000000000):D9}"
+                });
+                _out.WriteLine($"CCCD người thân lạ: {strangerGuardian.Message}");
+                Assert.False(strangerGuardian.Success);
+                Assert.Contains("không khớp với hồ sơ nào đang hoạt động", strangerGuardian.Message);
+
+                // 4) CCCD người thân đúng là CCCD hồ sơ "Bản thân" ACTIVE của tài khoản -> tạo được.
+                var childOk = await profiles.CreateProfileAsync(OwnerAccountId, new CreateProfileRequest
+                {
+                    FullName = "Test Tre Co CCCD Nguoi Than",
+                    DateOfBirth = childDob,
+                    Gender = "FEMALE",
+                    PhoneNumber = "0987654004",
+                    Relationship = "CHILD",
+                    GuardianNationalId = ownerCccd,
+                    Address = "Thành phố Hồ Chí Minh",
+                    InsuranceCardNumber = $"BT{Random.Shared.Next(100000000):D8}"
+                });
+                _out.WriteLine($"Trẻ khai CCCD người thân hợp lệ: {childOk.Success} | {childOk.Message}");
+                Assert.True(childOk.Success, childOk.Message);
+                createdPatientId = childOk.PatientId;
+
+                // 5) CCCD đã có trong hệ thống -> từ chối và hướng dẫn dùng nhánh "Đã từng khám".
+                var duplicate = await profiles.CreateProfileAsync(OwnerAccountId, new CreateProfileRequest
+                {
+                    FullName = "Test CCCD Trung",
+                    DateOfBirth = new DateOnly(1995, 9, 9),
+                    Gender = "MALE",
+                    PhoneNumber = "0987654005",
+                    NationalId = ownerCccd,
+                    Relationship = "SPOUSE"
+                });
+                _out.WriteLine($"CCCD trùng: {duplicate.Message}");
+                Assert.False(duplicate.Success);
+                Assert.Contains("đã có trong hệ thống", duplicate.Message);
+                Assert.Contains("Đã từng khám", duplicate.Message);
+
+                await using var audit = NewContext(cs);
+                Patient child = await audit.Patients.AsNoTracking().SingleAsync(p => p.Id == createdPatientId);
+                Assert.Null(child.NationalId);
+                Assert.Equal("Thành phố Hồ Chí Minh", child.Address);
+                Assert.True(await audit.InsuranceCards.AnyAsync(c => c.PatientId == createdPatientId),
+                            "Số thẻ BHYT khai ở form phải được lưu vào insurance_cards.");
+            }
+        }
+        finally
+        {
+            await CleanupAsync(cs, createdPatientId);
+        }
+    }
+
     [Fact]
     public async Task Danh_sach_tiep_don_hien_dat_boi_va_co_co_duyet_lien_ket()
     {
@@ -141,7 +265,7 @@ public class PatientProfileFlowTests
         await using var ctx = NewContext(cs);
         var bookingOptions = Options.Create(new BookingOptions());
         var reception = new ReceptionService(ctx, new QueuePositionAllocator(ctx, bookingOptions, TimeProvider.System), bookingOptions, TimeProvider.System);
-        var profiles = new PatientProfileService(ctx);
+        var profiles = new PatientProfileService(ctx, Options.Create(new BookingOptions()));
 
         IReadOnlyList<ReceptionItemDto> firstLoad = await reception.GetReceptionListAsync(ReceptionTab.Waiting);
         if (firstLoad.Count == 0)

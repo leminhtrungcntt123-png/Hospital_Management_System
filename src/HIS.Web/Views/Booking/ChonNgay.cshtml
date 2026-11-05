@@ -1,0 +1,72 @@
+@* Bước 1 của luồng "khám theo ngày": lịch toàn viện trong cửa sổ đặt được.
+   Ngày nghỉ (Chủ nhật), ngày đã quá cutoff hoặc kín suất đều mờ và bấm không được - trạng thái
+   do BookingService.GetDaysAsync trả về, view chỉ tô màu. *@
+@model ChonNgayViewModel
+@{
+    Layout = "_BookingLayout";
+    ViewData["Title"] = "Chọn ngày khám";
+
+    var firstDay = Model.Days.FirstOrDefault();
+    var lastDay = Model.Days.LastOrDefault();
+}
+
+<form asp-action="ChonNgay" method="post" id="ngay-form">
+    <input type="hidden" name="date" id="field-date" value="@Model.SelectedDate.ToString("yyyy-MM-dd")" />
+
+    <section class="booking-content">
+        <div class="content-head">
+            <div>
+                <div class="eyebrow">@ViewData["StepLabel"]</div>
+                <div class="page-title">Bạn muốn đến khám ngày nào?</div>
+                <p>
+                    Hệ thống chỉ mở đặt online từ @(firstDay?.Date.ToString("dd/MM/yyyy")) đến @(lastDay?.Date.ToString("dd/MM/yyyy")).
+                    Bệnh viện không nhận khám Chủ nhật trên web; mỗi lượt phải đặt trước 15:00 ngày liền trước.
+                </p>
+            </div>
+            <span class="badge badge-gray">@Model.MonthLabel</span>
+        </div>
+
+        <partial name="_ErrorAlert" />
+
+        <div class="subhead">
+            <div>
+                <strong>Lịch nhận khám</strong>
+                <span>Ngày còn chỗ hiện màu xanh, ngày sắp hết hiện màu vàng, ngày nghỉ hoặc kín lịch thì mờ.</span>
+            </div>
+        </div>
+
+        <div class="date-strip" id="date-strip">
+            @foreach (var day in Model.Days)
+            {
+                var isSelected = day.Date == Model.SelectedDate;
+                var isBlocked = day.State is "off" or "closed" or "full";
+                <button type="button" class="@(isSelected ? "selected" : "") @(isBlocked ? "off" : day.State)"
+                        data-date="@day.Date.ToString("yyyy-MM-dd")" data-state="@day.State"
+                        data-label="@VietnameseFormat.FullDate(day.Date)" disabled="@isBlocked">
+                    <span>@VietnameseFormat.WeekdayShort(day.Date)</span>
+                    <strong>@day.Date.Day</strong>
+                    <small>@(day.State switch { "closed" => "Ngưng nhận", "full" => "Hết chỗ", "off" => "Nghỉ", "few" => "Sắp hết", _ => "Còn lịch" })</small>
+                </button>
+            }
+        </div>
+        <div class="legend">
+            <span><i class="dot green"></i> Còn lịch</span>
+            <span><i class="dot yellow"></i> Sắp hết</span>
+            <span><i class="dot gray"></i> Nghỉ / hết chỗ</span>
+        </div>
+
+        <div class="booking-footer">
+            <span>Đã chọn: <strong id="ngay-selected-label">@VietnameseFormat.FullDate(Model.SelectedDate)</strong></span>
+            <div class="footer-actions">
+                <a class="btn btn-outline" asp-action="Index"><i data-lucide="chevron-left"></i> Thoát đặt lịch</a>
+                <button type="submit" class="btn btn-primary" id="ngay-next">
+                    Tiếp tục <i data-lucide="chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    </section>
+</form>
+
+@section Scripts {
+    <script src="~/js/booking.js" asp-append-version="true"></script>
+}

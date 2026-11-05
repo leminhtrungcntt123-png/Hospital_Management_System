@@ -5,14 +5,14 @@
 -- end state giống hệt DB đã migrate.
 --
 -- Sinh lại sau khi sửa entity/configuration (và trước khi tạo migration mới):
---   1. tạm xóa src/HIS.DAL/Migrations (dòng lịch sử dưới đây chính là 4 migration đã commit);
+--   1. tạm xóa src/HIS.DAL/Migrations (dòng lịch sử dưới đây chính là 6 migration đã commit);
 --   2. dotnet ef migrations add SchemaFromModel --project src/HIS.DAL --output-dir MigrationsFresh
 --      (cần env ConnectionStrings__DefaultConnection trỏ tới một DB bất kỳ, lệnh này không ghi DB);
 --   3. dotnet ef migrations script --project src/HIS.DAL --output docs/database/ci/schema.sql
 --   4. khôi phục src/HIS.DAL/Migrations (git checkout -- src/HIS.DAL/Migrations), xóa MigrationsFresh,
---      thay dòng INSERT __EFMigrationsHistory của SchemaFromModel bằng 4 id migration thật ở cuối file.
+--      thay dòng INSERT __EFMigrationsHistory của SchemaFromModel bằng 6 id migration thật ở cuối file.
 --
--- Sau khi nạp: chạy docs/database/ci/schema_checks.sql (16 kiểm tra cấu trúc) để chắc DB mới
+-- Sau khi nạp: chạy docs/database/ci/schema_checks.sql (18 kiểm tra cấu trúc) để chắc DB mới
 -- vẫn khớp đúng cấu trúc mà gate đã chốt trên hospital_his và his_rehearsal.
 CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
     migration_id character varying(150) NOT NULL,
@@ -65,6 +65,7 @@ CREATE TABLE patients (
     national_id character varying(20),
     phone_number character varying(15) NOT NULL,
     address character varying(255),
+    email character varying(200),
     created_at timestamp without time zone NOT NULL DEFAULT (now()),
     CONSTRAINT pk_patients PRIMARY KEY (id),
     CONSTRAINT ck_patients_gender CHECK (gender IS NULL OR gender IN ('MALE','FEMALE','OTHER'))
@@ -292,6 +293,8 @@ CREATE TABLE appointments (
     overtaken_count integer NOT NULL DEFAULT 0,
     queue_number character varying(10),
     reason character varying(255),
+    has_health_insurance boolean NOT NULL DEFAULT FALSE,
+    has_private_insurance boolean NOT NULL DEFAULT FALSE,
     hold_until timestamp without time zone,
     checked_in_at timestamp without time zone,
     called_at timestamp without time zone,
@@ -678,9 +681,18 @@ CREATE UNIQUE INDEX ix_vital_signs_appointment_id ON vital_signs (appointment_id
 
 CREATE INDEX ix_vital_signs_recorded_by ON vital_signs (recorded_by);
 
-INSERT INTO "__EFMigrationsHistory" (migration_id, product_version) VALUES ('20261015010838_InitialCreate', '10.0.13');
-INSERT INTO "__EFMigrationsHistory" (migration_id, product_version) VALUES ('20261103165420_AlignToGroupSpec', '10.0.13');
-INSERT INTO "__EFMigrationsHistory" (migration_id, product_version) VALUES ('20261103173448_SanityCheck', '10.0.13');
-INSERT INTO "__EFMigrationsHistory" (migration_id, product_version) VALUES ('20261104144910_QueuePositionNumbering', '10.0.13');
+INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
+VALUES ('20261015010838_InitialCreate', '10.0.13');
+INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
+VALUES ('20261103165420_AlignToGroupSpec', '10.0.13');
+INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
+VALUES ('20261103173448_SanityCheck', '10.0.13');
+INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
+VALUES ('20261104144910_QueuePositionNumbering', '10.0.13');
+INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
+VALUES ('20261105131631_AppointmentInsuranceDeclaration', '10.0.13');
+INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
+VALUES ('20261105141229_PatientEmail', '10.0.13');
+
 COMMIT;
 

@@ -1,21 +1,64 @@
-﻿namespace HIS.BLL.DTOs;
+namespace HIS.BLL.DTOs;
 
-// DTO danh sách Khoa phục vụ màn hình Đặt lịch (có thêm SlotsThisWeek)
+// DTO danh sách Khoa phục vụ màn hình Đặt lịch
 public class BookingDepartmentDto
 {
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public int SlotsThisWeek { get; set; }
+
+    /// <summary>
+    /// Số suất đặt online còn lại trong phạm vi đang xét: cả cửa sổ đặt được khi liệt kê khoa,
+    /// hoặc riêng một ngày khi gọi GetDepartmentsOnDateAsync. 0 = khoa đó không còn lịch đặt được.
+    /// </summary>
+    public int SlotsAvailable { get; set; }
 }
 
 public class BookingDayDto
 {
     public DateOnly Date { get; set; }
-    public string State { get; set; } = "available"; // "off", "full", "few", "available"
+
+    /// <summary>"off" (nghỉ/không trực), "full" (kín suất online), "few", "available", "closed" (ngoài cửa sổ/quá cutoff).</summary>
+    public string State { get; set; } = "available";
 }
 
-/// <summary>Khung giờ khám ở bước "chọn giờ" của web. SlotsLeft là số suất A (đặt online) còn lại của khung.</summary>
+/// <summary>
+/// Bác sĩ ở màn "chọn bác sĩ". SlotsAvailable là suất A (đặt online) còn lại, không phải tổng ghế,
+/// vì phần còn lại của mỗi khung dành cho bệnh nhân đến quầy lấy số T.
+/// </summary>
+public class BookingDoctorDto
+{
+    public int Id { get; set; }
+    public string FullName { get; set; } = string.Empty;
+
+    /// <summary>Chuyên môn sâu trong doctors.specialty (VD: "Nội tiêu hóa").</summary>
+    public string Specialty { get; set; } = string.Empty;
+
+    public int DepartmentId { get; set; }
+    public string DepartmentName { get; set; } = string.Empty;
+
+    /// <summary>Các ngày trong tuần bác sĩ có lịch trực đang hiệu lực, dạng "T2 · T5 · T7".</summary>
+    public string DutyDays { get; set; } = string.Empty;
+
+    public int SlotsAvailable { get; set; }
+
+    /// <summary>Ngày gần nhất còn suất đặt online; null khi không còn lịch đặt được trong cửa sổ.</summary>
+    public DateOnly? NextAvailableDate { get; set; }
+}
+
+/// <summary>Một bác sĩ kèm các khung giờ của họ trong một ngày — màn "Bác sĩ & khung giờ".</summary>
+public class BookingDoctorSlotsDto
+{
+    public int DoctorId { get; set; }
+    public string DoctorName { get; set; } = string.Empty;
+    public string Specialty { get; set; } = string.Empty;
+    public string RoomName { get; set; } = string.Empty;
+    public List<BookingSlotDto> Slots { get; set; } = new();
+
+    public int SlotsLeft => Slots.Sum(s => s.SlotsLeft);
+}
+
+/// <summary>Khung giờ khám ở màn "chọn ngày & giờ". SlotsLeft là số suất A còn lại của khung.</summary>
 public class BookingSlotDto
 {
     public int Id { get; set; }
@@ -28,21 +71,8 @@ public class BookingSlotDto
     public int SlotsLeft { get; set; }
     public string Status { get; set; } = "AVAILABLE";          // "AVAILABLE", "FULL"
     public bool IsSelectable => SlotsLeft > 0;
+    public int DepartmentId { get; set; }
     public int DoctorId { get; set; }
-    public string? DoctorName { get; set; }
-    public string? DoctorTitle { get; set; }
-    public string? RoomName { get; set; }
-}
-
-public class BookingShiftDto
-{
-    public string Key { get; set; } = string.Empty;     // "MORNING", "AFTERNOON"
-    public string Label { get; set; } = string.Empty;   // "Ca sáng", "Ca chiều"
-    public string TimeRange { get; set; } = string.Empty; // "07:30 – 11:30"
-    public int SlotsLeft { get; set; }                    // tổng suất A còn lại của các khung giờ trong ca
-    public string Status { get; set; } = "AVAILABLE";   // "AVAILABLE", "FULL", "NO_SCHEDULE"
-    public bool IsSelectable => Status == "AVAILABLE" && SlotsLeft > 0;
-    public int? DoctorId { get; set; }
     public string? DoctorName { get; set; }
     public string? DoctorTitle { get; set; }
     public string? RoomName { get; set; }
@@ -61,6 +91,10 @@ public class BookingAppointmentDto
     public string DoctorName { get; set; } = string.Empty;
     public string RoomName { get; set; } = string.Empty;
     public string QueueNumber { get; set; } = string.Empty;      // "A06"; rỗng khi suất A đã bị giải phóng
+
+    /// <summary>Hai khai báo bảo hiểm người bệnh tick ở bước xác nhận; rỗng/false thì UI không hiển thị gì thêm.</summary>
+    public bool HasHealthInsurance { get; set; }
+    public bool HasPrivateInsurance { get; set; }
     public DateTime? SlotStartTime { get; set; }
     public DateTime? SlotEndTime { get; set; }
 
@@ -68,9 +102,5 @@ public class BookingAppointmentDto
     public bool IsCancellable { get; set; }
 }
 
-/// <summary>Kết quả hủy lịch hẹn trên web: báo cho bệnh nhân biết lần hủy có tính vào hạn mức tháng hay không.</summary>
-public sealed record CancelAppointmentResult(
-    bool Success,
-    string Message,
-    bool IsLateCancel = false,
-    int LateCancelsUsedThisMonth = 0);
+/// <summary>Kết quả hủy lịch hẹn trên web: thành công hay nêu lý do bị từ chối (quá hạn hủy).</summary>
+public sealed record CancelAppointmentResult(bool Success, string Message);

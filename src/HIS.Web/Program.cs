@@ -3,10 +3,17 @@ using HIS.BLL;
 using HIS.BLL.Interfaces;
 using HIS.BLL.Options;
 using HIS.BLL.Services;
+using HIS.Web.Options;
+using HIS.Web.Realtime;
+using HIS.Web.Services;
 
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// App Password SMTP để gửi mail OTP thật: cất trong file này (đã .gitignore vì khớp *.local.json)
+// hoặc biến môi trường Otp:Smtp:User / Otp:Smtp:Password. Không để vào appsettings.json vì file đó đang được commit.
+builder.Configuration.AddJsonFile("appsettings.Otp.local.json", optional: true, reloadOnChange: false);
 
 // MVC (Controllers + Views) thay cho Razor Pages mặc định
 builder.Services.AddControllersWithViews();
@@ -26,6 +33,9 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")).UseSnakeCaseNamingConvention());
 builder.Services.AddBookingOptions(builder.Configuration);
+builder.Services.AddOtpOptions(builder.Configuration);
+builder.Services.Configure<OtpSmtpOptions>(builder.Configuration.GetSection(OtpSmtpOptions.SectionName));
+
 // Nguồn dữ liệu đặt lịch.
 // Khi nối database: tạo class mới implement  (gọi HIS.BLL) rồi thay dòng này.
 // Đăng ký các Service của BLL vào Web
@@ -41,6 +51,21 @@ builder.Services.AddScoped<IPatientAccessService, PatientAccessService>();
 // Trang đăng nhập demo của web gọi thẳng IAuthService (module của thành viên khác) để kiểm mật khẩu.
 builder.Services.AddScoped<IAuthService, AuthService>();
 
+// Mã OTP khi thêm hồ sơ: có SMTP thật thì gửi mail, chưa có thì kênh demo in mã ra log + hiện trên màn hình.
+builder.Services.AddScoped<IOtpService, OtpService>();
+var smtpOptions = builder.Configuration.GetSection(OtpSmtpOptions.SectionName).Get<OtpSmtpOptions>() ?? new OtpSmtpOptions();
+if (smtpOptions.IsConfigured)
+{
+    builder.Services.AddScoped<IOtpDelivery, SmtpOtpDelivery>();
+}
+else
+{
+    builder.Services.AddScoped<IOtpDelivery, DemoOtpDelivery>();
+}
+
+// Kênh realtime cho quầy tiếp nhận (WinForms nối vào /ws/quay để biết dữ liệu vừa đổi).
+builder.Services.AddSingleton<QueueChangeNotifier>();
+
 // Giữ nguyên cấu hình HttpClient gọi HIS.WebApi (phần của thành viên khác có thể dùng)
 builder.Services.AddHttpClient("HisWebApi", client =>
 {
@@ -49,6 +74,10 @@ builder.Services.AddHttpClient("HisWebApi", client =>
 });
 
 var app = builder.Build();
+
+// Nối WebSocket phải đứng trước UseHttpsRedirection: quầy WinForms bấm ws:// trên cổng http
+// và yêu cầu upgrade này không được phép bị chuyển hướng sang https.
+app.UseQueueChangeSocket();
 
 if (!app.Environment.IsDevelopment())
 {

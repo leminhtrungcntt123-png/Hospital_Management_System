@@ -41,6 +41,7 @@ partial class ReceptionPage
         colGender = new DataGridViewTextBoxColumn();
         colDateOfBirth = new DataGridViewTextBoxColumn();
         colInsurance = new DataGridViewTextBoxColumn();
+        colInsuranceDeclared = new DataGridViewTextBoxColumn();
         colDepartment = new DataGridViewTextBoxColumn();
         colDoctor = new DataGridViewTextBoxColumn();
         colAppointmentTime = new DataGridViewTextBoxColumn();
@@ -298,7 +299,7 @@ partial class ReceptionPage
         };
         gridReceptions.ColumnHeadersHeight = 36;
         gridReceptions.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
-        gridReceptions.Columns.AddRange(new DataGridViewColumn[] { colAppointmentCode, colPatientCode, colPatientName, colGender, colDateOfBirth, colInsurance, colDepartment, colDoctor, colAppointmentTime, colQueue, colPriority, colBookedBy, colStatus, colAction });
+        gridReceptions.Columns.AddRange(new DataGridViewColumn[] { colAppointmentCode, colPatientCode, colPatientName, colGender, colDateOfBirth, colInsurance, colInsuranceDeclared, colDepartment, colDoctor, colAppointmentTime, colQueue, colPriority, colBookedBy, colStatus, colAction });
         gridReceptions.DefaultCellStyle = new DataGridViewCellStyle
         {
             Alignment = DataGridViewContentAlignment.MiddleLeft,
@@ -370,6 +371,14 @@ partial class ReceptionPage
         colInsurance.MinimumWidth = 82;
         colInsurance.Name = "colInsurance";
         colInsurance.ReadOnly = true;
+        //
+        // colInsuranceDeclared
+        //
+        colInsuranceDeclared.FillWeight = 96F;
+        colInsuranceDeclared.HeaderText = "KHAI BẢO HIỂM";
+        colInsuranceDeclared.MinimumWidth = 84;
+        colInsuranceDeclared.Name = "colInsuranceDeclared";
+        colInsuranceDeclared.ReadOnly = true;
         // 
         // colDepartment
         // 
@@ -641,6 +650,7 @@ partial class ReceptionPage
     private DataGridViewTextBoxColumn colGender;
     private DataGridViewTextBoxColumn colDateOfBirth;
     private DataGridViewTextBoxColumn colInsurance;
+    private DataGridViewTextBoxColumn colInsuranceDeclared;
     private DataGridViewTextBoxColumn colDepartment;
     private DataGridViewTextBoxColumn colDoctor;
     private DataGridViewTextBoxColumn colAppointmentTime;

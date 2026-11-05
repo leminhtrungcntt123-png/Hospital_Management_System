@@ -1,29 +1,67 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace HIS.Web.ViewModels.Booking;
 
 // ViewModel của từng màn hình đặt lịch (chỉ phục vụ hiển thị ở HIS.Web).
 
+/// <summary>Bước "chọn ngày khám" của luồng theo ngày: lịch toàn viện trong cửa sổ đặt được.</summary>
+public class ChonNgayViewModel
+{
+    public List<DayVm> Days { get; set; } = new();
+    public DateOnly SelectedDate { get; set; }
+    public string MonthLabel { get; set; } = string.Empty;
+}
+
+/// <summary>Bước "chọn chuyên khoa". OnDate khác null khi đi theo luồng ngày (số chỗ chỉ tính trong ngày đó).</summary>
 public class ChonKhoaViewModel
 {
     public List<DepartmentVm> Departments { get; set; } = new();
     public int? SelectedDepartmentId { get; set; }
-}
-public class ChonNgayCaViewModel
-{
-    public DepartmentVm Department { get; set; } = new();
-    public List<DayVm> Days { get; set; } = new();
-    public string MonthLabel { get; set; } = string.Empty;
-    public ShiftListViewModel ShiftList { get; set; } = new();
+    public DateOnly? OnDate { get; set; }
 }
 
-// Phần danh sách ca khám của một ngày. Cũng là model của partial _ShiftList (tải bằng fetch).</summary>
-public class ShiftListViewModel
+/// <summary>
+/// Màn "chọn bác sĩ". Khi Date khác null (luồng theo ngày) mỗi bác sĩ kèm trọn khung giờ
+/// của người đó trong ngày nên bệnh nhân chốt luôn cả hai trong một màn.
+/// </summary>
+public class ChonBacsiViewModel
 {
-    public string DepartmentName { get; set; } = string.Empty;
+    public DepartmentVm? Department { get; set; }
+    public DateOnly? Date { get; set; }
+
+    /// <summary>Chỉ luồng theo chuyên khoa mới có thẻ "Bác sĩ bất kỳ".</summary>
+    public bool ShowAnyDoctor { get; set; }
+
+    public List<DoctorVm> Doctors { get; set; } = new();
+    public List<DoctorSlotsVm> DoctorSlots { get; set; } = new();
+
+    public int? SelectedDoctorId { get; set; }
+    public int? SelectedSlotId { get; set; }
+}
+
+/// <summary>Bước "ngày & khung giờ" — gộp thành một màn nên bệnh nhân không phải chọn ca riêng.</summary>
+public class ChonNgayGioViewModel
+{
+    public DepartmentVm? Department { get; set; }
+    public DoctorVm? Doctor { get; set; }
+    public List<DayVm> Days { get; set; } = new();
+    public DateOnly SelectedDate { get; set; }
+    public string MonthLabel { get; set; } = string.Empty;
+    public List<SlotVm> Slots { get; set; } = new();
+    public int? SelectedSlotId { get; set; }
+
+    /// <summary>Luồng hiện hành có bước chọn chuyên khoa / chọn bác sĩ phía trước không, để hiện nút "Đổi".</summary>
+    public bool CanChangeDepartment { get; set; }
+    public bool CanChangeDoctor { get; set; }
+}
+
+/// <summary>Model của partial _SlotChips / _SlotList (khung giờ của một ngày, booking.js tải lại bằng fetch).</summary>
+public class SlotListViewModel
+{
     public DateOnly Date { get; set; }
-    public List<ShiftVm> Shifts { get; set; } = new();
-    public string? SelectedShift { get; set; }
+    public List<SlotVm> Slots { get; set; } = new();
+    public int? SelectedSlotId { get; set; }
+
+    /// <summary>Hiện tên bác sĩ trên chip khi bệnh nhân chọn "Bác sĩ bất kỳ" (chưa chốt người khám).</summary>
+    public bool ShowDoctor { get; set; }
 }
 
 public class ChonNguoiKhamViewModel
@@ -32,32 +70,19 @@ public class ChonNguoiKhamViewModel
     public int? SelectedPatientId { get; set; }
 }
 
-/// <summary>Nội dung khối danh sách khung giờ của màn ChonGio.</summary>
-public class SlotListViewModel
-{
-    public DepartmentVm Department { get; set; } = new();
-    public ShiftVm Shift { get; set; } = new();
-    public List<SlotVm> Slots { get; set; } = new();
-}
-
-/// <summary>Bước 3: chọn khung giờ trong ca đã chọn. Mỗi khung là một suất A còn trống.</summary>
-public class ChonGioViewModel
-{
-    public DepartmentVm Department { get; set; } = new();
-    public DateOnly Date { get; set; }
-    public ShiftVm Shift { get; set; } = new();
-    public List<SlotVm> Slots { get; set; } = new();
-    public int? SelectedSlotId { get; set; }
-}
-
 public class XacNhanViewModel
 {
     public PatientVm Patient { get; set; } = new();
     public DepartmentVm Department { get; set; } = new();
     public DateOnly Date { get; set; }
-    public ShiftVm Shift { get; set; } = new();
     public SlotVm Slot { get; set; } = new();
+
+    /// <summary>Phí khám dự kiến của chuyên khoa; bệnh nhân đóng tại quầy khi đến khám.</summary>
     public decimal Fee { get; set; }
+
+    /// <summary>Hai khai báo bảo hiểm lấy từ Session, bấm lại được ngay ở bước này.</summary>
+    public bool HasHealthInsurance { get; set; }
+    public bool HasPrivateInsurance { get; set; }
 }
 
 public class ThanhCongViewModel
@@ -72,39 +97,14 @@ public class ThanhCongViewModel
     public string ShiftLabel { get; set; } = string.Empty;
     public string TimeRange { get; set; } = string.Empty;
 
-    /// <summary>Số thứ tự A## bệnh nhân sẽ thấy trên màn gọi ở quầy; rỗng nếu khung giờ chưa cấp số.</summary>
+    // Số thứ tự A## bệnh nhân sẽ thấy trên màn gọi ở quầy; rỗng nếu khung giờ chưa cấp số.
     public string QueueNumber { get; set; } = string.Empty;
 
     public DoctorVm? Doctor { get; set; }
     public string Room { get; set; } = string.Empty;
 }
 
-// Dữ liệu form "Thêm hồ sơ người khám".
-public class ThemHoSoRequest
-{
-    [Required(ErrorMessage = "Vui lòng nhập họ và tên.")]
-    [StringLength(100, ErrorMessage = "Họ tên không được vượt quá 100 ký tự.")]
-    public string? FullName { get; set; }
-
-    // Định dạng DD/MM/YYYY.
-    [Required(ErrorMessage = "Vui lòng nhập ngày sinh.")]
-    [RegularExpression(@"^\d{2}/\d{2}/\d{4}$", ErrorMessage = "Ngày sinh phải theo định dạng DD/MM/YYYY.")]
-    public string? DateOfBirth { get; set; }
-
-    public string? Gender { get; set; }
-
-    public string? Relationship { get; set; }
-
-    /// <summary>CCCD/SĐT định danh; để trống với trẻ nhỏ chưa có. BLL chặn nếu CCCD đã có trong hệ thống.</summary>
-    [StringLength(12, MinimumLength = 0, ErrorMessage = "CCCD không được vượt quá 12 ký tự.")]
-    public string? NationalId { get; set; }
-
-    [Required(ErrorMessage = "Vui lòng nhập số điện thoại.")]
-    [RegularExpression(@"^0\d{9,10}$", ErrorMessage = "Số điện thoại phải từ 10-11 số và bắt đầu bằng 0.")]
-    public string? Phone { get; set; }
-}
-
-/// <summary>Màn "Lịch khám của tôi": các lượt hẹn web do tài khoản đang đăng nhập đặt.</summary>
+// Màn "Lịch khám của tôi": các lượt hẹn web do tài khoản đang đăng nhập đặt.
 public class MyAppointmentsViewModel
 {
     public List<AppointmentVm> Appointments { get; set; } = new();
@@ -124,4 +124,7 @@ public class AppointmentVm
     public string DoctorName { get; set; } = string.Empty;
     public string Room { get; set; } = string.Empty;
     public string QueueNumber { get; set; } = string.Empty;
+
+    /// <summary>"BHYT · Bảo hiểm tư nhân"; rỗng khi người bệnh không khai báo gì.</summary>
+    public string InsuranceSummary { get; set; } = string.Empty;
 }

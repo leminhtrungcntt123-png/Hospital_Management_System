@@ -21,6 +21,7 @@ public class PatientConfiguration : IEntityTypeConfiguration<Patient>
         builder.HasIndex(p => p.NationalId).IsUnique();
         builder.Property(p => p.PhoneNumber).HasMaxLength(15).IsRequired();
         builder.Property(p => p.Address).HasMaxLength(255);
+        builder.Property(p => p.Email).HasMaxLength(200);
         builder.Property(p => p.CreatedAt).HasDefaultValueSql("now()");
 
         // Quan hệ tài khoản <-> hồ sơ nằm ở account_patient_profiles (nhiều-nhiều),

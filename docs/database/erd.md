@@ -162,6 +162,8 @@ erDiagram
         int priority_level
         int slot_position
         int overtaken_count
+        boolean has_health_insurance
+        boolean has_private_insurance
         varchar queue_number
         varchar reason
         timestamp hold_until
@@ -336,6 +338,7 @@ erDiagram
         varchar national_id
         varchar phone_number
         varchar address
+        varchar email
         timestamp created_at
     }
 

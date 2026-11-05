@@ -26,10 +26,10 @@
 
                 <nav class="nav">
                     <a asp-controller="Booking" asp-action="Index">Trang chủ</a>
-                    <a asp-controller="Booking" asp-action="ChonKhoa">Đặt lịch khám</a>
+                    <a asp-controller="Booking" asp-action="Index">Đặt lịch khám</a>
                     <a asp-controller="LichKham" asp-action="Index">Lịch khám</a>
+                    <a asp-controller="HoSo" asp-action="Index">Hồ sơ</a>
                     @* TODO (người phụ trách từng phần bật lên khi hoàn thành):
-                    <a href="#">Hồ sơ người khám</a>
                     <a href="#">Lịch sử khám</a>
                     <a href="#">Hàng đợi</a>
                     *@
@@ -49,7 +49,7 @@
                             <button type="submit" class="btn btn-outline"><i data-lucide="log-out"></i> Đăng xuất</button>
                         </form>
                     }
-                    <a class="btn btn-primary" asp-controller="Booking" asp-action="ChonKhoa">
+                    <a class="btn btn-primary" asp-controller="Booking" asp-action="Index">
                         <i data-lucide="calendar-days"></i> Đặt lịch khám
                     </a>
                 </div>
@@ -70,7 +70,7 @@
                     </div>
                     <p>Chăm sóc bằng chuyên môn, đồng hành bằng sự tận tâm.</p>
                 </div>
-                <div><strong>Hỗ trợ đặt lịch</strong><span>1900 6868</span><span>Thứ 2 – Thứ 7, 06:30 – 20:00</span></div>
+                <div><strong>Hỗ trợ đặt lịch</strong><span>0808 0808</span><span>Thứ 2 – Thứ 7, 06:30 – 20:00</span></div>
                 <div><strong>Địa chỉ</strong><span>xxx Nguyễn Chí Thanh, Hà Nội</span><span>contact@his-hospital.vn</span></div>
                 <div><strong>Thông tin</strong><span>Hướng dẫn khám bệnh</span><span>Chính sách bảo mật</span></div>
             </div>

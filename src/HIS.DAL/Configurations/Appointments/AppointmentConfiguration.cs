@@ -29,6 +29,8 @@ public class AppointmentConfiguration : IEntityTypeConfiguration<Appointment>
         builder.Property(a => a.OvertakenCount).HasDefaultValue(0);
         builder.Property(a => a.QueueNumber).HasMaxLength(10);
         builder.Property(a => a.Reason).HasMaxLength(255);
+        builder.Property(a => a.HasHealthInsurance).HasDefaultValue(false);
+        builder.Property(a => a.HasPrivateInsurance).HasDefaultValue(false);
         builder.Property(a => a.CreatedAt).HasDefaultValueSql("now()");
         builder.Property(a => a.UpdatedAt).HasDefaultValueSql("now()");
 

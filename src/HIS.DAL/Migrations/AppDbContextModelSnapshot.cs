@@ -294,6 +294,18 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("doctor_id");
 
+                    b.Property<bool>("HasHealthInsurance")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("has_health_insurance");
+
+                    b.Property<bool>("HasPrivateInsurance")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("has_private_insurance");
+
                     b.Property<DateTime?>("HoldUntil")
                         .HasColumnType("timestamp without time zone")
                         .HasColumnName("hold_until");
@@ -1523,6 +1535,11 @@ namespace HIS.DAL.Migrations
                     b.Property<DateOnly>("DateOfBirth")
                         .HasColumnType("date")
                         .HasColumnName("date_of_birth");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("email");
 
                     b.Property<string>("FullName")
                         .IsRequired()

@@ -14,7 +14,19 @@ public sealed class CreateProfileRequest
     public string Gender { get; set; } = string.Empty;
     public string PhoneNumber { get; set; } = string.Empty;
     public string? NationalId { get; set; }
+
+    /// <summary>
+    /// CCCD của người thân, chỉ bắt buộc khi tạo hồ sơ cho trẻ dưới tuổi cấp CCCD và đứa trẻ chưa có
+    /// định danh cá nhân. Phải khớp CCCD của một hồ sơ ACTIVE thuộc chính tài khoản; không lưu thành cột mới.
+    /// </summary>
+    public string? GuardianNationalId { get; set; }
     public string? Address { get; set; }
+
+    /// <summary>
+    /// Email của hồ sơ. Màn Tạo hồ sơ trên Web không thu ô này nữa: để trống thì dịch vụ
+    /// tự lấy email của tài khoản đang tạo, nhờ đó hồ sơ luôn có nơi nhận mã OTP về sau.
+    /// </summary>
+    public string? Email { get; set; }
     public string? InsuranceCardNumber { get; set; }
 
     /// <summary>Mã quan hệ theo góc nhìn chủ tài khoản: SELF, SPOUSE, CHILD, PARENT, SIBLING, OTHER.</summary>
@@ -38,8 +50,8 @@ public interface IPatientProfileService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Xin liên kết một hồ sơ ĐÃ tồn tại (tìm theo CCCD / SĐT / mã BN / số BHYT / họ tên đúng nguyên văn).
-    /// Không có hồ sơ => thất bại, hướng dẫn tạo mới. Đã có link => trả về trạng thái hiện tại, không tạo trùng.
+    /// Xin liên kết một hồ sơ ĐÃ tồn tại theo MÃ BỆNH NHÂN (BN######). Không tra CCCD/SĐT/thẻ BHYT/họ tên.
+    /// Không có hồ sơ => thất bại, hướng dẫn tạo mới hoặc gọi hotline. Đã có link => trả trạng thái hiện tại, không tạo trùng.
     /// </summary>
     Task<ProfileLinkResult> RequestLinkAsync(
         int accountId,

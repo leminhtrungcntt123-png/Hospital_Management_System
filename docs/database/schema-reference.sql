@@ -83,6 +83,7 @@ CREATE TABLE patients (
     national_id     VARCHAR(20) UNIQUE,               -- NULL với trẻ chưa có CCCD
     phone_number    VARCHAR(15) NOT NULL,
     address         VARCHAR(255),
+    email           VARCHAR(200),                     -- nhận mã OTP lúc thêm hồ sơ
     created_at      TIMESTAMP NOT NULL DEFAULT now()
 );
 
@@ -249,6 +250,8 @@ CREATE TABLE appointments (
     slot_position           INTEGER CHECK (slot_position >= 1),   -- vị trí trong khung giờ: 1..online_quota = suất A, sau đó = suất T
     queue_number            VARCHAR(10),          -- "A06" (web) / "T09" (tại quầy) = tổng capacity các khung trước + slot_position
     overtaken_count         INTEGER NOT NULL DEFAULT 0 CHECK (overtaken_count BETWEEN 0 AND 3), -- số lần bị chen
+    has_health_insurance    BOOLEAN NOT NULL DEFAULT false,  -- người bệnh khai khi đặt lịch: có BHYT (chỉ để quầy phân luồng)
+    has_private_insurance   BOOLEAN NOT NULL DEFAULT false,  -- người bệnh khai khi đặt lịch: có bảo hiểm tư nhân (không validate, không ảnh hưởng giá)
     reason                  VARCHAR(255),
     hold_until              TIMESTAMP,            -- Hạn giữ chỗ PENDING
     checked_in_at           TIMESTAMP,

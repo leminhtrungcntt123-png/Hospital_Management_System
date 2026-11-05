@@ -1,10 +1,9 @@
-@* Bước 4: Chọn người khám (kèm modal thêm hồ sơ mới) *@
+@* Bước "chọn người khám" của cả ba luồng. Tạo hồ sơ mới ở mục Hồ sơ (HoSoController), bước này chỉ chọn.
+   Khai báo bảo hiểm dời sang bước xác nhận vì người bệnh chỉ quyết định khi đã thấy đủ phiếu khám. *@
 @model ChonNguoiKhamViewModel
 @{
     Layout = "_BookingLayout";
     ViewData["Title"] = "Chọn người khám";
-    ViewData["Step"] = 4;
-    ViewData["BackUrl"] = Url.Action("ChonGio", "Booking");
 
     var selected = Model.Patients.FirstOrDefault(p => p.Id == Model.SelectedPatientId);
 }
@@ -15,13 +14,18 @@
     <section class="booking-content">
         <div class="content-head">
             <div>
-                <div class="eyebrow">BƯỚC 4 / 5</div>
+                <div class="eyebrow">@ViewData["StepLabel"]</div>
                 <div class="page-title">Ai sẽ là người đến khám?</div>
                 <p>Chọn một hồ sơ đã lưu trong tài khoản của bạn. Mỗi lịch hẹn chỉ liên kết với một người khám.</p>
             </div>
-            <button type="button" class="btn btn-outline" data-open-add-profile>
-                <i data-lucide="plus"></i> Thêm hồ sơ mới
-            </button>
+            <div class="head-actions">
+                <a class="btn btn-outline" asp-controller="HoSo" asp-action="Index">
+                    <i data-lucide="folder-open"></i> Hồ sơ của tôi
+                </a>
+                <a class="btn btn-primary" asp-controller="HoSo" asp-action="Them">
+                    <i data-lucide="user-plus"></i> Thêm hồ sơ mới
+                </a>
+            </div>
         </div>
 
         <partial name="_ErrorAlert" />
@@ -63,7 +67,7 @@
             <i data-lucide="circle-alert"></i>
             <div>
                 <strong>Hồ sơ này không đặt lịch được</strong>
-                <p>Liên kết hồ sơ đã bị thu hồi. Vui lòng chọn hồ sơ khác hoặc thêm hồ sơ mới để tiếp tục.</p>
+                <p>Liên kết hồ sơ đã bị thu hồi. Chọn hồ sơ khác, hoặc tạo hồ sơ mới ở mục <a asp-controller="HoSo" asp-action="Them">Hồ sơ của tôi</a>.</p>
             </div>
         </div>
 
@@ -74,74 +78,15 @@
 
         <div class="booking-footer">
             <span>Đã chọn: <strong id="nguoi-selected-name">@(selected?.FullName ?? "chưa chọn")</strong></span>
-            <button type="submit" class="btn btn-primary" id="nguoi-next" disabled="@(selected is null)">
-                Tiếp tục <i data-lucide="chevron-right"></i>
-            </button>
+            <div class="footer-actions">
+                <a class="btn btn-outline" href="@ViewData["BackUrl"]"><i data-lucide="chevron-left"></i> Quay lại</a>
+                <button type="submit" class="btn btn-primary" id="nguoi-next" disabled="@(selected is null)">
+                    Tiếp tục <i data-lucide="chevron-right"></i>
+                </button>
+            </div>
         </div>
     </section>
 </form>
-
-@* Modal thêm hồ sơ: đặt NGOÀI form chọn người khám (không được lồng form trong form). *@
-<div class="scrim modal-scrim" id="add-profile-scrim" data-modal-close hidden></div>
-<div class="modal profile-modal" id="add-profile-modal" role="dialog" aria-modal="true" aria-labelledby="add-profile-title" hidden>
-    <div class="modal-icon profile"><i data-lucide="user-round"></i></div>
-    <button type="button" class="icon-button modal-close" data-modal-close aria-label="Đóng"><i data-lucide="x"></i></button>
-    <div class="modal-title" id="add-profile-title">Thêm hồ sơ người khám</div>
-    <p>Thông tin chuyên khoa, ngày, ca và khung giờ hiện tại sẽ được giữ nguyên.</p>
-
-    <form asp-action="ThemHoSo" method="post" id="add-profile-form" novalidate>
-        <div class="form-grid">
-            <label>
-                <span>Họ và tên <b>*</b></span>
-                <input name="FullName" maxlength="100" placeholder="Nhập họ và tên" autocomplete="off" />
-                <small hidden>Vui lòng nhập họ và tên người khám.</small>
-            </label>
-            <label>
-                <span>Ngày sinh <b>*</b></span>
-                <input name="DateOfBirth" placeholder="DD/MM/YYYY" inputmode="numeric" autocomplete="off" />
-                <small hidden>Ngày sinh không hợp lệ. Vui lòng nhập theo định dạng DD/MM/YYYY.</small>
-            </label>
-            <label>
-                <span>Giới tính</span>
-                <select name="Gender">
-                    <option value="">Chọn giới tính</option>
-                    <option value="MALE">Nam</option>
-                    <option value="FEMALE">Nữ</option>
-                    <option value="OTHER">Khác</option>
-                </select>
-            </label>
-            <label>
-                <span>Mối quan hệ</span>
-                <select name="Relationship">
-                    <option value="OTHER">Người thân</option>
-                    <option value="SIBLING">Anh/Chị/Em</option>
-                    <option value="PARENT">Cha/Mẹ</option>
-                    <option value="CHILD">Con</option>
-                    <option value="SPOUSE">Vợ/Chồng</option>
-                    <option value="SELF">Bản thân</option>
-                </select>
-            </label>
-            <label class="wide">
-                <span>Số điện thoại liên hệ <b>*</b></span>
-                <input name="Phone" type="tel" placeholder="Nhập số điện thoại" autocomplete="off" />
-                <small hidden>Số điện thoại không hợp lệ (10 đến 11 chữ số, bắt đầu bằng 0).</small>
-            </label>
-            <label class="wide">
-                <span>CCCD / Định danh cá nhân</span>
-                <input name="NationalId" maxlength="12" placeholder="Để trống với trẻ nhỏ chưa có CCCD" autocomplete="off" />
-                <small hidden>CCCD không được vượt quá 12 ký tự.</small>
-            </label>
-        </div>
-        <div class="duplicate-note">
-            <i data-lucide="info"></i>
-            <span>Hồ sơ có CCCD đã tồn tại trong hệ thống sẽ bị từ chối; khi đó bạn cần xin liên kết hồ sơ ở quầy tiếp nhận.</span>
-        </div>
-        <div class="modal-actions">
-            <button type="button" class="btn btn-outline" data-modal-close>Hủy</button>
-            <button type="submit" class="btn btn-primary" id="add-profile-submit">Lưu và chọn hồ sơ</button>
-        </div>
-    </form>
-</div>
 
 @section Scripts {
     <script src="~/js/booking.js" asp-append-version="true"></script>

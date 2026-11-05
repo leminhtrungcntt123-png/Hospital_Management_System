@@ -1,0 +1,50 @@
+@* khung giờ của một ngày + tóm tắt lựa chọn.
+   Render ở ChonNgayGio.cshtml và được Booking/KhungGio trả về cho fetch khi bấm ngày khác.
+   Chỉ chứa phần bên trong .slot-layout; khung .slot-layout do view/booking.js tạo để giữ bố cục. *@
+@model SlotListViewModel
+
+<div>
+    <div class="subhead">
+        <div>
+            <strong>Chọn một khung giờ</strong>
+            <span>@VietnameseFormat.FullDate(Model.Date)</span>
+        </div>
+        @if (Model.Slots.Sum(s => s.SlotsLeft) > 0)
+        {
+            <span class="badge badge-green">Còn @Model.Slots.Sum(s => s.SlotsLeft) suất đặt online</span>
+        }
+        else
+        {
+            <span class="badge badge-red">Hết suất online</span>
+        }
+    </div>
+
+    @if (Model.Slots.Count == 0)
+    {
+        <div class="empty-state">
+            <i data-lucide="calendar-x"></i>
+            <strong>Ngày này không còn khung giờ đặt online</strong>
+            <p>Chọn ngày khác trong lịch phía trên, hoặc đến quầy lấy số T trong ngày.</p>
+        </div>
+    }
+    else
+    {
+        <partial name="_SlotChips" model="Model" />
+    }
+
+    <div class="alert info">
+        <i data-lucide="info"></i>
+        <div>
+            <strong>Số thứ tự của bạn là chữ A</strong>
+            <p>Bệnh nhân đặt online nhận số A theo thứ tự khung giờ; phần chỗ còn lại của mỗi khung dành cho bệnh nhân đến lấy số T tại quầy.</p>
+        </div>
+    </div>
+</div>
+
+<aside class="selection-summary">
+    <div class="eyebrow">LỰA CHỌN CỦA BẠN</div>
+    <div><i data-lucide="calendar-days"></i><span>Ngày khám<em>@VietnameseFormat.FullDate(Model.Date)</em></span></div>
+    <div><i data-lucide="clock-3"></i><span>Khung giờ<em id="sum-slot">@(Model.SelectedSlotId is null ? "Chưa chọn" : Model.Slots.First(s => s.Id == Model.SelectedSlotId).Label)</em></span></div>
+    <div><i data-lucide="user-round"></i><span>Bác sĩ phụ trách<em id="sum-doctor">@(Model.SelectedSlotId is null ? "Chưa chọn" : Model.Slots.First(s => s.Id == Model.SelectedSlotId).Doctor?.FullName)</em></span></div>
+    <div><i data-lucide="map-pin"></i><span>Phòng khám<em id="sum-room">@(Model.SelectedSlotId is null ? "Chưa chọn" : Model.Slots.First(s => s.Id == Model.SelectedSlotId).Room)</em></span></div>
+</aside>

@@ -1,11 +1,14 @@
 @{
-    // Mỗi view đặt:
-    //   ViewData["Step"]    = 1..5  (không đặt ở trang thành công -> ẩn thanh trên và stepper)
+    // Controller đặt ba key này trong BookingController.Guard:
+    //   ViewData["Steps"]   = nhãn từng bước của luồng đang đi (3 luồng có số bước khác nhau)
+    //   ViewData["Step"]    = 1..Steps.Length (không đặt ở trang thành công -> ẩn thanh trên và stepper)
     //   ViewData["BackUrl"] = đường dẫn nút quay lại
     int? step = ViewData["Step"] as int?;
     string backUrl = ViewData["BackUrl"] as string ?? Url.Action("Index", "Booking")!;
     string backText = step == 1 ? "Thoát đặt lịch" : "Quay lại";
-    string[] labels = { "Chuyên khoa", "Ngày & ca khám", "Khung giờ", "Người khám", "Xác nhận" };
+    // Trang thành công không có stepper nên chỉ kiểm tra nhãn khi bước được hiển thị.
+    string[] labels = step is null ? Array.Empty<string>() : ViewData["Steps"] as string[]
+        ?? throw new InvalidOperationException("View đặt lịch phải có ViewData[\"Steps\"] do BookingController.Guard đặt.");
 }
 <!DOCTYPE html>
 <html lang="vi">

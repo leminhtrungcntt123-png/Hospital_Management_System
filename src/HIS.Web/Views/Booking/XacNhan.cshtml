@@ -1,12 +1,10 @@
-@* Bước 5: Kiểm tra và xác nhận lịch khám *@
+@* Bước cuối của cả ba luồng: kiểm tra phiếu khám, khai báo bảo hiểm và gửi yêu cầu đặt lịch.
+   Phí khám chỉ mang tính thông báo - hệ thống chưa thu tiền online nên không có bước thanh toán. *@
 @model XacNhanViewModel
 @{
     Layout = "_BookingLayout";
     ViewData["Title"] = "Xác nhận lịch khám";
-    ViewData["Step"] = 5;
-    ViewData["BackUrl"] = Url.Action("ChonNguoiKham", "Booking");
 
-    var shift = Model.Shift;
     var slot = Model.Slot;
 }
 
@@ -14,7 +12,7 @@
     <section class="booking-content">
         <div class="content-head">
             <div>
-                <div class="eyebrow">BƯỚC 5 / 5</div>
+                <div class="eyebrow">@ViewData["StepLabel"]</div>
                 <div class="page-title">Kiểm tra và xác nhận lịch khám</div>
                 <p>Vui lòng kiểm tra kỹ thông tin trước khi gửi yêu cầu đặt lịch.</p>
             </div>
@@ -27,7 +25,7 @@
                 <div class="card-section">
                     <div class="card-head">
                         <strong>Thông tin người khám</strong>
-                        <a asp-action="ChonNguoiKham" class="link-button">Chỉnh sửa</a>
+                        @* Không đặt nút "Chỉnh sửa" ở đây: muốn đổi hồ sơ thì bấm "Quay lại" về bước chọn người khám. *@
                     </div>
                     <div class="patient-inline">
                         <div class="profile-avatar">@Model.Patient.Initials</div>
@@ -54,6 +52,46 @@
                     </div>
                 </div>
 
+                @* Khai báo bảo hiểm: chỉ để quầy nhắc mang thẻ và làm thủ tục viện phí, hệ thống không kiểm tra giấy tờ ở bước này. *@
+                <div class="card-section">
+                    <div class="card-head"><strong>Bạn có tham gia bảo hiểm nào không?</strong></div>
+                    <div class="declare-choice">
+                        <label class="declare @(Model.HasHealthInsurance ? "selected" : "")">
+                            <input type="checkbox" name="hasHealthInsurance" value="true" checked="@Model.HasHealthInsurance" />
+                            <span>
+                                <strong>Bảo hiểm y tế</strong>
+                                <small>Nhớ mang theo thẻ BHYT (thẻ giấy hoặc VssID) khi đến khám.</small>
+                            </span>
+                        </label>
+                        <label class="declare @(Model.HasPrivateInsurance ? "selected" : "")">
+                            <input type="checkbox" name="hasPrivateInsurance" value="true" checked="@Model.HasPrivateInsurance" />
+                            <span>
+                                <strong>Bảo hiểm tư nhân</strong>
+                                <small>Mang theo thẻ hoặc giấy xác nhận của công ty bảo hiểm (Bảo Việt, PVI, Liberty...).</small>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="card-section">
+                    <div class="card-head"><strong>Chi phí và thanh toán</strong></div>
+                    <div class="cost-rows">
+                        <div>
+                            <span>Phí khám bệnh (@Model.Department.Name)</span>
+                            <strong>@VietnameseFormat.Money(Model.Fee)</strong>
+                        </div>
+                        <div class="cost-total">
+                            <span>Tạm tính</span>
+                            <strong>@VietnameseFormat.Money(Model.Fee)</strong>
+                        </div>
+                    </div>
+                    <p class="cost-note">
+                        <i data-lucide="wallet"></i>
+                        Đặt online không thu tiền. Bạn đóng phí khám tại quầy viện phí khi đến khám;
+                        nếu có bảo hiểm, quầy sẽ làm thủ tục theo giấy tờ bạn mang theo.
+                    </p>
+                </div>
+
                 <div class="alert warning">
                     <i data-lucide="circle-alert"></i>
                     <div>
@@ -72,8 +110,7 @@
                 <div class="summary-title"><i data-lucide="calendar-days"></i> Tóm tắt lịch khám</div>
                 <div class="summary-row"><span>Chuyên khoa</span><strong>@Model.Department.Name</strong></div>
                 <div class="summary-row"><span>Ngày khám</span><strong>@VietnameseFormat.FullDate(Model.Date)</strong></div>
-                <div class="summary-row"><span>Ca khám</span><strong>@shift.Label · @shift.TimeRange</strong></div>
-                <div class="summary-row"><span>Khung giờ</span><strong>@slot.Label</strong></div>
+                <div class="summary-row"><span>Khung giờ</span><strong>@slot.ShiftLabel · @slot.Label</strong></div>
                 @if (slot.Doctor is not null)
                 {
                     <div class="summary-doctor">
@@ -81,22 +118,27 @@
                         <div>
                             <span>Bác sĩ phụ trách</span>
                             <strong>@slot.Doctor.FullName</strong>
-                            <button type="button" data-doctor-open="@slot.Doctor.ToModalJson(slot.Label, slot.Room, Model.Date)">Xem thông tin bác sĩ</button>
+                            <button type="button" data-doctor-open="@slot.Doctor.ToModalJson(slot.Label, slot.Room, Model.Date, Model.Department?.Name)">
+                                Xem thông tin bác sĩ
+                            </button>
                         </div>
                     </div>
                 }
                 <div class="summary-row"><span>Địa điểm</span><strong>@slot.Room</strong></div>
                 <div class="summary-divider"></div>
-                <div class="summary-row"><span>Chi phí dự kiến</span><strong>@VietnameseFormat.Money(Model.Fee)</strong></div>
-                <small>Chưa bao gồm xét nghiệm và dịch vụ phát sinh.</small>
+                <div class="summary-row"><span>Phí khám dự kiến</span><strong>@VietnameseFormat.Money(Model.Fee)</strong></div>
+                <small>Số thứ tự (chữ A) và phòng khám chính thức hiện trên phiếu hẹn sau khi đặt thành công.</small>
             </aside>
         </div>
 
         <div class="booking-footer">
             <span><i data-lucide="shield-check"></i> Hệ thống sẽ kiểm tra khả năng tiếp nhận lần cuối.</span>
-            <button type="submit" class="btn btn-primary" id="xacnhan-submit">
-                Xác nhận đặt lịch <i data-lucide="check"></i>
-            </button>
+            <div class="footer-actions">
+                <a class="btn btn-outline" href="@ViewData["BackUrl"]"><i data-lucide="chevron-left"></i> Quay lại</a>
+                <button type="submit" class="btn btn-primary" id="xacnhan-submit">
+                    Xác nhận đặt lịch <i data-lucide="check"></i>
+                </button>
+            </div>
         </div>
     </section>
 </form>

@@ -6,6 +6,7 @@ using HIS.BLL.Interfaces;
 using HIS.BLL.Security;
 using HIS.WinForms.Controls;
 using HIS.WinForms.Pages;
+using HIS.WinForms.Services;
 
 namespace HIS.WinForms;
 
@@ -32,6 +33,7 @@ public partial class MainForm : Form
     private readonly IAuthService? _authService;
     private readonly UserSession? _session;
     private readonly IPatientProfileService? _profileService;
+    private readonly QueueChangeClient? _realtime;
     private UserControl? _currentPage;
 
     public bool LogoutRequested { get; private set; }
@@ -49,7 +51,7 @@ public partial class MainForm : Form
     private static extern IntPtr SendMessage(IntPtr hWnd, int msg, int wParam, int lParam);
 
     // Constructor không tham số để Visual Studio Designer có thể mở form
-    public MainForm() : this(null!, null!, null!, null!, null!, null!, null!, null!)
+    public MainForm() : this(null!, null!, null!, null!, null!, null!, null!, null!, null!, null!)
     {
     }
 
@@ -63,7 +65,8 @@ public partial class MainForm : Form
         IAuthService authService,
         UserSession session,
         ISchedulingService? schedulingService = null,
-        IPatientProfileService? profileService = null)
+        IPatientProfileService? profileService = null,
+        QueueChangeSettings? realtimeSettings = null)
     {
         _bookingService = bookingService;
         _adminService = adminService;
@@ -74,6 +77,7 @@ public partial class MainForm : Form
         _session = session;
         _profileService = profileService;
         _schedulingService = schedulingService;
+        _realtime = realtimeSettings is { Enabled: true } settings ? new QueueChangeClient(settings) : null;
 
         InitializeComponent();
         DoubleBuffered = true;
@@ -99,7 +103,14 @@ public partial class MainForm : Form
             clockTimer.Start();
             lblBadgeReception.Visible = false;
             Shown += async (_, _) => await UpdateReceptionBadgeAsync();
+            _realtime?.Start();
         }
+    }
+
+    protected override void OnFormClosed(FormClosedEventArgs e)
+    {
+        _realtime?.Dispose();
+        base.OnFormClosed(e);
     }
 
     protected override void OnLoad(EventArgs e)
@@ -384,7 +395,7 @@ public partial class MainForm : Form
         SetActiveNav(btnNavReception);
         lblBreadcrumb.Text = "HIS   ›   Tiếp đón bệnh nhân";
 
-        var page = new ReceptionPage(_receptionService, _profileService, _session?.User?.AccountId);
+        var page = new ReceptionPage(_receptionService, _profileService, _session?.User?.AccountId, _realtime);
         page.CountsChanged += counts => UpdateReceptionBadge(counts.Waiting);
         ShowPage(page);
     }

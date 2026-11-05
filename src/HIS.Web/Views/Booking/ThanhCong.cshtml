@@ -55,9 +55,9 @@
                 <div>
                     <span>Bác sĩ phụ trách</span>
                     <strong>@Model.Doctor.FullName</strong>
-                    <small>@Model.Doctor.Title</small>
+                    <small>@Model.Doctor.Specialty</small>
                 </div>
-                <button type="button" data-doctor-open="@Model.Doctor.ToModalJson(Model.TimeRange, Model.Room, Model.Date)">Xem thông tin</button>
+                <button type="button" data-doctor-open="@Model.Doctor.ToModalJson(Model.TimeRange, Model.Room, Model.Date, Model.DepartmentName)">Xem thông tin</button>
             </div>
         }
 

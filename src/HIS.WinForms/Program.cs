@@ -7,6 +7,7 @@ using HIS.BLL;
 using HIS.BLL.Interfaces;
 using HIS.BLL.Options;
 using HIS.BLL.Services;
+using HIS.WinForms.Services;
 
 namespace HIS.WinForms;
 
@@ -59,6 +60,11 @@ static class Program
                 services.AddScoped<UserSession>();
                 services.AddTransient<LoginForm>();
                 services.AddTransient<MainForm>();
+
+                // Kênh realtime từ HIS.Web: mặc định cổng http 5044 của hồ sơ launch "https".
+                services.AddSingleton(new QueueChangeSettings(
+                    context.Configuration["Realtime:WebSocketUrl"] ?? "ws://localhost:5044/ws/quay",
+                    context.Configuration.GetValue("Realtime:Enabled", true)));
             })
             .Build();
 
