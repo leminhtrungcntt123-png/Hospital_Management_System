@@ -901,3 +901,29 @@ Không thêm/xóa cột nào: `patients.email varchar(200) NULL` (mục 12) đã
 * DOM probe trên trình duyệt: hai ô `Phone`/`Email` có cùng `offsetTop` (657) và `left` khác nhau (49 và 317) khi grid 2 cột → đúng yêu cầu "để chung dòng với nhập số điện thoại"; ở viewport 635px grid tự xếp 1 cột.
 * Dọn dẹp: link `(7,39)`, hai dòng `notifications` test, `access_logs` và hồ sơ tạo trong lần kiểm thử đã xóa; mật khẩu demo đã khôi phục bằng `bash backup/demologin.sh patient.tranb`.
 * **Hồ sơ ma `BN000057` do bug cũ để lại đã hủy + xóa theo yêu cầu người dùng (06/11/2026)**, chạy trong MỘT transaction theo thứ tự FK (`appointment_status_history` → `notifications` → `access_logs` → `insurance_cards` → `invoices` → `appointments` → `account_patient_profiles` → `patients`) rồi trừ bộ đếm khung giờ: `DELETE 1` cho `access_logs`/`insurance_cards`/`appointments`(73 `HIS-20261124-VX3JTA`)/link/`patients`, `UPDATE 1` cho `appointment_slots` id 612 (`booked_count 1 → 0`, `online_booked 1 → 0`, vẫn `AVAILABLE`, capacity 3). Đối chiếu sau xóa: `patients` **9 → 8**, không còn dòng nào tham chiếu id 57 ở 5 bảng có cột `patient_id`, `notifications` không còn dấu vết nào mentioning hồ sơ này; tài khoản 8 còn đúng `BN000001 (OTHER)`, `BN000002 (SELF)`, `BN000039 (SIBLING)`. Ảnh toàn bộ các dòng bị xóa nằm ở `D:\tmp\del_bn000057_snapshot.txt` (không tracked, để khôi phục thủ công nếu cần).
+
+---
+
+## 15. SỬA WORKFLOW CI: `cache` CỦA SETUP-DOTNET LÀ BOOLEAN + THÊM LOCK FILE (06/11/2026)
+
+GitHub Actions fail ở bước **Setup .NET 10** của cả hai job với `Error: Input does not meet YAML 1.2 "Core Schema" specification: cache / Support boolean input list: true|True|TRUE|false|False|FALSE`. Hai dòng `dotnet-install: ... already installed` ở ngay trên **không phải lỗi** — SDK 10.0.403 và runtime 10.0.14 đã có sẵn trên runner; bước chỉ đỏ lên ở khâu validate input, sau khi cài đặt xong.
+
+### 15.1 Nguyên nhân
+
+`.github/workflows/ci.yml` viết `cache: 'nuget'` — cú pháp của **`setup-node`/`setup-python`** (ở đó `cache` nhận *tên* package manager). Với `actions/setup-dotnet`, `cache` là **boolean** nên chuỗi `nuget` không parse được.
+
+### 15.2 Vì sao không thể chỉ đổi thành `true`
+
+Đọc mã nguồn action (`src/cache-restore.ts`, branch `main`): khi bật cache mà **không** truyền `cache-dependency-path`, action chỉ tìm `packages.lock.json` **ở thư mục gốc repo** và `throw new Error('Dependencies lock file is not found in <workspace>. Supported file patterns: packages.lock.json')` → CI lại đỏ, chỉ khác thông báo. Repo này lock file nằm cạnh từng `.csproj` (không có file gốc), nên cần cả hai thứ cùng lúc.
+
+### 15.3 Đã sửa
+
+* `dotnet restore HIS.sln --use-lock-file` sinh **7** `packages.lock.json` (`src/HIS.Domain|HIS.DAL|HIS.BLL|HIS.Web|HIS.WebApi|HIS.WinForms`, `tests/HIS.Tests`) và commit sang git — đây là khóa để action tính hash cho cache key. Repo **không** đổi sang CPM và **không** thêm `Directory.Build.props` (DECISIONS #12 vẫn nguyên); ai thêm/xóa package phải chạy lại lệnh trên để lock file khớp.
+* `ci.yml`: hai khối `Setup .NET 10` đổi thành `cache: true` + `cache-dependency-path: '**/packages.lock.json'` (bắt buộc quote vì `**` đầu giá trị là alias indicator của YAML) kèm comment giải thích để không ai copy lại kiểu `cache: nuget`.
+* Tên bước `Structure gate (16 checks)` → `(18 checks)` cho khớp `docs/database/ci/schema_checks.sql` (đếm `^SELECT '` ra đúng 18; chỉ là chữ trong tên bước, không đổi nội dung kiểm tra).
+
+### 15.4 Kiểm chứng
+
+* `dotnet restore HIS.sln` (bản **không** cờ, đúng như CI chạy) sau khi có lock file: **không** warning/error nào liên quan tới lock — lock file chỉ được dùng khi có cờ/property, nên không làm fragile bản build của nhóm.
+* `grep -P "\t"` trên ci.yml: không có tab; `cache-dependency-path` đã quote.
+* Chưa có bằng chứng runner thật (phải push mới chạy) — người dùng push, theo dõi lần xanh kế tiếp.

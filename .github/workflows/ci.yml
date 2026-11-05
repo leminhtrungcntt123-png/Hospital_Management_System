@@ -29,7 +29,13 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-          cache: 'nuget'
+          # `cache` của setup-dotnet là BOOLEAN (khác setup-node/setup-python, nơi nó nhận TÊN
+          # package manager — viết `cache: nuget` sẽ fail bước ở khâu validate input).
+          # Bật cache thì action bắt buộc có packages.lock.json, và nó chỉ tìm ở THƯ MỤC GỐC
+          # nếu không truyền cache-dependency-path; repo này để lock file cạnh từng .csproj
+          # nên phải nêu glob. Chạy lại khi thêm/xóa package: dotnet restore HIS.sln --use-lock-file
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
 
       - name: Restore dependencies
         run: dotnet restore HIS.sln
@@ -75,7 +81,9 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-          cache: 'nuget'
+          # Cùng bộ cache/lock-file như job Windows (giải thích đầy đủ ở trên).
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
 
       - name: Install psql client
         run: command -v psql >/dev/null || (sudo apt-get update && sudo apt-get install -y postgresql-client)
@@ -96,7 +104,7 @@ jobs:
           psql -h localhost -U postgres -d hospital_his_ci -v ON_ERROR_STOP=1 -q -f docs/database/ci/demo_day.sql
 
       # File tự RAISE EXCEPTION khi còn check failed => ON_ERROR_STOP làm step đỏ, không cần đếm kết quả.
-      - name: Structure gate (16 checks)
+      - name: Structure gate (18 checks)
         run: psql -h localhost -U postgres -d hospital_his_ci -v ON_ERROR_STOP=1 -P pager=off -f docs/database/ci/schema_checks.sql
 
       - name: Run integration tests
