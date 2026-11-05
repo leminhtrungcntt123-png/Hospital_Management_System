@@ -23,10 +23,13 @@ public static class BusinessServiceCollectionExtensions
             }, "BookingOptions validation failed")
             .ValidateOnStart();
 
+        services.AddOptions<EmailOptions>()
+            .Bind(configuration.GetSection(EmailOptions.SectionName));
+
         services.AddValidatorsFromAssembly(typeof(BusinessServiceCollectionExtensions).Assembly);
 
         services.AddScoped<IAuthService, AuthService>();
-        services.AddScoped<IEmailSender, LoggingEmailSender>();
+        services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.AddScoped<IPatientProfileService, PatientProfileService>();
         services.AddScoped<IPatientAccessService, PatientAccessService>();
         services.AddScoped<IBookingService, BookingService>();

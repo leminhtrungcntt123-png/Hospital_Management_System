@@ -594,11 +594,7 @@ const handleUiClick = async (e) => {
                 break;
             }
             case 'logout':
-                session.authenticated = false;
-                session.role = 'PATIENT';
-                session.accountId = 'ac-p';
-                go('account/login');
-                toast('Đã thoát phiên tài khoản mẫu.');
+                location.assign('/Account/Logout');
                 break;
             case 'privacy':
                 openModal(

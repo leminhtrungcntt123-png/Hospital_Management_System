@@ -124,11 +124,12 @@
             location.assign(config.login);
             return;
         }
+        const isPat = (config.role || '').toUpperCase() === 'PATIENT';
         openModal(
             'Tài khoản của bạn',
             config.displayName || 'Tài khoản HIS',
             /* HTML */ `<div class="menu-links">
-                <a href="${esc(config.home)}">${icon('grid')}Không gian làm việc</a
+                <a href="${esc(config.home)}">${icon(isPat ? 'calendar' : 'grid')}${isPat ? 'Lịch khám & Hồ sơ của tôi' : 'Không gian làm việc'}</a
                 ><a href="${esc(config.changePassword)}">${icon('shield')}Đổi mật khẩu</a>
             </div>`,
             button('Đóng', 'close') + button('Đăng xuất', 'server-logout', 'logout', 'btn outline')
@@ -158,7 +159,7 @@
                 persistDraft();
                 location.assign(config.pathBase + '/');
             } else if (action === 'logout' || action === 'server-logout')
-                document.getElementById('his-server-logout').requestSubmit();
+                location.assign((config.pathBase || '') + '/Account/Logout');
             else accountMenu();
         },
         true
