@@ -43,17 +43,50 @@ public static class ReceptionWorkflowScenario
         var patient = new Patient { FullName = "QA Web Patient", PhoneNumber = "0900000001", DateOfBirth = new DateOnly(1990, 1, 1) };
         var oldPatient = new Patient { FullName = "QA Existing Patient", PhoneNumber = "0900000002", DateOfBirth = new DateOnly(1992, 1, 1) };
         db.AddRange(nurse, other, doctor, room, patientAccount, patient, oldPatient);
-        var schedule = new DoctorSchedule { Doctor = doctor, Room = room, DayOfWeek = DayOfWeek.Thursday,
-            Shift = ExamShift.Morning, StartTime = new TimeOnly(7, 30), EndTime = new TimeOnly(11, 30),
-            EffectiveFrom = new DateOnly(2026, 11, 1), MaxPatients = 4, OnlineSlots = 2 };
+        var schedule = new DoctorSchedule
+        {
+            Doctor = doctor,
+            Room = room,
+            DayOfWeek = DayOfWeek.Thursday,
+            Shift = ExamShift.Morning,
+            StartTime = new TimeOnly(7, 30),
+            EndTime = new TimeOnly(11, 30),
+            EffectiveFrom = new DateOnly(2026, 11, 1),
+            MaxPatients = 4,
+            OnlineSlots = 2
+        };
         db.Add(schedule);
-        var slot = new AppointmentSlot { Doctor = doctor, Room = room, StartTime = new DateTime(2026, 11, 5, 9, 30, 0),
-            EndTime = new DateTime(2026, 11, 5, 9, 45, 0), Capacity = 1, BookedCount = 1, Status = SlotStatus.Full };
-        var appointment = new Appointment { AppointmentCode = "QA_WEB_VISIT", Patient = patient, BookedByAccount = patientAccount,
-            Doctor = doctor, Department = dept, Room = room, Slot = slot, StatusId = 2, CreatedAt = new DateTime(2026, 11, 5, 8, 0, 0) };
+        var slot = new AppointmentSlot
+        {
+            Doctor = doctor,
+            Room = room,
+            StartTime = new DateTime(2026, 11, 5, 9, 30, 0),
+            EndTime = new DateTime(2026, 11, 5, 9, 45, 0),
+            Capacity = 1,
+            BookedCount = 1,
+            Status = SlotStatus.Full
+        };
+        var appointment = new Appointment
+        {
+            AppointmentCode = "QA_WEB_VISIT",
+            Patient = patient,
+            BookedByAccount = patientAccount,
+            Doctor = doctor,
+            Department = dept,
+            Room = room,
+            Slot = slot,
+            StatusId = 2,
+            CreatedAt = new DateTime(2026, 11, 5, 8, 0, 0)
+        };
         db.Add(appointment);
-        db.AccountPatientProfiles.Add(new AccountPatientProfile { Account = patientAccount, Patient = patient,
-            Relationship = PatientRelationship.Parent, Status = LinkStatus.Pending, CreatedAt = new DateTime(2026, 11, 5, 8, 0, 0) });
+        db.AccountPatientProfiles.Add(new AccountPatientProfile
+        {
+            Account = patientAccount,
+            Patient = patient,
+            Relationship = PatientRelationship.Parent,
+            Status = LinkStatus.Pending,
+            CreatedAt = new DateTime(2026, 11, 5, 8, 0, 0)
+        });
         await db.SaveChangesAsync();
         var nurseId = nurseAccount.Id; var otherId = otherAccount.Id; var doctorId = doctorAccount.Id;
         var appointmentId = appointment.Id; var scheduleId = schedule.Id; var oldPatientId = oldPatient.Id;
@@ -76,12 +109,23 @@ public static class ReceptionWorkflowScenario
         Assert.False((await service.RegisterWalkInAsync(otherId, Existing())).IsSuccess);
         Assert.Equal("W01", (await service.RegisterWalkInAsync(nurseId, Existing())).Value);
         Assert.False((await service.RegisterWalkInAsync(nurseId, Existing())).IsSuccess);
-        Assert.Equal("W02", (await service.RegisterWalkInAsync(nurseId, new WalkInReceptionRequest {
-            FullName = "QA New Patient", DateOfBirth = new DateOnly(2000, 1, 1), PhoneNumber = "0900000003",
-            ScheduleId = scheduleId, IdentityVerified = true, PriorityLevel = 2 })).Value);
-        Assert.False((await service.RegisterWalkInAsync(nurseId, new WalkInReceptionRequest {
-            FullName = "QA Over Quota", DateOfBirth = new DateOnly(2000, 1, 1), PhoneNumber = "0900000004",
-            ScheduleId = scheduleId, IdentityVerified = true })).IsSuccess);
+        Assert.Equal("W02", (await service.RegisterWalkInAsync(nurseId, new WalkInReceptionRequest
+        {
+            FullName = "QA New Patient",
+            DateOfBirth = new DateOnly(2000, 1, 1),
+            PhoneNumber = "0900000003",
+            ScheduleId = scheduleId,
+            IdentityVerified = true,
+            PriorityLevel = 2
+        })).Value);
+        Assert.False((await service.RegisterWalkInAsync(nurseId, new WalkInReceptionRequest
+        {
+            FullName = "QA Over Quota",
+            DateOfBirth = new DateOnly(2000, 1, 1),
+            PhoneNumber = "0900000004",
+            ScheduleId = scheduleId,
+            IdentityVerified = true
+        })).IsSuccess);
         Assert.False(await db.Patients.AnyAsync(p => p.PhoneNumber == "0900000004"));
         Assert.Equal(2, await db.Appointments.CountAsync(a => a.BookingChannel == BookingChannel.OnSite && a.SlotId == null && a.StatusId == 3));
         Assert.Equal(3, (await service.GetDeskAsync(nurseId, null)).Value!.Visits.Count);

@@ -124,19 +124,39 @@ public sealed class ReceptionService(AppDbContext db, TimeProvider clock, IOptio
                 Require(nationalId == null || !await db.Patients.AnyAsync(p => p.NationalId == nationalId, ct), "CCCD đã có hồ sơ. Hãy tìm và chọn hồ sơ sẵn có.");
                 Require(!await db.Patients.AnyAsync(p => p.FullName == request.FullName!.Trim()
                     && p.DateOfBirth == request.DateOfBirth && p.PhoneNumber == request.PhoneNumber!.Trim(), ct), "Người khám đã có hồ sơ. Hãy tìm và chọn hồ sơ sẵn có.");
-                patient = new Patient { FullName = request.FullName!.Trim(), DateOfBirth = request.DateOfBirth!.Value,
-                    PhoneNumber = request.PhoneNumber!.Trim(), NationalId = nationalId, Address = request.Address?.Trim(), Gender = request.Gender, CreatedAt = Now };
+                patient = new Patient
+                {
+                    FullName = request.FullName!.Trim(),
+                    DateOfBirth = request.DateOfBirth!.Value,
+                    PhoneNumber = request.PhoneNumber!.Trim(),
+                    NationalId = nationalId,
+                    Address = request.Address?.Trim(),
+                    Gender = request.Gender,
+                    CreatedAt = Now
+                };
                 db.Patients.Add(patient);
             }
             var dayStart = Today.ToDateTime(TimeOnly.MinValue); var dayEnd = dayStart.AddDays(1);
             Require(patient!.Id == 0 || !await db.Appointments.AnyAsync(a => a.PatientId == patient.Id && a.DepartmentId == nurse.DepartmentId
                 && a.StatusId >= 1 && a.StatusId <= 5 && ((a.Slot != null && a.Slot.StartTime >= dayStart && a.Slot.StartTime < dayEnd)
                     || a.Slot == null && a.CreatedAt >= dayStart && a.CreatedAt < dayEnd), ct), "Người khám đã có lượt đang hiệu lực hôm nay tại khoa.");
-            var a = new Appointment { AppointmentCode = "HIS-" + Today.ToString("yyyyMMdd") + "-" + Convert.ToHexString(RandomNumberGenerator.GetBytes(4)),
-                Patient = patient, DepartmentId = nurse.DepartmentId, DoctorId = schedule.DoctorId, RoomId = schedule.RoomId,
-                BookingChannel = BookingChannel.OnSite, VisitType = VisitType.WalkIn, StatusId = 3, CheckedInAt = Now,
+            var a = new Appointment
+            {
+                AppointmentCode = "HIS-" + Today.ToString("yyyyMMdd") + "-" + Convert.ToHexString(RandomNumberGenerator.GetBytes(4)),
+                Patient = patient,
+                DepartmentId = nurse.DepartmentId,
+                DoctorId = schedule.DoctorId,
+                RoomId = schedule.RoomId,
+                BookingChannel = BookingChannel.OnSite,
+                VisitType = VisitType.WalkIn,
+                StatusId = 3,
+                CheckedInAt = Now,
                 QueueNumber = await IssueNumberAsync(schedule.RoomId, schedule.Shift, BookingChannel.OnSite, ct),
-                PriorityLevel = request.PriorityLevel, Reason = request.Reason?.Trim(), CreatedAt = Now, UpdatedAt = Now };
+                PriorityLevel = request.PriorityLevel,
+                Reason = request.Reason?.Trim(),
+                CreatedAt = Now,
+                UpdatedAt = Now
+            };
             db.Appointments.Add(a);
             db.AppointmentStatusHistories.Add(new AppointmentStatusHistory { Appointment = a, NewStatusId = 3, PerformedBy = staffAccountId, ChangedAt = Now });
             await db.SaveChangesAsync(ct);
