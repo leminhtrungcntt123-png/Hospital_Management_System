@@ -100,6 +100,7 @@ public class AuthService : IAuthService
         string fullName = account.Doctor?.FullName
             ?? account.Nurse?.FullName
             ?? account.DepartmentHead?.FullName
+            ?? account.DepartmentHead?.FullName
             ?? account.PatientLinks.FirstOrDefault(l => l.Relationship == PatientRelationship.Self)?.Patient.FullName
             ?? account.Username;
 
