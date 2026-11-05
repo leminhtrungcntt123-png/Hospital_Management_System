@@ -38,7 +38,7 @@
                     <label class="branch @(seen ? "" : "selected")">
                         <input type="radio" name="Branch" value="@ThemHoSoRequest.NewBranch" checked="@(!seen)" />
                         <strong>Chưa từng khám</strong>
-                        <small>Tạo hồ sơ mới cho người nhà, lưu xong là đặt lịch được ngay. Mã xác thực gửi về email của tài khoản đang đăng nhập.</small>
+                        <small>Tạo hồ sơ mới cho người nhà. Hệ thống gửi mã xác thực về email bạn nhập bên dưới, và hồ sơ chỉ được lưu sau khi nhập đúng mã.</small>
                     </label>
                 </div>
 
@@ -107,10 +107,15 @@
                                 }
                             </select>
                         </label>
-                        <label class="wide">
+                        <label>
                             <span>Số điện thoại liên hệ <b>*</b></span>
                             <input name="Phone" value="@Model.Phone" type="tel" placeholder="Nhập số điện thoại" autocomplete="off" />
                             <small hidden>Số điện thoại không hợp lệ (10 đến 11 chữ số, bắt đầu bằng 0).</small>
+                        </label>
+                        <label>
+                            <span>Email nhận mã xác thực <b>*</b></span>
+                            <input name="Email" value="@Model.Email" type="email" maxlength="200" placeholder="vi.du@example.com" autocomplete="off" spellcheck="false" />
+                            <small hidden>Email không hợp lệ. Ví dụ hợp lệ: ten@email.com</small>
                         </label>
                         <label>
                             <span>CCCD / Định danh cá nhân</span>
@@ -150,8 +155,8 @@
 
                     <div class="duplicate-note">
                         <i data-lucide="mail"></i>
-                        <span>Sau khi lưu, hệ thống gửi mã xác thực 6 số tới email của tài khoản đang đăng nhập và sao chép email đó vào hồ sơ mới.
-                            Tài khoản chưa có email thì màn hình sẽ báo cách bổ sung.</span>
+                        <span>Hệ thống gửi mã xác thực 6 số tới email bạn vừa nhập. Nhập đúng mã thì hồ sơ mới được tạo và đặt lịch được ngay;
+                            bỏ giữa chừng thì màn hình chưa lưu gì cả, bạn có thể khai lại.</span>
                     </div>
                 </div>
 

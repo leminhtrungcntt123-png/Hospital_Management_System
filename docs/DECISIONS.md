@@ -2,7 +2,7 @@
 
 Mỗi mục: **Bối cảnh → Quyết định → Hệ quả**. Đánh dấu ⚠️ là chỗ **lệch `init.md` có chủ đích** — ai định "sửa cho đúng spec" phải đọc mục đó trước.
 
-Trạng thái cập nhật: đợt nghiệm thu yêu cầu người dùng (05/11/2026) — 21 quyết định.
+Trạng thái cập nhật: đợt sửa luồng OTP nhánh "chưa từng khám" (06/11/2026) — 24 quyết định.
 
 ---
 
@@ -104,7 +104,7 @@ Trạng thái cập nhật: đợt nghiệm thu yêu cầu người dùng (05/11
 ## 22. OTP xác thực hồ sơ: email lấy theo từng nhánh, chỉ tìm hồ sơ bằng mã BN, mã chỉ sống trong Session
 
 **Bối cảnh**: thêm hồ sơ trên web là chỗ duy nhất cần chặn kẻ gian liên kết bừa hồ sơ của người khác, nên nghiệp vụ chốt "chỉ xác thực khi thêm hồ sơ". Câu hỏi còn lại là **gửi mã cho ai** và **tìm hồ sơ bằng gì**. Phương án ban đầu (thử rồi bỏ) là để người dùng gõ email ngay trên form: nó mở cửa tự tay chỉ định hộp thư nhận mã, và cho phép tìm hồ sơ bằng CCCD/SĐT/tên nên một người lạ dò đúng số CCCD là xin liên kết được.
-**Quyết định**: form **không thu thập email nào cả**, và mỗi nhánh lấy một nguồn cố định, không cho ghi đè:
+**Quyết định**: form **không thu thập email nào cả**, và mỗi nhánh lấy một nguồn cố định, không cho ghi đè. *(Nhánh "chưa từng khám" đã bị bác ở mục 24: nay form có ô email và hồ sơ chỉ tạo sau khi nhập đúng mã. Nhánh "đã từng khám" vẫn giữ nguyên như dưới đây.)*
 * nhánh *chưa từng khám* → tạo hồ sơ mới, mã gửi về `accounts.email` của tài khoản đang đăng nhập, rồi **sao chép** email đó sang `patients.email` của hồ sơ mới (để lần sau hồ sơ này còn có mail mà nhận mã);
 * nhánh *đã từng khám* → ô tìm kiếm chỉ chấp nhận **mã bệnh nhân** `BN######` in trên phiếu khám, mã gửi về `patients.email` **đã lưu trong hồ sơ**; không được ghi đè từ form. Liên kết tạo trước ở trạng thái `PENDING`, nhập đúng mã mới `ACTIVE` (giữ nguyên thứ tự `VerifyLinkAsync` vốn có);
 * thiếu email ở nguồn nào thì báo lỗi tiếng Việt đúng nguyên nhân (kèm hotline 0808 0808) chứ không im lặng: "Tài khoản đăng nhập chưa có email…" / "Hồ sơ … chưa có email trong hệ thống…".
@@ -125,6 +125,17 @@ Khai báo bảo hiểm dịch từ bước "Người khám" sang bước "Xác n
 
 **Hệ quả**: DB **không đổi cấu trúc** (chỉ thêm truy vấn đọc: `GetDepartmentsOnDateAsync`, `GetDoctorsAsync(dept, date)`, `GetDoctorSlotsAsync`, `GetDaysAsync(from, count, dept, doctor)`, `GetSlotByIdAsync`). Link "Đặt lịch khám" ở header và nút "Đặt lịch mới" nay vào `Booking/Index` (màn chọn lối vào) thay vì nhảy thẳng vào `ChonKhoa`, vì GET `ChonKhoa` không còn nghĩa khi chưa có mode. Giao diện degrade trung thực theo dữ liệu thật: chưa có cột ảnh nên avatar là tên viết tắt, chưa có rating/số lượt khám nên thẻ bác sĩ hiện **số suất online còn lại + ngày gần nhất còn chỗ** (đọc từ `appointment_slots`), chưa có bảng nghỉ lễ nên chỉ chặn Chủ nhật, chưa có module thanh toán nên bước 5 ghi "phí khám dự kiến + đóng tại quầy viện phí" chứ không bày thẻ ATM/QR/ví điện tử, và modal bác sĩ **ẩn** dòng Chuyên khoa/Ngày trực khi dữ liệu đổ về từ khung giờ không mang theo chúng. Test mới `tests/HIS.Tests/BookingEntryPathTests.cs` (3 test) không giả định dữ liệu mà **so chiếu chéo** ba đường đọc với nhau: số suất trên thẻ khoa = tổng suất từng bác sĩ của khoa đó, danh sách khung của khoa = gộp danh sách khung từng bác sĩ, lịch một bác sĩ không bao giờ mở ngày Chủ nhật, và `GetSlotByIdAsync` đọc lại đúng khung vừa chọn.
 
+
+## 24. Nhánh "chưa từng khám": form có ô email và cấp mã OTP **trước** khi ghi hồ sơ
+
+**Bối cảnh**: hai lỗi người dùng bắt được trên cùng một màn hình. (1) Nhánh *chưa từng khám* không có ô nhập email, trong khi app tham chiếu (UMC Care) luôn xin email ngay cạnh số điện thoại — và vì bản trước lấy `accounts.email`, một tài khoản demo chưa có email là **mù hoàn toàn**, không còn đường nào để xin mã. (2) Nghiêm trọng hơn: `CreateNewAsync` lưu hồ sơ **trước** rồi mới xin mã, nên khi xin mã thất bại, hồ sơ vẫn nằm lại DB ở trạng thái `ACTIVE` và dùng để đặt khám được — người dùng gọi là "thoát ra vẫn thêm thành công hồ sơ đó". Bằng chứng thật: `BN000057 Lê Minh Chí` gắn tài khoản 8 có `accounts.email = NULL`.
+**Quyết định**: 
+* `ThemHoSoRequest` nhận lại `Email`, ô input đặt **cùng dòng** với Số điện thoại (bỏ `class="wide"` ở cả hai ô), có `[StringLength(200)]` phía server và regex phía `hoso.js`; để trống hoặc sai định dạng thì ở lại form với câu "Hồ sơ chưa được lưu."
+* **Thứ tự ghi đảo lại**: `CreateNewAsync` chỉ validate rồi xin mã; hồ sơ chỉ do `CreateProfileAsync` tạo ra trong POST của `XacOtp`, sau khi mã đúng. `PendingOtp.Source` thay bằng `ThemHoSoRequest? Draft` (bản khai giữ trong Session, `null` = nhánh *seen*).
+* BLL bỏ enum `ProfileOtpSource` vì nó chỉ còn một ý nghĩa (chọn cột để đọc email) và không áp dụng được cho hồ sơ chưa tồn tại: tách thành `IssueProfileOtpAsync(accountId, patientId)` (đọc `patients.email`) và `IssueNewProfileOtpAsync(accountId, email, fullName)` (email từ form), cả hai dồn về `IssueAndSendAsync` — phần sinh mã/ghi `notifications`/gửi qua `IOtpDelivery` chỉ có một bản.
+* **Không** dùng phương án "tạo rồi rollback xóa": `access_logs` và `appointments` đều FK `Restrict` vào `patients`, nên mọi cách xóa ngược phải biết thứ tự bảng và dễ bỏ sót; cũng **không** cho hồ sơ mới ở `PENDING` vì sẽ phá vỡ bất biến "SELF chỉ `PENDING` khi chưa xác thực liên kết" và làm màn danh sách hiển thị hồ sơ chưa ai xác nhận.
+* Nhánh *đã từng khám* **giữ nguyên** thứ tự cũ (tạo `PENDING` → `VerifyLinkAsync` → `ACTIVE`), email vẫn chỉ lấy từ `patients.email` đã lưu, không cho form ghi đè — đây là nhánh cần chống kẻ gian liên kết hồ sơ người khác, nên không được để form chọn hộp thư.
+**Hệ quả**: DB **không đổi cấu trúc** (cột `patients.email` mục 22 đã đủ), gate vẫn 18. Test `OtpProfileFlowTests` bỏ tham số source, thêm `Cap_ma_khi_ho_so_chua_ton_tai_khong_tao_ra_ho_so` chốt bằng bất biến "đếm `patients` không đổi sau khi cấp mã" — chính là điều bản cũ vi phạm. Đánh đổi còn lại: người dùng phải nhớ email của mình và mã xác thực chỉ là 6 số trong Session 5 phút; nếu bỏ giữa màn nhập mã thì phải làm lại từ đầu, nhưng đổi lại không bao giờ có hồ sơ rác. Bằng chứng chạy thật: `Changed.md` §14.
 
 ## 12. ⚠️ Chưa bật `TreatWarningsAsErrors`, chưa có CPM, chưa `dotnet format`
 

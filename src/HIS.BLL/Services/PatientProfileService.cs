@@ -173,8 +173,8 @@ public class PatientProfileService : IPatientProfileService
             .FirstOrDefaultAsync(a => a.Id == accountId, cancellationToken)
             ?? throw new ArgumentException("Tài khoản đăng nhập không tồn tại.");
 
-        // Màn Tạo hồ sơ không thu email nữa, nên hồ sơ mới mang email của tài khoản tạo ra nó.
-        // Nhờ vậy lần sau người khác liên kết lại hồ sơ này (nhánh "đã từng khám") vẫn gửi được mã OTP.
+        // Web đã thu ô email ở nhánh "chưa từng khám"; chỗ nào để trống (WinForms, dữ liệu cũ) thì hồ sơ
+        // mới mang email của tài khoản tạo ra nó, nhờ lần sau liên kết lại vẫn gửi được mã OTP.
         email ??= ProfileEmail.NormalizeUsable(account.Email);
 
         string? quotaError = await ValidateProfileQuotaAsync(accountId, phone, relationship, cancellationToken);

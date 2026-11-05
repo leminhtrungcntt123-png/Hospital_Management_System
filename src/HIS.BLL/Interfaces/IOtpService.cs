@@ -13,26 +13,24 @@ public sealed record OtpIssueResult(
     bool RevealCode = false,
     string PatientName = "");
 
-/// <summary>Nguồn email nhận mã OTP, quyết định theo nhánh người dùng vừa chọn ở màn Tạo hồ sơ.</summary>
-public enum ProfileOtpSource
-{
-    /// <summary>Hồ sơ vừa tạo (chưa từng khám): mã gửi về email của TÀI KHOẢN đang đăng nhập.</summary>
-    NewProfile,
-
-    /// <summary>Hồ sơ đã có (đã từng khám): mã gửi về email ĐÃ LƯU trong hồ sơ, không lấy từ form.</summary>
-    ExistingProfile
-}
-
 public interface IOtpService
 {
     /// <summary>
-    /// Sinh mã, ghi dấu vết vào notifications và đẩy qua mọi <see cref="IOtpDelivery"/> đã đăng ký.
-    /// Email nhận luôn lấy theo <paramref name="source"/> (tài khoản hoặc hồ sơ), không có ô nhập ở form
-    /// và không ghi đè patients.email.
+    /// Nhánh "đã từng khám": sinh mã gửi về email ĐÃ LƯU trong hồ sơ (patients.email), không lấy từ form
+    /// và không cho ghi đè — mã phải chứng minh người xin đúng là người đứng tên hồ sơ.
     /// </summary>
     Task<OtpIssueResult> IssueProfileOtpAsync(
         int accountId,
         int patientId,
-        ProfileOtpSource source,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Nhánh "chưa từng khám": hồ sơ còn chưa tồn tại nên mã gửi thẳng về email vừa gõ trên form.
+    /// Không ghi gì vào tables hồ sơ — chỉ một dòng notifications làm dấu vết.
+    /// </summary>
+    Task<OtpIssueResult> IssueNewProfileOtpAsync(
+        int accountId,
+        string email,
+        string fullName,
         CancellationToken cancellationToken = default);
 }

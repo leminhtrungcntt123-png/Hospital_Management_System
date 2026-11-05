@@ -37,7 +37,8 @@
         Keyword: (v) => /^BN\d{1,6}$/i.test(v.replace(/\s+/g, '')),
         FullName: (v) => v.trim().length > 0,
         DateOfBirth: isValidDob,
-        Phone: (v) => /^0\d{9,10}$/.test(v.replace(/\s+/g, ''))
+        Phone: (v) => /^0\d{9,10}$/.test(v.replace(/\s+/g, '')),
+        Email: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim())
     };
 
     const applyBranch = () => {
@@ -68,7 +69,7 @@
             const input = form.elements[name];
             if (!input || input.disabled) return;
             if (branch === 'new' && name === 'Keyword') return;
-            // Nhánh "đã từng khám" chỉ có ô mã bệnh nhân là bắt buộc; email lấy theo hồ sơ nên không nhập ở form.
+            // Nhánh "đã từng khám" chỉ có ô mã bệnh nhân là bắt buộc; email lấy theo hồ sơ đã lưu nên không nhập ở form.
             if (branch === 'seen' && name !== 'Keyword') return;
 
             const wrapper = input.closest('label');

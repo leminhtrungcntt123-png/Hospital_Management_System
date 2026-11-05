@@ -861,3 +861,43 @@ Mẻ này **không** đụng schema: chỉ thêm đường đọc mới trên c�
 * Thanh toán thật (thẻ ATM/QR/ví) chưa có module nên bước 5 chỉ ghi phí dự kiến + hướng dẫn đóng tại quầy; ảnh bác sĩ, điểm đánh giá, số lượt khám, ngày nghỉ lễ cũng chưa có cột trong DB nên UI hiện số thật thay vì bịa.
 
 
+
+---
+
+## 14. SỬA LUỒNG OTP NHÁNH "CHƯA TỪNG KHÁM": CÓ Ô EMAIL + CẤP MÃ TRƯỚC KHI LƯU HỒ SƠ (06/11/2026)
+
+Người dùng báo hai lỗi trên cùng một màn: nhánh *chưa từng khám* không còn ô nhập email (khác bản UMC Care), và khi tài khoản đăng nhập **không có email** thì bước xin mã thất bại nhưng **hồ sơ vẫn đã nằm trong DB** — thoát ra vẫn thấy hồ sơ dùng được. Nguyên nhân: `CreateNewAsync` gọi `CreateProfileAsync` **trước** `IssueProfileOtpAsync`, nên mọi lỗi OTP để lại một hồ sơ "ma" link `ACTIVE`. Bằng chứng thật: `BN000057 Lê Minh Chí` gắn vào tài khoản 8 (`patient.tranb`, `accounts.email = NULL`) — hồ sơ này đã hủy lượt hẹn và xóa khỏi DB ngày 06/11 (14.3). Chi tiết quyết định ở `docs/DECISIONS.md` mục **24** (bác một phần mục 22).
+
+### 14.1 Cấu trúc DB — không thay đổi
+
+Không thêm/xóa cột nào: `patients.email varchar(200) NULL` (mục 12) đã đủ để chứa email người dùng nhập. `dotnet ef migrations has-pending-model-changes` vẫn "No changes", gate vẫn **18** kiểm tra.
+
+### 14.2 Sửa code
+
+**HIS.BLL** (`Interfaces/IOtpService.cs`, `Services/OtpService.cs`):
+* **Xóa enum `ProfileOtpSource`** — nguồn email không còn do "nhánh" quyết định trong BLL mà do chính hàm được gọi.
+* `IssueProfileOtpAsync(accountId, patientId)` (bỏ tham số source) vẫn đọc `patients.email`, dùng cho hồ sơ **đã tồn tại**; `IssueNewProfileOtpAsync(accountId, email, fullName)` mới nhận email từ form cho hồ sơ **chưa tồn tại** (không có `patientId` vì chưa có dòng nào để tra).
+* Hai hàm chỉ chuẩn hóa email (`ProfileEmail.NormalizeUsable`) rồi dồn về `IssueAndSendAsync(accountId, patientName, recipient, ct)` — phần sinh mã, ghi `notifications`, gọi `IOtpDelivery` chỉ còn **một** bản. `patient.FullName` thay bằng `patientName` truyền vào, vì hồ sơ mới chưa có entity.
+
+**HIS.Web** (`Controllers/HoSoController.cs`, `ViewModels/HoSo/HoSoViewModels.cs`, `Views/HoSo/Them.cshtml`, `Views/HoSo/XacOtp.cshtml`, `wwwroot/js/hoso.js`):
+* `ThemHoSoRequest` có lại `Email` (`[StringLength(200)]`); `PendingOtp.Source` thay bằng `ThemHoSoRequest? Draft` — `null` nghĩa là nhánh *seen*, còn non-null là bản khai nhánh *new* cần tạo sau khi xác thực.
+* `CreateNewAsync` **không còn ghi DB**: kiểm tra rỗng/định dạng email rồi `StartNewProfileOtpAsync(draft, email)`; email hỏng thì ở lại form kèm câu "Hồ sơ chưa được lưu." thay vì để nhân viên phải đoán.
+* `XacOtp` POST: nhập đúng mã **rồi mới** `CreateProfileAsync(AccountId, BuildCreateRequest(draft, pending.Email))` → `Chitiet`; lỗi khi tạo (đụng CCCD, vượt hạn mức 5 hồ sơ…) trả về đúng nhánh `new` kèm thông điệp của BLL. Hết 5 lần nhập/quá hạn ở nhánh `new` chỉ xóa Session — DB không có gì để dọn.
+* `GuiLaiOtp` phân nhánh theo `Draft` (gửi lại theo email form hay email hồ sơ); 5 lần sai in message khác nhau cho từng nhánh.
+* `Them.cshtml`: ô **Email nhận mã xác thực** đặt ngay sau ô Số điện thoại và **bỏ `class="wide"`** ở cả hai nên chung một dòng grid; nội dung giải thích đổi thành "gửi mã về email bạn nhập bên dưới, hồ sơ chỉ được lưu sau khi nhập đúng mã". `hoso.js` thêm rule `Email` (regex `^[^\s@]+@[^\s@]+\.[^\s@]{2,}$`) chặn submit ngay phía trình duyệt.
+
+**Test** (`tests/HIS.Tests/OtpProfileFlowTests.cs`): bỏ mọi tham số `ProfileOtpSource`; `Thieu_email_thi_khong_cap_ma_va_bao_ro_ly_do` nay kiểm cả hai cổng (hồ sơ chưa có email trong DB **và** `IssueNewProfileOtpAsync` với chuỗi không phải email); thêm `Cap_ma_khi_ho_so_chua_ton_tai_khong_tao_ra_ho_so` — cấp mã cho hồ sơ chưa tạo xong **đếm lại `Patients.CountAsync()` không đổi**, và `notifications` vẫn có dấu vết chứa mã + email đã chuẩn hóa chữ thường.
+
+### 14.3 Bằng chứng chạy thật
+
+* Build `HIS.sln` **0 warning / 0 error**. `dotnet test --filter Category!=Integration` **73/73**; integration **21/21** (tăng 1 vì test mới); `bash backup/ci_local.sh` → gate **18/18** → integration **21/21**.
+* Chuột thật qua HTTP trên `https://localhost:7024` với tài khoản **không có email** (`patient.tranb`), SMTP Gmail thật (`Otp:RevealCodeOnScreen=false`, không hiện mã):
+  * bỏ trống email → ở lại form, message "Vui lòng nhập email để hệ thống gửi mã xác thực. Hồ sơ chưa được lưu.", `SELECT count(*) FROM patients` = **9**;
+  * gõ `chưa phải email` → ở lại form + rule phía JS chặn submit ("Email không hợp lệ. Ví dụ hợp lệ: ten@email.com"), patients vẫn **9**;
+  * gõ email hợp lệ → sang màn nhập mã, patients vẫn **9**, `notifications` có đúng 1 dòng dấu vết;
+  * nhập đúng mã → patients = **10**, hồ sơ tạo một lần duy nhất với `patients.email` = email đã nhập, link `ACTIVE`, chuyển thẳng vào trang chi tiết;
+  * thoát giữa màn nhập mã (không nhập gì) → patients vẫn **9** — đây chính là bug gốc, nay hết;
+  * nhánh *seen* (`BN000039`, nhận mã qua `patients.email` đã lưu) vẫn chạy đúng thứ tự cũ: `PENDING` → nhập đúng mã → `ACTIVE`, `verified_by` = tài khoản đăng nhập.
+* DOM probe trên trình duyệt: hai ô `Phone`/`Email` có cùng `offsetTop` (657) và `left` khác nhau (49 và 317) khi grid 2 cột → đúng yêu cầu "để chung dòng với nhập số điện thoại"; ở viewport 635px grid tự xếp 1 cột.
+* Dọn dẹp: link `(7,39)`, hai dòng `notifications` test, `access_logs` và hồ sơ tạo trong lần kiểm thử đã xóa; mật khẩu demo đã khôi phục bằng `bash backup/demologin.sh patient.tranb`.
+* **Hồ sơ ma `BN000057` do bug cũ để lại đã hủy + xóa theo yêu cầu người dùng (06/11/2026)**, chạy trong MỘT transaction theo thứ tự FK (`appointment_status_history` → `notifications` → `access_logs` → `insurance_cards` → `invoices` → `appointments` → `account_patient_profiles` → `patients`) rồi trừ bộ đếm khung giờ: `DELETE 1` cho `access_logs`/`insurance_cards`/`appointments`(73 `HIS-20261124-VX3JTA`)/link/`patients`, `UPDATE 1` cho `appointment_slots` id 612 (`booked_count 1 → 0`, `online_booked 1 → 0`, vẫn `AVAILABLE`, capacity 3). Đối chiếu sau xóa: `patients` **9 → 8**, không còn dòng nào tham chiếu id 57 ở 5 bảng có cột `patient_id`, `notifications` không còn dấu vết nào mentioning hồ sơ này; tài khoản 8 còn đúng `BN000001 (OTHER)`, `BN000002 (SELF)`, `BN000039 (SIBLING)`. Ảnh toàn bộ các dòng bị xóa nằm ở `D:\tmp\del_bn000057_snapshot.txt` (không tracked, để khôi phục thủ công nếu cần).

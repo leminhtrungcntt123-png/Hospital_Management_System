@@ -23,8 +23,9 @@ public sealed class CreateProfileRequest
     public string? Address { get; set; }
 
     /// <summary>
-    /// Email của hồ sơ. Màn Tạo hồ sơ trên Web không thu ô này nữa: để trống thì dịch vụ
-    /// tự lấy email của tài khoản đang tạo, nhờ đó hồ sơ luôn có nơi nhận mã OTP về sau.
+    /// Email của hồ sơ. Nhánh "chưa từng khám" trên Web bắt buộc nhập ô này và mã OTP được gửi về đúng
+    /// địa chỉ đó TRƯỚC khi hồ sơ được tạo. Để trống (WinForms, dữ liệu cũ) thì dịch vụ tự lấy email của
+    /// tài khoản tạo ra nó, nhờ hồ sơ luôn có nơi nhận mã về sau.
     /// </summary>
     public string? Email { get; set; }
     public string? InsuranceCardNumber { get; set; }

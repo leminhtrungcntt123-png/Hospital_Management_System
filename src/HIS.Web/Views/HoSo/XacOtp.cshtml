@@ -1,5 +1,5 @@
-@* Màn xác thực email sau khi thêm hồ sơ. Mã chỉ sống trong Session; bản demo chưa có SMTP
-   (Otp:RevealCodeOnScreen = true) thì in luôn mã ra màn hình để còn test được luồng. *@
+@* Màn xác thực email sau khi thêm hồ sơ. Mã chỉ sống trong Session; Otp:RevealCodeOnScreen = true
+   (host chưa cấu hình SMTP) thì in luôn mã ra màn hình để còn test được luồng. *@
 @model XacOtpViewModel
 @{
     ViewData["Title"] = "Nhập mã xác thực";
@@ -11,7 +11,7 @@
             <div>
                 <div class="eyebrow">HỒ SƠ CỦA TÔI</div>
                 <div class="page-title">Nhập mã xác thực</div>
-                <p>Mã gồm 6 số đã gửi tới <strong>@Model.Email</strong> để xác nhận bạn thêm hồ sơ @(string.IsNullOrWhiteSpace(Model.PatientName) ? "" : $"cho {Model.PatientName}").</p>
+                <p>Mã gồm 6 số đã gửi tới <strong>@Model.Email</strong>. Nhập mã để hoàn tất hồ sơ @(string.IsNullOrWhiteSpace(Model.PatientName) ? "" : $"của {Model.PatientName}"); chưa nhập mã thì hệ thống chưa lưu gì.</p>
             </div>
             <a class="back-link" asp-action="Index"><i data-lucide="chevron-left"></i> Về danh sách hồ sơ</a>
         </div>

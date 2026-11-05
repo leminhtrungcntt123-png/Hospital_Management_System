@@ -72,6 +72,10 @@ public class ThemHoSoRequest
 
     public string? Phone { get; set; }
 
+    /// <summary>Email nhận mã xác thực, bắt buộc ở nhánh "chưa từng khám" và được lưu vào patients.email.</summary>
+    [StringLength(200, ErrorMessage = "Email không được vượt quá 200 ký tự.")]
+    public string? Email { get; set; }
+
     // CCCD/SĐT định danh; để trống với trẻ nhỏ chưa có thì phải có CCCD người thân.
     [StringLength(12, ErrorMessage = "CCCD không được vượt quá 12 ký tự.")]
     public string? NationalId { get; set; }
@@ -101,8 +105,11 @@ public sealed class PendingOtp
     public int Attempts { get; set; }
     public bool RevealCode { get; set; }
 
-    /// <summary>Nhánh vừa khai, quyết định nguồn email khi bấm "Gửi lại mã".</summary>
-    public ProfileOtpSource Source { get; set; }
+    /// <summary>
+    /// Phiếu nhánh "chưa từng khám" còn chờ mã: DB chưa có hồ sơ nào, chỉ tạo khi nhập đúng mã.
+    /// null = nhánh "đã từng khám" (liên kết PENDING đã có sẵn, nhập đúng mã thì chuyển ACTIVE).
+    /// </summary>
+    public ThemHoSoRequest? Draft { get; set; }
 }
 
 // Màn "Nhập mã xác thực" sau khi thêm hồ sơ.

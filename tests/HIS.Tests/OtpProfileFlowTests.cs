@@ -12,10 +12,10 @@ namespace HIS.Tests;
 
 /// <summary>
 /// Mã OTP khi thêm hồ sơ, chạy trên CSDL thật (HIS_REHEARSAL_CONNECTION).
-/// Hai nguồn email đã chốt: hồ sơ MỚI gửi về email TÀI KHOẢN đang đăng nhập (và được chép vào
-/// patients.email của hồ sơ mới), hồ sơ ĐÃ TỪNG KHÁM gửi về email ĐÃ LƯU trong hồ sơ, không lấy từ
-/// form và không ghi đè. Mỗi lần cấp mã để lại một dòng notifications; liên kết PENDING chỉ thành
-/// ACTIVE sau khi nhập đúng mã (HoSoController gọi VerifyLinkAsync ở màn "Nhập mã xác thực").
+/// Nhánh "chưa từng khám" gõ email ngay trên form và mã gửi về đúng địa chỉ đó KHI hồ sơ còn chưa tồn tại
+/// (bản ghi patients chỉ được tạo sau khi nhập đúng mã); nhánh "đã từng khám" gửi về email ĐÃ LƯU trong
+/// patients.email, form không có ô email và không được ghi đè. Mỗi lần cấp mã để lại một dòng notifications;
+/// liên kết PENDING thành ACTIVE qua VerifyLinkAsync ở màn "Nhập mã xác thực".
 /// </summary>
 [Trait("Category", "Integration")]
 [Collection("RehearsalPostgres")]
@@ -77,7 +77,7 @@ public class OtpProfileFlowTests
                 var channel = new RecordingOtpDelivery();
                 OtpService otp = NewOtp(ctx, channel);
 
-                // Form không còn ô email: hồ sơ mới phải tự mang email của tài khoản tạo ra nó.
+                // Caller không kèm email (WinForms, dữ liệu cũ) thì hồ sơ mới mang email của tài khoản tạo ra nó.
                 var created = await profiles.CreateProfileAsync(OwnerAccountId, new CreateProfileRequest
                 {
                     FullName = "Test OTP Henh Mo",
@@ -93,7 +93,7 @@ public class OtpProfileFlowTests
                 Patient saved = await ctx.Patients.AsNoTracking().SingleAsync(p => p.Id == patientId);
                 Assert.Equal(accountEmail, saved.Email);
 
-                OtpIssueResult issued = await otp.IssueProfileOtpAsync(OwnerAccountId, patientId, ProfileOtpSource.NewProfile);
+                OtpIssueResult issued = await otp.IssueProfileOtpAsync(OwnerAccountId, patientId);
                 _out.WriteLine($"IssueProfileOtpAsync: {issued.Success} | {issued.Message} | recipient={issued.RecipientEmail} | reveal={issued.RevealCode}");
                 Assert.True(issued.Success, issued.Message);
                 Assert.Equal(accountEmail, issued.RecipientEmail);
@@ -118,7 +118,7 @@ public class OtpProfileFlowTests
                 Assert.Contains(accountEmail, note.Content);
 
                 // Gửi lại mã: email không đổi và patients.email không bị ghi đè.
-                OtpIssueResult resent = await otp.IssueProfileOtpAsync(OwnerAccountId, patientId, ProfileOtpSource.NewProfile);
+                OtpIssueResult resent = await otp.IssueProfileOtpAsync(OwnerAccountId, patientId);
                 Assert.True(resent.Success, resent.Message);
                 Assert.Equal(accountEmail, resent.RecipientEmail);
                 saved = await ctx.Patients.AsNoTracking().SingleAsync(p => p.Id == patientId);
@@ -126,7 +126,7 @@ public class OtpProfileFlowTests
                 Assert.Equal(2, channel.Sent.Count);
 
                 // Hồ sơ không thuộc tài khoản thì không được cấp mã cho nó.
-                OtpIssueResult notMine = await otp.IssueProfileOtpAsync(RelativeAccountId, patientId, ProfileOtpSource.NewProfile);
+                OtpIssueResult notMine = await otp.IssueProfileOtpAsync(RelativeAccountId, patientId);
                 Assert.False(notMine.Success);
                 Assert.Contains("không thuộc tài khoản", notMine.Message);
 
@@ -140,8 +140,52 @@ public class OtpProfileFlowTests
     }
 
     /// <summary>
+    /// Nhánh "chưa từng khám": cấp mã cho địa chỉ gõ trên form lúc DB chưa có hồ sơ nào.
+    /// Mã đi trước, bản ghi tạo sau — đó là cách chặn hồ sơ "ma" báo lỗi mà vẫn nằm trong danh sách.
+    /// </summary>
+    [Fact]
+    public async Task Cap_ma_khi_ho_so_chua_ton_tai_khong_tao_ra_ho_so()
+    {
+        var cs = Connection;
+        if (cs is null) { _out.WriteLine("Bỏ qua: chưa đặt HIS_REHEARSAL_CONNECTION"); return; }
+
+        string draftEmail = TestEmail("draft");
+
+        await using (var ctx = NewContext(cs))
+        {
+            var channel = new RecordingOtpDelivery();
+            OtpService otp = NewOtp(ctx, channel);
+            int patientsBefore = await ctx.Patients.CountAsync();
+
+            OtpIssueResult issued = await otp.IssueNewProfileOtpAsync(OwnerAccountId, $" {draftEmail} ", "Test OTP Henh Chua Luu");
+            _out.WriteLine($"IssueNewProfileOtpAsync: {issued.Success} | {issued.Message} | recipient={issued.RecipientEmail}");
+
+            Assert.True(issued.Success, issued.Message);
+            Assert.Equal(draftEmail, issued.RecipientEmail);
+            Assert.NotNull(issued.Code);
+            Assert.Equal(6, issued.Code!.Length);
+
+            Assert.Single(channel.Sent);
+            Assert.Equal(draftEmail, channel.Sent[0].To.Email);
+            Assert.Equal("Test OTP Henh Chua Luu", channel.Sent[0].To.DisplayName);
+
+            Assert.Equal(patientsBefore, await ctx.Patients.CountAsync());
+
+            Notification note = await ctx.Notifications.AsNoTracking()
+                .Where(n => n.AccountId == OwnerAccountId && n.Title == "Mã xác thực hồ sơ")
+                .OrderByDescending(n => n.Id)
+                .FirstAsync();
+            _out.WriteLine($"notifications #{note.Id}: {note.Content}");
+            Assert.Contains(issued.Code, note.Content);
+            Assert.Contains(draftEmail, note.Content);
+
+            await CleanupNotificationsAsync(ctx);
+        }
+    }
+
+    /// <summary>
     /// Thiếu email thì báo rõ ràng bằng tiếng Việt thay vì âm thầm gửi vào khoảng không:
-    /// tài khoản chưa có email (nhánh hồ sơ mới) và hồ sơ chưa có email (nhánh đã từng khám).
+    /// hồ sơ chưa có email trong hệ thống (nhánh đã từng khám) và địa chỉ gõ sai trên form (nhánh tạo mới).
     /// </summary>
     [Fact]
     public async Task Thieu_email_thi_khong_cap_ma_va_bao_ro_ly_do()
@@ -175,17 +219,18 @@ public class OtpProfileFlowTests
                 Assert.True(created.Success, created.Message);
                 patientId = created.PatientId;
 
-                // Tài khoản không có email => hồ sơ mới cũng không có email => không gửi được mã.
-                OtpIssueResult noAccountMail = await otp.IssueProfileOtpAsync(OwnerAccountId, patientId, ProfileOtpSource.NewProfile);
-                _out.WriteLine($"NewProfile thiếu email: {noAccountMail.Message}");
-                Assert.False(noAccountMail.Success);
-                Assert.Contains("Tài khoản đăng nhập chưa có email", noAccountMail.Message);
-                Assert.Contains("0808 0808", noAccountMail.Message);
-
-                OtpIssueResult noProfileMail = await otp.IssueProfileOtpAsync(OwnerAccountId, patientId, ProfileOtpSource.ExistingProfile);
-                _out.WriteLine($"ExistingProfile thiếu email: {noProfileMail.Message}");
+                // Hồ sơ không có email (tài khoản tạo ra nó cũng không có) thì không gửi được mã.
+                OtpIssueResult noProfileMail = await otp.IssueProfileOtpAsync(OwnerAccountId, patientId);
+                _out.WriteLine($"Hồ sơ chưa có email: {noProfileMail.Message}");
                 Assert.False(noProfileMail.Success);
                 Assert.Contains("chưa có email trong hệ thống", noProfileMail.Message);
+                Assert.Contains("0808 0808", noProfileMail.Message);
+
+                // Nhánh "chưa từng khám" gõ email sai: từ chối ngay cả khi hồ sơ còn chưa tồn tại.
+                OtpIssueResult badDraftMail = await otp.IssueNewProfileOtpAsync(OwnerAccountId, "chưa phải email", "Test OTP Henh Sai");
+                _out.WriteLine($"Email form không hợp lệ: {badDraftMail.Message}");
+                Assert.False(badDraftMail.Success);
+                Assert.Contains("không hợp lệ", badDraftMail.Message);
 
                 Assert.Empty(channel.Sent);
                 await CleanupNotificationsAsync(ctx);
@@ -247,8 +292,8 @@ public class OtpProfileFlowTests
                 Assert.True(byCode.Success, byCode.Message);
                 Assert.Equal("PENDING", byCode.LinkStatus);
 
-                OtpIssueResult issued = await otp.IssueProfileOtpAsync(RelativeAccountId, target.Id, ProfileOtpSource.ExistingProfile);
-                _out.WriteLine($"IssueProfileOtpAsync (ExistingProfile): {issued.Success} | recipient={issued.RecipientEmail}");
+                OtpIssueResult issued = await otp.IssueProfileOtpAsync(RelativeAccountId, target.Id);
+                _out.WriteLine($"IssueProfileOtpAsync (email đã lưu trong hồ sơ): {issued.Success} | recipient={issued.RecipientEmail}");
                 Assert.True(issued.Success, issued.Message);
                 Assert.Equal(profileEmail, issued.RecipientEmail);
                 Assert.True(OtpCodes.Matches(issued.Code, $"  {issued.Code}  "));

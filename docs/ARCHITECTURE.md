@@ -55,7 +55,7 @@ Trích `init.md:33-34`, áp dụng cho toàn bộ code trong repo:
 - `Services/AppointmentStateMachine.cs`: hàm thuần, không đụng DB — định nghĩa các bước chuyển trạng thái hợp lệ. Test unit trực tiếp, không cần Postgres.
 - `Services/QueuePositionAllocator.cs`: cấp vị trí trong khung giờ, tính số thứ tự hiển thị `A##`/`T##`. Là scoped service, **phải đăng ký trong mọi composition root** (`Web/Program.cs:33`, `WebApi/Program.cs:36`, `WinForms/Program.cs:43`).
 - `Services/QueueCallOrder.cs`: thứ tự gọi số, gồm ưu tiên/chen hàng.
-- `Services/OtpService.cs` + `Interfaces/IOtpService.cs`: cấp/xác thực mã OTP khi thêm hồ sơ (mục 5.4). BLL **chỉ** chọn email nhận theo `ProfileOtpSource`, sinh mã, ghi dấu vết `notifications` rồi gọi `IOtpDelivery` — không biết gì về SMTP/ASP.NET, nên WebApi và test dùng chung được. `OtpCodes.Matches` so mã trong Session, chịu khoảng trắng nhưng chặn sai độ dài.
+- `Services/OtpService.cs` + `Interfaces/IOtpService.cs`: cấp/xác thực mã OTP khi thêm hồ sơ (mục 5.4). Có hai cổng vào rõ ràng — `IssueProfileOtpAsync(accountId, patientId)` cho hồ sơ **đã có** (email lấy từ `patients.email`) và `IssueNewProfileOtpAsync(accountId, email, fullName)` cho hồ sơ **chưa lưu** (email do form truyền vào, BLL không tự đi tìm `accounts.email`). Phần chung nằm trong `IssueAndSendAsync`: sinh mã, ghi dấu vết `notifications` rồi gọi `IOtpDelivery` — không biết gì về SMTP/ASP.NET, nên WebApi và test dùng chung được. `OtpCodes.Matches` so mã trong Session, chịu khoảng trắng nhưng chặn sai độ dài.
 - `Services/ProfileEmail.cs`: chuẩn hóa email về chữ thường + `IsUsable`/`NormalizeUsable` (chuỗi rỗng/khoảng trắng/email vô nghĩa → `null`) để mọi chỗ cần email dùng chung một cách từ chối.
 - `Options/BookingOptions.cs`: các ngưỡng nghiệp vụ (`OnlineRatioPct=60`, `ReleaseCutoffMinutes=10`, ngưỡng chen hàng/tuổi ưu tiên, `MaxAdvanceDays=30`, `BookingCutoffHour=15`, `MaxProfilesPerAccount=5`, `MaxProfilesPerOwnerPhone=5`, `MaxRelativesPerDay=3`, `MaxBookingsPerDay=6`). Mặc định ghi thẳng trong code; muốn đổi thì thêm section `Booking` vào `appsettings.json` — `AddBookingOptions` bind và `ValidateOnStart()` sẽ chặn giá trị vô lý ngay lúc khởi động. **Đã bỏ** `FreeCancelHours`, `MaxLateCancelsPerMonth`, `BookingBlockDays`, `MaxNoShowsBeforeBlock`, `NoShowWindowDays`: không còn phạt hủy trễ và không còn chặn tài khoản vì vắng mặt (đến trễ thì bỏ lượt, quầy bắt số lại). Cột `accounts.booking_blocked_until`, `accounts.no_show_reset_at`, `appointment_status_history.is_late_cancel` vẫn còn trong DB cho khỏi ALTER nhưng code không đọc/ghi nữa.
 - `Security/RolePermissions.cs`: map role → trang được mở, dùng cho `MainForm` (WinForms) và guard của portal.
@@ -120,9 +120,9 @@ Toàn bộ quy tắc nằm trong `BookingService` (BLL), UI chỉ hỏi `FirstBo
 `HoSo/Them` là **màn hình duy nhất** cho cả hai tình trạng người bệnh (màn "Xin liên kết" riêng đã xóa), chọn nhánh bằng radio `Branch` = `seen` | `new`:
 
 - **`seen` — đã từng khám**: chỉ được nhập **mã bệnh nhân** `BN######` in trên phiếu khám (`Keyword`, `hoso.js` chặn format, `FindByPatientCodeAsync` chỉ parse mỗi mã) + quan hệ → `RequestLinkAsync` → link `PENDING`, `can_view_records=false` → màn nhập mã OTP (mục 5.4); mã không về được (hồ sơ chưa có email) thì link vẫn `PENDING` để quầy đối chiếu giấy tờ khi bệnh nhân tới. WinForms vẫn duyệt được. Broadcast `profile.link_requested`.
-- **`new` — chưa từng khám**: khai họ tên, ngày sinh, giới tính, quan hệ, SĐT, CCCD (hoặc CCCD người thân), địa chỉ, số thẻ BHYT → `CreateProfileAsync` → link `ACTIVE` + `can_view_records=true`, đặt lịch ngay. `InsuranceCardNumber` được lưu vào `insurance_cards` qua `TrackInsuranceCardAsync` (không cần ALTER).
+- **`new` — chưa từng khám**: khai họ tên, ngày sinh, giới tính, quan hệ, **email** (ô bắt buộc, nằm **cùng dòng** với SĐT trong `.form-grid`), SĐT, CCCD (hoặc CCCD người thân), địa chỉ, số thẻ BHYT → xin mã OTP trước (mục 5.4) → **chỉ khi nhập đúng mã** mới gọi `CreateProfileAsync` → link `ACTIVE` + `can_view_records=true`, email nhập được lưu vào `patients.email`, đặt lịch ngay. Thoát giữa màn nhập mã thì DB chưa có dòng nào. `InsuranceCardNumber` được lưu vào `insurance_cards` qua `TrackInsuranceCardAsync` (không cần ALTER).
 - **Quy tắc giấy tờ** `PatientProfileService.ValidateIdentityDocumentsAsync` (chạy sau hạn mức hồ sơ): CCCD đã tồn tại trong `patients` → từ chối và bảo chuyển sang nhánh `seen`; đủ `OwnIdFromAge` (14) tuổi → **bắt buộc** CCCD của chính mình; dưới 14 mà chưa có CCCD → **bắt buộc** `GuardianNationalId` và số đó phải khớp `national_id` của một hồ sơ `ACTIVE` thuộc đúng tài khoản (`uq` không đổi, chỉ là kiểm tra BLL — không thêm cột nào).
-- `ThemHoSoRequest` **không** dùng `[Required]`/`[RegularExpression]` vì hai nhánh chung một form (trường của nhánh kia luôn rỗng); rỗng/format kiểm tra trong controller, nhân thân kiểm tra trong BLL. `hoso.js` disable toàn bộ input của panel không chọn để trình duyệt không gửi lẫn không chặn submit.
+- `ThemHoSoRequest` **không** dùng `[Required]`/`[RegularExpression]` vì hai nhánh chung một form (trường của nhánh kia luôn rỗng; `Email` chỉ mang `[StringLength(200)]`); rỗng/format kiểm tra trong controller, nhân thân kiểm tra trong BLL. `hoso.js` disable toàn bộ input của panel không chọn để trình duyệt không gửi lẫn không chặn submit, và chỉ validate `Email` ở panel `new` (panel `seen` chỉ có ô mã BN).
 
 ### 5.3 Hai khai báo bảo hiểm trên lượt khám
 
@@ -135,17 +135,18 @@ Toàn bộ quy tắc nằm trong `BookingService` (BLL), UI chỉ hỏi `FirstBo
 
 ### 5.4 Mã OTP khi thêm hồ sơ
 
-Chỉ nghiệp vụ *thêm hồ sơ* cần xác thực (mục 5.2). Form **không thu thập email** — nguồn hộp thư do nhánh vừa chọn quyết định, lấy từ dữ liệu đã có trong DB:
+Chỉ nghiệp vụ *thêm hồ sơ* cần xác thực (mục 5.2). Hai nhánh thu email khác nhau và **thứ tự ghi DB cũng khác nhau**:
 
 | Nhánh | Hồ sơ | Email nhận mã | Kết quả sau khi nhập đúng mã |
 |---|---|---|---|
-| `new` (chưa từng khám) | vừa tạo, link `ACTIVE` ngay | `accounts.email` của tài khoản đăng nhập, và được **sao chép** sang `patients.email` của hồ sơ mới | mã chỉ để xác nhận đã đọc được hộp thư, hồ sơ vẫn dùng được |
+| `new` (chưa từng khám) | **chưa tồn tại** — form thu email, đặt cạnh ô Số điện thoại | email **người dùng nhập trên form** (chưa nhập/sai định dạng thì chặn tại form, báo "Hồ sơ chưa được lưu") | mới gọi `CreateProfileAsync` để tạo `patients` + link `ACTIVE`, email nhập được lưu vào `patients.email` |
 | `seen` (đã từng khám) | đã tồn tại, tìm bằng `BN######` | `patients.email` **đã lưu trong hồ sơ** (không cho form ghi đè) | `VerifyLinkAsync` chuyển link `PENDING` → `ACTIVE`, `verified_by` = tài khoản đang đăng nhập |
 
-- Trạng thái chờ nằm trong `Session` (`HoSoController` key `PendingProfileOtp`: patientId, email nhận, mã, hạn, số lần đã nhập, `Source`); **không** có cột/bảng mới chứa mã nên không cần thêm ALTER. Hết hạn 5 phút, 5 lần nhập, cách 60 giây mới được gửi lại, xác nhận xong là xóa mã.
-- Thiếu email ở nguồn nào → báo lỗi tiếng Việt đúng nguyên nhân kèm hotline 0808 0808, **không** cấp mã, trả người dùng về đúng nhánh vừa khai (`?branch=seen|new`). Nhánh `seen` vẫn để lại link `PENDING` vì quầy còn đường duyệt giấy tờ.
+- Vì nhánh `new` cấp mã **trước** khi ghi, thoát giữa màn nhập mã không để lại hồ sơ "ma" — hết 5 lần nhập hoặc quá hạn thì coi như chưa tạo gì.
+- Trạng thái chờ nằm trong `Session` (`HoSoController` key `PendingProfileOtp`: patientId, email nhận, mã, hạn, số lần đã nhập, `Draft` = bản khai nhánh `new` còn `null` ở nhánh `seen`); **không** có cột/bảng mới chứa mã nên không cần thêm ALTER. Hết hạn 5 phút, 5 lần nhập, cách 60 giây mới được gửi lại, xác nhận xong là xóa mã.
+- Email không hợp lệ/không có → `IssueNewProfileOtpAsync`/`IssueProfileOtpAsync` trả `Success=false`, **không** cấp mã, không ghi `notifications`, trả người dùng về đúng nhánh vừa khai kèm hotline 0808 0808. Nhánh `seen` vẫn để lại link `PENDING` vì quầy còn đường duyệt giấy tờ.
 - Mỗi lần cấp mã ghi một dòng `notifications` (`title = "Mã xác thực hồ sơ"`) làm dấu vết đối chiếu; đây là bảng có thật nhưng người dùng chưa có UI đọc nó (`docs/DECISIONS.md` #15).
-- Chi tiết và lý do chốt: `docs/DECISIONS.md` #22, bằng chứng chạy thật: `Changed.md` §12.
+- Chi tiết và lý do chốt: `docs/DECISIONS.md` #22 và #24, bằng chứng chạy thật: `Changed.md` §12 và §14.
 
 ## 6. Kênh realtime giữa portal bệnh nhân và quầy tiếp nhận
 
