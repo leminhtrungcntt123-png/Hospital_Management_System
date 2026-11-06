@@ -372,7 +372,14 @@ public class HoSoController : PatientPageController
 
         SavePendingOtp(pending);
 
-        TempData[issue.Success ? "Message" : "Error"] = issue.Message;
+        // Chỉ mang đi LỖI. Màn XacOtp đã tự hiện email đã che + hạn mã nên lời "đã gửi mã" là thừa,
+        // mà TempData["Message"] sống tới trang kế tiếp nên nó dễ hiện lại ở HoSo/Index hoặc LichKham —
+        // đúng lúc người dùng chưa chứng minh quyền, nên không được mang theo email/mã BN thô.
+        if (!issue.Success)
+        {
+            TempData["Error"] = issue.Message;
+        }
+
         return RedirectToAction(nameof(XacOtp));
     }
 

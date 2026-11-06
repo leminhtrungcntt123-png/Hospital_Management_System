@@ -971,3 +971,28 @@ Cắm một liên kết demo `account_id=7 → patient_id=2` ở `PENDING` để
 
 * Quầy chưa sửa được khai báo BHYT sai của bệnh nhân (người dùng hẹn xử lý sau).
 * `MaxIssuesPerWindow`/`IssueWindowMinutes` đang là mặc định trong code; chưa đưa vào `appsettings.json` để không đụng file tracked chứa mật khẩu DB dev.
+
+### 16.6 Bổ sung: ba chỗ hở người dùng bắt lại trên commit `3dbee72` (06/11/2026)
+
+| # | Chỗ hở | Bản sửa |
+|---|---|---|
+| 1 | `RevealCodeOnScreen` mặc định `true` + `appsettings.json` commit không có section `Otp` → máy thiếu file local in mã 6 số ra màn *Nhập mã xác thực*, quay lại đúng lỗ hổng mục 16.1 số 2 | Mặc định `false` (`src/HIS.BLL/Options/OtpOptions.cs`); `src/HIS.Web/appsettings.Development.json` mới chỉ bật cờ demo cho dev (`.gitignore` thêm dòng `!src/HIS.Web/appsettings.Development.json` vì pattern `appsettings.Development.json` đang ignore nó, file không chứa bí mật); `Program.cs` chỉ đăng ký `DemoOtpDelivery` khi `IsDevelopment()` và **ném `InvalidOperationException`** nếu ngoài Development mà cờ vẫn bật |
+| 2 | `OtpService` trả `message` chứa email nguyên văn và `HoSoController.SavePendingAndAskCodeAsync` set `TempData["Message"]` → email thô hiện lại ở trang kế tiếp | `message` dùng `ProfileEmail.Mask(recipient)`; controller bỏ hẳn `TempData["Message"]`, chỉ set `TempData["Error"]` khi `!issue.Success` |
+| 3 | `Notification.CreatedAt` không gán trong code → cột lấy `DEFAULT now()` của Postgres (`timestamp without time zone`, múi giờ server) trong khi `IssueQuotaMessageAsync` so `DateTime.Now` của app; DB UTC + app UTC+7 là hạn mức 5 mã/15' **không bao giờ kích hoạt**. Nội dung còn ghi "…lúc {expiresAt}" dù đó là giờ hết hạn | Một `DateTime now = DateTime.Now` dùng cho cả `CreatedAt`, cả giới hạn và cả nội dung: "…tới `m***@x` lúc {giờ gửi} ngày dd/MM/yyyy; mã hết hạn lúc {giờ hết hạn}" |
+
+**Kiểm chứng tự động**
+
+* `dotnet build HIS.sln`: **0 Warning(s), 0 Error(s)**.
+* unit **90/90** (thêm `Mac_dinh_khong_in_ma_ra_man_hinh` chốt thẳng mặc định của `new OtpOptions()`).
+* `bash backup/ci_local.sh`: gate **18/18**, integration **25/25**. Test mới `Han_muc_dem_theo_dong_ho_ung_dung_khong_phai_dong_ho_server` chèn 5 dòng `TraceTitle` với `CreatedAt = DateTime.Now.AddMinutes(-1)` rồi đòi lần thứ 6 bị chặn và **không gửi thêm mail**; các test cũ được bồi thêm assert: `Assert.DoesNotContain(email_thô, issued.Message)` (cả hai nhánh), `Assert.InRange((DateTime.Now - note.CreatedAt).TotalSeconds, -5, 5)`, `Assert.Contains("mã hết hạn lúc", note.Content)`.
+
+**Bằng chứng chạy thật** (`https://localhost:7024`, `patient.nguyena` = id 7, nhánh *chưa từng khám*, email `test.batch2.probe@example.com`)
+
+* Phân biệt môi trường: chạy `HIS.Web.dll` với `ASPNETCORE_ENVIRONMENT=Production` + `Otp:RevealCodeOnScreen=true` → process chết ngay ở `Program.cs:72` với `InvalidOperationException` đúng thông điệp; chạy Production với cấu hình mặc định (không có section `Otp`) → app start bình thường, `Hosting environment: Production`, không đăng ký kênh demo.
+* `/HoSo/XacOtp`: "Mã gồm 6 số đã gửi tới **t\*\*\*@example.com**. Nhập mã để hoàn tất hồ sơ của Test Nghiệm Thu Batch2; chưa nhập mã thì hệ thống chưa lưu gì." + "Mã hết hạn lúc 11:57 — còn 5 lần nhập." → **không có mã 6 số**, **không có email thô**.
+* `/HoSo` và `/LichKham` ngay sau đó: không còn banner "Đã gửi mã…" lẫn chuỗi `@example.com` nào (kiểm bằng script đọc `main.innerText`: `has_gui_ma=false`, `has_email=false`).
+* `notifications` id 18: `created_at = 11:52:07` trong khi `now() = 11:57:50` → `age_seconds = 343` đúng bằng tuổi thật của mã, `masked_ok=t`, `raw_email_leak=f`, `six_digit_leak=f`; nội dung "…tới t***@example.com **lúc 11:52** ngày 06/11/2026; **mã hết hạn lúc 11:57**."
+* Bất biến "chưa nhập mã thì chưa lưu gì" vẫn đúng: `patients` WHERE `national_id='079095000123'` → **0 dòng**, tổng số hồ sơ giữ nguyên **8**.
+* Dọn dẹp: xóa dòng `notifications` do test sinh ra (bảng về 0 dòng `TraceTitle`); đặt lại mật khẩu demo bằng `backup/demologin.sh` sau khi dùng mật khẩu tạm.
+
+**Lưu ý cho máy dev**: `appsettings.Otp.local.json` được `AddJsonFile` **sau** các nguồn mặc định nên nó thắng `appsettings.Development.json`; máy đã cấu hình SMTP thật vì thế vẫn `RevealCodeOnScreen=false` và không hiện mã. Muốn xem thử mã trên máy đó thì phải tạm đổi file local, không phải thêm cờ. Hai knob hạn mức (`MaxIssuesPerWindow`, `IssueWindowMinutes`) vẫn chưa đưa vào cấu hình.

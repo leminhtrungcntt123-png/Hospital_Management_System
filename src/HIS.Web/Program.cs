@@ -51,16 +51,26 @@ builder.Services.AddScoped<IPatientAccessService, PatientAccessService>();
 // Trang đăng nhập demo của web gọi thẳng IAuthService (module của thành viên khác) để kiểm mật khẩu.
 builder.Services.AddScoped<IAuthService, AuthService>();
 
-// Mã OTP khi thêm hồ sơ: có SMTP thật thì gửi mail, chưa có thì kênh demo in mã ra log + hiện trên màn hình.
+// Mã OTP khi thêm hồ sơ: có SMTP thật thì gửi mail. Chưa có SMTP thì chỉ môi trường Development mới được
+// fallback sang kênh demo (in mã ra log + màn hình); môi trường khác mà thiếu SMTP là KHÔNG có kênh gửi,
+// OtpService trả "Chưa cấu hình kênh gửi mã OTP." thay vì âm thầm phát mã cho người không kiểm soát được.
 builder.Services.AddScoped<IOtpService, OtpService>();
 var smtpOptions = builder.Configuration.GetSection(OtpSmtpOptions.SectionName).Get<OtpSmtpOptions>() ?? new OtpSmtpOptions();
 if (smtpOptions.IsConfigured)
 {
     builder.Services.AddScoped<IOtpDelivery, SmtpOtpDelivery>();
 }
-else
+else if (builder.Environment.IsDevelopment())
 {
     builder.Services.AddScoped<IOtpDelivery, DemoOtpDelivery>();
+}
+
+// Cờ hiện mã chỉ hợp lệ khi lập trình viên tự test; để nó bật ở môi trường khác là lộ mã cho mọi người dùng.
+if (!builder.Environment.IsDevelopment()
+    && builder.Configuration.GetValue<bool>($"{OtpOptions.SectionName}:{nameof(OtpOptions.RevealCodeOnScreen)}"))
+{
+    throw new InvalidOperationException(
+        "Otp:RevealCodeOnScreen chỉ được bật ở môi trường Development vì ai biết mã bệnh nhân cũng đọc được mã ngay trên màn hình.");
 }
 
 // Kênh realtime cho quầy tiếp nhận (WinForms nối vào /ws/quay để biết dữ liệu vừa đổi).

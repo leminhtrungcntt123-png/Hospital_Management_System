@@ -98,7 +98,12 @@ public class OtpService : IOtpService
         string recipient,
         CancellationToken cancellationToken)
     {
-        string? tooOften = await IssueQuotaMessageAsync(accountId, cancellationToken);
+        // Đồng hồ của ứng dụng: cột created_at là "timestamp without time zone" và Postgres điền DEFAULT now()
+        // theo MÚI GIỜ CỦA SERVER. Nếu không tự gán, máy nào chạy DB UTC sẽ ghi giờ lệch 7 tiếng so với
+        // DateTime.Now mà IssueQuotaMessageAsync dùng để đếm — hạn mức phát mã thành ra không bao giờ kích hoạt.
+        DateTime now = DateTime.Now;
+
+        string? tooOften = await IssueQuotaMessageAsync(accountId, now, cancellationToken);
         if (tooOften is not null)
         {
             return new OtpIssueResult(false, tooOften);
@@ -114,9 +119,10 @@ public class OtpService : IOtpService
             AccountId = accountId,
             Title = TraceTitle,
             Content = $"Đã gửi mã {_options.CodeLength} số xác thực hồ sơ {patientName} tới " +
-                      $"{ProfileEmail.Mask(recipient)} lúc {expiresAt:HH:mm} ngày {expiresAt:dd/MM/yyyy}. " +
-                      "Mã không nằm trong thông báo này.",
-            IsRead = false
+                      $"{ProfileEmail.Mask(recipient)} lúc {now:HH:mm} ngày {now:dd/MM/yyyy}; " +
+                      $"mã hết hạn lúc {expiresAt:HH:mm}. Mã không nằm trong thông báo này.",
+            IsRead = false,
+            CreatedAt = now
         });
 
         try
@@ -144,8 +150,10 @@ public class OtpService : IOtpService
 
         bool delivered = _deliveries.Count > 0 && failures.Count == 0;
         string channels = string.Join(" / ", _deliveries.Select(d => d.Name));
+        // Email cũng phải đi qua Mask: message này có thể được render ở màn hình khác (kể cả khi người dùng
+        // chưa chứng minh quyền sở hữu hộp thư), nên không được mang địa chỉ thô.
         string message = delivered
-            ? $"Đã gửi mã xác thực {_options.CodeLength} số tới {recipient} qua {channels}. Mã hết hạn lúc {expiresAt:HH:mm}."
+            ? $"Đã gửi mã xác thực {_options.CodeLength} số tới {ProfileEmail.Mask(recipient)} qua {channels}. Mã hết hạn lúc {expiresAt:HH:mm}."
             : _deliveries.Count == 0
                 ? "Chưa cấu hình kênh gửi mã OTP."
                 : $"Chưa gửi được mã. {string.Join(" | ", failures)}";
@@ -158,9 +166,9 @@ public class OtpService : IOtpService
     /// Đếm số lần cấp mã của chính tài khoản này trong cửa sổ đang cấu hình, dựa trên dấu vết notifications
     /// vừa ghi ở trên nên không phải thêm bảng. Trả lời tiếng Việt khi vượt ngưỡng, null khi còn xin được.
     /// </summary>
-    private async Task<string?> IssueQuotaMessageAsync(int accountId, CancellationToken cancellationToken)
+    private async Task<string?> IssueQuotaMessageAsync(int accountId, DateTime now, CancellationToken cancellationToken)
     {
-        DateTime since = DateTime.Now.AddMinutes(-_options.IssueWindowMinutes);
+        DateTime since = now.AddMinutes(-_options.IssueWindowMinutes);
 
         List<DateTime> recent = await _context.Notifications
             .Where(n => n.AccountId == accountId && n.Title == TraceTitle && n.CreatedAt >= since)
@@ -173,9 +181,9 @@ public class OtpService : IOtpService
             return null;
         }
 
-        // Cột created_at có DEFAULT now() nên bản ghi cũ nhất trong cửa sổ cho biết thời điểm được xin lại.
+        // Dòng cũ nhất trong cửa sổ cho biết thời điểm được xin lại (giờ của ứng dụng, vì CreatedAt do code gán).
         int waitMinutes = (int)Math.Ceiling(
-            (recent[0].AddMinutes(_options.IssueWindowMinutes) - DateTime.Now).TotalMinutes);
+            (recent[0].AddMinutes(_options.IssueWindowMinutes) - now).TotalMinutes);
         if (waitMinutes < 1)
         {
             waitMinutes = 1;

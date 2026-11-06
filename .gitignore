@@ -31,6 +31,8 @@ bld/
 appsettings.json
 appsettings.Development.json
 *.local.json
+# Ngoại lệ: file dev của HIS.Web chỉ bật cờ demo RevealCodeOnScreen, không chứa mật khẩu/SMTP nào.
+!src/HIS.Web/appsettings.Development.json
 
 ## Rider / JetBrains
 .idea/

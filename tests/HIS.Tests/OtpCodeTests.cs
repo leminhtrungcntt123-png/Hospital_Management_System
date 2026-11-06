@@ -1,3 +1,4 @@
+using HIS.BLL.Options;
 using HIS.BLL.Services;
 using Xunit;
 
@@ -71,4 +72,13 @@ public class OtpCodeTests
     [Fact]
     public void So_dien_tho_chuan_hoa_bo_khoang_trang_dau_cham_va_gach()
         => Assert.Equal("0912345678", PhoneNumbers.Normalize(" 09 12.34-56 78 "));
+
+    /// <summary>
+    /// Cờ in mã ra màn hình là của bản demo Development nên MẶC ĐỊNH phải tắt: máy nào thiếu
+    /// appsettings.Development.json (hoặc appsettings.Otp.local.json) cũng không được hiển thị mã,
+    /// nếu không ai biết mã bệnh nhân cũng tự đọc mã và xác thực hồ sơ của người khác.
+    /// </summary>
+    [Fact]
+    public void Mac_dinh_khong_in_ma_ra_man_hinh()
+        => Assert.False(new OtpOptions().RevealCodeOnScreen);
 }

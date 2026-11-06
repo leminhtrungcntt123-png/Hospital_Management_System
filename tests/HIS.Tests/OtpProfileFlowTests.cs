@@ -101,6 +101,9 @@ public class OtpProfileFlowTests
                 _out.WriteLine($"IssueProfileOtpAsync: {issued.Success} | {issued.Message} | recipient={issued.RecipientEmail} | reveal={issued.RevealCode}");
                 Assert.True(issued.Success, issued.Message);
                 Assert.Equal(accountEmail, issued.RecipientEmail);
+                // Message có thể được render ở trang người dùng chưa chứng minh quyền nên chỉ mang email đã che.
+                Assert.DoesNotContain(accountEmail, issued.Message);
+                Assert.Contains(ProfileEmail.Mask(accountEmail), issued.Message);
                 Assert.NotNull(issued.Code);
                 Assert.Equal(6, issued.Code!.Length);
                 Assert.True(issued.Code.All(char.IsDigit));
@@ -124,6 +127,13 @@ public class OtpProfileFlowTests
                 Assert.DoesNotContain(issued.Code, note.Content);
                 Assert.DoesNotContain(accountEmail, note.Content);
                 Assert.Contains(ProfileEmail.Mask(accountEmail), note.Content);
+                // created_at PHẢI do ứng dụng ghi: cột là "timestamp without time zone" nên nếu để Postgres
+                // tự DEFAULT now() trên máy chạy UTC, hạn mức 15 phút sẽ đếm lệch hàng giờ và không bao giờ chặn.
+                _out.WriteLine($"created_at của dấu vết: {note.CreatedAt:dd/MM/yyyy HH:mm:ss} | đồng hồ app: {DateTime.Now:HH:mm:ss}");
+                Assert.InRange((DateTime.Now - note.CreatedAt).TotalSeconds, -5, 5);
+                // Nội dung phải nói GIỜ GỬI, không phải giờ hết hạn.
+                Assert.Contains($"lúc {note.CreatedAt:HH:mm}", note.Content);
+                Assert.Contains("mã hết hạn lúc", note.Content);
 
                 // Gửi lại mã: email không đổi và patients.email không bị ghi đè.
                 OtpIssueResult resent = await otp.IssueProfileOtpAsync(OwnerAccountId, patientId);
@@ -170,6 +180,7 @@ public class OtpProfileFlowTests
 
             Assert.True(issued.Success, issued.Message);
             Assert.Equal(draftEmail, issued.RecipientEmail);
+            Assert.DoesNotContain(draftEmail, issued.Message);
             Assert.NotNull(issued.Code);
             Assert.Equal(6, issued.Code!.Length);
 
@@ -230,6 +241,55 @@ public class OtpProfileFlowTests
                 options.MaxIssuesPerWindow,
                 await ctx.Notifications.CountAsync(
                     n => n.AccountId == OwnerAccountId && n.Title == OtpService.TraceTitle));
+
+            await CleanupNotificationsAsync(ctx);
+        }
+    }
+
+    /// <summary>
+    /// Hạn mức phải đếm bằng ĐỒNG HỒ ỨNG DỤNG ở cả hai đầu. Cột created_at là "timestamp without time zone"
+    /// nên bản cũ để Postgres tự DEFAULT now(): máy nào có DB chạy UTC sẽ ghi dòng trông như đã cũ 7 tiếng,
+    /// giới hạn 5 mã/15 phút không bao giờ kích hoạt. Test chèn đúng ngưỡng mang giờ của app
+    /// (DateTime.Now - 1 phút) rồi đòi lần xin kế tiếp bị chặn.
+    /// </summary>
+    [Fact]
+    public async Task Han_muc_dem_theo_dong_ho_ung_dung_khong_phai_dong_ho_server()
+    {
+        var cs = Connection;
+        if (cs is null) { _out.WriteLine("Bỏ qua: chưa đặt HIS_REHEARSAL_CONNECTION"); return; }
+
+        string draftEmail = TestEmail("clock");
+
+        await using (var ctx = NewContext(cs))
+        {
+            await CleanupNotificationsAsync(ctx);
+            var options = new OtpOptions();
+
+            DateTime stamped = DateTime.Now.AddMinutes(-1);
+            for (int i = 1; i <= options.MaxIssuesPerWindow; i++)
+            {
+                ctx.Notifications.Add(new Notification
+                {
+                    AccountId = OwnerAccountId,
+                    Title = OtpService.TraceTitle,
+                    Content = $"dong mui {i} de kiem chan theo gio cua app",
+                    IsRead = false,
+                    CreatedAt = stamped
+                });
+            }
+            await ctx.SaveChangesAsync();
+            _out.WriteLine($"Đã chèn {options.MaxIssuesPerWindow} dòng \"{OtpService.TraceTitle}\" mang giờ app " +
+                           $"{stamped:HH:mm:ss} (cùng lúc đó UTC: {DateTime.UtcNow:HH:mm:ss})");
+
+            var channel = new RecordingOtpDelivery();
+            OtpService otp = NewOtp(ctx, channel, options);
+
+            OtpIssueResult blocked = await otp.IssueNewProfileOtpAsync(OwnerAccountId, draftEmail, "Test OTP Henh Mui Gio");
+            _out.WriteLine($"Lần xin kế tiếp: {blocked.Success} | {blocked.Message}");
+
+            Assert.False(blocked.Success);
+            Assert.Contains("xin mã xác thực", blocked.Message);
+            Assert.Empty(channel.Sent);
 
             await CleanupNotificationsAsync(ctx);
         }

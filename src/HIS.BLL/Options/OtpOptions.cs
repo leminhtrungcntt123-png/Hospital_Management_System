@@ -33,10 +33,11 @@ public class OtpOptions
     public int IssueWindowMinutes { get; set; } = 15;
 
     /// <summary>
-    /// TRUE = in mã ra màn hình "Nhập mã xác thực" cho bản demo chưa có kênh gửi thật;
-    /// bản thật đặt FALSE vì mã chỉ được nằm trong email/SMS của người nhận.
+    /// TRUE = in mã ra màn hình "Nhập mã xác thực". Mặc định FALSE vì ai biết mã BN cũng đọc được mã ngay
+    /// trên màn hình mà không cần chứng minh quyền sở hữu hộp thư; bản dev chỉ bật cờ này qua
+    /// appsettings.Development.json (xem HIS.Web/Program.cs, cờ bật ngoài Development là lỗi khởi động).
     /// </summary>
-    public bool RevealCodeOnScreen { get; set; } = true;
+    public bool RevealCodeOnScreen { get; set; }
 }
 
 public static class OtpOptionsRegistration
