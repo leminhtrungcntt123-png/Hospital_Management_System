@@ -19,3 +19,4 @@ appsettings.Development.json
 .DS_Store
 Thumbs.db
 .init
+.vs/

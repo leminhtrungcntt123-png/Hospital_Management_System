@@ -1,15 +1,18 @@
-using System.Security.Claims;
 using System.Diagnostics.CodeAnalysis;
-using HIS.BLL.DTOs;
+using System.Security.Claims;
 using HIS.BLL.Common;
+using HIS.BLL.DTOs;
 using HIS.BLL.Services;
+using HIS.DAL;
+using HIS.Domain;
 using HIS.Web.Models;
 using HIS.Web.Workers;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 
 namespace HIS.Web.Controllers;
 
@@ -41,16 +44,154 @@ public class AccountController : Controller
     [HttpGet]
     public IActionResult Login(string? returnUrl = null, int? loggedOut = null)
     {
-        if (loggedOut != 1 && User.Identity?.IsAuthenticated == true)
+        if (loggedOut != 1 && User.Identity?.IsAuthenticated == true && IsAllowedReturnUrl(returnUrl))
         {
-            if (IsAllowedReturnUrl(returnUrl))
-            {
-                return Redirect(returnUrl);
-            }
-            return RedirectToDashboard(User.FindFirst(ClaimTypes.Role)?.Value);
+            return Redirect(returnUrl);
         }
 
         return View(new LoginViewModel { ReturnUrl = returnUrl });
+    }
+
+    // Đăng nhập nhanh cho Dev / Test (Bỏ qua mật khẩu)
+    // Ví dụ truy cập: /Account/DevLogin?role=ADMIN hoặc /Account/DevLogin?role=DOCTOR
+    [HttpGet]
+    [AllowAnonymous]
+    public async Task<IActionResult> DevLogin([FromServices] AppDbContext db, string role = "ADMIN")
+    {
+        var targetRole = role.ToUpperInvariant() switch
+        {
+            "DOCTOR" or "DOC" => "DOCTOR",
+            "NURSE" => "NURSE",
+            "DEPT_HEAD" or "DEPARTMENT_HEAD" => "DEPARTMENT_HEAD",
+            "PATIENT" => "PATIENT",
+            _ => "ADMIN"
+        };
+
+        int accountId = 1;
+        string username = targetRole.ToLower() + "_dev";
+        string fullName = "Test " + targetRole;
+        string? doctorId = null;
+
+        if (targetRole == "ADMIN")
+        {
+            var acc = await db.Accounts.FirstOrDefaultAsync(a => a.Username == "admin");
+            if (acc != null)
+            {
+                accountId = acc.Id;
+                username = acc.Username;
+                fullName = "Quản trị viên";
+            }
+        }
+        else if (targetRole == "DEPARTMENT_HEAD")
+        {
+            var head = await db.DepartmentHeads
+                .Include(dh => dh.Account)
+                .Include(dh => dh.Department)
+                .FirstOrDefaultAsync();
+
+            if (head != null)
+            {
+                accountId = head.AccountId;
+                username = head.Account?.Username ?? "head_noi";
+                fullName = head.FullName;
+            }
+            else
+            {
+                var acc = await db.Accounts.FirstOrDefaultAsync(a => a.RoleId == (int)RoleId.DepartmentHead);
+                if (acc != null)
+                {
+                    accountId = acc.Id;
+                    username = acc.Username;
+                    fullName = "Trưởng khoa";
+                }
+            }
+        }
+        else if (targetRole == "DOCTOR")
+        {
+            var doc = await db.Doctors
+                .Include(d => d.Account)
+                .Include(d => d.Department)
+                .FirstOrDefaultAsync(d => d.AccountId > 0 && d.Account.RoleId == (int)RoleId.Doctor)
+                ?? await db.Doctors.Include(d => d.Account).FirstOrDefaultAsync();
+
+            if (doc != null)
+            {
+                accountId = doc.AccountId;
+                username = doc.Account?.Username ?? "bs_nam";
+                fullName = doc.FullName;
+                doctorId = doc.Id.ToString();
+            }
+            else
+            {
+                var acc = await db.Accounts.FirstOrDefaultAsync(a => a.RoleId == (int)RoleId.Doctor);
+                if (acc != null)
+                {
+                    accountId = acc.Id;
+                    username = acc.Username;
+                    fullName = "Bác sĩ";
+                }
+            }
+        }
+        else if (targetRole == "NURSE")
+        {
+            var nurse = await db.Nurses
+                .Include(n => n.Account)
+                .FirstOrDefaultAsync();
+
+            if (nurse != null)
+            {
+                accountId = nurse.AccountId;
+                username = nurse.Account?.Username ?? "nurse_lan";
+                fullName = nurse.FullName;
+            }
+            else
+            {
+                var acc = await db.Accounts.FirstOrDefaultAsync(a => a.RoleId == (int)RoleId.Nurse);
+                if (acc != null)
+                {
+                    accountId = acc.Id;
+                    username = acc.Username;
+                    fullName = "Điều dưỡng";
+                }
+            }
+        }
+        else if (targetRole == "PATIENT")
+        {
+            var patientAcc = await db.Accounts.FirstOrDefaultAsync(a => a.RoleId == (int)RoleId.Patient);
+            if (patientAcc != null)
+            {
+                accountId = patientAcc.Id;
+                username = patientAcc.Username;
+                fullName = "Người bệnh";
+            }
+        }
+
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, accountId.ToString()),
+            new(ClaimTypes.Name, username),
+            new(ClaimTypes.Role, targetRole),
+            new("FullName", fullName)
+        };
+
+        if (!string.IsNullOrEmpty(doctorId))
+        {
+            claims.Add(new Claim("DoctorId", doctorId));
+        }
+
+        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+        var principal = new ClaimsPrincipal(identity);
+
+        await HttpContext.SignInAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            principal,
+            new AuthenticationProperties
+            {
+                IsPersistent = true,
+                ExpiresUtc = DateTimeOffset.UtcNow.AddDays(7)
+            });
+
+        return RedirectToDashboard(targetRole);
     }
 
     [HttpPost]
@@ -171,16 +312,9 @@ public class AccountController : Controller
         }
 
         TempData["SuccessMessage"] = RegistrationMessage;
-        return RedirectToAction("Login", "Account");
+        return RedirectToAction("Login", "Account", new { mode = "login" });
     }
 
-    [HttpGet]
-    public IActionResult ForgotPassword() => RedirectToAction("Login", "Account", new { mode = "forgot" });
-
-    [HttpGet]
-    public IActionResult ResetPassword() => RedirectToAction("Login", "Account", new { mode = "forgot" });
-
-    // API endpoints cho Interactive Modal tại màn hình Login
     [HttpPost]
     [EnableRateLimiting("password-reset-request")]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
@@ -226,6 +360,7 @@ public class AccountController : Controller
         });
     }
 
+    [HttpGet]
     public IActionResult AccessDenied() => View();
 
     [HttpGet]

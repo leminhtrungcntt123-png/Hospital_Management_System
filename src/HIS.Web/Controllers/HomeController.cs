@@ -11,6 +11,26 @@ public class HomeController(
     [HttpGet]
     public IActionResult Index()
     {
+        if (User.IsInRole("DEPARTMENT_HEAD"))
+        {
+            return RedirectToAction("Index", "Schedule", new { area = "Staff" });
+        }
+
+        if (User.IsInRole("DOCTOR"))
+        {
+            return RedirectToAction("Index", "Consultation", new { area = "Staff" });
+        }
+
+        if (User.IsInRole("NURSE"))
+        {
+            return RedirectToAction("Index", "Reception", new { area = "Staff" });
+        }
+
+        if (User.IsInRole("ADMIN"))
+        {
+            return RedirectToAction("Index", "Management", new { area = "Admin" });
+        }
+
         return View();
     }
 

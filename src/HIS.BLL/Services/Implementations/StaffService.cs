@@ -10,12 +10,14 @@ public partial class StaffService : IStaffService
     private readonly AppDbContext _context;
     private readonly IDoctorService _doctorService;
     private readonly TimeProvider _adminClock;
+    private readonly TimeProvider _timeProvider;
 
-    public StaffService(AppDbContext context, IDoctorService doctorService, TimeProvider adminClock)
+    public StaffService(AppDbContext context, IDoctorService doctorService, TimeProvider? adminClock = null)
     {
         _context = context;
         _doctorService = doctorService;
-        _adminClock = adminClock;
+        _adminClock = adminClock ?? TimeProvider.System;
+        _timeProvider = _adminClock;
     }
 
     // Lấy danh sách tài khoản nhân sự và vai trò tương ứng trong hệ thống
@@ -184,7 +186,8 @@ public partial class StaffService : IStaffService
         if (account.Username.Equals("admin", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Không thể xóa tài khoản quản trị viên mặc định (admin).");
 
-        _context.Accounts.Remove(account);
+        account.IsActive = false;
+        account.UpdatedAt = _timeProvider.GetLocalNow().DateTime;
         await _context.SaveChangesAsync(cancellationToken);
         return true;
     }

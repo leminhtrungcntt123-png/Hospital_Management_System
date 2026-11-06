@@ -59,4 +59,3 @@ public class AppointmentStateMachineTests
         Assert.Equal(expected, actual);
     }
 }
-
