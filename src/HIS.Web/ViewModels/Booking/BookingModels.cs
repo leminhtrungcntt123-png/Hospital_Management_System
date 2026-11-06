@@ -268,6 +268,8 @@ internal static class AppointmentVmMapper
         DoctorName = a.DoctorName,
         Room = a.RoomName,
         QueueNumber = a.QueueNumber,
+        Amount = a.Amount,
+        IsAwaitingPayment = a.IsAwaitingPayment,
         InsuranceSummary = InsuranceDeclarations.Summary(a.HasHealthInsurance, a.HasPrivateInsurance)
     };
 }

@@ -40,7 +40,14 @@
                 <div class="card-section">
                     <div class="card-head">
                         <strong>@a.DepartmentName</strong>
-                        <span class="badge @(a.IsCancellable ? "badge-green" : "badge-gray")">@a.StatusLabel</span>
+                        @if (a.IsAwaitingPayment)
+                        {
+                            <span class="badge badge-yellow">Chờ thanh toán</span>
+                        }
+                        else
+                        {
+                            <span class="badge @(a.IsCancellable ? "badge-green" : "badge-gray")">@a.StatusLabel</span>
+                        }
                     </div>
                     <div class="detail-grid">
                         <label><span>Mã lịch hẹn</span><strong>@a.Code</strong></label>
@@ -62,22 +69,32 @@
                         </label>
                         <label><span>Bác sĩ</span><strong>@a.DoctorName</strong></label>
                         <label><span>Địa điểm</span><strong>@a.Room</strong></label>
+                        @if (a.Amount > 0)
+                        {
+                            <label><span>Phí khám</span><strong>@VietnameseFormat.Money(a.Amount)</strong></label>
+                        }
                         @if (!string.IsNullOrEmpty(a.InsuranceSummary))
                         {
                             <label><span>Bảo hiểm đã khai</span><strong>@a.InsuranceSummary</strong></label>
                         }
                     </div>
 
-                    @if (a.IsCancellable)
-                    {
-                        <form asp-action="HuyLich" method="post" onsubmit="return confirm('Bạn chắc chắn muốn hủy lịch hẹn @a.Code?');">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="appointmentId" value="@a.Id" />
-                            <div class="modal-actions">
+                    <div class="modal-actions">
+                        @if (a.IsAwaitingPayment)
+                        {
+                            <a class="btn btn-primary" asp-controller="Booking" asp-action="ThanhToan" asp-route-id="@a.Id">
+                                <i data-lucide="qr-code"></i> Thanh toán ngay
+                            </a>
+                        }
+                        @if (a.IsCancellable)
+                        {
+                            <form asp-action="HuyLich" method="post" onsubmit="return confirm('Bạn chắc chắn muốn hủy lịch hẹn @a.Code?');">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="appointmentId" value="@a.Id" />
                                 <button type="submit" class="btn btn-outline"><i data-lucide="x"></i> Hủy lịch</button>
-                            </div>
-                        </form>
-                    }
+                            </form>
+                        }
+                    </div>
                 </div>
             }
         }

@@ -488,6 +488,7 @@ public class OtpProfileFlowTests
         public List<SentOtp> Sent { get; } = [];
         public string Name => "kenh gia";
 
-        public void Send(OtpRecipient to, string code, DateTimeOffset expiresAt) => Sent.Add(new SentOtp(to, code, expiresAt));
+        public void Send(OtpRecipient to, string code, DateTimeOffset expiresAt, string? purpose = null)
+            => Sent.Add(new SentOtp(to, code, expiresAt));
     }
 }

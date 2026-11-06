@@ -13,5 +13,9 @@ public interface IOtpDelivery
     /// <summary>Tên kênh xuất hiện trong thông báo cho người dùng, ví dụ "email".</summary>
     string Name { get; }
 
-    void Send(OtpRecipient to, string code, DateTimeOffset expiresAt);
+    /// <summary>
+    /// Chuyển một mã tới người nhận. <paramref name="purpose"/> là tiêu đề hiển thị (ví dụ
+    /// "Mã xác thực đặt lại mật khẩu"); bỏ trống thì kênh dùng tiêu đề mặc định của OTP hồ sơ.
+    /// </summary>
+    void Send(OtpRecipient to, string code, DateTimeOffset expiresAt, string? purpose = null);
 }

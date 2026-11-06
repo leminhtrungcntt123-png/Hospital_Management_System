@@ -1,6 +1,7 @@
 ﻿@{
-    // Phiên demo của web (xem Helpers/DemoSession.cs): chỉ cần Id tài khoản để hiện tên và nút Đăng xuất.
-    var account = ViewContext.HttpContext.Account();
+    // Cookie đăng nhập phát claim FullName khi login; khách chưa đăng nhập thì chỉ hiện nút Đăng nhập.
+    var isSignedIn = User.Identity?.IsAuthenticated == true;
+    var displayName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name;
 }
 <!DOCTYPE html>
 <html lang="vi">
@@ -36,7 +37,7 @@
                 </nav>
 
                 <div class="header-actions">
-                    @if (account is null)
+                    @if (!isSignedIn)
                     {
                         <a class="btn btn-outline" asp-controller="Account" asp-action="Login">
                             <i data-lucide="log-in"></i> Đăng nhập
@@ -44,7 +45,7 @@
                     }
                     else
                     {
-                        <span class="save-note"><i data-lucide="user-round"></i> @account.DisplayName</span>
+                        <span class="save-note"><i data-lucide="user-round"></i> @displayName</span>
                         <form asp-controller="Account" asp-action="Logout" method="post">
                             <button type="submit" class="btn btn-outline"><i data-lucide="log-out"></i> Đăng xuất</button>
                         </form>

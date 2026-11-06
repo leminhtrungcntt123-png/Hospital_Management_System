@@ -28,5 +28,26 @@ public interface IAuthService
         LoginSurface surface = LoginSurface.Staff,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Tạo tài khoản bệnh nhân kèm hồ sơ "Bản thân" ACTIVE trong một lần lưu.
+    /// SĐT chủ tài khoản chỉ được thuộc một tài khoản (quy tắc hồ sơ của HIS), email bắt buộc
+    /// để sau này còn nhận mã OTP đặt lại mật khẩu.
+    /// </summary>
+    Task<RegisterResult> RegisterPatientAsync(
+        RegisterPatientRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Sinh mã OTP 6 số, gửi tới email của tài khoản qua các kênh <see cref="IOtpDelivery"/> đã đăng ký.</summary>
+    Task<ForgotPasswordResult> SendPasswordResetOtpAsync(
+        string emailOrUsername,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Đối chiếu OTP còn hiệu lực rồi đặt mật khẩu mới; thành công thì mở khóa đăng nhập.</summary>
+    Task<PasswordResetResult> ResetPasswordWithOtpAsync(
+        string emailOrUsername,
+        string otp,
+        string newPassword,
+        CancellationToken cancellationToken = default);
+
     Task LogoutAsync(int accountId, CancellationToken cancellationToken = default);
 }

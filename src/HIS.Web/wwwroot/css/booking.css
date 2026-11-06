@@ -2000,3 +2000,204 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* ---------- Bước thanh toán VietQR ---------- */
+.payment-page {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 40px 20px;
+    background: #f3f7fb;
+}
+
+.payment-card {
+    width: min(980px, 100%);
+    background: white;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 34px 40px;
+    box-shadow: var(--shadow);
+}
+
+.payment-head {
+    text-align: center;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 20px;
+    margin-bottom: 24px;
+}
+
+    .payment-head .success-title {
+        margin-top: 12px;
+    }
+
+    .payment-head p {
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 6px;
+    }
+
+    .payment-head b {
+        color: var(--blue);
+        font-variant-numeric: tabular-nums;
+    }
+
+.payment-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+    align-items: start;
+}
+
+.payment-qr {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    border: 1px solid #cfe1fb;
+    background: #f8fbff;
+    border-radius: 12px;
+    padding: 20px;
+}
+
+    .payment-qr img {
+        width: 240px;
+        height: 240px;
+        border-radius: 8px;
+        background: white;
+        padding: 8px;
+        border: 1px solid var(--line);
+    }
+
+.payment-bank {
+    width: 100%;
+    display: grid;
+    gap: 7px;
+}
+
+    .payment-bank > div {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 10px;
+        border-bottom: 1px dashed var(--line);
+        padding-bottom: 6px;
+    }
+
+    .payment-bank span {
+        color: var(--muted);
+    }
+
+    .payment-bank strong {
+        color: var(--ink);
+        text-align: right;
+    }
+
+    .payment-bank .payment-amount {
+        color: var(--blue);
+        font-size: 13px;
+    }
+
+.payment-qr > small {
+    font-size: 8px;
+    color: var(--muted);
+    text-align: center;
+}
+
+.payment-summary {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 18px;
+}
+
+    .payment-summary .summary-title {
+        margin-bottom: 10px;
+    }
+
+    .payment-summary .summary-row {
+        font-size: 10px;
+        padding: 6px 0;
+    }
+
+.payment-warning {
+    margin-top: 12px;
+}
+
+.payment-submit {
+    width: 100%;
+    margin-top: 16px;
+    min-height: 46px;
+}
+
+.payment-submit:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+.payment-cancel {
+    margin-top: 10px;
+}
+
+.payment-cancel .btn {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+}
+
+.payment-summary .text-button {
+    display: block;
+    text-align: center;
+    margin-top: 12px;
+}
+
+/* ---------- Hộp thoại SweetAlert2 sau khi đặt lịch thành công ---------- */
+.swal-booking-popup {
+    border-radius: 18px;
+}
+
+.swal-booking {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 16px;
+    text-align: left;
+}
+
+.swal-booking-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed var(--line);
+    font-size: 14px;
+}
+
+.swal-booking-row span {
+    color: var(--muted);
+}
+
+.swal-booking-row strong {
+    color: var(--ink);
+    text-align: right;
+}
+
+.swal-booking-note {
+    margin-top: 8px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: var(--yellow-light);
+    color: var(--yellow);
+    font-size: 13.5px;
+    line-height: 1.55;
+    text-align: left;
+}
+
+@media (max-width: 860px) {
+    .payment-card {
+        padding: 24px 18px;
+    }
+
+    .payment-body {
+        grid-template-columns: 1fr;
+    }
+}
+

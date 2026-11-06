@@ -1,5 +1,5 @@
 @* Bước cuối của cả ba luồng: kiểm tra phiếu khám, khai báo bảo hiểm và gửi yêu cầu đặt lịch.
-   Phí khám chỉ mang tính thông báo - hệ thống chưa thu tiền online nên không có bước thanh toán. *@
+   Sau bước này bệnh nhân sang trang thanh toán VietQR; chỉ khi thanh toán mới được cấp số thứ tự. *@
 @model XacNhanViewModel
 @{
     Layout = "_BookingLayout";
@@ -87,8 +87,9 @@
                     </div>
                     <p class="cost-note">
                         <i data-lucide="wallet"></i>
-                        Đặt online không thu tiền. Bạn đóng phí khám tại quầy viện phí khi đến khám;
-                        nếu có bảo hiểm, quầy sẽ làm thủ tục theo giấy tờ bạn mang theo.
+                        Thanh toán phí khám bằng VietQR ở bước tiếp theo; thanh toán thành công hệ thống mới cấp
+                        số thứ tự và phiếu khám. Nếu chưa thanh toán, bạn có thể hủy đơn để nhường suất cho người khác.
+                        Khi có bảo hiểm, quầy sẽ đối chiếu giấy tờ bạn mang theo khi đến khám.
                     </p>
                 </div>
 
@@ -127,7 +128,7 @@
                 <div class="summary-row"><span>Địa điểm</span><strong>@slot.Room</strong></div>
                 <div class="summary-divider"></div>
                 <div class="summary-row"><span>Phí khám dự kiến</span><strong>@VietnameseFormat.Money(Model.Fee)</strong></div>
-                <small>Số thứ tự (chữ A) và phòng khám chính thức hiện trên phiếu hẹn sau khi đặt thành công.</small>
+                <small>Số thứ tự (chữ A) và phiếu khám chỉ được cấp sau khi bạn thanh toán thành công.</small>
             </aside>
         </div>
 

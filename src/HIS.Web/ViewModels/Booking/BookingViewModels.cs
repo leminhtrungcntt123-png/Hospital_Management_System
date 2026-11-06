@@ -1,3 +1,5 @@
+using HIS.BLL.DTOs;
+
 namespace HIS.Web.ViewModels.Booking;
 
 // ViewModel của từng màn hình đặt lịch (chỉ phục vụ hiển thị ở HIS.Web).
@@ -101,7 +103,34 @@ public class ThanhCongViewModel
     public string QueueNumber { get; set; } = string.Empty;
 
     public DoctorVm? Doctor { get; set; }
+
+    /// <summary>Tên bác sĩ của lượt hẹn; trang thành công và hộp thoại luôn hiện được tên này.</summary>
+    public string DoctorName { get; set; } = string.Empty;
+
     public string Room { get; set; } = string.Empty;
+
+    /// <summary>Quyết định hướng dẫn sau khi đặt: có BHYT thì ghé quầy, không thì lên thẳng phòng khám.</summary>
+    public bool HasHealthInsurance { get; set; }
+
+    /// <summary>Số tiền đã thu ở bước thanh toán; 0 khi chưa thanh toán.</summary>
+    public decimal PaidAmount { get; set; }
+
+    public DateTime? PaidAt { get; set; }
+}
+
+/// <summary>
+/// Màn thanh toán phí khám: thông tin lượt hẹn, tài khoản nhận tiền và VietQR động.
+/// </summary>
+public class ThanhToanViewModel
+{
+    public AppointmentPaymentDto Appointment { get; set; } = new();
+    public string BankName { get; set; } = string.Empty;
+    public string AccountNumber { get; set; } = string.Empty;
+    public string AccountName { get; set; } = string.Empty;
+    public string TransferContent => Appointment.Code;
+
+    /// <summary>Đường dẫn ảnh VietQR đã sinh trong wwwroot/images/qrcode.</summary>
+    public string QrImagePath { get; set; } = string.Empty;
 }
 
 // Màn "Lịch khám của tôi": các lượt hẹn web do tài khoản đang đăng nhập đặt.
@@ -124,6 +153,12 @@ public class AppointmentVm
     public string DoctorName { get; set; } = string.Empty;
     public string Room { get; set; } = string.Empty;
     public string QueueNumber { get; set; } = string.Empty;
+
+    /// <summary>Phí khám của lượt hẹn (hóa đơn), dùng cho dòng "Phí khám" và nút thanh toán.</summary>
+    public decimal Amount { get; set; }
+
+    /// <summary>Đang chờ chuyển khoản: hiện nút "Thanh toán ngay"; chưa trả thì chưa có số.</summary>
+    public bool IsAwaitingPayment { get; set; }
 
     /// <summary>"BHYT · Bảo hiểm tư nhân"; rỗng khi người bệnh không khai báo gì.</summary>
     public string InsuranceSummary { get; set; } = string.Empty;

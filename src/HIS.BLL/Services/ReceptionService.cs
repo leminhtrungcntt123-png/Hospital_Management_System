@@ -515,6 +515,11 @@ public class ReceptionService : IReceptionService
                 appointment.DoctorId = placement.Slot.DoctorId;
                 queueNumber = placement.QueueNumber;
             }
+            else if (string.IsNullOrEmpty(appointment.QueueNumber))
+            {
+                // Lượt web đã giữ suất nhưng chưa thanh toán nên chưa có số; quầy tiếp nhận cấp số theo đúng suất đã giữ.
+                queueNumber = await _allocator.IssueQueueNumberAsync(appointment, cancellationToken) ?? string.Empty;
+            }
 
             int oldStatusId = appointment.StatusId;
             appointment.StatusId = checkedInStatusId;

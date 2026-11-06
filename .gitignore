@@ -52,3 +52,6 @@ init.md
 
 ## Local database dumps
 backup/
+
+## QR sinh lúc chạy (Utils.GenerateQRCodeImage)
+src/HIS.Web/wwwroot/images/qrcode/*.png

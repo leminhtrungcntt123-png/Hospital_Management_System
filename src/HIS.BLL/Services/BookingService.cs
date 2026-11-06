@@ -498,7 +498,8 @@ public class BookingService : IBookingService
             .Where(a => a.BookedBy == accountId
                         && a.CreatedAt >= dayStart
                         && a.CreatedAt < dayEnd
-                        && a.Status.Code != AppointmentStatus.Codes.Cancelled)
+                        && a.Status.Code != AppointmentStatus.Codes.Cancelled
+                        && a.Status.Code != AppointmentStatus.Codes.Expired)
             .Select(a => a.PatientId)
             .ToListAsync(cancellationToken);
 
@@ -520,10 +521,10 @@ public class BookingService : IBookingService
     }
 
     /// <summary>
-    /// Tạo lịch hẹn web và giữ một suất A của khung giờ bệnh nhân đã chọn.
-    /// Khung giờ là nguồn chân lý về chỗ trống nên mọi kiểm tra (còn mở, còn suất A, trùng ngày khám)
-    /// đều làm ở đây thay vì để UI tự tính. Cấp số qua QueuePositionAllocator để số A và booked_count
-    /// tăng trong cùng một lần ghi, và uq_slot_position từ chối lượt đặt trúng tranh chấp.
+    /// Tạo lịch hẹn web ở trạng thái PENDING và giữ một suất A của khung giờ bệnh nhân đã chọn.
+    /// Số thứ tự CHƯA được cấp: bệnh nhân thanh toán thì mới có số; không thanh toán thì tự hủy
+    /// để trả suất. Hóa đơn UNPAID được tạo cùng lượt hẹn để bước thanh toán chỉ việc đối chiếu
+    /// số tiền, không tính lại giá.
     /// </summary>
     public async Task<Appointment> CreateAppointmentAsync(
         int accountId,
@@ -534,7 +535,7 @@ public class BookingService : IBookingService
         CancellationToken cancellationToken = default)
     {
         var status = await _context.AppointmentStatuses
-            .FirstAsync(s => s.Code == AppointmentStatus.Codes.Confirmed, cancellationToken);
+            .FirstAsync(s => s.Code == AppointmentStatus.Codes.Pending, cancellationToken);
 
         Patient patient = await _context.Patients
             .AsNoTracking()
@@ -624,6 +625,13 @@ public class BookingService : IBookingService
             UpdatedAt = now
         };
 
+        decimal examinationFee = await GetExaminationFeeAsync(slot.Doctor.DepartmentId);
+        string departmentName = await _context.Departments
+            .AsNoTracking()
+            .Where(d => d.Id == slot.Doctor.DepartmentId)
+            .Select(d => d.Name)
+            .FirstOrDefaultAsync(cancellationToken) ?? "chuyên khoa";
+
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
         try
@@ -637,10 +645,32 @@ public class BookingService : IBookingService
                 throw new InvalidOperationException("Khung giờ này vừa hết suất đặt online. Vui lòng chọn khung khác.");
             }
 
+            // Vị trí trong khung đã giữ từ lúc đặt, nhưng số hiển thị chỉ cấp sau khi thanh toán.
+            appointment.QueueNumber = null;
+
             // Bác sĩ, phòng và chuyên khoa lấy từ khung giờ thật sự giữ chỗ để màn danh sách không trống cột.
             appointment.RoomId = placement.Slot.RoomId;
             appointment.DoctorId = placement.Slot.DoctorId;
             appointment.DepartmentId = slot.Doctor.DepartmentId;
+
+            _context.Invoices.Add(new Invoice
+            {
+                AppointmentId = appointment.Id,
+                PatientId = patientId,
+                TotalAmount = examinationFee,
+                PatientAmount = examinationFee,
+                Status = InvoiceStatus.Unpaid,
+                CreatedAt = now,
+                InvoiceItems =
+                [
+                    new InvoiceItem
+                    {
+                        Category = InvoiceCategory.Examination,
+                        Description = $"Phí khám bệnh - {departmentName}",
+                        Amount = examinationFee
+                    }
+                ]
+            });
 
             await _context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
@@ -748,6 +778,7 @@ public class BookingService : IBookingService
             .Include(a => a.Patient)
             .Include(a => a.Status)
             .Include(a => a.Department)
+            .Include(a => a.Invoice)
             .Include(a => a.Slot).ThenInclude(s => s!.Room)
             .Include(a => a.Slot).ThenInclude(s => s!.Doctor)
             .Where(a => a.BookedBy == accountId && a.BookingChannel == BookingChannel.Web)
@@ -771,10 +802,203 @@ public class BookingService : IBookingService
             HasPrivateInsurance = a.HasPrivateInsurance,
             SlotStartTime = a.Slot?.StartTime,
             SlotEndTime = a.Slot?.EndTime,
+            Amount = a.Invoice?.PatientAmount ?? 0m,
+            IsAwaitingPayment = a.Status.Code == AppointmentStatus.Codes.Pending,
             IsCancellable = (a.Status.Code == AppointmentStatus.Codes.Pending
                              || a.Status.Code == AppointmentStatus.Codes.Confirmed)
                             && (a.Slot is null || IsCancelAllowed(a.Slot.StartTime, now))
         }).ToList();
+    }
+
+    /// <summary>
+    /// Thông tin thanh toán của một lượt hẹn web. Trả null khi lượt không thuộc tài khoản.
+    /// </summary>
+    public async Task<AppointmentPaymentDto?> GetPaymentInfoAsync(
+        int appointmentId,
+        int accountId,
+        CancellationToken cancellationToken = default)
+    {
+        var appointment = await _context.Appointments
+            .AsNoTracking()
+            .Include(a => a.Patient)
+            .Include(a => a.Status)
+            .Include(a => a.Department)
+            .Include(a => a.Invoice)
+            .Include(a => a.Slot).ThenInclude(s => s!.Room)
+            .Include(a => a.Slot).ThenInclude(s => s!.Doctor)
+            .FirstOrDefaultAsync(a => a.Id == appointmentId
+                                      && a.BookedBy == accountId
+                                      && a.BookingChannel == BookingChannel.Web,
+                cancellationToken);
+
+        if (appointment is null)
+        {
+            return null;
+        }
+
+        decimal amount = appointment.Invoice?.PatientAmount
+                         ?? (appointment.DepartmentId is int departmentId
+                             ? await GetExaminationFeeAsync(departmentId)
+                             : 0m);
+
+        return new AppointmentPaymentDto
+        {
+            AppointmentId = appointment.Id,
+            Code = appointment.AppointmentCode,
+            Status = appointment.Status.Code,
+            PatientName = appointment.Patient.FullName,
+            PatientPhone = appointment.Patient.PhoneNumber,
+            HasHealthInsurance = appointment.HasHealthInsurance,
+            DepartmentName = appointment.Department?.Name ?? string.Empty,
+            DoctorName = appointment.Slot?.Doctor?.FullName ?? string.Empty,
+            RoomName = appointment.Slot?.Room?.RoomName ?? string.Empty,
+            Date = appointment.Slot is { } slot
+                ? DateOnly.FromDateTime(slot.StartTime)
+                : DateOnly.FromDateTime(appointment.CreatedAt),
+            ShiftLabel = appointment.Slot is { } shiftSlot
+                ? ExamShifts.For(shiftSlot.StartTime).ToLabel()
+                : string.Empty,
+            TimeRange = appointment.Slot is { } timeSlot
+                ? $"{timeSlot.StartTime:HH\\:mm} – {timeSlot.EndTime:HH\\:mm}"
+                : string.Empty,
+            Amount = amount,
+            QueueNumber = appointment.QueueNumber ?? string.Empty
+        };
+    }
+
+    /// <summary>
+    /// Ghi nhận thanh toán chuyển khoản của bệnh nhân: chuyển lượt PENDING sang CONFIRMED,
+    /// cấp số thứ tự theo vị trí đã giữ, đánh dấu hóa đơn PAID và thêm một dòng payments.
+    /// Số chỉ được cấp ở đây nên lượt chưa trả tiền không bao giờ xuất hiện trên màn gọi số.
+    /// </summary>
+    public async Task<PaymentConfirmationResult> ConfirmPaymentAsync(
+        int appointmentId,
+        int accountId,
+        CancellationToken cancellationToken = default)
+    {
+        DateTime now = Now;
+
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+
+        // Khóa dòng lượt hẹn để hai lần bấm "Tôi đã chuyển khoản" không tạo hai phiếu thu.
+        await _context.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM appointments WHERE id = {appointmentId} FOR UPDATE", cancellationToken);
+
+        var appointment = await _context.Appointments
+            .Include(a => a.Status)
+            .Include(a => a.Slot)
+            .Include(a => a.Invoice).ThenInclude(i => i!.InvoiceItems)
+            .FirstOrDefaultAsync(a => a.Id == appointmentId
+                                      && a.BookedBy == accountId
+                                      && a.BookingChannel == BookingChannel.Web,
+                cancellationToken);
+
+        if (appointment is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new PaymentConfirmationResult(false, "Không tìm thấy lịch hẹn cần thanh toán.");
+        }
+
+        // Bấm lại sau khi đã thanh toán: trả lại đúng số đã cấp, không thu thêm lần nữa.
+        if (appointment.Status.Code == AppointmentStatus.Codes.Confirmed)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new PaymentConfirmationResult(
+                true,
+                $"Lịch hẹn {appointment.AppointmentCode} đã được thanh toán.",
+                appointment.QueueNumber ?? string.Empty,
+                appointment.Invoice?.PatientAmount ?? 0m);
+        }
+
+        if (appointment.Status.Code != AppointmentStatus.Codes.Pending)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new PaymentConfirmationResult(
+                false,
+                $"Lượt {appointment.AppointmentCode} đang ở trạng thái \"{appointment.Status.Name}\" nên không thanh toán được.");
+        }
+
+        string? queueNumber = await _allocator.IssueQueueNumberAsync(appointment, cancellationToken);
+        if (queueNumber is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new PaymentConfirmationResult(
+                false,
+                "Không xác định được số thứ tự của suất đã giữ. Vui lòng liên hệ quầy tiếp nhận.");
+        }
+
+        decimal amount = appointment.Invoice?.PatientAmount
+                         ?? (appointment.DepartmentId is int departmentId
+                             ? await GetExaminationFeeAsync(departmentId)
+                             : 0m);
+
+        if (amount <= 0)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new PaymentConfirmationResult(false, "Chưa xác định được phí khám của lượt hẹn này.");
+        }
+
+        Invoice? invoice = appointment.Invoice;
+        if (invoice is null)
+        {
+            invoice = new Invoice
+            {
+                AppointmentId = appointment.Id,
+                PatientId = appointment.PatientId,
+                TotalAmount = amount,
+                PatientAmount = amount,
+                CreatedAt = now
+            };
+            _context.Invoices.Add(invoice);
+        }
+        else if (invoice.InvoiceItems.Count == 0)
+        {
+            invoice.InvoiceItems.Add(new InvoiceItem
+            {
+                Category = InvoiceCategory.Examination,
+                Description = "Phí khám bệnh",
+                Amount = amount
+            });
+        }
+
+        invoice.TotalAmount = Math.Max(invoice.TotalAmount, amount);
+        invoice.PatientAmount = amount;
+        invoice.Status = InvoiceStatus.Paid;
+
+        _context.Payments.Add(new Payment
+        {
+            Invoice = invoice,
+            Amount = amount,
+            PaymentType = PaymentType.Payment,
+            PaymentMethod = PaymentMethod.BankTransfer,
+            PaidAt = now,
+            Note = $"Chuyển khoản VietQR - {appointment.AppointmentCode}"
+        });
+
+        int confirmedStatusId = (await _context.AppointmentStatuses
+            .AsNoTracking()
+            .FirstAsync(s => s.Code == AppointmentStatus.Codes.Confirmed, cancellationToken)).Id;
+
+        int previousStatusId = appointment.StatusId;
+        appointment.StatusId = confirmedStatusId;
+        appointment.UpdatedAt = now;
+
+        _context.AppointmentStatusHistories.Add(new AppointmentStatusHistory
+        {
+            AppointmentId = appointment.Id,
+            OldStatusId = previousStatusId,
+            NewStatusId = confirmedStatusId,
+            ChangedAt = now
+        });
+
+        await _context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return new PaymentConfirmationResult(
+            true,
+            $"Đã nhận thanh toán {amount:#,##0} đ cho lượt {appointment.AppointmentCode}. Số thứ tự của bạn là {queueNumber}.",
+            queueNumber,
+            amount);
     }
 
     // Một khung giờ kèm số suất A còn lại, dùng chung cho màn chọn ngày, màn khung giờ và đếm chỗ.

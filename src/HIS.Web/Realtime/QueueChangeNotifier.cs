@@ -80,6 +80,7 @@ public sealed class QueueChangeNotifier
 public static class QueueChangeKinds
 {
     public const string AppointmentCreated = "appointment.created";
+    public const string AppointmentPaid = "appointment.paid";
     public const string AppointmentCancelled = "appointment.cancelled";
     public const string ProfileLinkRequested = "profile.link_requested";
 }

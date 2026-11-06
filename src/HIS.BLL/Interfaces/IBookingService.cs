@@ -90,4 +90,16 @@ public interface IBookingService
 
     // Lịch hẹn web do tài khoản này đặt, mới nhất trước, dùng cho màn "Lịch khám của tôi"
     Task<List<BookingAppointmentDto>> GetAppointmentsByAccountAsync(int accountId, CancellationToken cancellationToken = default);
+
+    // Thông tin thanh toán (phí khám, hạn giữ chỗ, dữ liệu QR) của một lượt hẹn thuộc tài khoản
+    Task<AppointmentPaymentDto?> GetPaymentInfoAsync(
+        int appointmentId,
+        int accountId,
+        CancellationToken cancellationToken = default);
+
+    // Ghi nhận đã chuyển khoản: chuyển PENDING -> CONFIRMED, cấp số thứ tự và đánh dấu hóa đơn PAID
+    Task<PaymentConfirmationResult> ConfirmPaymentAsync(
+        int appointmentId,
+        int accountId,
+        CancellationToken cancellationToken = default);
 }

@@ -98,9 +98,40 @@ public class BookingAppointmentDto
     public DateTime? SlotStartTime { get; set; }
     public DateTime? SlotEndTime { get; set; }
 
+    /// <summary>Phí khám phải trả của lượt hẹn; 0 khi chưa có hóa đơn.</summary>
+    public decimal Amount { get; set; }
+
+    /// <summary>Đang chờ chuyển khoản; chưa trả thì chưa có số thứ tự và có thể hủy để trả suất.</summary>
+    public bool IsAwaitingPayment { get; set; }
+
     /// <summary>Chỉ PENDING/CONFIRMED và chưa tới giờ khám mới tự hủy được trên web.</summary>
     public bool IsCancellable { get; set; }
 }
 
 /// <summary>Kết quả hủy lịch hẹn trên web: thành công hay nêu lý do bị từ chối (quá hạn hủy).</summary>
 public sealed record CancelAppointmentResult(bool Success, string Message);
+
+/// <summary>
+/// Thông tin một lượt hẹn ở bước thanh toán: phí khám và dữ liệu để dựng VietQR.
+/// Status là mã trạng thái hiện tại để màn hình biết đang chờ trả tiền hay đã thanh toán.
+/// </summary>
+public class AppointmentPaymentDto
+{
+    public int AppointmentId { get; set; }
+    public string Code { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public string PatientName { get; set; } = string.Empty;
+    public string PatientPhone { get; set; } = string.Empty;
+    public bool HasHealthInsurance { get; set; }
+    public string DepartmentName { get; set; } = string.Empty;
+    public string DoctorName { get; set; } = string.Empty;
+    public string RoomName { get; set; } = string.Empty;
+    public DateOnly Date { get; set; }
+    public string ShiftLabel { get; set; } = string.Empty;
+    public string TimeRange { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+    public string QueueNumber { get; set; } = string.Empty;
+}
+
+/// <summary>Kết quả xác nhận chuyển khoản: số thứ tự chỉ được cấp khi thanh toán đã được ghi nhận.</summary>
+public sealed record PaymentConfirmationResult(bool Success, string Message, string QueueNumber = "", decimal Amount = 0m);

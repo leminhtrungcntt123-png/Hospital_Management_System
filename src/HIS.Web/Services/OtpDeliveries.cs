@@ -18,19 +18,21 @@ public class SmtpOtpDelivery : IOtpDelivery
 
     public string Name => $"email ({_options.Host})";
 
-    public void Send(OtpRecipient to, string code, DateTimeOffset expiresAt)
+    public void Send(OtpRecipient to, string code, DateTimeOffset expiresAt, string? purpose = null)
     {
+        string title = string.IsNullOrWhiteSpace(purpose) ? "Mã xác thực hồ sơ của bạn" : purpose!;
+
         using var message = new MailMessage
         {
             From = new MailAddress(_options.User!, _options.SenderName),
-            Subject = "Mã xác thực hồ sơ của bạn"
+            Subject = title
         };
         message.To.Add(new MailAddress(to.Email));
         message.Body =
             $"Xin chào {to.DisplayName},\n\n" +
-            $"Mã xác thực hồ sơ của bạn: {code}\n" +
+            $"{title}: {code}\n" +
             $"Mã có hiệu lực đến {expiresAt:HH:mm} ngày {expiresAt:dd/MM/yyyy}.\n\n" +
-            "Nếu bạn không vừa thêm hồ sơ trên cổng đặt khám, hãy bỏ qua email này.\n";
+            "Nếu bạn không yêu cầu mã này, hãy bỏ qua email.\n";
 
         using var client = new SmtpClient(_options.Host, _options.Port)
         {
@@ -55,7 +57,9 @@ public class DemoOtpDelivery : IOtpDelivery
 
     public string Name => "demo trên màn hình";
 
-    public void Send(OtpRecipient to, string code, DateTimeOffset expiresAt)
-        => _logger.LogInformation("Mã OTP demo cho {Email} ({FullName}): {Code}, hết hạn {ExpiresAt:HH:mm}",
+    public void Send(OtpRecipient to, string code, DateTimeOffset expiresAt, string? purpose = null)
+        => _logger.LogInformation(
+            "{Purpose} demo cho {Email} ({FullName}): {Code}, hết hạn {ExpiresAt:HH:mm}",
+            string.IsNullOrWhiteSpace(purpose) ? "Mã OTP" : purpose,
             to.Email, to.DisplayName, code, expiresAt);
 }

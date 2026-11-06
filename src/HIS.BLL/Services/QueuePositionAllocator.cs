@@ -133,6 +133,49 @@ public class QueuePositionAllocator
     }
 
     /// <summary>
+    /// Cấp số hiển thị cho một suất đã giữ chỗ nhưng chưa có số (lượt web chờ thanh toán).
+    /// Vị trí trong khung đã được giữ từ lúc đặt nên số chỉ là hàm của vị trí đó; không cấp thêm chỗ.
+    /// </summary>
+    public async Task<string?> IssueQueueNumberAsync(
+        Appointment appointment,
+        CancellationToken cancellationToken = default)
+    {
+        if (!string.IsNullOrEmpty(appointment.QueueNumber))
+        {
+            return appointment.QueueNumber;
+        }
+
+        if (appointment.SlotPosition is not int position)
+        {
+            return null;
+        }
+
+        AppointmentSlot? slot = appointment.Slot
+            ?? await _context.AppointmentSlots
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.Id == appointment.SlotId, cancellationToken);
+
+        if (slot is null)
+        {
+            return null;
+        }
+
+        var shiftSlots = await LoadShiftAsync(slot.RoomId, slot.StartTime, ExamShifts.For(slot.StartTime), cancellationToken);
+        var entry = shiftSlots.FirstOrDefault(e => e.Slot.Id == slot.Id);
+
+        if (entry is null)
+        {
+            return null;
+        }
+
+        appointment.QueueNumber = QueueNumberPrefix.Format(
+            appointment.BookingChannel,
+            QueuePositions.ShiftNumber(entry.CapacityBefore, position));
+
+        return appointment.QueueNumber;
+    }
+
+    /// <summary>
     /// Qua mốc cắt (trước giờ khung bắt đầu ReleaseCutoffMinutes) mà suất A vẫn chưa check-in thì giải phóng:
     /// vị trí trả về NULL để kênh T dùng được, booked_count và online_booked giảm theo.
     /// Lượt hẹn vẫn giữ trạng thái cũ; bệnh nhân đến trễ được cấp lại suất T khi check-in.

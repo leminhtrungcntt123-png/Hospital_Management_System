@@ -7,7 +7,10 @@ using HIS.Web.Options;
 using HIS.Web.Realtime;
 using HIS.Web.Services;
 
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +20,38 @@ builder.Configuration.AddJsonFile("appsettings.Otp.local.json", optional: true, 
 
 // MVC (Controllers + Views) thay cho Razor Pages mặc định
 builder.Services.AddControllersWithViews();
+
+// Trang đăng nhập gửi JSON kèm token chống giả mạo trong header.
+builder.Services.AddAntiforgery(options => options.HeaderName = "RequestVerificationToken");
+
+// Đăng nhập bằng cookie xác thực: giữ được "Ghi nhớ đăng nhập" mà Session demo trước đây không có.
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/Account/Login";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+            ? CookieSecurePolicy.SameAsRequest
+            : CookieSecurePolicy.Always;
+        options.SlidingExpiration = true;
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
+    });
+builder.Services.AddAuthorization();
+
+// Chặn dò mật khẩu: tối đa 5 lượt đăng nhập mỗi phút cho một địa chỉ IP.
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddPolicy("login", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+});
 
 // Session: lưu lựa chọn của người dùng giữa các bước đặt lịch (khoa, ngày, ca, người khám)
 builder.Services.AddDistributedMemoryCache();
@@ -100,7 +135,9 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+app.UseRateLimiter();
 app.UseSession();
+app.UseAuthentication();
 app.UseAuthorization();
 
 // Trang mặc định: trang bắt đầu đặt lịch

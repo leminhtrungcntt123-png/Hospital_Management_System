@@ -996,3 +996,83 @@ Cắm một liên kết demo `account_id=7 → patient_id=2` ở `PENDING` để
 * Dọn dẹp: xóa dòng `notifications` do test sinh ra (bảng về 0 dòng `TraceTitle`); đặt lại mật khẩu demo bằng `backup/demologin.sh` sau khi dùng mật khẩu tạm.
 
 **Lưu ý cho máy dev**: `appsettings.Otp.local.json` được `AddJsonFile` **sau** các nguồn mặc định nên nó thắng `appsettings.Development.json`; máy đã cấu hình SMTP thật vì thế vẫn `RevealCodeOnScreen=false` và không hiện mã. Muốn xem thử mã trên máy đó thì phải tạm đổi file local, không phải thêm cờ. Hai knob hạn mức (`MaxIssuesPerWindow`, `IssueWindowMinutes`) vẫn chưa đưa vào cấu hình.
+
+## 17. Thanh toán phí khám bằng VietQR + cấp số sau khi thanh toán (06/11/2026)
+
+> Cơ chế giữ suất 15 phút và đếm ngược ở mục này **đã được bỏ ở mục 18**; phần VietQR và cấp số sau thanh toán vẫn đúng.
+
+### 17.1 Luồng mới
+
+| Bước | Trước | Sau |
+|---|---|---|
+| Đặt lịch web | Tạo ngay `CONFIRMED`, có số A | Tạo `PENDING`, `hold_until = now + 15'`, **`queue_number = NULL`**; vẫn giữ `slot_position` và tăng `online_booked`/`booked_count` |
+| Hóa đơn | Không có | Tạo `invoices` (`UNPAID`, `total_amount = patient_amount = phí khám`) + 1 `invoice_items` nhóm `Examination` |
+| Sau khi gửi form xác nhận | Trang "Thành công" + số A | Chuyển sang `/Booking/ThanhToan/{id}`: VietQR động (BIN 970422, STK 0787956752, `LE MINH CHI`), số tiền = phí khám, nội dung = mã lịch hẹn, đếm ngược 15 phút |
+| Bấm "Tôi đã chuyển khoản" | — | `ConfirmPaymentAsync`: khóa dòng `appointments` bằng `SELECT … FOR UPDATE`, kiểm tra `hold_until`, **cấp số từ `slot_position` đã giữ** (`QueuePositionAllocator.IssueQueueNumberAsync`), ghi `payments` (`BANK_TRANSFER`, `PAYMENT`), hóa đơn `PAID`, trạng thái `CONFIRMED`, xóa `hold_until`, ghi lịch sử trạng thái |
+| Quá 15 phút | — | Mọi đường đọc (`GetAppointmentsByAccountAsync`, chọn khoa/bác sĩ/ngày/slot) chạy `ExpireUnpaidAppointmentsAsync`: `EXPIRED`, nhả suất, `queue_number`/`slot_position` về NULL; hóa đơn vẫn `UNPAID`, không có dòng `payments` |
+| Hạn mức ngày | Đếm cả lượt hủy | Bỏ `CANCELLED` **và `EXPIRED`** để người hết hạn giữ chỗ được đặt lại |
+| Quầy tiếp nhận | Lượt `PENDING` không có số bị bỏ trống | `CheckInAsync` gọi `IssueQueueNumberAsync` theo đúng suất đã giữ khi nhân viên tiếp nhận |
+
+QR dùng `QRCoder` 1.8.1 (`PngByteQRCode`, không cần System.Drawing) và được sinh tại `/Booking/MaQr/{id}` với `Cache-Control: no-store`; endpoint kiểm tra tài khoản sở hữu lượt. **Từ mục 19, QR chuyển sang `Helpers/Utils.cs` + `Helpers/WebConstants.cs` và lưu PNG trong `wwwroot/images/qrcode`; endpoint `MaQr` đã bỏ.**
+
+### 17.2 Kiểm chứng tự động
+
+* `dotnet build HIS.sln`: **0 Warning, 0 Error**.
+* `dotnet test` với `HIS_REHEARSAL_CONNECTION=hospital_his`: **114/115**. Test fail duy nhất `RehearsalReadPathsTests.Quyen_cho_quay_va_web_doc_du_tren_schema_moi` do fixture `HIS-SEED-*` đã cũ (seed ngày 05/11, hôm nay 06/11; `HIS-SEED-CONFIRMED` đã thành `NO_SHOW`), **không liên quan thay đổi thanh toán**.
+* Ba constructor `BookingService` trong test đã thêm `Options.Create(new PaymentOptions())`.
+
+### 17.3 Bằng chứng dữ liệu thật (`hospital_his`, 06/11/2026)
+
+* Đơn chưa trả (id 123, `HIS-20261109-25QH84`): `status_id=1`, `queue_number=NULL`, `slot_position=1`, `hold_until=15:53`, hóa đơn 3 `UNPAID` 150.000đ, 1 item, 0 payment. Trang thanh toán hiện đúng MB Bank / 0787956752 / LE MINH CHI / 150.000 đ / nội dung `HIS-20261109-25QH84`, đồng hồ 14:57.
+* Payload QR in ra từ chính `VietQr.BuildPayload` (biên dịch lại nguyên file nguồn): `…5303704 54 06 150000 5802VN 6223 0819HIS-20261109-25QH84 6304 1B8E`; PNG 555 byte, magic `89 50 4E 47` — trùng đúng 555 byte endpoint trả về.
+* Bấm "Tôi đã chuyển khoản": `status_id=2`, `queue_number=A09`, `hold_until=NULL`, hóa đơn `PAID`, `payments` id 2 = 150.000đ `PAYMENT`/`BANK_TRANSFER`, note "Chuyển khoản VietQR - HIS-20261109-25QH84". Trang "Thanh toán thành công" hiện A09 + "Phí khám đã thanh toán 150.000 đ".
+* Mở lại `/Booking/ThanhToan/123` sau khi trả → chuyển về `/LichKham` kèm "Lịch hẹn … đã được thanh toán".
+* Đơn thứ hai (id 124, `HIS-20261110-QDVVBD`) chưa trả: `/LichKham` hiện badge "Chờ thanh toán", số "-", "Giữ chỗ đến 15:57", nút "Thanh toán ngay". Đặt `hold_until` về quá khứ rồi mở lại `/LichKham`: `status_id=9`, `queue_number`/`slot_position` NULL, slot 93 về `online_booked=0/booked_count=0`, hóa đơn vẫn `UNPAID`, không có payment; mở lại trang thanh toán bị chặn với "…hết hạn giữ chỗ. Vui lòng đặt lịch mới."
+* Dữ liệu để lại: hai lượt 123 (đã trả, A09 ngày 09/11) và 124 (`EXPIRED` ngày 10/11) của hồ sơ `Bệnh Nhân Kiểm Thử` (account 25) làm mẫu; xóa bằng `DELETE FROM appointments WHERE id IN (123,124)` nếu không cần.
+
+## 18. Bỏ giữ suất 15 phút + hộp thoại SweetAlert2 sau thanh toán (06/11/2026)
+
+### 18.1 Thay đổi
+
+| Hạng mục | Sau thay đổi |
+|---|---|
+| Giữ suất | **Bỏ hoàn toàn** cơ chế `hold_until` và quét `ExpireUnpaidAppointmentsAsync`. Đơn chưa trả nằm `PENDING` vô thời hạn, vẫn giữ `slot_position` và suất online |
+| Trả suất | Bệnh nhân bấm **Hủy đơn** ngay trên trang thanh toán (hoặc "Hủy lịch" ở `/LichKham`); `CancelAppointmentAsync` nhả suất, `queue_number`/`slot_position` về NULL, hóa đơn vẫn `UNPAID` |
+| Trang thanh toán | Không còn đồng hồ đếm ngược; cảnh báo đổi thành "không thanh toán thì bấm Hủy đơn để nhường suất" |
+| Cấu hình | `PaymentOptions` bỏ `HoldMinutes`; `appsettings.json` bỏ khóa tương ứng. Cột `appointments.hold_until` và index cũ vẫn giữ trong schema (không dùng) |
+| Trang thành công | Thêm hộp thoại **SweetAlert2** (CDN jsdelivr) tự hiện: mã lịch hẹn, ngày giờ, phòng khám, bác sĩ, số khám và hướng dẫn theo `has_health_insurance` — có BHYT: ghé quầy tiếp nhận xác nhận; không BHYT: lên thẳng phòng khám |
+| View model | `ThanhCongViewModel` thêm `DoctorName` để trang/hộp thoại luôn có tên bác sĩ kể cả khi không dựng `DoctorVm` |
+
+### 18.2 Kiểm chứng tự động
+
+* `dotnet build HIS.sln`: **0 Warning, 0 Error**.
+* `dotnet test` với `HIS_REHEARSAL_CONNECTION=hospital_his`: **114/115** — vẫn chỉ fail `RehearsalReadPathsTests` vì fixture `HIS-SEED-*` cũ ngày 05/11, không liên quan.
+* Ba constructor test đã bỏ tham số `Options.Create(new PaymentOptions())`.
+
+### 18.3 Bằng chứng dữ liệu thật (`hospital_his`, 06/11/2026)
+
+* Đặt mới id 148 (`HIS-20261111-8AQ42P`, BHYT=true): `status_id=1`, `queue_number=NULL`, `slot_position=1`, `invoice UNPAID`, slot 62 `online_booked=1/booked_count=1`; trang thanh toán không có đồng hồ, có nút **Hủy đơn**.
+* Bấm Hủy đơn trên trang thanh toán: `status_id=7`, `queue_number`/`slot_position` NULL, slot 62 về `online_booked=0/booked_count=0`, hóa đơn vẫn `UNPAID`; `/LichKham` báo "Đã hủy lượt HIS-20261111-8AQ42P".
+* Đặt mới id 149 (`HIS-20261111-ESGT89`, không BHYT), bấm "Tôi đã chuyển khoản": `CONFIRMED`, số **A05**; trang thành công tự mở SweetAlert2 hiện mã, "Ca sáng · 08:30 – 09:30, 11/11/2026", "Phòng khám Nội 1", "Số khám A05" và câu "Bạn không dùng BHYT: sau khi thanh toán, đi thẳng đến Phòng khám Nội 1 theo giờ hẹn." Lần chạy này lộ ra hộp thoại còn ghi "Bác sĩ tiếp nhận tại phòng khám" vì `ThanhCongViewModel` chưa mang tên bác sĩ → bổ sung `DoctorName`.
+* Đặt tiếp id 150 (`HIS-20261112-0W3HG0`, BHYT=true, 12/11 09:30), thanh toán: `CONFIRMED`, số **A09**; hộp thoại hiện đủ "Bác sĩ: BS. Lê Văn Cường", "Số khám A09" và "Bạn đã khai báo BHYT: vui lòng ghé quầy tiếp nhận để xác nhận bảo hiểm trước khi lên phòng khám."
+* DB sau hai lượt trả: 149/150 `status_id=2`, `queue_number` lần lượt `A05`/`A09`, `has_health_insurance` false/true, hóa đơn `PAID` 150.000đ, mỗi lượt đúng 1 dòng `payments`.
+
+## 19. Sinh VietQR bằng `Helpers/Utils.cs` + `Helpers/WebConstants.cs` theo project WebBanSach (06/11/2026)
+
+### 19.1 Thay đổi
+
+| Hạng mục | Sau thay đổi |
+|---|---|
+| Helper | Thêm `src/HIS.Web/Helpers/Utils.cs` (port từ WebBanSach: `GenerateQRCode`, `GenerateCheckSum`, `GetBankBin`, `BankCodes`, `StringBuilderBank`, `GenerateQRCodeImage`, `GenerateQRCodeImageBytes`, `GenerateQRCodeImageWithLogo`, `ChangeQRCodeColors`) và `src/HIS.Web/Helpers/WebConstants.cs` (ngân hàng nhận tiền, thư mục QR, màu QR) |
+| Thư viện | Thêm `SkiaSharp` 4.153.1 (cùng bản với project tham chiếu) để vẽ/tô màu PNG QR |
+| Sinh ảnh | `BookingController.ThanhToan` gọi `Utils.GenerateQRCode(WebConstants.NganHangNhan, WebConstants.SoTaiKhoanNhan, tiền, mã lịch hẹn)` rồi `Utils.GenerateQRCodeImage` lưu `wwwroot/images/qrcode/{mã}.png` (300×300, màu `WebConstants.QRColor = #174ea6`); view hiển thị qua `ThanhToanViewModel.QrImagePath` |
+| Bỏ code cũ | Xóa `Services/VietQr.cs` và `PaymentOptions`: bỏ `PaymentOptions.cs`, `AddPaymentOptions`, section `Payment` trong `appsettings.json` và action `MaQr` |
+| Git | Thêm `.gitignore` cho `src/HIS.Web/wwwroot/images/qrcode/*.png` (file sinh lúc chạy) |
+
+### 19.2 Kiểm chứng tự động và dữ liệu thật (`hospital_his`, 06/11/2026)
+
+* `dotnet build HIS.sln`: **0 Warning, 0 Error**.
+* Đặt mới id 174 (`HIS-20261113-3WPTC5`, 13/11 07:30, 150.000đ): trang `/Booking/ThanhToan/174` render `<img src="/images/qrcode/HIS-20261113-3WPTC5.png">`, ảnh tải xong 300×300.
+* File thật: `src/HIS.Web/wwwroot/images/qrcode/HIS-20261113-3WPTC5.png` — PNG 300×300 RGBA, 2.129 byte; chỉ có đúng 2 màu pixel `255,255,255` và `23,78,166` (= `#174ea6`).
+* Biên dịch lại chính `Helpers/Utils.cs` và in payload: `00020101021238540010A00000072701240006970422011007879567520208QRIBFTTA530370454061500005802VN62230819HIS-20261113-3WPTC563041C04` — đúng BIN `970422`, STK `0787956752`, số tiền `150000`, nội dung mã lịch hẹn, CRC `1C04`.
+* `dotnet test` với `HIS_REHEARSAL_CONNECTION=hospital_his`: **114/115**, vẫn chỉ fail `RehearsalReadPathsTests` do fixture `HIS-SEED-*` cũ ngày 05/11.

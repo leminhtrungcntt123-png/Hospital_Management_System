@@ -1,13 +1,14 @@
 using System.Diagnostics;
 using System.Globalization;
+using HIS.BLL.DTOs;
+using HIS.BLL.Interfaces;
 using HIS.Domain;
 using HIS.Web.Helpers;
 using HIS.Web.Realtime;
+using HIS.Web.Services;
 using HIS.Web.ViewModels;
 using HIS.Web.ViewModels.Booking;
 using Microsoft.AspNetCore.Mvc;
-using HIS.BLL.Interfaces;
-using HIS.BLL.DTOs;
 namespace HIS.Web.Controllers;
 
 
@@ -60,17 +61,20 @@ public class BookingController : PatientPageController
     private readonly IPatientProfileService _profileService;
     private readonly IPatientAccessService _accessService;
     private readonly QueueChangeNotifier _realtime;
+    private readonly IWebHostEnvironment _env;
 
     public BookingController(
         IBookingService bookingService,
         IPatientProfileService profileService,
         IPatientAccessService accessService,
-        QueueChangeNotifier realtime)
+        QueueChangeNotifier realtime,
+        IWebHostEnvironment env)
     {
         _bookingService = bookingService;
         _profileService = profileService;
         _accessService = accessService;
         _realtime = realtime;
+        _env = env;
     }
 
     // ------------------------------------------------------------ A1: Trang bắt đầu, ba lối vào
@@ -522,7 +526,8 @@ public class BookingController : PatientPageController
         state.HasHealthInsurance = hasHealthInsurance;
         state.HasPrivateInsurance = hasPrivateInsurance;
 
-        // BLL giữ một suất A của khung giờ, sinh số thứ tự và kiểm tra hạn mức trong cùng một giao dịch.
+        // BLL giữ một suất A của khung giờ, kiểm tra hạn mức và tạo hóa đơn UNPAID trong cùng giao dịch.
+        // Số thứ tự chưa được cấp: chỉ cấp sau khi bệnh nhân xác nhận đã chuyển khoản.
         Appointment created;
         try
         {
@@ -539,27 +544,115 @@ public class BookingController : PatientPageController
             return RedirectToAction(nameof(XacNhan));
         }
 
-        var slotVm = ToSlotVm(slot);
-
-        HttpContext.Session.SetObject(LastBookingKey, new ThanhCongViewModel
-        {
-            Code = created.AppointmentCode,
-            Status = "CONFIRMED",
-            Patient = patient,
-            DepartmentName = dept.Name,
-            Date = visitDate,
-            ShiftLabel = slotVm.ShiftLabel,
-            TimeRange = slotVm.Label,
-            QueueNumber = created.QueueNumber ?? string.Empty,
-            Doctor = slotVm.Doctor,
-            Room = slotVm.Room
-        });
-
         // Đặt thành công -> reset trạng thái chọn lịch (vẫn giữ PatientId cho lần sau)
         SaveState(new BookingState { Mode = state.Mode, PatientId = state.PatientId });
 
         // Báo quầy tiếp nhận (WinForms) nạp lại danh sách ngay khi có lượt hẹn mới.
         _realtime.Publish(QueueChangeKinds.AppointmentCreated);
+
+        return RedirectToAction(nameof(ThanhToan), new { id = created.Id });
+    }
+
+    // ------------------------------------------------------------ Bước thanh toán
+
+    /// <summary>
+    /// Trang thanh toán phí khám: hiện VietQR động (đúng số tiền + mã lịch hẹn) và thông tin
+    /// tài khoản nhận tiền; chưa thanh toán thì có thể hủy để trả suất cho người khác.
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> ThanhToan(int id)
+    {
+        if (RequireAccount() is { } signIn) return signIn;
+
+        var appointment = await _bookingService.GetPaymentInfoAsync(id, AccountId);
+        if (appointment is null)
+        {
+            TempData["Error"] = "Không tìm thấy lịch hẹn cần thanh toán.";
+            return RedirectToAction("Index", "LichKham");
+        }
+
+        if (appointment.Status == AppointmentStatus.Codes.Confirmed)
+        {
+            TempData["Message"] = $"Lịch hẹn {appointment.Code} đã được thanh toán.";
+            return RedirectToAction("Index", "LichKham");
+        }
+
+        if (appointment.Status != AppointmentStatus.Codes.Pending)
+        {
+            TempData["Error"] = $"Lịch hẹn {appointment.Code} không còn ở trạng thái chờ thanh toán. Vui lòng đặt lịch mới.";
+            return RedirectToAction("Index", "LichKham");
+        }
+
+        return View(new ThanhToanViewModel
+        {
+            Appointment = appointment,
+            BankName = WebConstants.TenNganHangNhan,
+            AccountNumber = WebConstants.SoTaiKhoanNhan,
+            AccountName = WebConstants.TenTaiKhoanNhan,
+            QrImagePath = EnsureQrImage(appointment)
+        });
+    }
+
+    /// <summary>
+    /// Sinh ảnh VietQR của lượt hẹn: payload EMV từ <see cref="Utils.GenerateQRCode"/> rồi vẽ PNG
+    /// vào wwwroot/images/qrcode để trang thanh toán hiển thị trực tiếp như project WebBanSach.
+    /// </summary>
+    private string EnsureQrImage(AppointmentPaymentDto appointment)
+    {
+        string fileName = $"{appointment.Code}.png";
+        string filePath = Path.Combine(_env.WebRootPath, WebConstants.QRFolder, fileName);
+
+        if (!System.IO.File.Exists(filePath))
+        {
+            string payload = Utils.GenerateQRCode(
+                WebConstants.NganHangNhan,
+                WebConstants.SoTaiKhoanNhan,
+                appointment.Amount.ToString("0"),
+                appointment.Code);
+            Utils.GenerateQRCodeImage(payload, filePath, qrColor: WebConstants.QRColor);
+        }
+
+        return $"/{WebConstants.QRFolder}/{fileName}";
+    }
+
+    /// <summary>
+    /// Nút "Tôi đã chuyển khoản" của bản demo: xác nhận thanh toán, cấp số thứ tự và mở phiếu khám.
+    /// Khi có webhook ngân hàng thật, chỉ cần gọi cùng BookingService.ConfirmPaymentAsync.
+    /// </summary>
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> XacNhanThanhToan(int id)
+    {
+        if (RequireAccount() is { } signIn) return signIn;
+
+        var result = await _bookingService.ConfirmPaymentAsync(id, AccountId);
+        if (!result.Success)
+        {
+            TempData["Error"] = result.Message;
+            return RedirectToAction(nameof(ThanhToan), new { id });
+        }
+
+        var appointment = await _bookingService.GetPaymentInfoAsync(id, AccountId);
+        if (appointment is not null)
+        {
+            HttpContext.Session.SetObject(LastBookingKey, new ThanhCongViewModel
+            {
+                Code = appointment.Code,
+                Status = AppointmentStatus.Codes.Confirmed,
+                Patient = new PatientVm { FullName = appointment.PatientName, Phone = appointment.PatientPhone },
+                DepartmentName = appointment.DepartmentName,
+                Date = appointment.Date,
+                ShiftLabel = appointment.ShiftLabel,
+                TimeRange = appointment.TimeRange,
+                QueueNumber = result.QueueNumber,
+                DoctorName = appointment.DoctorName,
+                Room = appointment.RoomName,
+                HasHealthInsurance = appointment.HasHealthInsurance,
+                PaidAmount = result.Amount,
+                PaidAt = DateTime.Now
+            });
+        }
+
+        _realtime.Publish(QueueChangeKinds.AppointmentPaid);
 
         return RedirectToAction(nameof(ThanhCong));
     }

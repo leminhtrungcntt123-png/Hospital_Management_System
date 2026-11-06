@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#079bc9" />
+    <link rel="icon" type="image/jpeg" href="~/images/medicare-logo.jpg" />
+    <title>@ViewData["Title"] — Hệ thống thông tin bệnh viện</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; }
+        body { font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif; color: #0f172a; }
+        button, input { font: inherit; }
+        a { color: inherit; }
+    </style>
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body class="mvc-auth his-auth-bg">
+    <main class="mvc-auth-main his-auth-main">
+        @RenderBody()
+    </main>
+
+    <footer style="position: relative; z-index: 5; padding: 10px; text-align: center; font-size: 12px; color: #0f172a; font-weight: 600; text-shadow: 0 0 6px #ffffff, 0 0 12px #ffffff;">
+        © @DateTime.Now.Year Hệ thống thông tin bệnh viện · HIS
+    </footer>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>
