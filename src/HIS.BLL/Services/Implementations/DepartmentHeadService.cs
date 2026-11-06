@@ -324,6 +324,7 @@ public class DepartmentHeadService : IDepartmentHeadService
 
         if (schedule != null)
         {
+            schedule.DoctorId = request.DoctorId;
             schedule.RoomId = request.RoomId;
             schedule.DayOfWeek = request.DayOfWeek;
             schedule.Shift = request.Shift;

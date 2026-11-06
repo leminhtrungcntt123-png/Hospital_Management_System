@@ -1,13 +1,21 @@
 @using System.Security.Claims
 
 @{
+    string GetInitials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "NV";
+        var parts = name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 1) return parts[0].Length >= 2 ? parts[0][..2].ToUpperInvariant() : parts[0].ToUpperInvariant();
+        return string.Concat(parts.TakeLast(2).Select(p => char.ToUpperInvariant(p[0])));
+    }
+
     var isAuthenticated = User.Identity?.IsAuthenticated == true;
     var isStaff = User.IsInRole("ADMIN") || User.IsInRole("DOCTOR") || User.IsInRole("NURSE") || User.IsInRole("DEPARTMENT_HEAD");
     var role = User.FindFirst(ClaimTypes.Role)?.Value ?? (isAuthenticated ? "ADMIN" : "PATIENT");
     var fullName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? (isAuthenticated ? "Nhân viên" : "Khách");
+    var departmentName = User.FindFirst("DepartmentName")?.Value;
     var currentPath = Context.Request.Path.Value ?? "";
     var currentTab = Context.Request.Query["tab"].ToString().ToLowerInvariant();
-    if (string.IsNullOrEmpty(currentTab)) currentTab = "consultation";
 
     var currentTitle = (currentPath.StartsWith("/Staff/Schedule", StringComparison.OrdinalIgnoreCase)) ? (currentTab switch
     {
@@ -59,7 +67,7 @@
                         <path d="M3 21h18 M9 8h1 M9 12h1 M9 16h1 M14 8h1 M14 12h1 M14 16h1 M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"></path>
                     </svg>
                     <span>
-                        <strong>@(User.IsInRole("ADMIN") ? "Bệnh viện MediCare" : "Khoa Nội tổng hợp")</strong>
+                        <strong>@(User.IsInRole("ADMIN") ? "Bệnh viện MediCare" : (!string.IsNullOrEmpty(departmentName) ? departmentName : "Khoa chuyên môn"))</strong>
                         <small>
                             @(User.IsInRole("ADMIN") ? "Quản trị viên" :
                               User.IsInRole("DOCTOR") ? "Bác sĩ" :
@@ -92,7 +100,7 @@
                 {
                     <div class="nav-group">
                         <span>CHUYÊN MÔN</span>
-                        <a href="/Staff/Consultation" class="@(currentPath.StartsWith("/Staff/Consultation") && currentTab == "consultation" ? "active" : "")">
+                        <a href="/Staff/Consultation" class="@(currentPath.StartsWith("/Staff/Consultation") && (string.IsNullOrEmpty(currentTab) || currentTab == "consultation") ? "active" : "")">
                             <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M5 3v5a5 5 0 0 0 10 0V3 M3 3h4 M13 3h4 M10 13v3a5 5 0 0 0 10 0v-2 M22 11a2 2 0 1 1-4 0 2 2 0 0 1 4 0"></path>
                             </svg>
@@ -217,8 +225,8 @@
                         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>
                         </svg>
-                        <span>04/11/2026 · 09:00</span>
-                        <small>giờ mẫu</small>
+                        <span>@DateTime.Now.ToString("dd/MM/yyyy · HH:mm")</span>
+                        <small>giờ hệ thống</small>
                     </div>
                     <button type="button" class="btn icon-btn" style="background:none; border:none; padding:6px; cursor:pointer;" aria-label="Tìm kiếm">
                         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;color:#596a7c;">
@@ -232,9 +240,14 @@
                     </button>
                     <div class="staff-profile">
                         @{
-                            var displayName = User.IsInRole("DEPARTMENT_HEAD") ? "Phạm Thu Hằng" : (string.IsNullOrEmpty(fullName) || fullName == "Nhân viên" ? "Nguyễn Hoàng Nam" : fullName);
-                            var displayInitials = User.IsInRole("DEPARTMENT_HEAD") ? "TH" : "HN";
-                            var displayRole = User.IsInRole("DEPARTMENT_HEAD") ? "Trưởng khoa" : (User.IsInRole("DOCTOR") ? "Bác sĩ" : role);
+                            var displayName = !string.IsNullOrWhiteSpace(fullName) && fullName != "Nhân viên"
+                                ? fullName
+                                : (User.Identity?.Name ?? "Nhân viên");
+                            var displayInitials = GetInitials(displayName);
+                            var displayRole = User.IsInRole("DEPARTMENT_HEAD") ? "Trưởng khoa" :
+                                              User.IsInRole("DOCTOR") ? "Bác sĩ" :
+                                              User.IsInRole("NURSE") ? "Điều dưỡng" :
+                                              User.IsInRole("ADMIN") ? "Quản trị viên" : role;
                         }
                         <div class="avatar" style="background:#e0f2fe; color:#0369a1; font-weight:700; font-size:11px; width:30px; height:30px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center;">
                             @displayInitials

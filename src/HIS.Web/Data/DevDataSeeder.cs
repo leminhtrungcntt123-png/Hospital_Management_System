@@ -442,13 +442,19 @@ public static class DevDataSeeder
             // 10. ĐỀ NGHỊ NGHỈ / ĐỔI CA (ScheduleException)
             if (doc3 != null)
             {
-                var exThu = await db.ScheduleExceptions.FirstOrDefaultAsync(e => e.DoctorId == doc3.Id && e.Date == new DateOnly(2026, 11, 5));
+                var nextWeekday = today.AddDays(1);
+                while (nextWeekday.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+                {
+                    nextWeekday = nextWeekday.AddDays(1);
+                }
+
+                var exThu = await db.ScheduleExceptions.FirstOrDefaultAsync(e => e.DoctorId == doc3.Id && e.Date == nextWeekday);
                 if (exThu == null)
                 {
                     db.ScheduleExceptions.Add(new ScheduleException
                     {
                         DoctorId = doc3.Id,
-                        Date = new DateOnly(2026, 11, 5),
+                        Date = nextWeekday,
                         Shift = ExamShift.Morning,
                         Type = ScheduleExceptionType.Training,
                         Status = ScheduleExceptionStatus.Pending,

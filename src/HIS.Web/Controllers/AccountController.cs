@@ -83,6 +83,7 @@ public class AccountController : Controller
         string username = targetRole.ToLower() + "_dev";
         string fullName = "Test " + targetRole;
         string? doctorId = null;
+        string? departmentName = null;
 
         if (targetRole == "ADMIN")
         {
@@ -106,6 +107,7 @@ public class AccountController : Controller
                 accountId = head.AccountId;
                 username = head.Account?.Username ?? "head_noi";
                 fullName = head.FullName;
+                departmentName = head.Department?.Name;
             }
             else
             {
@@ -124,7 +126,7 @@ public class AccountController : Controller
                 .Include(d => d.Account)
                 .Include(d => d.Department)
                 .FirstOrDefaultAsync(d => d.AccountId > 0 && d.Account.RoleId == (int)RoleId.Doctor)
-                ?? await db.Doctors.Include(d => d.Account).FirstOrDefaultAsync();
+                ?? await db.Doctors.Include(d => d.Account).Include(d => d.Department).FirstOrDefaultAsync();
 
             if (doc != null)
             {
@@ -132,6 +134,7 @@ public class AccountController : Controller
                 username = doc.Account?.Username ?? "bs_nam";
                 fullName = doc.FullName;
                 doctorId = doc.Id.ToString();
+                departmentName = doc.Department?.Name;
             }
             else
             {
@@ -148,6 +151,7 @@ public class AccountController : Controller
         {
             var nurse = await db.Nurses
                 .Include(n => n.Account)
+                .Include(n => n.Department)
                 .FirstOrDefaultAsync();
 
             if (nurse != null)
@@ -155,6 +159,7 @@ public class AccountController : Controller
                 accountId = nurse.AccountId;
                 username = nurse.Account?.Username ?? "nurse_lan";
                 fullName = nurse.FullName;
+                departmentName = nurse.Department?.Name;
             }
             else
             {
@@ -189,6 +194,11 @@ public class AccountController : Controller
         if (!string.IsNullOrEmpty(doctorId))
         {
             claims.Add(new Claim("DoctorId", doctorId));
+        }
+
+        if (!string.IsNullOrEmpty(departmentName))
+        {
+            claims.Add(new Claim("DepartmentName", departmentName));
         }
 
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
@@ -242,6 +252,11 @@ public class AccountController : Controller
             new(ClaimTypes.Role, auth.Role),
             new("FullName", string.IsNullOrWhiteSpace(auth.FullName) ? auth.Username : auth.FullName)
         };
+
+        if (!string.IsNullOrEmpty(auth.DepartmentName))
+        {
+            claims.Add(new Claim("DepartmentName", auth.DepartmentName));
+        }
 
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         var principal = new ClaimsPrincipal(identity);

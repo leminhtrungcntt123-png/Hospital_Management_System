@@ -18,24 +18,12 @@
         <div class="hero-actions" style="display:flex; gap:12px; margin-top:24px;">
             @if (User.Identity?.IsAuthenticated == true)
             {
-                @if (User.IsInRole("DOCTOR"))
-                {
-                    <a href="/Staff/Consultation" class="btn btn-primary" style="background:#079bc9; border:none; padding:12px 24px; border-radius:8px; font-weight:600; font-size:14px; color:#fff; text-decoration:none;">
-                        🩺 Vào Bàn khám Ngoại trú &rarr;
-                    </a>
-                }
-                else if (User.IsInRole("ADMIN"))
-                {
-                    <a href="/Admin/Accounts" class="btn btn-primary" style="background:#079bc9; border:none; padding:12px 24px; border-radius:8px; font-weight:600; font-size:14px; color:#fff; text-decoration:none;">
-                        🛡️ Vào Không gian Quản trị &rarr;
-                    </a>
-                }
-                else if (User.IsInRole("NURSE"))
-                {
-                    <a href="/Staff/Reception" class="btn btn-primary" style="background:#079bc9; border:none; padding:12px 24px; border-radius:8px; font-weight:600; font-size:14px; color:#fff; text-decoration:none;">
-                        📋 Vào Bàn Tiếp đón &rarr;
-                    </a>
-                }
+                <a href="/Patient/Booking" class="btn btn-primary" style="background:#079bc9; border:none; padding:12px 24px; border-radius:8px; font-weight:600; font-size:14px; color:#fff; text-decoration:none;">
+                    📅 Đặt lịch khám ngay &rarr;
+                </a>
+                <a href="/Patient/MedicalRecords" class="btn btn-outline-secondary" style="padding:12px 20px; border-radius:8px; font-weight:600; font-size:14px; text-decoration:none;">
+                    📋 Xem hồ sơ bệnh án
+                </a>
             }
             else
             {
@@ -63,8 +51,12 @@
 </section>
 
 <!-- LỐI TẮT TRUY CẬP NHANH (QUICK ACCESS) -->
+@{
+    var bookingUrl = User.Identity?.IsAuthenticated == true ? "/Patient/Booking" : "/Account/Login";
+    var recordsUrl = User.Identity?.IsAuthenticated == true ? "/Patient/MedicalRecords" : "/Account/Login";
+}
 <div class="quick-access" style="display:grid; grid-template-columns:repeat(3, 1fr); margin:0 32px 40px; background:#f4faff; border:1px solid #dbeaf4; border-radius:11px; overflow:hidden;">
-    <a href="/Account/Login" class="quick-item" style="padding:20px 24px; display:flex; align-items:center; gap:14px; text-decoration:none; color:inherit; border-right:1px solid #dfeaf3;">
+    <a href="@bookingUrl" class="quick-item" style="padding:20px 24px; display:flex; align-items:center; gap:14px; text-decoration:none; color:inherit; border-right:1px solid #dfeaf3;">
         <span style="font-size:24px;">📅</span>
         <span style="display:flex; flex-direction:column;">
             <strong style="color:#10243e; font-size:13px;">Đặt lịch khám ngoại trú</strong>
@@ -78,7 +70,7 @@
             <small style="color:#596a7c; font-size:11px;">Nội, Ngoại, Tim mạch, Da liễu, Nhi khoa</small>
         </span>
     </a>
-    <a href="/Account/Login" class="quick-item" style="padding:20px 24px; display:flex; align-items:center; gap:14px; text-decoration:none; color:inherit;">
+    <a href="@recordsUrl" class="quick-item" style="padding:20px 24px; display:flex; align-items:center; gap:14px; text-decoration:none; color:inherit;">
         <span style="font-size:24px;">📋</span>
         <span style="display:flex; flex-direction:column;">
             <strong style="color:#10243e; font-size:13px;">Tra cứu kết quả bệnh án</strong>
@@ -115,7 +107,7 @@
                     </p>
                     <div style="border-top:1px solid #f1f5f9; padding-top:12px; display:flex; justify-content:space-between; align-items:center;">
                         <span style="font-size:11px; color:#10b981; font-weight:600;">● Đang tiếp nhận khám</span>
-                        <a href="/Account/Login" style="font-size:12px; color:#079bc9; font-weight:600; text-decoration:none;">Đặt hẹn &rarr;</a>
+                        <a href="@bookingUrl" style="font-size:12px; color:#079bc9; font-weight:600; text-decoration:none;">Đặt hẹn &rarr;</a>
                     </div>
                 </div>
             }

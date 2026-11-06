@@ -21,6 +21,11 @@ public class QueueService : IQueueService
         var app = await _context.Appointments.FirstOrDefaultAsync(a => a.Id == appointmentId, ct);
         if (app == null) return Result.Failure<string>("NOT_FOUND", "Không tìm thấy lượt hẹn.");
 
+        if (!AppointmentStateMachine.CanTransition((AppointmentStatusId)app.StatusId, AppointmentStatusId.CheckedIn))
+        {
+            return Result.Failure<string>("INVALID_STATUS", "Trạng thái lịch hẹn không hợp lệ để tiếp nhận check-in.");
+        }
+
         var now = _timeProvider.GetLocalNow().DateTime;
         app.StatusId = (int)AppointmentStatusId.CheckedIn;
         app.CheckedInAt = now;
@@ -57,7 +62,11 @@ public class QueueService : IQueueService
 
         if (doctor != null)
         {
-            query = query.Where(a => a.DoctorId == doctor.Id || (roomId > 0 && a.RoomId == roomId));
+            query = query.Where(a => a.DoctorId == doctor.Id);
+            if (roomId > 0)
+            {
+                query = query.Where(a => a.RoomId == roomId);
+            }
         }
         else if (departmentId.HasValue && departmentId.Value > 0)
         {

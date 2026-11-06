@@ -1,3 +1,4 @@
+using HIS.BLL.Common;
 using HIS.BLL.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -8,11 +9,14 @@ namespace HIS.Web.Areas.Admin.Controllers;
 [Authorize(Policy = "AdminOnly")]
 public class AccountsController : Controller
 {
+    private const string GenericErrorMessage = "Đã xảy ra lỗi trong quá trình xử lý. Vui lòng thử lại sau.";
     private readonly IStaffService _staffService;
+    private readonly ILogger<AccountsController> _logger;
 
-    public AccountsController(IStaffService staffService)
+    public AccountsController(IStaffService staffService, ILogger<AccountsController> logger)
     {
         _staffService = staffService;
+        _logger = logger;
     }
 
     // 1. Danh sách tài khoản nhân sự và vai trò hệ thống
@@ -34,9 +38,14 @@ public class AccountsController : Controller
             await _staffService.CreateStaffAsync(username, password, fullName, roleId, isActive, ct);
             TempData["SuccessMessage"] = "Tạo tài khoản nhân viên thành công.";
         }
-        catch (Exception ex)
+        catch (AdminOperationException ex)
         {
             TempData["ErrorMessage"] = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Lỗi không xác định khi tạo tài khoản nhân viên.");
+            TempData["ErrorMessage"] = GenericErrorMessage;
         }
 
         return RedirectToAction(nameof(Index));
@@ -52,9 +61,14 @@ public class AccountsController : Controller
             await _staffService.UpdateStaffAsync(id, password, fullName, roleId, isActive, ct);
             TempData["SuccessMessage"] = "Cập nhật tài khoản nhân viên thành công.";
         }
-        catch (Exception ex)
+        catch (AdminOperationException ex)
         {
             TempData["ErrorMessage"] = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Lỗi không xác định khi cập nhật tài khoản nhân viên {AccountId}.", id);
+            TempData["ErrorMessage"] = GenericErrorMessage;
         }
 
         return RedirectToAction(nameof(Index));
@@ -73,9 +87,14 @@ public class AccountsController : Controller
             else
                 TempData["ErrorMessage"] = "Tài khoản không tồn tại.";
         }
-        catch (Exception ex)
+        catch (AdminOperationException ex)
         {
             TempData["ErrorMessage"] = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Lỗi không xác định khi xóa tài khoản {AccountId}.", id);
+            TempData["ErrorMessage"] = GenericErrorMessage;
         }
 
         return RedirectToAction(nameof(Index));
@@ -88,6 +107,12 @@ public class AccountsController : Controller
     {
         try
         {
+            if (string.IsNullOrWhiteSpace(newPassword))
+            {
+                TempData["ErrorMessage"] = "Mật khẩu mới không được để trống.";
+                return RedirectToAction(nameof(Index));
+            }
+
             var staff = await _staffService.GetStaffAsync(ct);
             var target = staff.FirstOrDefault(s => s.Id == accountId);
             if (target == null)
@@ -97,14 +122,24 @@ public class AccountsController : Controller
             }
 
             var roles = await _staffService.GetRolesAsync(ct);
-            var roleId = roles.FirstOrDefault(r => r.Code == target.RoleCode)?.Id ?? 1;
+            var role = roles.FirstOrDefault(r => r.Code == target.RoleCode);
+            if (role == null)
+            {
+                TempData["ErrorMessage"] = "Không xác định được vai trò hợp lệ của tài khoản.";
+                return RedirectToAction(nameof(Index));
+            }
 
-            await _staffService.UpdateStaffAsync(accountId, newPassword, target.FullName, roleId, target.IsActive, ct);
+            await _staffService.UpdateStaffAsync(accountId, newPassword.Trim(), target.FullName, role.Id, target.IsActive, ct);
             TempData["SuccessMessage"] = $"Đặt lại mật khẩu cho tài khoản '{target.Username}' thành công.";
+        }
+        catch (AdminOperationException ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
         }
         catch (Exception ex)
         {
-            TempData["ErrorMessage"] = ex.Message;
+            _logger.LogError(ex, "Lỗi không xác định khi đặt lại mật khẩu cho tài khoản {AccountId}.", accountId);
+            TempData["ErrorMessage"] = GenericErrorMessage;
         }
 
         return RedirectToAction(nameof(Index));
