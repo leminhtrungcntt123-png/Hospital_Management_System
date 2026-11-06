@@ -1,0 +1,295 @@
+@{
+    ViewData["Title"] = "Quản trị bệnh viện";
+    var home = Url.Action("Index", "Home", new { area = "" });
+}
+
+<div class="admin-workspace staff-app"
+     data-api="@Url.Action("Index", "Management", new { area = "Admin" })"
+     data-section="@(ViewData["AdminSection"] ?? "dashboard")">
+    <aside class="admin-sidebar sidebar" id="admin-sidebar" aria-label="Điều hướng quản trị">
+        <div>
+            <a class="admin-brand brand-link" href="@home" aria-label="MediCare, về trang chủ">
+                <span class="brand">
+                    <span class="brand-mark">@await Html.PartialAsync("_AdminIcon", "plus")</span>
+                    <span>MediCare<sup>+</sup></span>
+                </span>
+            </a>
+            <div class="workspace">
+                @await Html.PartialAsync("_AdminIcon", "building")
+                <span>
+                    <strong>Bệnh viện An Tâm</strong>
+                    <small>Quản trị viên</small>
+                </span>
+            </div>
+        </div>
+        <nav class="staff-nav" aria-label="Chức năng quản trị">
+            <div class="nav-group">
+                <span>ĐIỀU HÀNH</span>
+                <a href="#dashboard" data-section="dashboard">
+                    @await Html.PartialAsync("_AdminIcon", "grid")
+                    <span>Tổng quan &amp; doanh thu</span>
+                </a>
+                <a href="#requests" data-section="requests">
+                    @await Html.PartialAsync("_AdminIcon", "calendar")
+                    <span>Nghỉ / đổi ca</span>
+                </a>
+            </div>
+            <div class="nav-group">
+                <span>QUẢN TRỊ</span>
+                <a href="#departments" data-section="departments">
+                    @await Html.PartialAsync("_AdminIcon", "building")
+                    <span>Phòng ban</span>
+                </a>
+                <a href="#staff" data-section="staff">
+                    @await Html.PartialAsync("_AdminIcon", "users")
+                    <span>Nhân sự</span>
+                </a>
+                <a href="#doctors" data-section="doctors">
+                    @await Html.PartialAsync("_AdminIcon", "stethoscope")
+                    <span>Danh sách bác sĩ</span>
+                </a>
+                <a href="#accounts" data-section="accounts">
+                    @await Html.PartialAsync("_AdminIcon", "shield")
+                    <span>Tài khoản</span>
+                </a>
+            </div>
+        </nav>
+        <div class="sidebar-bottom">
+            <a class="btn portal-link" href="@home">
+                @await Html.PartialAsync("_AdminIcon", "external")
+                <span>Cổng bệnh nhân</span>
+            </a>
+            <div>
+                <span><i></i>MediCare HIS</span>
+            </div>
+        </div>
+    </aside>
+    <button class="admin-sidebar-scrim sidebar-scrim" type="button" aria-label="Đóng điều hướng" hidden></button>
+
+    <div class="admin-content">
+        <header class="admin-topbar staff-topbar">
+            <button class="icon-btn mobile-only" id="admin-menu-toggle" type="button"
+                    aria-label="Mở điều hướng" aria-controls="admin-sidebar" aria-expanded="false">
+                @await Html.PartialAsync("_AdminIcon", "menu")
+            </button>
+            <div class="staff-breadcrumb">
+                <span>Quản trị viên</span>
+                <i>/</i>
+                <strong id="admin-breadcrumb">Tổng quan &amp; doanh thu</strong>
+            </div>
+            <div class="admin-session">
+                <span class="admin-identity">@(User.FindFirst("FullName")?.Value ?? User.Identity?.Name)</span>
+                <form asp-area="" asp-controller="Account" asp-action="Logout" method="post">
+                    <button class="btn button secondary sm small-button" type="submit">Đăng xuất</button>
+                </form>
+            </div>
+        </header>
+
+        <main class="staff-main">
+            <div class="admin-heading">
+                <div>
+                    <p class="eyebrow">ĐIỀU HÀNH BỆNH VIỆN</p>
+                    <h1 id="page-title">Tổng quan &amp; doanh thu</h1>
+                    <p id="page-description">
+                        Theo dõi số lượt tiếp nhận và dòng tiền theo thời gian.
+                    </p>
+                </div>
+                <button class="btn button secondary" id="refresh-data" type="button">@await Html.PartialAsync("_AdminIcon", "refresh")<span>Làm mới</span></button>
+            </div>
+
+            <div id="admin-message" role="status" aria-live="polite" hidden></div>
+            <div id="admin-token" hidden>@Html.AntiForgeryToken()</div>
+
+            <section data-panel="dashboard" aria-label="Báo cáo doanh thu">
+                <form id="report-filter" class="filter-bar">
+                    <label>
+                        Từ ngày
+                        <input name="from" type="date" required />
+                    </label>
+                    <label>
+                        Đến ngày
+                        <input name="to" type="date" required />
+                    </label>
+                    <button class="btn button primary" type="submit">Xem báo cáo</button>
+                    <button class="btn button secondary" id="export-revenue" type="button">
+                        @await Html.PartialAsync("_AdminIcon", "download")<span>Xuất CSV / Excel</span>
+                    </button>
+                </form>
+                <p class="definition">
+                    Doanh thu thực thu = tạm ứng + thanh toán − hoàn tiền. Lượng khách tính theo
+                    lượt đã tiếp nhận; một người khám nhiều lần được tính nhiều lượt.
+                </p>
+                <div class="admin-stats" id="report-stats" aria-live="polite"></div>
+                <div class="card chart-card">
+                    <div class="card-heading">
+                        <h2>Doanh thu theo ngày</h2>
+                        <span>Tiền thực thu · VNĐ</span>
+                    </div>
+                    <div id="revenue-chart" class="revenue-chart"></div>
+                </div>
+                <div class="card">
+                    <div class="card-heading">
+                        <h2>Chi tiết theo thời gian</h2>
+                        <span id="report-period"></span>
+                    </div>
+                    <div class="table-scroll" id="report-table"></div>
+                </div>
+            </section>
+
+            <section data-panel="requests" aria-label="Yêu cầu nghỉ và đổi ca" hidden>
+                <p class="definition">
+                    Duyệt trước khi ca bắt đầu. Hệ thống chuyển lịch sang khung giờ còn chỗ trong khoa;
+                    lịch không còn chỗ được đánh dấu cần đặt lại và gửi thông báo. Khung giờ cũ được khóa
+                    để giữ lịch sử.
+                </p>
+                <div class="card">
+                    <div class="card-heading">
+                        <h2>Đề nghị nghỉ / đổi ca</h2>
+                        <span>Hiển thị tối đa 200 đề nghị gần nhất</span>
+                    </div>
+                    <div class="table-scroll" id="requests-table"></div>
+                </div>
+            </section>
+
+            <section data-panel="departments" aria-label="Danh sách phòng ban" hidden>
+                <div class="section-actions">
+                    <span>Khoa / đơn vị chuyên môn của bệnh viện</span>
+                    <button class="btn button primary" data-open="department-dialog" type="button">
+                        + Thêm phòng ban
+                    </button>
+                </div>
+                <div class="card"><div class="table-scroll" id="departments-table"></div></div>
+            </section>
+
+            <section data-panel="staff" aria-label="Danh sách nhân sự" hidden>
+                <div class="section-actions">
+                    <span>Bác sĩ, y tá và trưởng khoa</span>
+                    <button class="btn button primary" id="new-staff" type="button">
+                        + Thêm nhân sự
+                    </button>
+                </div>
+                <p class="definition">
+                    Hồ sơ nhân sự được tạo cùng tài khoản để bảo đảm liên kết đúng vai trò và phòng
+                    ban.
+                </p>
+                <div class="card"><div class="table-scroll" id="staff-table"></div></div>
+            </section>
+
+            <section data-panel="doctors" aria-label="Danh sách bác sĩ" hidden>
+                <div class="card">
+                    <div class="card-heading">
+                        <h2>Đội ngũ bác sĩ</h2>
+                        <span>Thông tin nhân sự, không bao gồm bệnh án</span>
+                    </div>
+                    <div class="table-scroll" id="doctors-table"></div>
+                </div>
+            </section>
+
+            <section data-panel="accounts" aria-label="Danh sách tài khoản" hidden>
+                <div class="section-actions">
+                    <span>Quản lý quyền truy cập và trạng thái hoạt động</span>
+                    <button class="btn button primary" id="new-account" type="button">
+                        + Tạo tài khoản
+                    </button>
+                </div>
+                <div class="card"><div class="table-scroll" id="accounts-table"></div></div>
+            </section>
+        </main>
+    </div>
+</div>
+
+<dialog id="department-dialog" aria-labelledby="department-title">
+    <form id="department-form">
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">CƠ CẤU BỆNH VIỆN</p>
+                <h2 id="department-title">Thêm phòng ban</h2>
+            </div>
+            <button type="button" data-close aria-label="Đóng">×</button>
+        </div>
+        <label>
+            Tên phòng ban *
+            <input name="name" maxlength="100" minlength="2" required />
+        </label>
+        <label>
+            Mô tả
+            <textarea name="description" maxlength="255" rows="3"></textarea>
+        </label>
+        <p class="form-error" role="alert"></p>
+        <div class="dialog-actions">
+            <button type="button" class="btn button secondary" data-close>Hủy</button>
+            <button class="btn button primary" type="submit">Lưu phòng ban</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="account-dialog" aria-labelledby="account-title">
+    <form id="account-form">
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">QUẢN LÝ TRUY CẬP</p>
+                <h2 id="account-title">Tạo tài khoản</h2>
+            </div>
+            <button type="button" data-close aria-label="Đóng">×</button>
+        </div>
+        <div class="form-grid">
+            <label>
+                Tên đăng nhập *
+                <input
+                    name="username"
+                    minlength="3"
+                    maxlength="50"
+                    pattern="[a-zA-Z0-9_.]+"
+                    autocomplete="off"
+                    required
+                />
+            </label>
+            <label>
+                Mật khẩu ban đầu *
+                <input
+                    name="password"
+                    type="password"
+                    minlength="8"
+                    maxlength="72"
+                    autocomplete="new-password"
+                    required
+                />
+            </label>
+            <label>
+                Vai trò *
+                <select name="roleId" required></select>
+            </label>
+            <label>
+                Email
+                <input name="email" type="email" maxlength="100" />
+            </label>
+            <label data-name-field>
+                Họ tên *
+                <input name="fullName" minlength="2" maxlength="100" />
+            </label>
+            <label data-department-field>
+                Phòng ban *
+                <select name="departmentId"></select>
+            </label>
+            <label data-patient-field>
+                Ngày sinh người khám *
+                <input name="dateOfBirth" type="date" />
+            </label>
+            <label data-patient-field>
+                Điện thoại người khám *
+                <input name="phoneNumber" type="tel" maxlength="15" />
+            </label>
+        </div>
+        <p class="definition" id="account-hint">
+            Tài khoản mới được kích hoạt sau khi tạo. Mật khẩu không được hiển thị trong danh sách.
+        </p>
+        <p class="form-error" role="alert"></p>
+        <div class="dialog-actions">
+            <button type="button" class="btn button secondary" data-close>Hủy</button>
+            <button class="btn button primary" type="submit">Tạo tài khoản</button>
+        </div>
+    </form>
+</dialog>
+
+<script src="~/js/admin-management.js" asp-append-version="true" defer></script>
+

@@ -12,7 +12,10 @@ public enum LoginSurface
     Staff,
 
     /// <summary>Trang đặt lịch của bệnh nhân: chỉ nhận tài khoản PATIENT.</summary>
-    PatientPortal
+    PatientPortal,
+
+    /// <summary>Cổng Web chung (chấp nhận cả PATIENT và Nhân sự).</summary>
+    Web
 }
 
 /// <summary>
@@ -29,9 +32,8 @@ public interface IAuthService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Tạo tài khoản bệnh nhân kèm hồ sơ "Bản thân" ACTIVE trong một lần lưu.
-    /// SĐT chủ tài khoản chỉ được thuộc một tài khoản (quy tắc hồ sơ của HIS), email bắt buộc
-    /// để sau này còn nhận mã OTP đặt lại mật khẩu.
+    /// Tạo tài khoản bệnh nhân. SĐT chủ tài khoản chỉ được thuộc một tài khoản (quy tắc hồ sơ của HIS),
+    /// email bắt buộc để sau này nhận mã OTP đặt lại mật khẩu.
     /// </summary>
     Task<RegisterResult> RegisterPatientAsync(
         RegisterPatientRequest request,
@@ -47,6 +49,19 @@ public interface IAuthService
         string emailOrUsername,
         string otp,
         string newPassword,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Đổi mật khẩu tài khoản đang đăng nhập.</summary>
+    Task<ChangePasswordResult> ChangePasswordAsync(
+        int accountId,
+        string oldPassword,
+        string newPassword,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Kiểm tra tài khoản còn hoạt động hợp lệ trong phiên làm việc.</summary>
+    Task<bool> IsSessionActiveAsync(
+        int accountId,
+        string? roleCode = null,
         CancellationToken cancellationToken = default);
 
     Task LogoutAsync(int accountId, CancellationToken cancellationToken = default);

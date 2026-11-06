@@ -28,6 +28,21 @@ public class DepartmentService : IDepartmentService
             .ToListAsync(cancellationToken);
     }
 
+    // Lấy danh sách phòng khám theo chuyên khoa
+    public async Task<IReadOnlyList<ClinicRoomDto>> GetRoomsByDepartmentAsync(int departmentId, CancellationToken cancellationToken = default)
+    {
+        return await _context.ClinicRooms
+            .AsNoTracking()
+            .Where(r => r.DepartmentId == departmentId)
+            .OrderBy(r => r.RoomNumber)
+            .Select(r => new ClinicRoomDto(
+                r.Id,
+                r.DepartmentId,
+                r.RoomName,
+                r.RoomNumber))
+            .ToListAsync(cancellationToken);
+    }
+
     // Thêm mới chuyên khoa phòng
     public async Task<DepartmentListItemDto> CreateDepartmentAsync(string name, string? description, CancellationToken cancellationToken = default)
     {

@@ -1,0 +1,57 @@
+/* patient / navigation */
+/* Patient workspace */
+.patient-nav {
+    border-bottom: 1px solid #dfeaf4;
+    background: #f8fbfe;
+}
+.patient-nav > div {
+    max-width: 1216px;
+    display: flex;
+    margin: auto;
+    gap: 30px;
+    padding: 0 7px;
+}
+.patient-nav a {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    color: #566c81;
+    padding: 15px 0;
+    position: relative;
+    white-space: nowrap;
+}
+.patient-nav a.active {
+    color: #087399;
+    font-weight: 600;
+}
+.patient-nav a.active:after {
+    content: '';
+    height: 2px;
+    background: #079bc9;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+}
+.patient-nav .icon {
+    width: 16px;
+    height: 16px;
+}
+.patient-nav b {
+    font-size: 9px;
+    min-width: 17px;
+    text-align: center;
+    background: #e0f1fb;
+    color: #087399;
+    border-radius: 4px;
+    font-weight: 600;
+    padding: 0 4px;
+}
+.patient-main {
+    max-width: 1280px;
+    margin: auto;
+    padding: 30px 32px 47px;
+    min-height: 60vh;
+    background: #fff;
+}

@@ -1,0 +1,304 @@
+/* Higher contrast: clear text hierarchy and visible controls, same cyan/navy identity. */
+body {
+    font-weight: 450;
+}
+h1,
+h2,
+h3 {
+    color: #10243e;
+    font-weight: 750;
+}
+.hero-copy h1 {
+    color: #10243e;
+    font-weight: 800;
+}
+.hero-copy h1 em {
+    color: #00769c;
+}
+.hero-copy > p {
+    font-size: 14px;
+    color: #3e536c;
+    font-weight: 500;
+}
+.section-heading p,
+.page-heading p,
+.page-intro > p {
+    color: #445b73;
+    font-size: 12px;
+    font-weight: 500;
+}
+.public-nav a {
+    color: #253f5c;
+    font-weight: 650;
+    font-size: 12px;
+}
+.public-nav a.active:after {
+    height: 3px;
+}
+.utility-bar {
+    background: #e8f0f7;
+    color: #405973;
+}
+.utility-bar button,
+.utility-bar .icon {
+    color: #355774;
+}
+.patient-account {
+    color: #2d4c67;
+    font-weight: 600;
+}
+.eyebrow,
+.mini-label {
+    font-weight: 750;
+}
+.btn {
+    font-weight: 650;
+    border-color: #a9c0d2;
+    color: #284764;
+}
+.btn.primary {
+    color: #fff;
+    background: #006f98;
+    border-color: #006489;
+    box-shadow: 0 3px 8px #006f9824;
+}
+.btn.primary:hover {
+    background: #005574;
+    border-color: #005574;
+}
+.btn.outline {
+    color: #00658a;
+    border-color: #8db6ca;
+    background: #fff;
+}
+.btn.ghost {
+    color: #3e5771;
+}
+.text-link,
+.link-button {
+    color: #00658a;
+    font-weight: 650;
+}
+.icon {
+    stroke-width: 1.9;
+}
+.icon-btn {
+    color: #315774;
+    border-color: #b7cbdc;
+}
+.quick-access {
+    background: #e5f4fb;
+    border-color: #a4c9dc;
+}
+.quick-item {
+    border-color: #b5d4e4;
+}
+.quick-item strong {
+    color: #163e5b;
+    font-weight: 700;
+    font-size: 14px;
+}
+.quick-item small {
+    color: #435f79;
+    font-size: 11px;
+    font-weight: 500;
+}
+.specialty-card,
+.doctor-card,
+.service-card,
+.card {
+    border-color: #c1d2e0;
+    box-shadow: 0 3px 12px #16365208;
+}
+.specialty-card strong {
+    font-weight: 700;
+    color: #193c59;
+}
+.doctor-card h3,
+.service-card h3 {
+    font-weight: 750;
+    color: #153752;
+}
+.doctor-card-body > p,
+.doctor-meta,
+.service-card-body > p {
+    color: #415b74;
+    font-weight: 500;
+}
+.section-tint,
+.public-footer {
+    background: #eaf1f8;
+}
+.journey-section {
+    background: #e3eef8;
+}
+.family-banner {
+    background: #e6f4fa;
+    border-color: #b3d1e1;
+}
+.section-heading h2 {
+    font-weight: 750;
+}
+.photo-note {
+    color: #175370;
+    border: 1px solid #9fc7d8;
+    font-weight: 550;
+}
+.patient-nav {
+    background: #eaf2f8;
+    border-color: #bfd0df;
+}
+.patient-nav a {
+    color: #35536e;
+    font-weight: 600;
+}
+.tab {
+    font-weight: 600;
+    color: #3b536d;
+}
+.tab.active {
+    background: #006f98;
+    border-color: #006489;
+    color: #fff;
+    font-weight: 700;
+}
+.tab.active > span {
+    background: #fff;
+    color: #006489;
+}
+.tab > span {
+    color: #405873;
+    background: #dde8f2;
+}
+.tabs,
+.toolbar {
+    border-color: #c6d6e3;
+}
+th {
+    color: #29435f;
+    background: #eaf1f7;
+    font-weight: 700;
+    border-color: #b7cadb;
+}
+td {
+    color: #304b67;
+    border-color: #d6e1eb;
+}
+td strong,
+.person-cell strong {
+    color: #142e49;
+    font-weight: 650;
+}
+td small,
+.person-cell small {
+    color: #4a627b;
+    font-size: 10px;
+}
+.badge {
+    font-weight: 650;
+    border: 1px solid currentColor;
+}
+.field label {
+    color: #25435f;
+    font-weight: 650;
+}
+.field input,
+.field select,
+.field textarea {
+    border-color: #a7bfd2;
+    color: #183951;
+}
+.search-input {
+    border-color: #b1c7d8;
+    background: #f6f9fc;
+}
+.search-input input {
+    color: #233f5b;
+}
+input::placeholder,
+textarea::placeholder {
+    color: #536b83;
+    opacity: 1;
+}
+.stat-label {
+    color: #35526f;
+    font-weight: 650;
+}
+.stat-card > small {
+    color: #465e77;
+    font-size: 10px;
+    font-weight: 500;
+}
+.stat-card {
+    border-color: #bdcedd;
+    border-top-width: 4px;
+}
+.card-header h2 {
+    font-weight: 700;
+    color: #12354f;
+}
+.sidebar {
+    color: #d7e5f2;
+}
+.nav-group > span {
+    color: #a6bfd7;
+    font-weight: 600;
+}
+.nav-group a {
+    color: #d3e2f0;
+    font-weight: 550;
+}
+.nav-group a.active {
+    color: #fff;
+    font-weight: 700;
+    background: #087fa9;
+}
+.sidebar-bottom button,
+.sidebar-bottom > div {
+    color: #b1c9de;
+}
+.doctor-strip small,
+.demo-clock {
+    color: #4d657c;
+}
+.public-footer {
+    color: #3f5871;
+    border-color: #bdcedf;
+}
+.public-footer h3 {
+    color: #1d3e5a;
+    font-weight: 700;
+}
+.public-footer a,
+.public-footer button {
+    font-weight: 550;
+}
+.fine-print,
+.field-help,
+.field small {
+    color: #4f6379;
+}
+@media (max-width: 640px) {
+    .hero-copy > p {
+        font-size: 13px;
+    }
+    .public-nav a {
+        font-size: 13px;
+    }
+    .quick-item strong {
+        font-size: 13px;
+    }
+    .page-heading p,
+    .section-heading p {
+        font-size: 11px;
+    }
+    .btn {
+        font-weight: 650;
+    }
+}
+.sidebar .portal-link {
+    color: #254561;
+    background: #fff;
+    border-color: #a9c6d9;
+    font-weight: 650;
+}

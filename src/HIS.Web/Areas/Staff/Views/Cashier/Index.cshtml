@@ -1,0 +1,321 @@
+@model IReadOnlyList<HIS.BLL.DTOs.PendingInvoiceItemDto>
+@{
+    Layout = "_CashierLayout";
+    ViewData["Title"] = "Thu phí và Giám định BHYT";
+    var selected = ViewBag.SelectedInvoice as HIS.BLL.DTOs.InvoiceDetailDto;
+    int selectedId = (int)(ViewBag.SelectedId ?? 0);
+    string search = (string)(ViewBag.Search ?? "");
+}
+
+<div class="reception-desk">
+    <header class="reception-heading">
+        <div>
+            <span class="reception-eyebrow">QUẦY THU NGÂN · PHÒNG KẾ TOÁN TÀI CHÍNH</span>
+            <h1>Thu viện phí &amp; Khấu trừ BHYT</h1>
+            <p>Hôm nay, @DateTime.Now.ToString("dd/MM/yyyy") · Quyết toán công khám, cận lâm sàng, thuốc và bảo hiểm y tế.</p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <a class="btn outline" asp-action="Index">
+                @await Html.PartialAsync("_AdminIcon", "refresh") Làm mới
+            </a>
+        </div>
+    </header>
+
+    @if (TempData["SuccessMessage"] is string success)
+    {
+        <div class="reception-alert success" role="status">@success</div>
+    }
+    @if (TempData["ErrorMessage"] is string error)
+    {
+        <div class="reception-alert error" role="alert">@error</div>
+    }
+
+    <form asp-action="Index" method="get" class="reception-search">
+        <label for="cashier-search">Tìm mã lượt khám, mã bệnh nhân, số điện thoại hoặc họ tên</label>
+        <div class="reception-search-input field">
+            <input id="cashier-search" name="search" value="@search" maxlength="50" class="form-control" placeholder="Nhập mã lịch, mã BN, SĐT hoặc họ tên..." />
+            <button class="btn primary" type="submit">Tìm kiếm</button>
+        </div>
+    </form>
+
+    <div class="cashier-grid">
+        <!-- Danh sách phiếu thu -->
+        <section class="reception-panel" style="margin-bottom: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h2 style="margin: 0;">Danh sách tiếp nhận &amp; chờ thu <span>@Model.Count</span></h2>
+            </div>
+            
+            <div class="table-responsive" style="max-height: 680px; overflow-y: auto;">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Mã khám / BN</th>
+                            <th>Người bệnh</th>
+                            <th>Khoa / Bác sĩ</th>
+                            <th class="text-end">Tạm tính</th>
+                            <th>BHYT</th>
+                            <th>Trạng thái</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center text-muted" style="padding: 30px;">
+                                    Không có phiếu thu nào phù hợp với bộ lọc.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var item in Model)
+                            {
+                                bool isCur = item.AppointmentId == selectedId;
+                                <tr class="@(isCur ? "invoice-row-selected" : "") cursor-pointer" onclick="location.href='@Url.Action("Index", new { selectedId = item.AppointmentId, search })'">
+                                    <td>
+                                        <strong>@item.AppointmentCode</strong><br />
+                                        <small class="text-muted">Mã: @item.PatientCode</small>
+                                    </td>
+                                    <td>
+                                        <strong>@item.PatientName</strong><br />
+                                        <small class="text-muted">@item.PhoneNumber</small>
+                                    </td>
+                                    <td>
+                                        <span>@item.DepartmentName</span><br />
+                                        <small class="text-muted">BS: @item.DoctorName</small>
+                                    </td>
+                                    <td class="text-end font-monospace">
+                                        <strong>@item.TotalAmount.ToString("N0")đ</strong>
+                                    </td>
+                                    <td>
+                                        @if (item.HasInsurance)
+                                        {
+                                            <span class="badge" style="background: #e1f5fe; color: #0277bd; font-weight: 600;">BHYT</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted" style="font-size: 11px;">Viện phí</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (item.InvoiceStatus == HIS.Domain.InvoiceStatus.Paid)
+                                        {
+                                            <span class="invoice-badge-paid">Đã thu</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="invoice-badge-unpaid">Chờ thu</span>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        <a href="@Url.Action("Index", new { selectedId = item.AppointmentId, search })" class="btn outline small" style="padding: 4px 8px; font-size: 11px;">Chi tiết</a>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Chi tiết hóa đơn & Quyết toán -->
+        <section class="invoice-card" id="billing-detail-panel">
+            @if (selected == null)
+            {
+                <div style="text-align: center; padding: 60px 20px; color: #78909c;">
+                    <div style="font-size: 40px; margin-bottom: 12px;">🧾</div>
+                    <h3>Chưa chọn phiếu thu</h3>
+                    <p>Vui lòng chọn một lượt khám từ danh sách bên trái để đối chiếu và thu tiền.</p>
+                </div>
+            }
+            else
+            {
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #eef2f5; padding-bottom: 12px; margin-bottom: 14px;">
+                    <div>
+                        <div style="font-size: 11px; font-weight: 700; color: #0077a3; text-transform: uppercase;">
+                            PHIẾU QUYẾT TOÁN VIỆN PHÍ · @selected.AppointmentCode
+                        </div>
+                        <h2 style="font-size: 18px; margin: 4px 0; color: #1c3144;">@selected.PatientName</h2>
+                        <div style="font-size: 12px; color: #5a7184;">
+                            Mã BN: <strong>@selected.PatientCode</strong> · @selected.Gender, @selected.Age tuổi · ĐT: @selected.PatientPhone
+                        </div>
+                    </div>
+                    <div>
+                        @if (selected.Status == HIS.Domain.InvoiceStatus.Paid)
+                        {
+                            <span class="invoice-badge-paid" style="font-size: 12px; padding: 6px 12px;">✓ ĐÃ THANH TOÁN</span>
+                        }
+                        else
+                        {
+                            <span class="invoice-badge-unpaid" style="font-size: 12px; padding: 6px 12px;">⏳ CHỜ THANH TOÁN</span>
+                        }
+                    </div>
+                </div>
+
+                @if (selected.HasInsurance && !string.IsNullOrEmpty(selected.InsuranceCardNumber))
+                {
+                    <div class="insurance-box" style="margin-bottom: 14px;">
+                        <div>
+                            <strong style="color: #0277bd; font-size: 13px;">Thẻ BHYT: @selected.InsuranceCardNumber</strong>
+                            <div style="font-size: 11px; color: #455a64; margin-top: 2px;">
+                                Nơi ĐKKCB: @(selected.RegisteredFacility ?? "Bệnh viện ĐK MediCare")
+                            </div>
+                        </div>
+                        <div style="text-align: right;">
+                            <span class="badge" style="background: #0288d1; color: white; padding: 4px 8px; font-weight: 700;">
+                                Mức hưởng: @selected.CoveragePct.ToString("0.#")%
+                            </span>
+                            <div style="font-size: 10px; color: #00796b; margin-top: 4px;">Đúng tuyến</div>
+                        </div>
+                    </div>
+                }
+
+                <!-- Danh sách khoản mục chi phí -->
+                <div style="margin-bottom: 15px;">
+                    <h3 style="font-size: 13px; text-transform: uppercase; color: #37474f; margin-bottom: 8px;">Chi tiết dịch vụ đã thực hiện</h3>
+                    <div style="max-height: 220px; overflow-y: auto; border: 1px solid #edf2f7; border-radius: 6px;">
+                        <table class="table table-sm" style="margin: 0; font-size: 12px;">
+                            <thead style="background: #f8fafc;">
+                                <tr>
+                                    <th>Khoản mục</th>
+                                    <th>Tên dịch vụ / Thuốc</th>
+                                    <th class="text-center">SL</th>
+                                    <th class="text-end">Đơn giá</th>
+                                    <th class="text-end">Thành tiền</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var grp in selected.Items.GroupBy(i => i.Category))
+                                {
+                                    <tr style="background: #f1f8fc;">
+                                        <td colspan="5" style="font-weight: 700; color: #0077a3; font-size: 11px;">@grp.Key</td>
+                                    </tr>
+                                    @foreach (var itm in grp)
+                                    {
+                                        <tr>
+                                            <td></td>
+                                            <td>@itm.Description</td>
+                                            <td class="text-center">@itm.Quantity</td>
+                                            <td class="text-end text-muted font-monospace">@itm.UnitPrice.ToString("N0")</td>
+                                            <td class="text-end font-monospace"><strong>@itm.Total.ToString("N0")</strong></td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Bảng tổng hợp chi phí & khấu trừ BHYT -->
+                <div class="billing-totals" style="margin-top: 0; margin-bottom: 16px;">
+                    <div>
+                        <span>Tổng chi phí phát sinh:</span>
+                        <strong class="font-monospace">@selected.TotalAmount.ToString("N0") đ</strong>
+                    </div>
+                    @if (selected.InsuranceCoveredAmount > 0)
+                    {
+                        <div style="color: #00897b;">
+                            <span>Khấu trừ BHYT (@selected.CoveragePct.ToString("0.#")%):</span>
+                            <strong class="font-monospace" style="color: #00897b;">-@selected.InsuranceCoveredAmount.ToString("N0") đ</strong>
+                        </div>
+                    }
+                    <div class="grand-total">
+                        <span style="font-weight: 600;">SỐ TIỀN THỰC THU:</span>
+                        <strong class="font-monospace">@selected.PatientAmount.ToString("N0") đ</strong>
+                    </div>
+                </div>
+
+                @if (selected.Status == HIS.Domain.InvoiceStatus.Paid)
+                {
+                    <div style="background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 8px; padding: 14px; margin-bottom: 14px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <strong style="color: #2e7d32; font-size: 13px;">Hóa đơn: @selected.InvoiceNumber</strong>
+                                <div style="font-size: 11px; color: #43a047;">Ngày thu: @selected.PaidAt?.ToString("HH:mm, dd/MM/yyyy") (@(selected.PaymentMethod ?? "Tiền mặt"))</div>
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <a class="btn primary small" asp-action="Receipt" asp-route-appointmentId="@selected.AppointmentId" target="_blank">
+                                    @await Html.PartialAsync("_AdminIcon", "printer") In phiếu thu
+                                </a>
+                                <a class="btn outline small" asp-controller="HoSo" asp-action="HealthRecord" asp-route-id="@selected.AppointmentId" target="_blank" style="color: #0277bd; border-color: #81d4fa;">
+                                    Xem hồ sơ khám
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <!-- Phương thức thanh toán & Nút Quyết toán -->
+                    <div style="margin-bottom: 16px;">
+                        <label style="font-size: 11px; font-weight: 700; color: #546e7a; text-transform: uppercase; margin-bottom: 6px; display: block;">
+                            Phương thức thanh toán
+                        </label>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;" id="payment-methods">
+                            <div class="pay-method-btn active" data-method="Cash">
+                                💵 Tiền mặt
+                            </div>
+                            <div class="pay-method-btn" data-method="BankTransfer">
+                                📱 Chuyển khoản / VietQR
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px;">
+                        <button type="button" class="btn primary" id="btn-checkout" style="flex: 1; padding: 12px; font-size: 14px; font-weight: 700;" onclick="submitCheckout(@selected.AppointmentId)">
+                            @await Html.PartialAsync("_AdminIcon", "check") XÁC NHẬN THU @selected.PatientAmount.ToString("N0") đ
+                        </button>
+                    </div>
+                }
+            }
+        </section>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        var selectedPaymentMethod = 'Cash';
+
+        document.querySelectorAll('.pay-method-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.pay-method-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                selectedPaymentMethod = btn.getAttribute('data-method');
+            });
+        });
+
+        async function submitCheckout(appointmentId) {
+            if (!confirm('Xác nhận thu tiền viện phí cho lượt khám này?')) return;
+
+            var btn = document.getElementById('btn-checkout');
+            if (btn) btn.disabled = true;
+
+            try {
+                var res = await fetch('@Url.Action("Checkout", "Cashier", new { area = "Staff" })', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        appointmentId: appointmentId,
+                        method: selectedPaymentMethod === 'BankTransfer' ? 1 : 0,
+                        note: 'Thu tại quầy'
+                    })
+                });
+
+                var data = await res.json();
+                if (res.ok && data.success) {
+                    alert('✓ ' + data.message);
+                    window.location.reload();
+                } else {
+                    alert('Lỗi: ' + (data.message || 'Không thể thực hiện thanh toán'));
+                    if (btn) btn.disabled = false;
+                }
+            } catch (err) {
+                alert('Lỗi kết nối: ' + err.message);
+                if (btn) btn.disabled = false;
+            }
+        }
+    </script>
+}

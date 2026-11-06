@@ -1,0 +1,382 @@
+/* responsive / desktop */
+@media (min-width: 1550px) {
+    .staff-main {
+        padding: 30px 34px;
+    }
+    .staff-dashboard-grid,
+    .admin-grid,
+    .reception-layout {
+        grid-template-columns: minmax(0, 1fr) 315px;
+    }
+    .stats-grid {
+        gap: 17px;
+    }
+    .stat-card {
+        padding: 18px 20px;
+    }
+    .stat-label {
+        font-size: 11px;
+    }
+    .stat-card > strong {
+        font-size: 31px;
+    }
+    .stat-card > small {
+        font-size: 10px;
+    }
+    .staff-main td {
+        font-size: 12px;
+    }
+    .staff-main td,
+    .staff-main th {
+        padding-top: 15px;
+        padding-bottom: 15px;
+    }
+    .staff-main td strong,
+    .person-cell strong {
+        font-size: 12px;
+    }
+    .doctor-strip strong {
+        font-size: 10px;
+    }
+    .ticket > strong {
+        font-size: 49px;
+    }
+    .queue-row strong {
+        font-size: 11px;
+    }
+    .queue-row small {
+        font-size: 9px;
+    }
+}
+@media (max-width: 1250px) {
+    .header-inner {
+        padding: 17px 26px;
+        gap: 23px;
+    }
+    .public-nav {
+        gap: 18px;
+    }
+    .public-nav a {
+        font-size: 10px;
+    }
+    .public-header-actions {
+        gap: 9px;
+        margin-left: 0;
+    }
+    .public-header-actions > .icon-btn {
+        display: none;
+    }
+    .patient-account > span:not(.avatar) {
+        display: none;
+    }
+    .header-book {
+        font-size: 10px;
+    }
+    .hero-copy h1 {
+        font-size: 38px;
+    }
+    .home-hero {
+        gap: 27px;
+        padding: 39px 28px;
+    }
+    .hero-copy > .eyebrow {
+        font-size: 8px;
+    }
+    .hero-copy > p {
+        font-size: 11px;
+    }
+    .hero-actions > .btn {
+        font-size: 11px;
+        padding: 11px 15px;
+    }
+    .hero-trust {
+        font-size: 8px;
+        gap: 13px;
+    }
+    .photo-note {
+        font-size: 9px;
+        bottom: 15px;
+        left: 15px;
+        padding: 9px 11px;
+    }
+    .home-section {
+        padding: 40px 28px;
+    }
+    .section-heading h2 {
+        font-size: 23px;
+    }
+    .quick-access {
+        margin: 0 28px;
+    }
+    .quick-item {
+        padding: 18px 20px;
+        gap: 11px;
+    }
+    .quick-item strong {
+        font-size: 12px;
+    }
+    .quick-item small {
+        font-size: 9px;
+    }
+    .upcoming-ribbon {
+        margin-left: 28px;
+        margin-right: 28px;
+    }
+    .specialty-card {
+        padding: 19px;
+    }
+    .specialty-card strong {
+        font-size: 12px;
+    }
+    .specialty-card small {
+        font-size: 9px;
+    }
+    .doctor-grid {
+        gap: 14px;
+    }
+    .doctor-card-body {
+        padding: 15px 13px;
+    }
+    .doctor-card h3 {
+        font-size: 12px;
+    }
+    .doctor-card-actions .btn {
+        font-size: 8px;
+        padding: 6px;
+    }
+    .doctor-card-body > p {
+        font-size: 9px;
+    }
+    .doctor-portrait {
+        height: 148px;
+    }
+    .service-grid {
+        gap: 17px;
+    }
+    .service-card-body {
+        padding: 17px;
+    }
+    .service-card h3 {
+        font-size: 15px;
+    }
+    .service-price strong {
+        font-size: 18px;
+    }
+    .service-card-body > p {
+        font-size: 10px;
+    }
+    .service-price small {
+        font-size: 8px;
+    }
+    .journey-section {
+        padding: 36px;
+        gap: 35px;
+    }
+    .family-banner {
+        margin: 35px 28px;
+    }
+    .footer-bottom {
+        margin: 0 28px;
+    }
+    .detail-layout {
+        grid-template-columns: minmax(0, 1fr) 285px;
+    }
+    .catalog-layout {
+        grid-template-columns: 185px minmax(0, 1fr);
+        gap: 20px;
+    }
+    .booking-layout {
+        grid-template-columns: minmax(0, 1fr) 280px;
+        gap: 20px;
+    }
+    .booking-panel {
+        padding: 22px;
+    }
+    .booking-summary {
+        padding: 20px;
+    }
+    .profile-option {
+        padding: 13px;
+        gap: 9px;
+    }
+    .profile-option strong {
+        font-size: 11px;
+    }
+    .profile-option .avatar {
+        width: 29px;
+        height: 29px;
+        font-size: 9px;
+    }
+    .sidebar {
+        width: 210px;
+        padding: 22px 11px 16px;
+    }
+    .sidebar .brand {
+        font-size: 23px;
+        padding: 0 8px;
+    }
+    .staff-shell {
+        margin-left: 210px;
+    }
+    .staff-topbar {
+        padding: 0 20px;
+        gap: 12px;
+    }
+    .staff-main {
+        padding: 23px 20px;
+    }
+    .staff-breadcrumb > span,
+    .staff-breadcrumb > i {
+        display: none;
+    }
+    .demo-clock {
+        font-size: 9px;
+    }
+    .demo-clock > small {
+        display: none;
+    }
+    .topbar-right {
+        gap: 9px;
+    }
+    .staff-profile {
+        padding-left: 9px;
+    }
+    .staff-profile > span:not(.avatar) {
+        display: none;
+    }
+    .staff-profile > .icon {
+        display: none;
+    }
+    .nav-group > a {
+        font-size: 10px;
+        gap: 9px;
+        padding: 10px 9px;
+    }
+    .nav-group > a.active {
+        padding: 9px 8px;
+    }
+    .nav-group > a > .icon {
+        width: 16px;
+        height: 16px;
+    }
+    .nav-group > a > b {
+        font-size: 8px;
+        min-width: 17px;
+        line-height: 16px;
+    }
+    .workspace strong {
+        font-size: 9px;
+    }
+    .workspace small {
+        font-size: 8px;
+    }
+    .staff-dashboard-grid,
+    .admin-grid,
+    .reception-layout {
+        grid-template-columns: minmax(0, 1fr) 260px;
+        gap: 15px;
+    }
+    .stat-card {
+        padding: 14px 13px;
+    }
+    .stat-label {
+        font-size: 9px;
+        gap: 6px;
+    }
+    .stat-card > strong {
+        font-size: 24px;
+    }
+    .stat-card > small {
+        font-size: 8px;
+    }
+    .stat-icon {
+        height: 23px;
+        width: 23px;
+    }
+    .staff-main .page-heading h1 {
+        font-size: 23px;
+    }
+    .staff-main .page-heading p {
+        font-size: 10px;
+    }
+    .heading-actions > .btn {
+        font-size: 10px;
+    }
+    .doctor-strip {
+        grid-template-columns: 1fr;
+        gap: 3px;
+        padding-bottom: 12px;
+    }
+    .doctor-strip > div {
+        padding: 5px 0;
+        flex-wrap: nowrap;
+    }
+    .doctor-strip > div + div {
+        border: 0;
+        padding-left: 0;
+    }
+    .doctor-strip strong {
+        font-size: 10px;
+    }
+    .doctor-strip small {
+        font-size: 9px;
+    }
+    .doctor-strip b {
+        margin-left: auto;
+        font-size: 9px;
+    }
+    .doctor-strip > div > span:not(.avatar) {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex: 1;
+    }
+    .appointments-table.compact th,
+    .appointments-table.compact td {
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+    .appointments-table.compact .person-cell .avatar {
+        display: none;
+    }
+    .appointments-table.compact .badge {
+        font-size: 8px;
+    }
+    .appointments-table.compact .btn.sm {
+        font-size: 9px;
+        padding: 5px 7px;
+    }
+    .clinical-layout {
+        grid-template-columns: 190px minmax(0, 1fr);
+        gap: 15px;
+    }
+    .clinical-inner {
+        padding-left: 17px;
+        padding-right: 17px;
+    }
+    .vitals-strip > div {
+        padding: 10px 9px;
+    }
+    .vitals-strip strong {
+        font-size: 11px;
+    }
+    .vitals-strip small {
+        font-size: 8px;
+    }
+    .clinical-actions > span {
+        display: none;
+    }
+    .rx-row {
+        grid-template-columns: 1.4fr 1.3fr 0.7fr 0.7fr;
+        gap: 8px;
+    }
+    .quota-grid {
+        gap: 12px;
+    }
+    .card-header {
+        padding: 16px;
+    }
+    .card-header h2 {
+        font-size: 13px;
+    }
+}

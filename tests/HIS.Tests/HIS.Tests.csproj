@@ -23,6 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\HIS.Web\HIS.Web.csproj" />
     <ProjectReference Include="..\..\src\HIS.BLL\HIS.BLL.csproj" />
     <ProjectReference Include="..\..\src\HIS.DAL\HIS.DAL.csproj" />
     <ProjectReference Include="..\..\src\HIS.Domain\HIS.Domain.csproj" />
