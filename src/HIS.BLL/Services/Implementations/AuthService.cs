@@ -24,6 +24,8 @@ public class AuthService : IAuthService
     private readonly TimeProvider _timeProvider;
     private readonly IEmailSender? _emailSender;
     private readonly ILogger<AuthService>? _logger;
+    private readonly Func<string, string, bool> _verifyPassword = (password, hash) => BCrypt.Net.BCrypt.Verify(password, hash);
+    private readonly Func<string, string> _hashPassword = password => BCrypt.Net.BCrypt.HashPassword(password);
 
     public AuthService(AppDbContext db, TimeProvider timeProvider, IEmailSender? emailSender = null,
         ILogger<AuthService>? logger = null)
@@ -32,6 +34,13 @@ public class AuthService : IAuthService
         _timeProvider = timeProvider;
         _emailSender = emailSender;
         _logger = logger;
+    }
+
+    internal AuthService(AppDbContext db, TimeProvider timeProvider,
+        Func<string, string, bool> verifyPassword, Func<string, string> hashPassword) : this(db, timeProvider)
+    {
+        _verifyPassword = verifyPassword;
+        _hashPassword = hashPassword;
     }
 
     private static Result<AuthResponse> InvalidLogin() =>
@@ -68,19 +77,19 @@ public class AuthService : IAuthService
             if (account == null || !account.IsActive || account.LockedUntil > now)
             {
                 // Use the same BCrypt cost as account creation instead of returning before password verification.
-                BCrypt.Net.BCrypt.Verify(request.Password, DummyPasswordHash);
+                _verifyPassword(request.Password, DummyPasswordHash);
                 return InvalidLogin();
             }
 
             var passwordMatches = false;
             try
             {
-                passwordMatches = BCrypt.Net.BCrypt.Verify(request.Password, account.PasswordHash);
+                passwordMatches = _verifyPassword(request.Password, account.PasswordHash);
             }
             catch (Exception error) when (error is BCrypt.Net.SaltParseException or ArgumentException or FormatException)
             {
                 // Invalid legacy hashes must not become successful logins or leak an exception to the page.
-                BCrypt.Net.BCrypt.Verify(request.Password, DummyPasswordHash);
+                _verifyPassword(request.Password, DummyPasswordHash);
             }
 
             if (account.LockedUntil.HasValue)
@@ -153,7 +162,7 @@ public class AuthService : IAuthService
         var normalizedUsername = request.Username.Trim().ToLowerInvariant();
         var normalizedEmail = request.Email?.Trim().ToLowerInvariant();
         // Conflicts must perform the same expensive password operation as a new registration.
-        var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
+        var passwordHash = _hashPassword(request.Password);
 
         // 1. Kiểm tra Username đã tồn tại chưa
         var isUsernameTaken = await _db.Accounts
@@ -249,7 +258,7 @@ public class AuthService : IAuthService
             return Result.Failure("AUTH_ACCOUNT_NOT_FOUND", "Không tìm thấy tài khoản.");
         }
 
-        if (!BCrypt.Net.BCrypt.Verify(oldPassword, account.PasswordHash))
+        if (!_verifyPassword(oldPassword, account.PasswordHash))
         {
             return Result.Failure("AUTH_INVALID_OLD_PASSWORD", "Mật khẩu hiện tại không chính xác.");
         }
@@ -259,7 +268,7 @@ public class AuthService : IAuthService
             return Result.Failure("AUTH_INVALID_NEW_PASSWORD", "Mật khẩu mới phải có tối thiểu 6 ký tự.");
         }
 
-        account.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        account.PasswordHash = _hashPassword(newPassword);
         account.UpdatedAt = _timeProvider.GetLocalNow().DateTime;
         await _db.SaveChangesAsync(ct);
 
@@ -343,7 +352,7 @@ public class AuthService : IAuthService
             return InvalidReset();
         }
 
-        account.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        account.PasswordHash = _hashPassword(newPassword);
         account.FailedLoginCount = 0;
         account.LockedUntil = null;
         account.UpdatedAt = now;

@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using HIS.BLL.DTOs;
 using HIS.BLL.Services;
 using HIS.DAL;
@@ -39,33 +38,39 @@ public static class AuthenticationReviewScenario
         var legacy = new Account { Username = "qa_review_legacy", RoleId = 5, PasswordHash = "malformed-test-hash" };
         db.AddRange(active, inactive, locked, legacy);
         await db.SaveChangesAsync();
-        var auth = new AuthService(db, clock);
-        await auth.LoginAsync(new("qa_review_warmup", password));
-        var baseline = await MedianAsync(() =>
+        var verifications = 0;
+        var hashes = 0;
+        var lastVerifiedHash = "";
+        var auth = new AuthService(db, clock, (submitted, stored) =>
         {
-            Assert.False(BCrypt.Net.BCrypt.Verify("incorrect_password", hash));
-            return Task.CompletedTask;
+            verifications++;
+            lastVerifiedHash = stored;
+            return BCrypt.Net.BCrypt.Verify(submitted, stored);
+        }, submitted =>
+        {
+            hashes++;
+            return BCrypt.Net.BCrypt.HashPassword(submitted);
         });
         foreach (var username in new[] { active.Username, inactive.Username, locked.Username, legacy.Username, "qa_review_missing" })
         {
-            var duration = await MedianAsync(async () =>
-            {
-                var result = await auth.LoginAsync(new(username, "incorrect_password"));
-                Assert.False(result.IsSuccess);
-                Assert.Equal("AUTH_INVALID", result.Error.Code);
-            });
-            // A broad relative floor catches skipped BCrypt without asserting identical network/DB latency.
-            Assert.True(duration >= baseline / 3, $"{username}: {duration:F1}ms; BCrypt baseline: {baseline:F1}ms");
+            var before = verifications;
+            var result = await auth.LoginAsync(new(username, "incorrect_password"));
+            Assert.False(result.IsSuccess);
+            Assert.Equal("AUTH_INVALID", result.Error.Code);
+            Assert.Equal(username == legacy.Username ? 2 : 1, verifications - before);
+            Assert.Equal(BCrypt.Net.BCrypt.InterrogateHash(hash).WorkFactor,
+                BCrypt.Net.BCrypt.InterrogateHash(lastVerifiedHash).WorkFactor);
         }
 
         var request = new RegisterPatientRequest("qa_review_patient", password, "QA Review Patient",
             new DateOnly(1998, 3, 20), "0900000012", "qa_review_patient@example.invalid");
         Assert.True((await auth.RegisterPatientAsync(request)).IsSuccess);
+        Assert.Equal(1, hashes);
         foreach (var duplicate in new[] { request with { Username = "qa_review_email_taken" }, request with { Email = "qa_review_other@example.invalid" } })
         {
-            var duration = await MedianAsync(async () =>
-                Assert.Equal("AUTH_REGISTRATION_CONFLICT", (await auth.RegisterPatientAsync(duplicate)).Error.Code));
-            Assert.True(duration >= baseline / 3, "Registration conflicts must not skip password hashing.");
+            var before = hashes;
+            Assert.Equal("AUTH_REGISTRATION_CONFLICT", (await auth.RegisterPatientAsync(duplicate)).Error.Code);
+            Assert.Equal(1, hashes - before);
         }
 
         var gate = new RegistrationSaveGate();
@@ -85,19 +90,6 @@ public static class AuthenticationReviewScenario
         Assert.Equal(2, await db.AccountPatientProfiles.CountAsync());
         await RegistrationHttpScenario.RunAsync(connection, request);
         await PasswordChangeHttpScenario.RunAsync(connection, active.Username, password);
-    }
-
-    private static async Task<double> MedianAsync(Func<Task> action)
-    {
-        var samples = new double[3];
-        for (var index = 0; index < samples.Length; index++)
-        {
-            var start = Stopwatch.GetTimestamp();
-            await action();
-            samples[index] = Stopwatch.GetElapsedTime(start).TotalMilliseconds;
-        }
-        Array.Sort(samples);
-        return samples[1];
     }
 
     private sealed class RegistrationSaveGate : SaveChangesInterceptor
