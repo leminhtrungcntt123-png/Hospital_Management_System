@@ -253,9 +253,22 @@ tbody tr:hover {
     font-weight: 650;
     font-size: 11px;
 }
-.status.inactive {
-    color: #7b5251;
-    background: #f8eae7;
+.status.inactive,
+.status.danger {
+    color: #991b1b;
+    background: #fee2e2;
+}
+.status.info {
+    color: #0369a1;
+    background: #e0f2fe;
+}
+.status.warning {
+    color: #92400e;
+    background: #fef3c7;
+}
+.status.neutral {
+    color: #475569;
+    background: #f1f5f9;
 }
 .empty {
     text-align: center;

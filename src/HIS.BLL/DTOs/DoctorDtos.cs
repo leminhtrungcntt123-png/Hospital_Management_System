@@ -11,6 +11,7 @@ public record CreateMedicalRecordRequest(
     string? ClinicalExamination,
     string? PrimaryDiagnosisCode,
     string? PrimaryDiagnosisDesc,
-    string? Conclusion
+    string? Conclusion,
+    string? IpAddress = null
 );
 

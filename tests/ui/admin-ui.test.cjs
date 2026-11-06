@@ -144,4 +144,6 @@ test('AdminWorkspace has department filter dropdowns for rooms and departments',
     const html = readFileSync(resolve(__dirname, '../../src/HIS.Web/Views/Shared/AdminWorkspace.cshtml'), 'utf8');
     assert.match(html, /id="filter-room-department"/, 'AdminWorkspace must have filter dropdown for rooms by department');
     assert.match(html, /id="filter-department"/, 'AdminWorkspace must have filter dropdown for departments');
+    assert.match(html, /id="audit-filter"/, 'AdminWorkspace must have filter bar for audit log');
+    assert.match(html, /id="audit-count"/, 'AdminWorkspace must have count element for audit events');
 });

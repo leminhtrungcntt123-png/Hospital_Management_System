@@ -265,10 +265,46 @@
             </section>
 
             <section data-panel="audit" aria-label="Nhật ký truy vết bảo mật" hidden>
+                <form id="audit-filter" class="filter-bar" style="margin-bottom: 20px;">
+                    <label>
+                        Từ ngày
+                        <input name="from" type="date" />
+                    </label>
+                    <label>
+                        Đến ngày
+                        <input name="to" type="date" />
+                    </label>
+                    <label>
+                        Loại hành động
+                        <select name="action">
+                            <option value="">Tất cả hành động</option>
+                            <option value="VIEW_RECORD">Xem bệnh án (VIEW_RECORD)</option>
+                            <option value="CREATE_RECORD">Lưu bệnh án (CREATE_RECORD)</option>
+                            <option value="CHECK_IN_WEB">Tiếp nhận hẹn trước (CHECK_IN_WEB)</option>
+                            <option value="REGISTER_WALK_IN">Tiếp nhận tại quầy (REGISTER_WALK_IN)</option>
+                            <option value="ADMIN_CREATE_ACCOUNT">Tạo tài khoản (ADMIN_CREATE_ACCOUNT)</option>
+                            <option value="ADMIN_ACTIVATE_ACCOUNT">Kích hoạt tài khoản</option>
+                            <option value="ADMIN_DEACTIVATE_ACCOUNT">Khóa tài khoản</option>
+                            <option value="ADMIN_APPROVE_SCHEDULE">Duyệt ca trực</option>
+                            <option value="ADMIN_REJECT_SCHEDULE">Từ chối ca trực</option>
+                            <option value="AdminLogin">Đăng nhập</option>
+                        </select>
+                    </label>
+                    <label>
+                        Tìm kiếm nhanh
+                        <input name="search" type="search" placeholder="Tên nhân sự, IP, bệnh nhân..." />
+                    </label>
+                    <button class="btn button primary" type="submit">Lọc nhật ký</button>
+                    <button class="btn button secondary" id="reset-audit" type="button">Đặt lại</button>
+                </form>
+
                 <div class="card">
                     <div class="card-heading">
-                        <h2>Nhật ký truy vết hệ thống (Audit Trail)</h2>
-                        <span>Ghi nhận thời gian, địa chỉ IP và hành vi truy cập bệnh án / phân quyền</span>
+                        <div>
+                            <h2>Nhật ký truy vết hệ thống (Audit Trail)</h2>
+                            <span>Ghi nhận thời gian, địa chỉ IP và hành vi truy cập bệnh án / phân quyền</span>
+                        </div>
+                        <span id="audit-count" class="status">Đang tải...</span>
                     </div>
                     <div class="table-scroll" id="audit-table"></div>
                 </div>

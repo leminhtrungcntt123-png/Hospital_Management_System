@@ -339,19 +339,66 @@
         }
     }
 
-    async function loadAudit() {
-        const rows = await request('AuditLogs');
+    async function loadAudit(withFilter = false) {
+        const filter = find('#audit-filter');
+        let query = '';
+        let searchKeyword = '';
+        if (filter && withFilter) {
+            const formData = new FormData(filter);
+            const params = new URLSearchParams();
+            if (formData.get('from')) params.set('from', formData.get('from'));
+            if (formData.get('to')) params.set('to', formData.get('to'));
+            if (formData.get('action')) params.set('action', formData.get('action'));
+            searchKeyword = (formData.get('search') || '').trim().toLowerCase();
+            const qs = params.toString();
+            if (qs) query = '?' + qs;
+        }
+
+        let rows = await request('AuditLogs' + query);
+
+        if (searchKeyword) {
+            rows = rows.filter((r) =>
+                (r.fullName && r.fullName.toLowerCase().includes(searchKeyword)) ||
+                (r.username && r.username.toLowerCase().includes(searchKeyword)) ||
+                (r.patientName && r.patientName.toLowerCase().includes(searchKeyword)) ||
+                (r.ipAddress && r.ipAddress.toLowerCase().includes(searchKeyword)) ||
+                (r.action && r.action.toLowerCase().includes(searchKeyword))
+            );
+        }
+
+        const countEl = find('#audit-count');
+        if (countEl) {
+            countEl.textContent = `${rows.length} sự kiện`;
+        }
+
+        const actionMap = {
+            VIEW_RECORD: { label: 'Xem bệnh án', cls: 'info' },
+            CREATE_RECORD: { label: 'Lưu bệnh án', cls: '' },
+            CHECK_IN_WEB: { label: 'Tiếp nhận hẹn', cls: 'info' },
+            REGISTER_WALK_IN: { label: 'Tiếp nhận quầy', cls: 'info' },
+            ADMIN_CREATE_ACCOUNT: { label: 'Tạo tài khoản', cls: '' },
+            ADMIN_ACTIVATE_ACCOUNT: { label: 'Kích hoạt TK', cls: '' },
+            ADMIN_DEACTIVATE_ACCOUNT: { label: 'Khóa tài khoản', cls: 'danger' },
+            ADMIN_APPROVE_SCHEDULE: { label: 'Duyệt lịch trực', cls: '' },
+            ADMIN_REJECT_SCHEDULE: { label: 'Từ chối ca', cls: 'danger' },
+            AdminLogin: { label: 'Đăng nhập', cls: 'warning' },
+            ViewDepartmentCatalog: { label: 'Xem danh mục', cls: 'neutral' },
+        };
+
         table(
             '#audit-table',
             ['Thời gian', 'Tài khoản / Nhân sự', 'Hành động', 'Bệnh nhân', 'Bệnh án', 'Địa chỉ IP'],
-            rows.map((row) => [
-                /* HTML */ `<small>${escape(new Date(row.occurredAt).toLocaleString('vi-VN'))}</small>`,
-                /* HTML */ `<strong>${escape(row.fullName)}</strong><br /><small style="color:#64748b;">${escape(row.username)}</small>`,
-                /* HTML */ `<span class="status">${escape(row.action)}</span>`,
-                escape(row.patientName || '—'),
-                escape(row.medicalRecordId ? '#' + row.medicalRecordId : '—'),
-                /* HTML */ `<code>${escape(row.ipAddress || '—')}</code>`,
-            ]),
+            rows.map((row) => {
+                const act = actionMap[row.action] || { label: row.action, cls: 'neutral' };
+                return [
+                    /* HTML */ `<span style="white-space:nowrap; font-size:12px; color:#475569;">${escape(new Date(row.occurredAt).toLocaleString('vi-VN'))}</span>`,
+                    /* HTML */ `<strong>${escape(row.fullName)}</strong><br /><small style="color:#64748b;">${escape(row.username)}</small>`,
+                    /* HTML */ `<span class="status ${act.cls}" title="${escape(row.action)}">${escape(act.label)}</span>`,
+                    row.patientName ? /* HTML */ `<strong>${escape(row.patientName)}</strong>` : '<span style="color:#94a3b8;">—</span>',
+                    row.medicalRecordId ? /* HTML */ `<strong style="color:#0f766e;">#BA-${escape(row.medicalRecordId)}</strong>` : '<span style="color:#94a3b8;">—</span>',
+                    /* HTML */ `<code style="font-size:12px; font-weight:600; color:#0369a1;">${escape(row.ipAddress || 'nội bộ')}</code>`,
+                ];
+            }),
         );
     }
 
@@ -561,6 +608,17 @@
     });
 
     find('#account-form [name="roleId"]').addEventListener('change', updateRoleFields);
+    find('#audit-filter')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        loadAudit(true).catch((err) => notify(err.message, true));
+    });
+    find('#reset-audit')?.addEventListener('click', () => {
+        const filter = find('#audit-filter');
+        if (filter) {
+            filter.reset();
+            loadAudit(false).catch((err) => notify(err.message, true));
+        }
+    });
     find('#filter-room-department')?.addEventListener('change', (e) => {
         renderRoomsTable(e.target.value);
     });

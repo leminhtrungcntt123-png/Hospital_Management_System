@@ -163,8 +163,8 @@ public sealed class ManagementController(
         });
 
     [HttpGet("AuditLogs")]
-    public Task<IActionResult> AuditLogs(DateOnly? from, DateOnly? to, CancellationToken ct) =>
-        ExecuteAsync(async () => Ok(await reports.GetAuditLogsAsync(ActorId, from, to, ct)));
+    public Task<IActionResult> AuditLogs(DateOnly? from, DateOnly? to, string? action, CancellationToken ct) =>
+        ExecuteAsync(async () => Ok(await reports.GetAuditLogsAsync(ActorId, from, to, action, ct)));
 
     [HttpGet("DepartmentStats")]
     public Task<IActionResult> DepartmentStats(DateOnly? from, DateOnly? to, CancellationToken ct) => ExecuteAsync(async () =>

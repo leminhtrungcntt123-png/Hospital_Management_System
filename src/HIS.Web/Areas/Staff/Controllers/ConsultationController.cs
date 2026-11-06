@@ -379,7 +379,11 @@ public class ConsultationController : Controller
                 return RedirectToAction(nameof(Index));
             }
 
-            var recordRequest = request with { DoctorId = doctorId };
+            var recordRequest = request with
+            {
+                DoctorId = doctorId,
+                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
+            };
             await _doctorService.CreateMedicalRecordAsync(recordRequest, ct);
             TempData["SuccessMessage"] = "Đã lưu hồ sơ bệnh án và hoàn thành lượt khám.";
         }

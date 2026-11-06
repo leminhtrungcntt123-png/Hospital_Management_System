@@ -105,6 +105,17 @@ public class DoctorService : IDoctorService
 
         _context.MedicalRecords.Add(record);
 
+        // Ghi nhận nhật ký truy vết tạo hồ sơ bệnh án
+        _context.AccessLogs.Add(new AccessLog
+        {
+            AccountId = doctor.AccountId,
+            PatientId = appointment.PatientId,
+            MedicalRecord = record,
+            Action = "CREATE_RECORD",
+            OccurredAt = now,
+            IpAddress = request.IpAddress
+        });
+
         // Chuyển trạng thái lượt khám sang Completed nếu đang InProgress hoặc ReadyForDoctor
         appointment.StatusId = (int)AppointmentStatusId.Completed;
         appointment.UpdatedAt = now;

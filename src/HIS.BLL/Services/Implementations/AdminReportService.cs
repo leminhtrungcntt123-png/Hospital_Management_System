@@ -116,7 +116,7 @@ public sealed class AdminReportService(AppDbContext db) : IAdminReportService
     }
 
     public async Task<IReadOnlyList<AdminAuditLogRow>> GetAuditLogsAsync(
-        int actorId, DateOnly? from = null, DateOnly? to = null, CancellationToken ct = default)
+        int actorId, DateOnly? from = null, DateOnly? to = null, string? action = null, CancellationToken ct = default)
     {
         await AdminRules.RequireAdminAsync(db, actorId, ct);
         var query = db.AccessLogs.AsNoTracking()
@@ -139,6 +139,11 @@ public sealed class AdminReportService(AppDbContext db) : IAdminReportService
         {
             var end = to.Value.AddDays(1).ToDateTime(TimeOnly.MinValue);
             query = query.Where(a => a.OccurredAt < end);
+        }
+
+        if (!string.IsNullOrWhiteSpace(action))
+        {
+            query = query.Where(a => a.Action == action);
         }
 
         return await query
