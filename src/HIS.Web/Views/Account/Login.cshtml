@@ -823,7 +823,7 @@
 <div class="his-modal-overlay" id="hisForgotModal" role="dialog" aria-modal="true" aria-labelledby="forgotModalTitle">
     <div class="his-modal-card">
         <button type="button" class="his-modal-close" onclick="closeForgotModal()" aria-label="Đóng">&times;</button>
-        
+
         <div class="his-modal-header">
             <img src="~/images/medicare-logo.jpg" alt="MediCare Logo" class="his-modal-logo" />
             <h3 class="his-modal-title" id="forgotModalTitle">Khôi Phục Mật Khẩu</h3>
@@ -992,6 +992,11 @@
             }
         }
 
+        function getCsrfToken() {
+            var input = document.querySelector('input[name="__RequestVerificationToken"]');
+            return input ? input.value : '';
+        }
+
         // Xử lý gửi đăng ký thực tế qua API lưu vào Database
         async function handleRegisterSubmit(e) {
             e.preventDefault();
@@ -1025,7 +1030,10 @@
             try {
                 var response = await fetch('/Account/RegisterApi', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': getCsrfToken()
+                    },
                     body: JSON.stringify({
                         fullName: fullname,
                         phoneNumber: phone,
@@ -1107,7 +1115,10 @@
             try {
                 var response = await fetch('/Account/RequestPasswordReset', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': getCsrfToken()
+                    },
                     body: JSON.stringify({ emailOrUsername: account })
                 });
 
@@ -1147,7 +1158,10 @@
             try {
                 var response = await fetch('/Account/RequestPasswordReset', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': getCsrfToken()
+                    },
                     body: JSON.stringify({ emailOrUsername: account })
                 });
 
@@ -1185,7 +1199,10 @@
             try {
                 var response = await fetch('/Account/ConfirmPasswordReset', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': getCsrfToken()
+                    },
                     body: JSON.stringify({
                         emailOrUsername: account,
                         otp: otp,

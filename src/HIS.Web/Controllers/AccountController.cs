@@ -89,7 +89,6 @@ public class AccountController : Controller
     }
 
     [HttpGet, HttpPost]
-    [IgnoreAntiforgeryToken]
     public async Task<IActionResult> Logout()
     {
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
@@ -112,7 +111,9 @@ public class AccountController : Controller
     public IActionResult Register() => RedirectToAction("Login", "Account", new { mode = "register" });
 
     [HttpPost]
-    [IgnoreAntiforgeryToken]
+    public IActionResult Register(string username, string password) => RedirectToAction("Login", "Account", new { mode = "register" });
+
+    [HttpPost]
     public async Task<IActionResult> RegisterApi([FromBody] RegisterPatientRequest request)
     {
         if (request == null)
@@ -171,7 +172,6 @@ public class AccountController : Controller
 
     // API endpoints cho Interactive Modal tại màn hình Login
     [HttpPost]
-    [IgnoreAntiforgeryToken]
     public async Task<IActionResult> RequestPasswordReset([FromBody] ForgotPasswordRequest request)
     {
         if (request == null || string.IsNullOrWhiteSpace(request.EmailOrUsername))
@@ -194,7 +194,6 @@ public class AccountController : Controller
     }
 
     [HttpPost]
-    [IgnoreAntiforgeryToken]
     public async Task<IActionResult> ConfirmPasswordReset([FromBody] ResetPasswordRequest request)
     {
         if (request == null || string.IsNullOrWhiteSpace(request.EmailOrUsername) ||
