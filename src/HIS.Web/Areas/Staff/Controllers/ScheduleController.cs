@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace HIS.Web.Areas.Staff.Controllers;
 
 [Area("Staff")]
-[Authorize(Policy = "DepartmentHeadOnly")]
+[Authorize(Policy = "StaffAny")]
 public class ScheduleController : Controller
 {
     private readonly IDepartmentHeadService _departmentHeadService;
@@ -24,12 +24,6 @@ public class ScheduleController : Controller
     {
         var accountId = GetCurrentAccountId();
         var departmentId = await _departmentHeadService.ResolveDepartmentIdByAccountIdAsync(accountId, ct);
-
-        if (departmentId <= 0)
-        {
-            TempData["ErrorMessage"] = "Tài khoản của bạn chưa được liên kết với khoa chuyên môn nào. Vui lòng liên hệ Quản trị viên hệ thống.";
-            return RedirectToAction("Index", "Consultation");
-        }
 
         var activeTab = string.IsNullOrWhiteSpace(tab) ? "schedule" : tab.ToLowerInvariant();
 
@@ -47,13 +41,28 @@ public class ScheduleController : Controller
             mondayTargetWeek.AddDays(4)
         };
 
+        if (departmentId <= 0)
+        {
+            TempData["ErrorMessage"] = "Tài khoản của bạn chưa được liên kết với khoa chuyên môn nào. Vui lòng liên hệ Quản trị viên hệ thống.";
+            return View(new ScheduleViewModel
+            {
+                ActiveTab = activeTab,
+                Today = today,
+                WeekStart = mondayTargetWeek,
+                WeekDates = weekDates
+            });
+        }
+
         var overview = await _departmentHeadService.GetDepartmentOverviewAsync(departmentId, ct);
         var exceptions = await _departmentHeadService.GetExceptionsAsync(departmentId, null, ct);
         var schedules = await _departmentHeadService.GetSchedulesAsync(departmentId, ct);
         var dutyShifts = await _departmentHeadService.GetDutyShiftsAsync(departmentId, ct);
 
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
-        var medicalRecords = await _departmentHeadService.GetMedicalRecordsAsync(departmentId, accountId, ipAddress, ct);
+        var isHead = User.IsInRole("DEPARTMENT_HEAD");
+        var medicalRecords = isHead
+            ? await _departmentHeadService.GetMedicalRecordsAsync(departmentId, accountId, ipAddress, ct)
+            : (IReadOnlyList<DepartmentMedicalRecordDto>)[];
 
         var doctors = await _departmentHeadService.GetDoctorsInDepartmentAsync(departmentId, ct);
         var staff = await _departmentHeadService.GetStaffInDepartmentAsync(departmentId, ct);
@@ -139,12 +148,18 @@ public class ScheduleController : Controller
 
     // Phân công ca trực đêm nhân sự
     [HttpPost]
+    [Authorize(Policy = "DepartmentHeadOnly")]
     [ActionName("AssignDuty")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> AssignDuty(int accountId, DateTime startTime, DateTime endTime, string? note, CancellationToken ct)
     {
         var currentAccountId = GetCurrentAccountId();
         var departmentId = await _departmentHeadService.ResolveDepartmentIdByAccountIdAsync(currentAccountId, ct);
+        if (departmentId <= 0)
+        {
+            TempData["ErrorMessage"] = "Tài khoản của bạn chưa được liên kết với khoa chuyên môn nào.";
+            return RedirectToAction(nameof(Index), new { tab = "schedule" });
+        }
 
         // Kiểm tra nhân sự có thuộc khoa quản lý không
         var allowedStaff = await _departmentHeadService.GetStaffInDepartmentAsync(departmentId, ct);
@@ -185,6 +200,7 @@ public class ScheduleController : Controller
 
     // Thiết lập / cập nhật lịch khám tuần & hạn mức
     [HttpPost]
+    [Authorize(Policy = "DepartmentHeadOnly")]
     [ActionName("UpsertSchedule")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UpsertSchedule(
@@ -203,6 +219,11 @@ public class ScheduleController : Controller
     {
         var currentAccountId = GetCurrentAccountId();
         var departmentId = await _departmentHeadService.ResolveDepartmentIdByAccountIdAsync(currentAccountId, ct);
+        if (departmentId <= 0)
+        {
+            TempData["ErrorMessage"] = "Tài khoản của bạn chưa được liên kết với khoa chuyên môn nào.";
+            return RedirectToAction(nameof(Index), new { tab = "schedule" });
+        }
 
         var today = DateOnly.FromDateTime(DateTime.Today);
         var effectiveDate = effectiveFrom ?? today;
@@ -259,11 +280,17 @@ public class ScheduleController : Controller
 
     // Xóa / hủy cấu hình lịch khám
     [HttpPost]
+    [Authorize(Policy = "DepartmentHeadOnly")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteSchedule(int scheduleId, CancellationToken ct)
     {
         var currentAccountId = GetCurrentAccountId();
         var departmentId = await _departmentHeadService.ResolveDepartmentIdByAccountIdAsync(currentAccountId, ct);
+        if (departmentId <= 0)
+        {
+            TempData["ErrorMessage"] = "Tài khoản của bạn chưa được liên kết với khoa chuyên môn nào.";
+            return RedirectToAction(nameof(Index), new { tab = "schedule" });
+        }
 
         var result = await _departmentHeadService.DeleteDoctorScheduleAsync(scheduleId, departmentId, ct);
         if (!result.IsSuccess)
@@ -280,11 +307,17 @@ public class ScheduleController : Controller
 
     // Xóa / hủy ca trực đêm
     [HttpPost]
+    [Authorize(Policy = "DepartmentHeadOnly")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteDutyShift(int id, CancellationToken ct)
     {
         var currentAccountId = GetCurrentAccountId();
         var departmentId = await _departmentHeadService.ResolveDepartmentIdByAccountIdAsync(currentAccountId, ct);
+        if (departmentId <= 0)
+        {
+            TempData["ErrorMessage"] = "Tài khoản của bạn chưa được liên kết với khoa chuyên môn nào.";
+            return RedirectToAction(nameof(Index), new { tab = "schedule" });
+        }
 
         var result = await _departmentHeadService.DeleteDutyShiftAsync(id, departmentId, ct);
         if (!result.IsSuccess)

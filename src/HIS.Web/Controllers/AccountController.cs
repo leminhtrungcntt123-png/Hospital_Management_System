@@ -44,9 +44,13 @@ public class AccountController : Controller
     [HttpGet]
     public IActionResult Login(string? returnUrl = null, int? loggedOut = null)
     {
-        if (loggedOut != 1 && User.Identity?.IsAuthenticated == true && IsAllowedReturnUrl(returnUrl))
+        if (loggedOut != 1 && User.Identity?.IsAuthenticated == true)
         {
-            return Redirect(returnUrl);
+            if (IsAllowedReturnUrl(returnUrl))
+            {
+                return Redirect(returnUrl);
+            }
+            return RedirectToDashboard(User.FindFirst(ClaimTypes.Role)?.Value);
         }
 
         return View(new LoginViewModel { ReturnUrl = returnUrl });
@@ -270,6 +274,12 @@ public class AccountController : Controller
     [HttpGet]
     public IActionResult Register() => RedirectToAction("Login", "Account", new { mode = "register" });
 
+    [HttpGet]
+    public IActionResult ForgotPassword() => RedirectToAction("Login", "Account", new { mode = "forgot" });
+
+    [HttpGet]
+    public IActionResult ResetPassword() => RedirectToAction("Login", "Account", new { mode = "forgot" });
+
     [HttpPost]
     [EnableRateLimiting("register")]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
@@ -320,7 +330,7 @@ public class AccountController : Controller
         }
 
         TempData["SuccessMessage"] = RegistrationMessage;
-        return RedirectToAction("Login", "Account", new { mode = "login" });
+        return RedirectToAction("Login", "Account");
     }
 
     [HttpPost]

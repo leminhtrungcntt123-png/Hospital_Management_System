@@ -38,6 +38,16 @@ public class DepartmentHeadService : IDepartmentHeadService
             return doctor.DepartmentId;
         }
 
+        // Fallback: nếu tài khoản là điều dưỡng thuộc khoa
+        var nurse = await _context.Nurses
+            .AsNoTracking()
+            .FirstOrDefaultAsync(n => n.AccountId == accountId, ct);
+
+        if (nurse != null && nurse.DepartmentId.HasValue && nurse.DepartmentId.Value > 0)
+        {
+            return nurse.DepartmentId.Value;
+        }
+
         return 0;
     }
 
