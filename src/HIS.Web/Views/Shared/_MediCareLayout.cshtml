@@ -4,6 +4,16 @@
 @{
     var isAuthenticated = User.Identity?.IsAuthenticated == true;
     var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "PATIENT";
+    var defaultRoute = (role?.ToUpperInvariant()) switch
+    {
+        "ADMIN" => "admin/accounts",
+        "DEPARTMENT_HEAD" or "DEPT_HEAD" => "staff/schedule",
+        "DOCTOR" => "staff/consultation",
+        "NURSE" => "staff/reception",
+        "CASHIER" => "staff/cashier",
+        "PATIENT" => "patient/booking",
+        _ => "public/home"
+    };
     var home = (role?.ToUpperInvariant()) switch
     {
         "ADMIN" => "/Admin/Management",
@@ -14,12 +24,15 @@
         "PATIENT" => "/Patient/Booking",
         _ => "/Admin/Accounts"
     };
+    var isPreview = ViewData["UiPreview"] is true;
     var config = new
     {
+        preview = isPreview,
+        live = !isPreview,
         role,
         authenticated = isAuthenticated,
-        displayName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? (isAuthenticated ? "Thành viên" : ""),
-        initialRoute = ViewData["MediCareRoute"]?.ToString() ?? "public/home",
+        displayName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? (isAuthenticated ? "Thành viên" : "Khách"),
+        initialRoute = ViewData["MediCareRoute"]?.ToString() ?? (isAuthenticated ? defaultRoute : "public/home"),
         pathBase = Context.Request.PathBase.ToString(),
         assetBase = Url.Content("~/ui/assets/"),
         catalogUrl = Url.Action("Catalog", "Home", new { area = "" }),

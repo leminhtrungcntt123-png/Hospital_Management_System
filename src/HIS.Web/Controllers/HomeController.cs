@@ -9,9 +9,30 @@ public class HomeController(
     ILogger<HomeController> logger) : Controller
 {
     [HttpGet]
-    public IActionResult Index()
+    public async Task<IActionResult> Index(CancellationToken ct = default)
     {
-        return View();
+        if (User.IsInRole("DEPARTMENT_HEAD"))
+        {
+            return RedirectToAction("Index", "Schedule", new { area = "Staff" });
+        }
+
+        if (User.IsInRole("DOCTOR"))
+        {
+            return RedirectToAction("Index", "Consultation", new { area = "Staff" });
+        }
+
+        if (User.IsInRole("NURSE"))
+        {
+            return RedirectToAction("Index", "Reception", new { area = "Staff" });
+        }
+
+        if (User.IsInRole("ADMIN"))
+        {
+            return RedirectToAction("Index", "Management", new { area = "Admin" });
+        }
+
+        var departmentList = await departments.GetDepartmentsAsync(ct);
+        return View(departmentList);
     }
 
     [HttpGet]

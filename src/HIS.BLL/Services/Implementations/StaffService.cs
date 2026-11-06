@@ -1,3 +1,4 @@
+using HIS.BLL.Common;
 using HIS.BLL.DTOs;
 using HIS.DAL;
 using HIS.Domain;
@@ -10,12 +11,14 @@ public partial class StaffService : IStaffService
     private readonly AppDbContext _context;
     private readonly IDoctorService _doctorService;
     private readonly TimeProvider _adminClock;
+    private readonly TimeProvider _timeProvider;
 
-    public StaffService(AppDbContext context, IDoctorService doctorService, TimeProvider adminClock)
+    public StaffService(AppDbContext context, IDoctorService doctorService, TimeProvider? adminClock = null)
     {
         _context = context;
         _doctorService = doctorService;
-        _adminClock = adminClock;
+        _adminClock = adminClock ?? TimeProvider.System;
+        _timeProvider = _adminClock;
     }
 
     // Lấy danh sách tài khoản nhân sự và vai trò tương ứng trong hệ thống
@@ -52,18 +55,18 @@ public partial class StaffService : IStaffService
     public async Task<StaffListItemDto> CreateStaffAsync(string username, string password, string fullName, int roleId, bool isActive = true, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(username))
-            throw new ArgumentException("Tên đăng nhập không được để trống.", nameof(username));
+            throw new AdminOperationException("Tên đăng nhập không được để trống.");
         if (string.IsNullOrWhiteSpace(password))
-            throw new ArgumentException("Mật khẩu không được để trống.", nameof(password));
+            throw new AdminOperationException("Mật khẩu không được để trống.");
         if (string.IsNullOrWhiteSpace(fullName))
-            throw new ArgumentException("Họ và tên không được để trống.", nameof(fullName));
+            throw new AdminOperationException("Họ và tên không được để trống.");
 
         var trimmedUsername = username.Trim();
         if (await _context.Accounts.AnyAsync(a => a.Username == trimmedUsername, cancellationToken))
-            throw new InvalidOperationException($"Tên đăng nhập '{trimmedUsername}' đã được sử dụng.");
+            throw new AdminOperationException($"Tên đăng nhập '{trimmedUsername}' đã được sử dụng.");
 
         var role = await _context.Roles.FirstOrDefaultAsync(r => r.Id == roleId, cancellationToken)
-            ?? throw new InvalidOperationException("Vai trò được chọn không tồn tại.");
+            ?? throw new AdminOperationException("Vai trò được chọn không tồn tại.");
 
         var now = DateTime.UtcNow;
         var account = new Account
@@ -125,7 +128,7 @@ public partial class StaffService : IStaffService
     public async Task<StaffListItemDto> UpdateStaffAsync(int id, string? password, string fullName, int roleId, bool isActive, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(fullName))
-            throw new ArgumentException("Họ và tên không được để trống.", nameof(fullName));
+            throw new AdminOperationException("Họ và tên không được để trống.");
 
         var account = await _context.Accounts
             .Include(a => a.Role)
@@ -133,10 +136,10 @@ public partial class StaffService : IStaffService
             .Include(a => a.Nurse)
             .Include(a => a.DepartmentHead)
             .FirstOrDefaultAsync(a => a.Id == id, cancellationToken)
-            ?? throw new InvalidOperationException($"Không tìm thấy tài khoản có mã {id}.");
+            ?? throw new AdminOperationException($"Không tìm thấy tài khoản có mã {id}.");
 
         var role = await _context.Roles.FirstOrDefaultAsync(r => r.Id == roleId, cancellationToken)
-            ?? throw new InvalidOperationException("Vai trò được chọn không tồn tại.");
+            ?? throw new AdminOperationException("Vai trò được chọn không tồn tại.");
 
         account.RoleId = roleId;
         account.IsActive = isActive;
@@ -182,9 +185,10 @@ public partial class StaffService : IStaffService
         if (account == null) return false;
 
         if (account.Username.Equals("admin", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Không thể xóa tài khoản quản trị viên mặc định (admin).");
+            throw new AdminOperationException("Không thể xóa tài khoản quản trị viên mặc định (admin).");
 
-        _context.Accounts.Remove(account);
+        account.IsActive = false;
+        account.UpdatedAt = _timeProvider.GetLocalNow().DateTime;
         await _context.SaveChangesAsync(cancellationToken);
         return true;
     }

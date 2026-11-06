@@ -74,6 +74,20 @@ public class DoctorService : IDoctorService
         if (appointment.MedicalRecord != null)
             throw new InvalidOperationException("Lượt khám này đã có hồ sơ bệnh án.");
 
+        var doctor = await _context.Doctors.FirstOrDefaultAsync(d => d.Id == request.DoctorId, cancellationToken);
+        if (doctor == null)
+            throw new InvalidOperationException("Không tìm thấy thông tin bác sĩ tạo bệnh án.");
+
+        if (appointment.DepartmentId != doctor.DepartmentId)
+        {
+            throw new InvalidOperationException("Bạn không có quyền tạo hồ sơ bệnh án cho lượt khám thuộc khoa khác.");
+        }
+
+        if (appointment.DoctorId.HasValue && appointment.DoctorId.Value != doctor.Id)
+        {
+            throw new InvalidOperationException("Bạn không có quyền tạo hồ sơ bệnh án cho lượt khám của bác sĩ khác.");
+        }
+
         var now = _timeProvider.GetLocalNow().DateTime;
 
         var record = new MedicalRecord

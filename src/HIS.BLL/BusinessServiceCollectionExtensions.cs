@@ -43,6 +43,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddScoped<IDoctorService, DoctorService>();
         services.AddScoped<IStaffService, StaffService>();
         services.AddScoped<IAdminReportService, AdminReportService>();
+        services.AddScoped<IDepartmentHeadService, DepartmentHeadService>();
 
         return services;
     }

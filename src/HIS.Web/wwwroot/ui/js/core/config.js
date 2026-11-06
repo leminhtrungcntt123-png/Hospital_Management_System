@@ -47,6 +47,7 @@ const paths = {
     volume: 'M11 5 6 9H2v6h4l5 4z M15 8a6 6 0 0 1 0 8 M18 5a10 10 0 0 1 0 14',
 };
 
+
 const roleInfo = {
     PATIENT: { name: 'Bệnh nhân', icon: 'heart' },
     NURSE: { name: 'Y tá / Lễ tân', icon: 'users' },
