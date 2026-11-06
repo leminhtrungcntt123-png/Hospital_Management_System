@@ -35,6 +35,18 @@ public class HomeController(
         return View(departmentList);
     }
 
+    [HttpGet, HttpPost]
+    [ActionName("NotFound")]
+    [Route("404")]
+    [Route("NotFound")]
+    [Route("Home/NotFound")]
+    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+    public IActionResult NotFoundPage(int? statusCode = null)
+    {
+        Response.StatusCode = statusCode ?? StatusCodes.Status404NotFound;
+        return View("NotFound");
+    }
+
     [HttpGet]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public async Task<IActionResult> Catalog(CancellationToken ct)
