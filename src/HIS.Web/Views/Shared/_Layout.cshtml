@@ -117,7 +117,9 @@
                                 }
                             </li>
                             <li class="nav-item">
-                                <a class="btn btn-outline-light btn-sm" asp-area="" asp-controller="Account" asp-action="Logout">Đăng xuất</a>
+                                <form asp-area="" asp-controller="Account" asp-action="Logout" method="post">
+                                    <button class="btn btn-outline-light btn-sm" type="submit">Đăng xuất</button>
+                                </form>
                             </li>
                         }
                         else

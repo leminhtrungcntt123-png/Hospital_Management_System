@@ -1,333 +1,110 @@
-/* views / public / catalog */
+function catalogStatus() {
+    if (['idle', 'loading'].includes(catalog.status))
+        return '<div class="notice" role="status">Đang tải thông tin từ bệnh viện…</div>';
+    return empty(
+        'Chưa tải được thông tin',
+        'Vui lòng thử lại sau.',
+        button('Thử lại', 'reload-catalog', 'refresh', 'outline'),
+    );
+}
+
 function specialtiesPage() {
-    return /* HTML */ `${pageIntro('CHUYÊN MÔN PHÙ HỢP VỚI NHU CẦU', 'Chuyên khoa', 'Tìm hiểu chuyên khoa và chọn lịch khám với bác sĩ phụ trách.')}
-        <section class="listing-section">
-            <div class="specialty-detail-grid">
-                ${db.doctors
-                    .map(
-                        (d) =>
-                            /* HTML */ `<article class="specialty-detail">
-                                <span class="specialty-icon ${d.color}"
-                                    >${icon(d.id === 'd2' ? 'heart' : d.id === 'd4' ? 'users' : 'stethoscope')}</span
-                                >
-                                <div>
-                                    <span class="mini-label">${dept(d.deptId).name}</span>
-                                    <h2>${d.specialty}</h2>
-                                    <p>${d.focus}</p>
-                                    <div class="flex">
-                                        ${link('BS. ' + d.name, 'public/doctor/' + d.id, '', 'text-link')}${button('Chọn lịch khám', 'book-doctor', 'arrow', 'btn primary sm', `data-id="${d.id}"`)}
-                                    </div>
-                                </div>
-                            </article>`
-                    )
-                    .join('')}
-            </div>
-            <div class="help-callout">
-                ${icon('info')}
-                <div>
-                    <h3>Chưa biết nên chọn chuyên khoa nào?</h3>
-                    <p>
-                        Bạn có thể bắt đầu với Nội tổng quát hoặc xem thông tin bác sĩ trước khi
-                        chọn lịch.
-                    </p>
-                </div>
-                ${button('Xem lịch Nội tổng quát', 'book-doctor', 'arrow', 'btn outline', `data-id="d1"`)}
-            </div>
+    return `${pageIntro('CHUYÊN KHOA', 'Chuyên khoa', 'Thông tin khoa phòng từ bệnh viện.')}
+        <section class="listing-section">${
+            catalog.status !== 'ready'
+                ? catalogStatus()
+                : catalog.departments.length
+                  ? `<div class="specialty-detail-grid">${catalog.departments
+                        .map(
+                            (department) => `
+                <article class="specialty-detail"><span class="specialty-icon">${icon('building')}</span>
+                    <div><h2>${esc(department.name)}</h2><p>${esc(department.description)}</p>
+                        ${link('Xem đội ngũ bác sĩ', 'public/doctors', 'arrow', 'text-link')}
+                    </div>
+                </article>`,
+                        )
+                        .join('')}</div>`
+                  : empty('Chưa có thông tin chuyên khoa')
+        }
         </section>`;
 }
 
 function doctorsPage() {
-    const ds = db.doctors.filter(
-        (d) =>
-            d.active &&
-            (ui.dept === 'ALL' || d.deptId === ui.dept) &&
-            matched(d.name + ' ' + d.specialty)
+    const doctors = catalog.doctors.filter(
+        (doctor) =>
+            matched(doctor.name + ' ' + doctor.specialty) &&
+            (!ui.department || doctor.department === ui.department),
     );
-    return /* HTML */ `${pageIntro('ĐỘI NGŨ CHUYÊN MÔN', 'Bác sĩ của bạn', 'Xem chuyên khoa, phòng khám và chủ động chọn thời gian phù hợp.')}
-        <section class="listing-section">
-            <div class="listing-toolbar">
-                ${searchInput('Tìm tên bác sĩ hoặc chuyên khoa…')}<select
-                    data-change="dept"
-                    aria-label="Lọc khoa bác sĩ"
-                >
-                    <option value="ALL">Tất cả khoa</option>
-                    ${db.departments.map((d) => /* HTML */ `<option value="${d.id}" ${ui.dept === d.id ? 'selected' : ''}>${d.name}</option>`).join('')}</select
-                ><span>${ds.length} bác sĩ</span>
-            </div>
-            <div class="doctor-grid">${ds.map(doctorCard).join('')}</div>
-            ${!ds.length ? empty('Không tìm thấy bác sĩ', 'Thử đổi chuyên khoa hoặc từ khóa tìm kiếm.') : ''}
-            <p class="fine-print">
-                Danh tính và thông tin bác sĩ trong website này là dữ liệu minh họa cho đồ án.
-            </p>
+    return `${pageIntro('ĐỘI NGŨ CHUYÊN MÔN', 'Bác sĩ của bạn', 'Thông tin chuyên môn được cung cấp bởi bệnh viện.')}
+        <section class="listing-section"><div class="listing-toolbar">
+            <label class="search-input">${icon('search')}<input data-search value="${esc(ui.query)}" placeholder="Tìm bác sĩ hoặc chuyên khoa…" aria-label="Tìm bác sĩ hoặc chuyên khoa" /></label>
+            <select data-department aria-label="Lọc khoa bác sĩ"><option value="">Tất cả khoa</option>
+                ${catalog.departments.map((department) => `<option value="${esc(department.name)}" ${ui.department === department.name ? 'selected' : ''}>${esc(department.name)}</option>`).join('')}
+            </select>
+        </div>${
+            catalog.status !== 'ready'
+                ? catalogStatus()
+                : doctors.length
+                  ? `<div class="doctor-grid">${doctors.map(doctorCard).join('')}</div>`
+                  : empty(
+                        'Không tìm thấy bác sĩ',
+                        'Thử đổi khoa hoặc từ khóa tìm kiếm.',
+                    )
+        }
         </section>`;
 }
 
 function doctorDetail(id) {
-    const d = doctor(id);
-    if (!d) return accessDenied();
-    return /* HTML */ `${pageIntro(d.specialty, 'Hồ sơ bác sĩ', 'Thông tin chuyên môn và lịch khám minh họa.')}
-        <section class="detail-layout">
-            <article class="card doctor-bio">
-                <div class="doctor-bio-top">
-                    <div class="doctor-portrait ${d.color}">
-                        <span class="doctor-avatar">${initials(d.name)}</span>${icon('stethoscope')}
-                    </div>
-                    <div>
-                        <span class="mini-label">${d.specialty}</span>
-                        <h1>BS. ${d.name}</h1>
-                        <p>${dept(d.deptId).name}</p>
-                        <span class="pill">${icon('location')}Phòng ${room(d.roomId).number}</span>
-                    </div>
-                </div>
-                <h2>Phạm vi thăm khám</h2>
-                <p>${d.focus}</p>
-                <h2>Lịch tiếp nhận</h2>
-                <div class="schedule-info">
-                    <span>${icon('calendar')}Thứ Hai đến Thứ Sáu</span
-                    ><span>${icon('clock')}Sáng 07:30–11:30 · Chiều 13:00–16:30</span>
-                </div>
-                <h2>Chuẩn bị trước buổi khám</h2>
-                <ul class="content-list">
-                    <li>Mang giấy tờ tùy thân và mã lịch hẹn.</li>
-                    <li>Chuẩn bị hồ sơ hoặc kết quả khám trước đây nếu có.</li>
-                    <li>Kiểm tra quyền liên kết nếu đặt khám cho người thân.</li>
-                </ul>
-                <p class="fine-print">
-                    Hồ sơ bác sĩ minh họa; không đại diện cho cá nhân hành nghề thực tế.
-                </p>
-            </article>
-            <aside class="sticky-card card">
-                <span class="mini-label">ĐẶT LỊCH VỚI BÁC SĨ</span>
-                <h2>BS. ${d.name}</h2>
-                <p>${d.specialty} · Phòng ${room(d.roomId).number}</p>
-                <div class="detail-price">
-                    <small>Phí khám tham khảo</small><strong>${money(d.fee)}</strong>
-                </div>
-                ${button('Chọn ngày & giờ khám', 'book-doctor', 'calendar', 'btn primary full', `data-id="${d.id}"`)}
-                <div class="mini-checks">
-                    <span>${icon('check')}Chọn người khám trước khi đặt</span
-                    ><span>${icon('check')}Giữ chỗ 10 phút để xác nhận</span
-                    ><span>${icon('check')}Thông báo khi lịch thay đổi</span>
-                </div>
-            </aside>
-        </section>`;
+    if (catalog.status !== 'ready') return catalogStatus();
+    const doctor = catalog.doctors.find((item) => String(item.id) === id);
+    if (!doctor) return empty('Không tìm thấy thông tin bác sĩ');
+    return `${pageIntro(doctor.specialty, doctor.name, doctor.department)}
+        <section class="detail-layout"><article class="card doctor-bio">
+            <div class="doctor-bio-top"><div class="doctor-portrait cyan"><span class="doctor-avatar">${esc(initials(doctor.name))}</span>${icon('stethoscope')}</div>
+                <div><h2>${esc(doctor.name)}</h2><p>${esc(doctor.specialty)}</p><p>${esc(doctor.department)}</p></div>
+            </div>
+            <h2>Chuẩn bị trước buổi khám</h2><ul class="content-list"><li>Mang giấy tờ của người khám.</li><li>Chuẩn bị kết quả khám trước đây nếu có.</li></ul>
+        </article><aside class="card sticky-card"><h2>Lịch khám</h2><p>Tra cứu lịch trong mục đặt lịch khám.</p>
+            ${link('Đến trang đặt lịch', 'patient/booking', 'calendar', 'btn primary full')}
+        </aside></section>`;
 }
 
 function servicesPage() {
-    const services = db.services.filter(
-        (s) => s.active && (ui.filter === 'ALL' || s.type === ui.filter) && matched(s.name)
-    );
-    return /* HTML */ `${pageIntro('TÌM HIỂU TRƯỚC KHI ĐẶT KHÁM', 'Dịch vụ y tế', 'Nội dung rõ ràng, quy trình dễ theo dõi và chi phí tham khảo ngay trên từng dịch vụ.')}
-        <section class="listing-section">
-            <div class="catalog-layout">
-                <aside class="filter-panel card">
-                    <h3>${icon('more')}Lọc dịch vụ</h3>
-                    ${[['ALL', 'Tất cả dịch vụ'], ...Object.entries(typeNames)].map(([v, l]) => /* HTML */ `<button class="filter-option ${ui.filter === v ? 'active' : ''}" data-act="tab" data-kind="filter" data-value="${v}">${icon(v === 'LAB_TEST' ? 'pulse' : v === 'IMAGING' ? 'file' : 'stethoscope')}<span>${l}</span><b>${db.services.filter((s) => s.active && (v === 'ALL' || s.type === v)).length}</b></button>`).join('')}
-                    <div class="filter-note">
-                        ${icon('info')}Xét nghiệm và chẩn đoán hình ảnh được thực hiện theo chỉ định
-                        của bác sĩ.
-                    </div>
-                </aside>
-                <div>
-                    <div class="listing-toolbar">
-                        ${searchInput('Tìm tên dịch vụ…')}<span>${services.length} dịch vụ</span>
-                    </div>
-                    <div class="service-grid two">${services.map(serviceCard).join('')}</div>
-                    ${!services.length ? empty('Không tìm thấy dịch vụ') : ''}
-                </div>
-            </div>
-        </section>`;
-}
-
-function serviceDetail(id) {
-    const s = db.services.find((x) => x.id === id);
-    if (!s) return accessDenied();
-    return /* HTML */ `${pageIntro(s.specialty || typeNames[s.type], s.name, 'Thông tin dịch vụ và hành trình thăm khám tại MediCare.')}
-        <section class="detail-layout">
-            <article class="service-content">
-                <div class="detail-banner">
-                    ${icon(s.icon || 'stethoscope')}
-                    <div>
-                        <span class="eyebrow">CHỦ ĐỘNG CHĂM SÓC SỨC KHỎE</span>
-                        <h2>${s.name}</h2>
-                        <p>${esc(s.description)}</p>
-                    </div>
-                </div>
-                <nav class="anchor-tabs" aria-label="Nội dung dịch vụ">
-                    ${[
-                        ['overview', 'Tổng quan'],
-                        ['items', 'Hạng mục'],
-                        ['process', 'Quy trình'],
-                        ['notes', 'Lưu ý'],
-                    ]
-                        .map(
-                            ([id, label]) =>
-                                /* HTML */ `<button data-act="anchor" data-id="${id}">
-                                    ${label}
-                                </button>`
-                        )
-                        .join('')}
-                </nav>
-                <section id="overview" class="content-section card">
-                    <span class="mini-label">TỔNG QUAN</span>
-                    <h2>Hiểu rõ dịch vụ trước buổi khám</h2>
-                    <p>${s.description}</p>
-                    <p>
-                        Bạn có thể xem thông tin bác sĩ, lựa chọn người khám và khung giờ phù hợp.
-                        Các bước được liên kết với lịch hẹn và hồ sơ của đúng người được khám.
-                    </p>
-                </section>
-                <section id="items" class="content-section card">
-                    <span class="mini-label">HẠNG MỤC THỰC HIỆN</span>
-                    <h2>Nội dung của dịch vụ</h2>
-                    <div class="item-list">
-                        ${s.items.map((item, i) => /* HTML */ `<div><span>${String(i + 1).padStart(2, '0')}</span><strong>${esc(item)}</strong>${icon('check')}</div>`).join('')}
-                    </div>
-                </section>
-                <section id="process" class="content-section card">
-                    <span class="mini-label">QUY TRÌNH</span>
-                    <h2>Từng bước trong hành trình chăm sóc</h2>
-                    <div class="process-list">
-                        ${[
-                            [
-                                'Đặt lịch trực tuyến',
-                                'Chọn người khám, bác sĩ và giờ còn trống. Xác nhận trong thời gian giữ chỗ.',
-                            ],
-                            [
-                                'Tiếp nhận tại quầy',
-                                'Đối chiếu thông tin, xác minh liên kết người thân và nhận số khám.',
-                            ],
-                            [
-                                'Thăm khám & chỉ định',
-                                'Nhân viên ghi sinh hiệu. Bác sĩ thăm khám và chỉ định dịch vụ nếu cần.',
-                            ],
-                            [
-                                'Thanh toán & theo dõi',
-                                'Kiểm tra chi phí, BHYT tại quầy và xem hồ sơ theo quyền được cấp.',
-                            ],
-                        ]
-                            .map(
-                                ([t, d], i) =>
-                                    /* HTML */ `<article>
-                                        <span>${i + 1}</span>
-                                        <div>
-                                            <h3>${t}</h3>
-                                            <p>${d}</p>
-                                        </div>
-                                    </article>`
-                            )
-                            .join('')}
-                    </div>
-                </section>
-                <section id="notes" class="content-section card">
-                    <span class="mini-label">LƯU Ý</span>
-                    <h2>Chuẩn bị cho buổi hẹn</h2>
-                    <ul class="content-list">
-                        <li>Check-in mở từ 60 phút trước giờ khám.</li>
-                        <li>Hủy lịch trực tuyến trước giờ khám ít nhất 120 phút.</li>
-                        <li>
-                            Thẻ BHYT được đối chiếu theo người khám và ngày khám tại bước thu phí.
-                        </li>
-                        <li>
-                            Chi phí trên trang là dữ liệu minh họa; chỉ định bổ sung được thể hiện
-                            trong hóa đơn.
-                        </li>
-                    </ul>
-                </section>
-            </article>
-            <aside class="sticky-card card">
-                <span class="mini-label">CHI PHÍ MINH HỌA</span>
-                <div class="detail-price"><strong>${money(s.price)}</strong></div>
-                <h3>${s.name}</h3>
-                <p>${typeNames[s.type]}</p>
-                ${s.type === 'EXAMINATION' ? button('Chọn lịch khám', 'book-service', 'calendar', 'btn primary full', `data-id="${s.id}"`) : link('Tìm bác sĩ để được chỉ định', 'public/doctors', 'stethoscope', 'btn primary full')}
-                <div class="mini-checks">
-                    <span>${icon('check')}Quy trình tiếp nhận rõ ràng</span
-                    ><span>${icon('check')}Chi phí gắn với từng lượt khám</span
-                    ><span>${icon('check')}Hồ sơ và kết quả được liên kết</span>
-                </div>
-            </aside>
-        </section>`;
+    return `${pageIntro('DỊCH VỤ Y TẾ', 'Dịch vụ y tế', 'Thông tin dịch vụ và chi phí từ bệnh viện.')}
+        <section class="listing-section">${unavailableNotice()}${pendingTable('Danh mục dịch vụ', ['Dịch vụ', 'Loại dịch vụ', 'Chi phí'])}</section>`;
 }
 
 function guidePage() {
-    return /* HTML */ `${pageIntro('CHUẨN BỊ TỐT CHO CUỘC HẸN', 'Hướng dẫn khám bệnh', 'Từ chọn hồ sơ người khám đến theo dõi kết quả, mọi bước đều có hướng dẫn.')}
-        <section class="guide-layout">
-            <div class="card guide-main">
-                ${[
-                    [
-                        '1',
-                        'Đặt khám cho đúng người',
-                        'Chọn bản thân hoặc hồ sơ người thân trong tài khoản. Hồ sơ chờ xác minh vẫn có thể được đặt lịch; quyền xem bệnh án chỉ được cấp sau xác minh và đồng ý phù hợp.',
-                    ],
-                    [
-                        '2',
-                        'Chọn bác sĩ và xác nhận lịch',
-                        'Lịch trống hiển thị trong 14 ngày. Khung giờ được giữ 10 phút, sau đó tự hết hạn nếu chưa xác nhận. Mỗi tài khoản có tối đa 5 lịch hiệu lực.',
-                    ],
-                    [
-                        '3',
-                        'Đến quầy và nhận số',
-                        'Check-in mở từ 60 phút trước hẹn. Mang giấy tờ của người khám, thẻ BHYT nếu có và mã lịch hẹn. Khách vãng lai có thể tạo lượt khám trực tiếp tại quầy.',
-                    ],
-                    [
-                        '4',
-                        'Đo sinh hiệu và vào phòng khám',
-                        'Nhân viên tiếp nhận ghi nhận sinh hiệu. Theo dõi số O cho lịch trực tuyến hoặc W cho lượt tại quầy. Hàng chờ có mức ưu tiên.',
-                    ],
-                    [
-                        '5',
-                        'Thanh toán và nhận biên lai',
-                        'BHYT được kiểm tra ở bước thu phí. Có thể ghi nhận tạm ứng, thanh toán một phần hoặc hoàn tiền. Biên lai điện tử chỉ thể hiện mã hẹn, ngày và số tiền.',
-                    ],
-                    [
-                        '6',
-                        'Xem hồ sơ và thay đổi lịch',
-                        'Hồ sơ người lớn cần sự đồng ý để người đặt hộ được xem. Nếu bác sĩ đổi ca, tài khoản đặt lịch nhận thông báo bác sĩ thay thế hoặc yêu cầu đặt lại.',
-                    ],
-                ]
-                    .map(
-                        ([n, t, d]) =>
-                            /* HTML */ `<article class="guide-step">
-                                <span>${n}</span>
-                                <div>
-                                    <h2>${t}</h2>
-                                    <p>${d}</p>
-                                </div>
-                            </article>`
-                    )
-                    .join('')}
-            </div>
-            <aside class="card guide-aside">
-                <span class="section-icon">${icon('clipboard')}</span>
-                <h2>Trước khi đến viện</h2>
-                <ul class="check-list">
-                    <li>Mã lịch hẹn đã xác nhận</li>
-                    <li>Giấy tờ của người khám</li>
-                    <li>Thẻ BHYT còn hiệu lực</li>
-                    <li>Kết quả khám trước đây nếu có</li>
-                </ul>
-                ${link('Đặt lịch khám', 'patient/booking', 'calendar', 'btn primary full')}
-                <details>
-                    <summary>Có thể hủy lịch vào lúc nào?</summary>
-                    <p>
-                        Lịch đã xác nhận được hủy trực tuyến khi còn ít nhất 120 phút trước giờ khám
-                        trong bản mẫu.
-                    </p>
-                </details>
-                <details>
-                    <summary>Tôi đặt cho người thân được không?</summary>
-                    <p>
-                        Có. Một tài khoản liên kết tối đa 5 hồ sơ. Quyền đặt và quyền xem bệnh án
-                        được kiểm soát riêng.
-                    </p>
-                </details>
-                <details>
-                    <summary>Ca trực đêm có đặt khám không?</summary>
-                    <p>
-                        Ca trực đêm là lịch nhân sự. Lịch đặt khám chỉ hiển thị ca sáng và ca chiều.
-                    </p>
-                </details>
-            </aside>
-        </section>`;
+    return `${pageIntro('HƯỚNG DẪN KHÁM', 'Chuẩn bị cho buổi khám', 'Theo dõi thông tin từ bệnh viện và hướng dẫn của nhân viên tại quầy.')}
+        <section class="guide-layout"><div class="guide-steps">${[
+            [
+                '1',
+                'Kiểm tra thông tin người khám',
+                'Chuẩn bị họ tên, ngày sinh, số điện thoại và giấy tờ tùy thân phù hợp.',
+            ],
+            [
+                '2',
+                'Đối chiếu lịch hẹn',
+                'Nếu đã đặt lịch, chuẩn bị mã lịch hẹn được hệ thống xác nhận.',
+            ],
+            [
+                '3',
+                'Đến quầy tiếp nhận',
+                'Nhân viên xác minh thông tin và hướng dẫn phòng khám, số thứ tự.',
+            ],
+            [
+                '4',
+                'Chuẩn bị hồ sơ và BHYT',
+                'Mang theo thẻ BHYT và kết quả khám trước đây nếu có.',
+            ],
+        ]
+            .map(
+                ([number, title, detail]) =>
+                    `<article class="guide-step"><span>${number}</span><div><h2>${title}</h2><p>${detail}</p></div></article>`,
+            )
+            .join('')}
+        </div><aside class="card guide-aside"><span class="section-icon">${icon('clipboard')}</span><h2>Thông tin lịch hẹn</h2>
+            <p>Thời gian khám, điều kiện đổi/hủy và quyền xem hồ sơ được xác định bởi hệ thống bệnh viện.</p>
+            ${link('Lịch hẹn của tôi', 'patient/appointments', 'calendar', 'btn outline full')}
+        </aside></section>`;
 }

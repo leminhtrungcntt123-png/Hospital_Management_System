@@ -49,6 +49,8 @@ public class DepartmentService : IDepartmentService
             throw new ArgumentException("Tên khoa/phòng không được để trống.", nameof(name));
 
         var trimmedName = name.Trim();
+        if (trimmedName.Length > 100 || description?.Trim().Length > 255)
+            throw new ArgumentException("Tên phòng ban tối đa 100 ký tự, mô tả tối đa 255 ký tự.");
         if (await _context.Departments.AnyAsync(d => d.Name == trimmedName, cancellationToken))
             throw new InvalidOperationException($"Khoa/phòng '{trimmedName}' đã tồn tại.");
 

@@ -14,6 +14,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Add DAL & BLL
 builder.Services.AddHisDataAccess(builder.Configuration);
 builder.Services.AddHisBusiness(builder.Configuration);
+builder.Services.ConfigureOptions<HIS.Web.Common.AccountStatusCookieOptions>();
 
 // Cookie Authentication
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -54,6 +55,14 @@ builder.Services.AddControllersWithViews(options =>
 // Rate limiting for login
 builder.Services.AddRateLimiter(options =>
 {
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, ct) =>
+    {
+        context.HttpContext.Response.ContentType = "text/plain; charset=utf-8";
+        context.HttpContext.Response.Headers.RetryAfter = "60";
+        await context.HttpContext.Response.WriteAsync(
+            "Bạn đã thử đăng nhập quá nhiều lần. Vui lòng đợi một phút rồi thử lại.", ct);
+    };
     options.AddPolicy("login", context =>
         RateLimitPartition.GetFixedWindowLimiter(
             context.Connection.RemoteIpAddress?.ToString() ?? "unknown",

@@ -1,16 +1,3 @@
-.ui-preview-shortcut {
-    position: fixed;
-    right: 16px;
-    bottom: 16px;
-    z-index: 70;
-    padding: 9px 13px;
-    background: #102b46;
-    color: white;
-    border: 1px solid #5d8eac;
-    border-radius: 7px;
-    font-size: 11px;
-    box-shadow: 0 3px 12px #152b4626;
-}
 .mvc-auth {
     min-height: 100vh;
     display: flex;
@@ -119,11 +106,6 @@
     }
     .mvc-auth-card h1 {
         font-size: 24px;
-    }
-    .ui-preview-shortcut {
-        font-size: 10px;
-        bottom: 12px;
-        right: 12px;
     }
 }
 
