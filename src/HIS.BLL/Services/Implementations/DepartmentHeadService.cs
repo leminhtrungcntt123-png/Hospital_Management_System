@@ -85,7 +85,7 @@ public class DepartmentHeadService : IDepartmentHeadService
         if (ex == null)
             return Result.Failure("NOT_FOUND", "Không tìm thấy đề nghị ngoại lệ.");
 
-        if (request.DepartmentId.HasValue && request.DepartmentId.Value > 0 && ex.Doctor != null && ex.Doctor.DepartmentId != request.DepartmentId.Value)
+        if (!request.DepartmentId.HasValue || request.DepartmentId.Value <= 0 || (ex.Doctor != null && ex.Doctor.DepartmentId != request.DepartmentId.Value))
             return Result.Failure("FORBIDDEN", "Bạn chỉ có thể phê duyệt đề nghị của bác sĩ thuộc khoa mình quản lý.");
 
         if (ex.Status != ScheduleExceptionStatus.Pending)
@@ -219,7 +219,7 @@ public class DepartmentHeadService : IDepartmentHeadService
         if (ex == null)
             return Result.Failure("NOT_FOUND", "Không tìm thấy đề nghị.");
 
-        if (request.DepartmentId.HasValue && request.DepartmentId.Value > 0 && ex.Doctor != null && ex.Doctor.DepartmentId != request.DepartmentId.Value)
+        if (!request.DepartmentId.HasValue || request.DepartmentId.Value <= 0 || (ex.Doctor != null && ex.Doctor.DepartmentId != request.DepartmentId.Value))
             return Result.Failure("FORBIDDEN", "Bạn chỉ có thể từ chối đề nghị của bác sĩ thuộc khoa mình quản lý.");
 
         if (ex.Status != ScheduleExceptionStatus.Pending)

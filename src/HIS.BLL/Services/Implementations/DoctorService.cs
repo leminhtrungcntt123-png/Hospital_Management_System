@@ -78,9 +78,14 @@ public class DoctorService : IDoctorService
         if (doctor == null)
             throw new InvalidOperationException("Không tìm thấy thông tin bác sĩ tạo bệnh án.");
 
-        if (appointment.DoctorId.HasValue && appointment.DoctorId.Value != doctor.Id && appointment.DepartmentId != doctor.DepartmentId)
+        if (appointment.DepartmentId != doctor.DepartmentId)
         {
             throw new InvalidOperationException("Bạn không có quyền tạo hồ sơ bệnh án cho lượt khám thuộc khoa khác.");
+        }
+
+        if (appointment.DoctorId.HasValue && appointment.DoctorId.Value != doctor.Id)
+        {
+            throw new InvalidOperationException("Bạn không có quyền tạo hồ sơ bệnh án cho lượt khám của bác sĩ khác.");
         }
 
         var now = _timeProvider.GetLocalNow().DateTime;

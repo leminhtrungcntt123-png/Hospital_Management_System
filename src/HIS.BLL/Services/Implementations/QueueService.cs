@@ -28,7 +28,15 @@ public class QueueService : IQueueService
 
         if (string.IsNullOrEmpty(app.QueueNumber))
         {
-            var countToday = await _context.Appointments.CountAsync(a => a.DepartmentId == app.DepartmentId && a.CreatedAt.Date == now.Date, ct);
+            var startOfDay = now.Date;
+            var endOfDay = startOfDay.AddDays(1);
+            var countToday = await _context.Appointments.CountAsync(a =>
+                a.DepartmentId == app.DepartmentId &&
+                a.Id != app.Id &&
+                a.CheckedInAt.HasValue &&
+                a.CheckedInAt.Value >= startOfDay &&
+                a.CheckedInAt.Value < endOfDay &&
+                !string.IsNullOrEmpty(a.QueueNumber), ct);
             app.QueueNumber = (countToday + 1).ToString("D3");
         }
 

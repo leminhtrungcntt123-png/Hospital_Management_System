@@ -312,11 +312,7 @@ public static class DevDataSeeder
             var today = DateOnly.FromDateTime(DateTime.Today);
             var todayMorning = today.ToDateTime(new TimeOnly(8, 30));
 
-            var activeQueueApps = await db.Appointments
-                .Where(a => a.DoctorId == doc1.Id && (a.StatusId == (int)AppointmentStatusId.ReadyForDoctor || a.StatusId == (int)AppointmentStatusId.CheckedIn))
-                .ToListAsync();
-
-            if (activeQueueApps.Count == 0)
+            if (!await db.Appointments.AnyAsync(a => a.AppointmentCode == "BN0006" || a.AppointmentCode == "BN0007"))
             {
                 var app1 = new Appointment
                 {

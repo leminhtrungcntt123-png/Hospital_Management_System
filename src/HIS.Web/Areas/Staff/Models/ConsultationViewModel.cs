@@ -12,12 +12,12 @@ public record ConsultationQueueItemDto(
     int PriorityLevel,
     DateTime? CheckedInAt,
     string Reason,
-    string Allergy,
-    int Pulse,
-    string BloodPressure,
-    decimal Temperature,
-    int Spo2,
-    decimal Weight,
+    string? Allergy,
+    int? Pulse,
+    string? BloodPressure,
+    decimal? Temperature,
+    int? Spo2,
+    decimal? Weight,
     string? DoctorName = null,
     string? RoomNumber = null
 );
@@ -57,7 +57,8 @@ public record DoctorScheduleItemDto(
     TimeOnly EndTime,
     string DoctorName,
     string RoomNumber,
-    string Specialty
+    string Specialty,
+    int? DoctorId = null
 );
 
 public record DutyShiftItemDto(

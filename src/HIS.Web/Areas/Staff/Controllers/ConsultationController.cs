@@ -40,306 +40,309 @@ public class ConsultationController : Controller
             var isDeptHead = User.IsInRole("DEPARTMENT_HEAD");
             var accountId = GetCurrentAccountId();
 
-        int currentDoctorId = 0;
-        int departmentId = 0;
-        string departmentName = "";
-        string currentDoctorName = "";
-        string currentDoctorRoom = "";
+            int currentDoctorId = 0;
+            int departmentId = 0;
+            string departmentName = "";
+            string currentDoctorName = "";
+            string currentDoctorRoom = "";
 
-        if (isDeptHead)
-        {
-            var deptHead = await _context.DepartmentHeads
-                .Include(dh => dh.Department)
-                .FirstOrDefaultAsync(dh => dh.AccountId == accountId, ct);
-
-            if (deptHead != null)
+            if (isDeptHead)
             {
-                departmentId = deptHead.DepartmentId;
-                departmentName = deptHead.Department.Name;
-                currentDoctorName = deptHead.FullName;
+                var deptHead = await _context.DepartmentHeads
+                    .Include(dh => dh.Department)
+                    .FirstOrDefaultAsync(dh => dh.AccountId == accountId, ct);
+
+                if (deptHead != null)
+                {
+                    departmentId = deptHead.DepartmentId;
+                    departmentName = deptHead.Department.Name;
+                    currentDoctorName = deptHead.FullName;
+                }
+                else
+                {
+                    var docHead = await _context.Doctors.Include(d => d.Department).FirstOrDefaultAsync(d => d.AccountId == accountId, ct);
+                    if (docHead != null)
+                    {
+                        departmentId = docHead.DepartmentId;
+                        departmentName = docHead.Department.Name;
+                        currentDoctorName = docHead.FullName;
+                    }
+                }
+
+                if (departmentId == 0)
+                {
+                    departmentName = "Chưa gán khoa quản lý";
+                }
+
+                currentDoctorRoom = "P. Trưởng khoa";
             }
             else
             {
-                var docHead = await _context.Doctors.Include(d => d.Department).FirstOrDefaultAsync(d => d.AccountId == accountId, ct);
-                if (docHead != null)
+                // Bác sĩ thường: Chỉ phụ trách phòng và bệnh nhân của chính mình
+                var doc = await _context.Doctors
+                    .Include(d => d.Department)
+                    .Include(d => d.Schedules).ThenInclude(s => s.Room)
+                    .FirstOrDefaultAsync(d => d.AccountId == accountId, ct);
+
+                if (doc != null)
                 {
-                    departmentId = docHead.DepartmentId;
-                    departmentName = docHead.Department.Name;
-                    currentDoctorName = docHead.FullName;
+                    currentDoctorId = doc.Id;
+                    departmentId = doc.DepartmentId;
+                    departmentName = doc.Department.Name;
+                    currentDoctorName = doc.FullName;
+                    currentDoctorRoom = doc.Schedules.FirstOrDefault()?.Room?.RoomNumber ?? doc.LicenseNumber ?? "P.201";
+                }
+                else
+                {
+                    currentDoctorId = await ResolveDoctorIdAsync(ct);
+                    var fallbackDoc = currentDoctorId > 0
+                        ? await _context.Doctors.Include(d => d.Department).FirstOrDefaultAsync(d => d.Id == currentDoctorId, ct)
+                        : null;
+                    departmentId = fallbackDoc?.DepartmentId ?? 0;
+                    departmentName = fallbackDoc?.Department?.Name ?? "";
+                    currentDoctorName = fallbackDoc?.FullName ?? "Bác sĩ";
+                    currentDoctorRoom = fallbackDoc?.LicenseNumber ?? "";
                 }
             }
 
-            if (departmentId == 0)
-            {
-                departmentName = "Chưa gán khoa quản lý";
-            }
+            var selectedDate = date ?? DateOnly.FromDateTime(DateTime.Today);
+            var selectedShift = shift ?? (DateTime.Now.Hour < 12 ? ExamShift.Morning : ExamShift.Afternoon);
+            var activeTab = string.IsNullOrWhiteSpace(tab) ? "consultation" : tab.ToLowerInvariant();
 
-            currentDoctorRoom = "P. Trưởng khoa";
-        }
-        else
-        {
-            // Bác sĩ thường: Chỉ phụ trách phòng và bệnh nhân của chính mình
-            var doc = await _context.Doctors
-                .Include(d => d.Department)
-                .Include(d => d.Schedules).ThenInclude(s => s.Room)
-                .FirstOrDefaultAsync(d => d.AccountId == accountId, ct);
+            // 1. Hàng đợi bệnh nhân đang chờ khám từ Database
+            var queueQuery = _context.Appointments
+                .AsNoTracking()
+                .Include(a => a.Patient)
+                .Include(a => a.VitalSigns)
+                .Include(a => a.Doctor)
+                .Include(a => a.Slot)
+                .Where(a => a.StatusId == (int)AppointmentStatusId.ReadyForDoctor ||
+                            a.StatusId == (int)AppointmentStatusId.CheckedIn ||
+                            a.StatusId == (int)AppointmentStatusId.InProgress);
 
-            if (doc != null)
+            if (isDeptHead)
             {
-                currentDoctorId = doc.Id;
-                departmentId = doc.DepartmentId;
-                departmentName = doc.Department.Name;
-                currentDoctorName = doc.FullName;
-                currentDoctorRoom = doc.Schedules.FirstOrDefault()?.Room?.RoomNumber ?? doc.LicenseNumber ?? "P.201";
+                // Trưởng khoa: Xem bệnh nhân thuộc khoa mình
+                queueQuery = queueQuery.Where(a => (a.Doctor != null && a.Doctor.DepartmentId == departmentId) || a.DepartmentId == departmentId);
+
+                // Nếu trưởng khoa chọn lọc theo 1 bác sĩ cụ thể trong khoa:
+                if (doctorId.HasValue && doctorId.Value > 0)
+                {
+                    queueQuery = queueQuery.Where(a => a.DoctorId == doctorId.Value);
+                }
             }
             else
             {
-                currentDoctorId = await ResolveDoctorIdAsync(ct);
-                var fallbackDoc = await _context.Doctors.Include(d => d.Department).FirstOrDefaultAsync(d => d.Id == currentDoctorId, ct);
-                departmentId = fallbackDoc?.DepartmentId ?? 1;
-                departmentName = fallbackDoc?.Department?.Name ?? "Khoa Nội tổng hợp";
-                currentDoctorName = fallbackDoc?.FullName ?? "Bác sĩ";
-                currentDoctorRoom = fallbackDoc?.LicenseNumber ?? "P.201";
+                // Bác sĩ thường: CHỈ THẤY BỆNH NHÂN THEO PHÒNG / BÁC SĨ CỦA MÌNH
+                queueQuery = queueQuery.Where(a => a.DoctorId == currentDoctorId);
             }
-        }
 
-        var selectedDate = date ?? DateOnly.FromDateTime(DateTime.Today);
-        var selectedShift = shift ?? (DateTime.Now.Hour < 12 ? ExamShift.Morning : ExamShift.Afternoon);
-        var activeTab = string.IsNullOrWhiteSpace(tab) ? "consultation" : tab.ToLowerInvariant();
+            var queue = await queueQuery
+                .OrderBy(a => a.PriorityLevel)
+                .ThenBy(a => a.QueueNumber)
+                .Select(a => new ConsultationQueueItemDto(
+                    a.Id,
+                    a.AppointmentCode,
+                    a.Patient.FullName,
+                    DateTime.Today.Year - a.Patient.DateOfBirth.Year,
+                    a.Patient.Gender == Gender.Male ? "Nam" : "Nữ",
+                    a.QueueNumber ?? "—",
+                    a.PriorityLevel,
+                    a.CheckedInAt,
+                    a.Reason ?? "Khám bệnh theo lịch hẹn",
+                    (string?)null,
+                    a.VitalSigns != null ? a.VitalSigns.Pulse : null,
+                    a.VitalSigns != null && a.VitalSigns.SystolicBp.HasValue && a.VitalSigns.DiastolicBp.HasValue
+                        ? $"{a.VitalSigns.SystolicBp}/{a.VitalSigns.DiastolicBp}"
+                        : null,
+                    a.VitalSigns != null ? a.VitalSigns.Temperature : null,
+                    a.VitalSigns != null ? a.VitalSigns.Spo2 : null,
+                    a.VitalSigns != null ? a.VitalSigns.Weight : null,
+                    a.Doctor != null ? a.Doctor.FullName : "Chuyên khoa",
+                    a.Slot != null && a.Slot.Room != null ? a.Slot.Room.RoomNumber : (a.Doctor != null ? (a.Doctor.LicenseNumber ?? "") : "")
+                ))
+                .ToListAsync(ct);
 
-        // 1. Hàng đợi bệnh nhân đang chờ khám từ Database
-        var queueQuery = _context.Appointments
-            .AsNoTracking()
-            .Include(a => a.Patient)
-            .Include(a => a.VitalSigns)
-            .Include(a => a.Doctor)
-            .Include(a => a.Slot)
-            .Where(a => a.StatusId == (int)AppointmentStatusId.ReadyForDoctor ||
-                        a.StatusId == (int)AppointmentStatusId.CheckedIn ||
-                        a.StatusId == (int)AppointmentStatusId.InProgress);
+            // 2. Danh sách Chỉ định & kết quả từ Database
+            var labsQuery = _context.LabOrders
+                .AsNoTracking()
+                .Include(l => l.Service)
+                .Include(l => l.MedicalRecord).ThenInclude(r => r.Appointment).ThenInclude(a => a.Patient)
+                .Include(l => l.MedicalRecord).ThenInclude(r => r.Doctor)
+                .Include(l => l.LabResult)
+                .AsQueryable();
 
-        if (isDeptHead)
-        {
-            // Trưởng khoa: Xem bệnh nhân thuộc khoa mình
-            queueQuery = queueQuery.Where(a => (a.Doctor != null && a.Doctor.DepartmentId == departmentId) || a.DepartmentId == departmentId);
-
-            // Nếu trưởng khoa chọn lọc theo 1 bác sĩ cụ thể trong khoa:
-            if (doctorId.HasValue && doctorId.Value > 0)
+            if (isDeptHead)
             {
-                queueQuery = queueQuery.Where(a => a.DoctorId == doctorId.Value);
+                labsQuery = labsQuery.Where(l => l.MedicalRecord != null && l.MedicalRecord.Doctor != null && l.MedicalRecord.Doctor.DepartmentId == departmentId);
+                if (doctorId.HasValue && doctorId.Value > 0)
+                {
+                    labsQuery = labsQuery.Where(l => l.MedicalRecord != null && l.MedicalRecord.DoctorId == doctorId.Value);
+                }
             }
-        }
-        else
-        {
-            // Bác sĩ thường: CHỈ THẤY BỆNH NHÂN THEO PHÒNG / BÁC SĨ CỦA MÌNH
-            queueQuery = queueQuery.Where(a => a.DoctorId == currentDoctorId);
-        }
-
-        var queue = await queueQuery
-            .OrderBy(a => a.PriorityLevel)
-            .ThenBy(a => a.QueueNumber)
-            .Select(a => new ConsultationQueueItemDto(
-                a.Id,
-                a.AppointmentCode,
-                a.Patient.FullName,
-                DateTime.Today.Year - a.Patient.DateOfBirth.Year,
-                a.Patient.Gender == Gender.Male ? "Nam" : "Nữ",
-                a.QueueNumber ?? "—",
-                a.PriorityLevel,
-                a.CheckedInAt,
-                a.Reason ?? "Khám bệnh theo lịch hẹn",
-                "Dị ứng thuốc do người bệnh khai báo — cần xác minh",
-                a.VitalSigns != null && a.VitalSigns.Pulse.HasValue ? a.VitalSigns.Pulse.Value : 75,
-                a.VitalSigns != null && a.VitalSigns.SystolicBp.HasValue && a.VitalSigns.DiastolicBp.HasValue
-                    ? $"{a.VitalSigns.SystolicBp}/{a.VitalSigns.DiastolicBp}"
-                    : "120/80",
-                a.VitalSigns != null && a.VitalSigns.Temperature.HasValue ? a.VitalSigns.Temperature.Value : 36.6m,
-                a.VitalSigns != null && a.VitalSigns.Spo2.HasValue ? a.VitalSigns.Spo2.Value : 98,
-                a.VitalSigns != null && a.VitalSigns.Weight.HasValue ? a.VitalSigns.Weight.Value : 65m,
-                a.Doctor != null ? a.Doctor.FullName : "Chuyên khoa",
-                a.Slot != null && a.Slot.Room != null ? a.Slot.Room.RoomNumber : (a.Doctor != null ? (a.Doctor.LicenseNumber ?? "") : "")
-            ))
-            .ToListAsync(ct);
-
-        // 2. Danh sách Chỉ định & kết quả từ Database
-        var labsQuery = _context.LabOrders
-            .AsNoTracking()
-            .Include(l => l.Service)
-            .Include(l => l.MedicalRecord).ThenInclude(r => r.Appointment).ThenInclude(a => a.Patient)
-            .Include(l => l.MedicalRecord).ThenInclude(r => r.Doctor)
-            .Include(l => l.LabResult)
-            .AsQueryable();
-
-        if (isDeptHead)
-        {
-            labsQuery = labsQuery.Where(l => l.MedicalRecord != null && l.MedicalRecord.Doctor != null && l.MedicalRecord.Doctor.DepartmentId == departmentId);
-            if (doctorId.HasValue && doctorId.Value > 0)
+            else
             {
-                labsQuery = labsQuery.Where(l => l.MedicalRecord != null && l.MedicalRecord.DoctorId == doctorId.Value);
+                labsQuery = labsQuery.Where(l => l.MedicalRecord != null && l.MedicalRecord.DoctorId == currentDoctorId);
             }
-        }
-        else
-        {
-            labsQuery = labsQuery.Where(l => l.MedicalRecord != null && l.MedicalRecord.DoctorId == currentDoctorId);
-        }
 
-        var labs = await labsQuery
-            .OrderByDescending(l => l.CreatedAt)
-            .Select(l => new ConsultationLabItemDto(
-                l.Id,
-                l.MedicalRecord.Appointment.Patient.FullName,
-                l.MedicalRecord.Appointment.AppointmentCode,
-                DateTime.Today.Year - l.MedicalRecord.Appointment.Patient.DateOfBirth.Year,
-                l.Service.Name,
-                l.Note ?? "Chỉ định chuyên khoa",
-                l.CreatedAt,
-                l.Status == LabOrderStatus.Completed ? "Đã có kết quả" : "Chờ kết quả",
-                l.LabResult != null ? l.LabResult.Result : null
-            ))
-            .ToListAsync(ct);
+            var labs = await labsQuery
+                .OrderByDescending(l => l.CreatedAt)
+                .Select(l => new ConsultationLabItemDto(
+                    l.Id,
+                    l.MedicalRecord.Appointment.Patient.FullName,
+                    l.MedicalRecord.Appointment.AppointmentCode,
+                    DateTime.Today.Year - l.MedicalRecord.Appointment.Patient.DateOfBirth.Year,
+                    l.Service.Name,
+                    l.Note ?? "Chỉ định chuyên khoa",
+                    l.CreatedAt,
+                    l.Status == LabOrderStatus.Completed ? "Đã có kết quả" : "Chờ kết quả",
+                    l.LabResult != null ? l.LabResult.Result : null
+                ))
+                .ToListAsync(ct);
 
-        // 3. Danh sách Bệnh án trong khoa từ Database
-        var recordsQuery = _context.MedicalRecords
-            .AsNoTracking()
-            .Include(r => r.Doctor).ThenInclude(d => d.Department)
-            .Include(r => r.Appointment).ThenInclude(a => a.Patient)
-            .AsQueryable();
+            // 3. Danh sách Bệnh án trong khoa từ Database
+            var recordsQuery = _context.MedicalRecords
+                .AsNoTracking()
+                .Include(r => r.Doctor).ThenInclude(d => d.Department)
+                .Include(r => r.Appointment).ThenInclude(a => a.Patient)
+                .AsQueryable();
 
-        if (isDeptHead)
-        {
-            recordsQuery = recordsQuery.Where(r => r.Doctor != null && r.Doctor.DepartmentId == departmentId);
-            if (doctorId.HasValue && doctorId.Value > 0)
+            if (isDeptHead)
             {
-                recordsQuery = recordsQuery.Where(r => r.DoctorId == doctorId.Value);
+                recordsQuery = recordsQuery.Where(r => r.Doctor != null && r.Doctor.DepartmentId == departmentId);
+                if (doctorId.HasValue && doctorId.Value > 0)
+                {
+                    recordsQuery = recordsQuery.Where(r => r.DoctorId == doctorId.Value);
+                }
             }
+            else
+            {
+                recordsQuery = recordsQuery.Where(r => r.DoctorId == currentDoctorId);
+            }
+
+            var records = await recordsQuery
+                .OrderByDescending(r => r.CreatedAt)
+                .Select(r => new ConsultationRecordItemDto(
+                    r.Id,
+                    r.Appointment.Patient.FullName,
+                    r.Appointment.AppointmentCode,
+                    DateTime.Today.Year - r.Appointment.Patient.DateOfBirth.Year,
+                    r.Appointment.Patient.Gender == Gender.Male ? "Nam" : "Nữ",
+                    r.CreatedAt,
+                    r.Doctor.FullName,
+                    r.Doctor.Department.Name,
+                    r.Symptoms ?? "Không ghi nhận",
+                    r.ClinicalExamination ?? "Không ghi nhận",
+                    r.PrimaryDiagnosisCode ?? "—",
+                    r.PrimaryDiagnosisDesc ?? "—",
+                    r.Conclusion ?? "Đã hoàn tất khám"
+                ))
+                .ToListAsync(ct);
+
+            // 4. Lịch làm việc trong tuần & Ca trực đêm từ Database
+            var schedules = await _context.DoctorSchedules
+                .AsNoTracking()
+                .Include(s => s.Doctor)
+                .Include(s => s.Room)
+                .Where(s => isDeptHead ? s.Doctor.DepartmentId == departmentId : s.DoctorId == currentDoctorId)
+                .Select(s => new DoctorScheduleItemDto(
+                    s.DayOfWeek,
+                    s.Shift,
+                    s.StartTime,
+                    s.EndTime,
+                    s.Doctor.FullName,
+                    s.Room.RoomNumber,
+                    s.Doctor.Specialty ?? "Chuyên khoa",
+                    s.DoctorId
+                ))
+                .ToListAsync(ct);
+
+            var dutyShifts = await _context.DutyShifts
+                .AsNoTracking()
+                .Include(d => d.Account).ThenInclude(a => a.Doctor)
+                .Include(d => d.Account).ThenInclude(a => a.DepartmentHead)
+                .Include(d => d.Account).ThenInclude(a => a.Nurse)
+                .Where(d => d.DepartmentId == departmentId || d.AccountId == accountId)
+                .OrderByDescending(d => d.StartTime)
+                .Select(d => new DutyShiftItemDto(
+                    d.Account.Doctor != null ? d.Account.Doctor.FullName :
+                    d.Account.DepartmentHead != null ? d.Account.DepartmentHead.FullName :
+                    d.Account.Nurse != null ? d.Account.Nurse.FullName : d.Account.Username,
+                    d.StartTime,
+                    d.EndTime,
+                    d.Note ?? "Trực đêm tại khoa",
+                    d.AccountId
+                ))
+                .ToListAsync(ct);
+
+            // 5. Đề nghị nghỉ / đổi ca từ Database
+            var exceptionsQuery = _context.ScheduleExceptions
+                .AsNoTracking()
+                .Include(e => e.ReplacementDoctor)
+                .Include(e => e.Doctor)
+                .AsQueryable();
+
+            if (isDeptHead)
+            {
+                exceptionsQuery = exceptionsQuery.Where(e => e.Doctor.DepartmentId == departmentId);
+            }
+            else
+            {
+                exceptionsQuery = exceptionsQuery.Where(e => e.DoctorId == currentDoctorId || (e.ReplacementDoctorId.HasValue && e.ReplacementDoctorId.Value == currentDoctorId));
+            }
+
+            var exceptions = await exceptionsQuery
+                .OrderByDescending(e => e.CreatedAt)
+                .Select(e => new ScheduleExceptionItemDto(
+                    e.Id,
+                    e.Date,
+                    e.Shift,
+                    e.Type.ToString(),
+                    e.Status == ScheduleExceptionStatus.Pending ? "Chờ duyệt" : e.Status == ScheduleExceptionStatus.Approved ? "Đã duyệt" : "Từ chối",
+                    e.Reason ?? "Nghỉ việc riêng",
+                    e.ReplacementDoctor != null ? e.ReplacementDoctor.FullName : null,
+                    e.DoctorId,
+                    e.ReplacementDoctorId
+                ))
+                .ToListAsync(ct);
+
+            var availableDoctors = await _context.Doctors
+                .AsNoTracking()
+                .Where(d => d.DepartmentId == departmentId)
+                .OrderBy(d => d.FullName)
+                .Select(d => new DoctorSelectItemDto(d.Id, d.FullName, d.Specialty ?? "Chuyên khoa", d.LicenseNumber))
+                .ToListAsync(ct);
+
+            var vm = new ConsultationViewModel
+            {
+                ActiveTab = activeTab,
+                WeekOffset = weekOffset,
+                SelectedDate = selectedDate,
+                SelectedShift = selectedShift,
+                IsDepartmentHead = isDeptHead,
+                SelectedDoctorId = doctorId,
+                DepartmentId = departmentId,
+                DepartmentName = departmentName,
+                CurrentDoctorName = currentDoctorName,
+                CurrentDoctorRoom = currentDoctorRoom,
+                QueuePatients = queue,
+                ActivePatient = queue.FirstOrDefault(),
+                LabOrders = labs,
+                MedicalRecords = records,
+                DoctorSchedules = schedules,
+                DutyShifts = dutyShifts,
+                Exceptions = exceptions,
+                AvailableDoctors = availableDoctors
+            };
+
+            return View(vm);
         }
-        else
+        catch (OperationCanceledException)
         {
-            recordsQuery = recordsQuery.Where(r => r.DoctorId == currentDoctorId);
+            // Trình duyệt reload/chuyển trang làm hủy request - tránh Visual Studio debug exception popup
+            return new EmptyResult();
         }
-
-        var records = await recordsQuery
-            .OrderByDescending(r => r.CreatedAt)
-            .Select(r => new ConsultationRecordItemDto(
-                r.Id,
-                r.Appointment.Patient.FullName,
-                r.Appointment.AppointmentCode,
-                DateTime.Today.Year - r.Appointment.Patient.DateOfBirth.Year,
-                r.Appointment.Patient.Gender == Gender.Male ? "Nam" : "Nữ",
-                r.CreatedAt,
-                r.Doctor.FullName,
-                r.Doctor.Department.Name,
-                r.Symptoms ?? "Không ghi nhận",
-                r.ClinicalExamination ?? "Không ghi nhận",
-                r.PrimaryDiagnosisCode ?? "—",
-                r.PrimaryDiagnosisDesc ?? "—",
-                r.Conclusion ?? "Đã hoàn tất khám"
-            ))
-            .ToListAsync(ct);
-
-        // 4. Lịch làm việc trong tuần & Ca trực đêm từ Database
-        var schedules = await _context.DoctorSchedules
-            .AsNoTracking()
-            .Include(s => s.Doctor)
-            .Include(s => s.Room)
-            .Where(s => isDeptHead ? s.Doctor.DepartmentId == departmentId : s.DoctorId == currentDoctorId)
-            .Select(s => new DoctorScheduleItemDto(
-                s.DayOfWeek,
-                s.Shift,
-                s.StartTime,
-                s.EndTime,
-                s.Doctor.FullName,
-                s.Room.RoomNumber,
-                s.Doctor.Specialty ?? "Chuyên khoa"
-            ))
-            .ToListAsync(ct);
-
-        var dutyShifts = await _context.DutyShifts
-            .AsNoTracking()
-            .Include(d => d.Account).ThenInclude(a => a.Doctor)
-            .Include(d => d.Account).ThenInclude(a => a.DepartmentHead)
-            .Include(d => d.Account).ThenInclude(a => a.Nurse)
-            .Where(d => d.DepartmentId == departmentId || d.AccountId == accountId)
-            .OrderByDescending(d => d.StartTime)
-            .Select(d => new DutyShiftItemDto(
-                d.Account.Doctor != null ? d.Account.Doctor.FullName :
-                d.Account.DepartmentHead != null ? d.Account.DepartmentHead.FullName :
-                d.Account.Nurse != null ? d.Account.Nurse.FullName : d.Account.Username,
-                d.StartTime,
-                d.EndTime,
-                d.Note ?? "Trực đêm tại khoa",
-                d.AccountId
-            ))
-            .ToListAsync(ct);
-
-        // 5. Đề nghị nghỉ / đổi ca từ Database
-        var exceptionsQuery = _context.ScheduleExceptions
-            .AsNoTracking()
-            .Include(e => e.ReplacementDoctor)
-            .Include(e => e.Doctor)
-            .AsQueryable();
-
-        if (isDeptHead)
-        {
-            exceptionsQuery = exceptionsQuery.Where(e => e.Doctor.DepartmentId == departmentId);
-        }
-        else
-        {
-            exceptionsQuery = exceptionsQuery.Where(e => e.DoctorId == currentDoctorId || (e.ReplacementDoctorId.HasValue && e.ReplacementDoctorId.Value == currentDoctorId));
-        }
-
-        var exceptions = await exceptionsQuery
-            .OrderByDescending(e => e.CreatedAt)
-            .Select(e => new ScheduleExceptionItemDto(
-                e.Id,
-                e.Date,
-                e.Shift,
-                e.Type.ToString(),
-                e.Status == ScheduleExceptionStatus.Pending ? "Chờ duyệt" : e.Status == ScheduleExceptionStatus.Approved ? "Đã duyệt" : "Từ chối",
-                e.Reason ?? "Nghỉ việc riêng",
-                e.ReplacementDoctor != null ? e.ReplacementDoctor.FullName : null,
-                e.DoctorId,
-                e.ReplacementDoctorId
-            ))
-            .ToListAsync(ct);
-
-        var availableDoctors = await _context.Doctors
-            .AsNoTracking()
-            .Where(d => d.DepartmentId == departmentId)
-            .OrderBy(d => d.FullName)
-            .Select(d => new DoctorSelectItemDto(d.Id, d.FullName, d.Specialty ?? "Chuyên khoa", d.LicenseNumber))
-            .ToListAsync(ct);
-
-        var vm = new ConsultationViewModel
-        {
-            ActiveTab = activeTab,
-            WeekOffset = weekOffset,
-            SelectedDate = selectedDate,
-            SelectedShift = selectedShift,
-            IsDepartmentHead = isDeptHead,
-            SelectedDoctorId = doctorId,
-            DepartmentId = departmentId,
-            DepartmentName = departmentName,
-            CurrentDoctorName = currentDoctorName,
-            CurrentDoctorRoom = currentDoctorRoom,
-            QueuePatients = queue,
-            ActivePatient = queue.FirstOrDefault(),
-            LabOrders = labs,
-            MedicalRecords = records,
-            DoctorSchedules = schedules,
-            DutyShifts = dutyShifts,
-            Exceptions = exceptions,
-            AvailableDoctors = availableDoctors
-        };
-
-        return View(vm);
     }
-    catch (OperationCanceledException)
-    {
-        // Trình duyệt reload/chuyển trang làm hủy request - tránh Visual Studio debug exception popup
-        return new EmptyResult();
-    }
-}
 
     // 2. Bác sĩ gọi bệnh nhân tiếp theo vào phòng khám
     [HttpPost]
@@ -367,6 +370,12 @@ public class ConsultationController : Controller
         try
         {
             var doctorId = await ResolveDoctorIdAsync(ct);
+            if (doctorId <= 0)
+            {
+                TempData["ErrorMessage"] = "Tài khoản hiện tại chưa được liên kết với hồ sơ bác sĩ.";
+                return RedirectToAction(nameof(Index));
+            }
+
             var recordRequest = request with { DoctorId = doctorId };
             await _doctorService.CreateMedicalRecordAsync(recordRequest, ct);
             TempData["SuccessMessage"] = "Đã lưu hồ sơ bệnh án và hoàn thành lượt khám.";
@@ -393,6 +402,11 @@ public class ConsultationController : Controller
         try
         {
             var doctorId = await ResolveDoctorIdAsync(ct);
+            if (doctorId <= 0)
+            {
+                TempData["ErrorMessage"] = "Tài khoản hiện tại chưa được liên kết với hồ sơ bác sĩ.";
+                return RedirectToAction(nameof(Index), new { tab = "exceptions" });
+            }
 
             // Parse date hỗ trợ cả yyyy-MM-dd (chuẩn HTML5) và dd/MM/yyyy
             DateOnly targetDate;
@@ -478,7 +492,6 @@ public class ConsultationController : Controller
             return doctor.Id;
         }
 
-        var firstDoctor = await _context.Doctors.FirstOrDefaultAsync(ct);
-        return firstDoctor?.Id ?? 1;
+        return 0;
     }
 }

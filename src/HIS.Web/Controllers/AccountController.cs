@@ -56,8 +56,16 @@ public class AccountController : Controller
     // Ví dụ truy cập: /Account/DevLogin?role=ADMIN hoặc /Account/DevLogin?role=DOCTOR
     [HttpGet]
     [AllowAnonymous]
-    public async Task<IActionResult> DevLogin([FromServices] AppDbContext db, string role = "ADMIN")
+    public async Task<IActionResult> DevLogin(
+        [FromServices] AppDbContext db,
+        [FromServices] IWebHostEnvironment env,
+        string role = "ADMIN")
     {
+        if (!env.IsDevelopment())
+        {
+            return NotFound();
+        }
+
         var targetRole = role.ToUpperInvariant() switch
         {
             "DOCTOR" or "DOC" => "DOCTOR",

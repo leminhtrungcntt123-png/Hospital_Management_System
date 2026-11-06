@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace HIS.Web.Areas.Staff.Controllers;
 
 [Area("Staff")]
-[Authorize(Policy = "StaffAny")]
+[Authorize(Policy = "DepartmentHeadOnly")]
 public class ScheduleController : Controller
 {
     private readonly IDepartmentHeadService _departmentHeadService;
@@ -83,11 +83,18 @@ public class ScheduleController : Controller
 
     // Duyệt đề nghị nghỉ / đổi ca
     [HttpPost]
+    [Authorize(Policy = "DepartmentHeadOnly")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ApproveException(int id, CancellationToken ct)
     {
         var accountId = GetCurrentAccountId();
         var departmentId = await _departmentHeadService.ResolveDepartmentIdByAccountIdAsync(accountId, ct);
+        if (departmentId <= 0)
+        {
+            TempData["ErrorMessage"] = "Tài khoản của bạn chưa được liên kết với khoa chuyên môn nào.";
+            return RedirectToAction(nameof(Index), new { tab = "exceptions" });
+        }
+
         var result = await _departmentHeadService.ApproveExceptionAsync(new ApproveExceptionRequest(id, accountId, departmentId), ct);
 
         if (!result.IsSuccess)
@@ -104,11 +111,18 @@ public class ScheduleController : Controller
 
     // Từ chối đề nghị nghỉ / đổi ca
     [HttpPost]
+    [Authorize(Policy = "DepartmentHeadOnly")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> RejectException(int id, string? reason, CancellationToken ct)
     {
         var accountId = GetCurrentAccountId();
         var departmentId = await _departmentHeadService.ResolveDepartmentIdByAccountIdAsync(accountId, ct);
+        if (departmentId <= 0)
+        {
+            TempData["ErrorMessage"] = "Tài khoản của bạn chưa được liên kết với khoa chuyên môn nào.";
+            return RedirectToAction(nameof(Index), new { tab = "exceptions" });
+        }
+
         var result = await _departmentHeadService.RejectExceptionAsync(new RejectExceptionRequest(id, accountId, reason, departmentId), ct);
 
         if (!result.IsSuccess)

@@ -179,7 +179,14 @@
                                 <td style="padding:14px 18px; text-align:right;">
                                     <button type="button" class="btn outline sm"
                                             style="font-size:11px; padding:5px 12px; border-radius:6px; border:1px solid #cbd5e1; background:#fff; color:#334155; display:inline-flex; align-items:center; gap:4px; cursor:pointer;"
-                                            onclick="openLabResultModal('@lab.PatientName', '@lab.PatientCode', '@lab.Age', '@lab.ServiceName', '@lab.OrderTime.ToString("dd/MM/yyyy HH:mm")', '@lab.Status', '@(string.IsNullOrWhiteSpace(lab.ResultData) ? "Chưa có kết quả xét nghiệm từ phòng lab." : lab.ResultData)')">
+                                            data-patient="@lab.PatientName"
+                                            data-code="@lab.PatientCode"
+                                            data-age="@lab.Age"
+                                            data-service="@lab.ServiceName"
+                                            data-time="@lab.OrderTime.ToString("dd/MM/yyyy HH:mm")"
+                                            data-status="@lab.Status"
+                                            data-result="@(string.IsNullOrWhiteSpace(lab.ResultData) ? "Chưa có kết quả xét nghiệm từ phòng lab." : lab.ResultData)"
+                                            onclick="openLabResultModalFromBtn(this)">
                                         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;">
                                             <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12 M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0"></path>
                                         </svg>
@@ -279,7 +286,20 @@ else if (tab == "records")
                                 <td style="padding:14px 18px; text-align:right;">
                                     <button type="button" class="btn outline sm"
                                             style="font-size:11px; padding:5px 12px; border-radius:6px; border:1px solid #cbd5e1; background:#fff; color:#334155; display:inline-flex; align-items:center; gap:4px; cursor:pointer;"
-                                            onclick="openRecordModal('@rec.RecordId', '@rec.PatientName', '@rec.PatientCode', '@rec.Age', '@rec.Gender', '@rec.DateTime.ToString("dd/MM/yyyy HH:mm")', '@rec.DoctorName', '@rec.DepartmentName', '@rec.Symptoms', '@rec.ClinicalExam', '@rec.DiagnosisCode', '@rec.Diagnosis', '@rec.Conclusion')">
+                                            data-id="@rec.RecordId"
+                                            data-patient="@rec.PatientName"
+                                            data-code="@rec.PatientCode"
+                                            data-age="@rec.Age"
+                                            data-gender="@rec.Gender"
+                                            data-date="@rec.DateTime.ToString("dd/MM/yyyy HH:mm")"
+                                            data-doctor="@rec.DoctorName"
+                                            data-dept="@rec.DepartmentName"
+                                            data-symptoms="@rec.Symptoms"
+                                            data-exam="@rec.ClinicalExam"
+                                            data-icd="@rec.DiagnosisCode"
+                                            data-diagnosis="@rec.Diagnosis"
+                                            data-conclusion="@rec.Conclusion"
+                                            onclick="openRecordModalFromBtn(this)">
                                         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;">
                                             <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12 M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0"></path>
                                         </svg>
@@ -438,29 +458,59 @@ else if (tab == "schedule")
                         var isToday = dayDate.Date == now.Date;
                         var dOfWeek = dayDate.DayOfWeek;
 
-                        // Tìm ngoại lệ ĐÃ DUYỆT (bác sĩ nghỉ / đổi ca)
+                        var currentDocId = Model.SelectedDoctorId ?? 0;
+
+                        // Lịch khám cấu hình từ Model.DoctorSchedules
+                        var schedMorning = Model.DoctorSchedules.FirstOrDefault(s =>
+                            s.DayOfWeek == dOfWeek &&
+                            s.Shift == ExamShift.Morning &&
+                            (!s.DoctorId.HasValue || s.DoctorId.Value == currentDocId || s.DoctorName == docDisplayName));
+
+                        var schedAfternoon = Model.DoctorSchedules.FirstOrDefault(s =>
+                            s.DayOfWeek == dOfWeek &&
+                            s.Shift == ExamShift.Afternoon &&
+                            (!s.DoctorId.HasValue || s.DoctorId.Value == currentDocId || s.DoctorName == docDisplayName));
+
+                        // Tìm ngoại lệ ĐÃ DUYỆT (bác sĩ nghỉ / đổi ca của chính bác sĩ này)
                         var approvedLeaveMorning = Model.Exceptions.FirstOrDefault(e =>
                             e.Date == curDate &&
                             (e.Shift == ExamShift.Morning || e.Shift == null) &&
-                            e.Status.Contains("duyệt") && !e.Status.Contains("Từ") && !e.Status.Contains("Chờ") &&
-                            (e.DoctorId == null || !e.ReplacementDoctorId.HasValue || e.DoctorId != e.ReplacementDoctorId));
+                            (e.DoctorId == currentDocId || (e.DoctorId == null && !Model.IsDepartmentHead)) &&
+                            e.Status.Contains("duyệt") && !e.Status.Contains("Từ") && !e.Status.Contains("Chờ"));
 
                         var approvedLeaveAfternoon = Model.Exceptions.FirstOrDefault(e =>
                             e.Date == curDate &&
                             (e.Shift == ExamShift.Afternoon || e.Shift == null) &&
-                            e.Status.Contains("duyệt") && !e.Status.Contains("Từ") && !e.Status.Contains("Chờ") &&
-                            (e.DoctorId == null || !e.ReplacementDoctorId.HasValue || e.DoctorId != e.ReplacementDoctorId));
+                            (e.DoctorId == currentDocId || (e.DoctorId == null && !Model.IsDepartmentHead)) &&
+                            e.Status.Contains("duyệt") && !e.Status.Contains("Từ") && !e.Status.Contains("Chờ"));
 
-                        // Tìm ngoại lệ ĐANG CHỜ DUYỆT (Pending)
+                        // Tìm ngoại lệ ĐANG CHỜ DUYỆT (Pending) của chính bác sĩ này
                         var pendingLeaveMorning = Model.Exceptions.FirstOrDefault(e =>
                             e.Date == curDate &&
                             (e.Shift == ExamShift.Morning || e.Shift == null) &&
+                            (e.DoctorId == currentDocId || (e.DoctorId == null && !Model.IsDepartmentHead)) &&
                             e.Status.Contains("Chờ"));
 
                         var pendingLeaveAfternoon = Model.Exceptions.FirstOrDefault(e =>
                             e.Date == curDate &&
                             (e.Shift == ExamShift.Afternoon || e.Shift == null) &&
+                            (e.DoctorId == currentDocId || (e.DoctorId == null && !Model.IsDepartmentHead)) &&
                             e.Status.Contains("Chờ"));
+
+                        // Ca đổi mà bác sĩ này là người nhận trực thay (ReplacementDoctorId)
+                        var coveringSwapMorning = Model.Exceptions.FirstOrDefault(e =>
+                            e.Date == curDate &&
+                            (e.Shift == ExamShift.Morning || e.Shift == null) &&
+                            e.ReplacementDoctorId.HasValue && e.ReplacementDoctorId.Value == currentDocId &&
+                            e.DoctorId != currentDocId &&
+                            e.Status.Contains("duyệt") && !e.Status.Contains("Từ") && !e.Status.Contains("Chờ"));
+
+                        var coveringSwapAfternoon = Model.Exceptions.FirstOrDefault(e =>
+                            e.Date == curDate &&
+                            (e.Shift == ExamShift.Afternoon || e.Shift == null) &&
+                            e.ReplacementDoctorId.HasValue && e.ReplacementDoctorId.Value == currentDocId &&
+                            e.DoctorId != currentDocId &&
+                            e.Status.Contains("duyệt") && !e.Status.Contains("Từ") && !e.Status.Contains("Chờ"));
 
                         // Lịch trực đêm trong ngày (khoa hoặc chính bác sĩ)
                         var dayDutyShifts = Model.DutyShifts.Where(d => DateOnly.FromDateTime(d.StartTime) == curDate).ToList();
@@ -468,9 +518,10 @@ else if (tab == "schedule")
                             d.AccountId == currentAccId ||
                             (!string.IsNullOrEmpty(d.StaffName) && (d.StaffName.Contains(docDisplayName) || docDisplayName.Contains(d.StaffName))));
 
-                        bool hasAnyShift = (dOfWeek != DayOfWeek.Saturday && dOfWeek != DayOfWeek.Sunday) ||
+                        bool hasAnyShift = schedMorning != null || schedAfternoon != null ||
                                            approvedLeaveMorning != null || approvedLeaveAfternoon != null ||
                                            pendingLeaveMorning != null || pendingLeaveAfternoon != null ||
+                                           coveringSwapMorning != null || coveringSwapAfternoon != null ||
                                            dayDutyShifts.Count > 0;
 
                         <div style="background:#fff; display:flex; flex-direction:column; @(isToday ? "outline:2px solid #079bc9; outline-offset:-2px; z-index:1;" : "")">
@@ -487,7 +538,19 @@ else if (tab == "schedule")
                             <!-- Body các ca khám / trực -->
                             <div style="padding:8px; display:flex; flex-direction:column; gap:6px; flex:1; min-height:130px; @(isToday ? "background:#fafefe;" : "background:#fff;")">
                                 <!-- 1. CA SÁNG -->
-                                @if (approvedLeaveMorning != null)
+                                @if (coveringSwapMorning != null)
+                                {
+                                    <div style="background:#eff6ff; border-left:3px solid #3b82f6; border-radius:6px; padding:6px 7px; text-align:left;" title="Trực thay ca đổi: @coveringSwapMorning.Reason">
+                                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                                            <strong style="font-size:11px; color:#1e40af;">Ca sáng</strong>
+                                            <span style="font-size:9px; background:#dbeafe; color:#1d4ed8; padding:1px 5px; border-radius:4px; font-weight:700;">Trực thay</span>
+                                        </div>
+                                        <small style="color:#2563eb; font-size:10px; font-weight:600; display:block; margin-top:2px;">
+                                            07:30–11:30
+                                        </small>
+                                    </div>
+                                }
+                                else if (approvedLeaveMorning != null)
                                 {
                                     <div style="background:#fff5e5; border-left:3px solid #f59e0b; border-radius:6px; padding:6px 7px; text-align:left;" title="Lý do: @approvedLeaveMorning.Reason">
                                         <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -515,16 +578,28 @@ else if (tab == "schedule")
                                         </small>
                                     </div>
                                 }
-                                else if (dOfWeek != DayOfWeek.Saturday && dOfWeek != DayOfWeek.Sunday)
+                                else if (schedMorning != null)
                                 {
                                     <div style="background:#f0fdfa; border-left:3px solid #0d9488; border-radius:6px; padding:6px 7px;">
                                         <strong style="display:block; font-size:11px; color:#0f766e;">Ca sáng</strong>
-                                        <small style="color:#0d9488; font-size:10px; font-weight:600;">07:30–11:30</small>
+                                        <small style="color:#0d9488; font-size:10px; font-weight:600;">@schedMorning.StartTime.ToString("HH:mm")–@schedMorning.EndTime.ToString("HH:mm")</small>
                                     </div>
                                 }
 
                                 <!-- 2. CA CHIỀU -->
-                                @if (approvedLeaveAfternoon != null)
+                                @if (coveringSwapAfternoon != null)
+                                {
+                                    <div style="background:#eff6ff; border-left:3px solid #3b82f6; border-radius:6px; padding:6px 7px; text-align:left;" title="Trực thay ca đổi: @coveringSwapAfternoon.Reason">
+                                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                                            <strong style="font-size:11px; color:#1e40af;">Ca chiều</strong>
+                                            <span style="font-size:9px; background:#dbeafe; color:#1d4ed8; padding:1px 5px; border-radius:4px; font-weight:700;">Trực thay</span>
+                                        </div>
+                                        <small style="color:#2563eb; font-size:10px; font-weight:600; display:block; margin-top:2px;">
+                                            13:00–16:30
+                                        </small>
+                                    </div>
+                                }
+                                else if (approvedLeaveAfternoon != null)
                                 {
                                     <div style="background:#fff5e5; border-left:3px solid #f59e0b; border-radius:6px; padding:6px 7px; text-align:left;" title="Lý do: @approvedLeaveAfternoon.Reason">
                                         <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -552,11 +627,11 @@ else if (tab == "schedule")
                                         </small>
                                     </div>
                                 }
-                                else if (dOfWeek != DayOfWeek.Saturday && dOfWeek != DayOfWeek.Sunday)
+                                else if (schedAfternoon != null)
                                 {
                                     <div style="background:#f5f3ff; border-left:3px solid #7c3aed; border-radius:6px; padding:6px 7px;">
                                         <strong style="display:block; font-size:11px; color:#5b21b6;">Ca chiều</strong>
-                                        <small style="color:#7c3aed; font-size:10px; font-weight:600;">13:00–16:30</small>
+                                        <small style="color:#7c3aed; font-size:10px; font-weight:600;">@schedAfternoon.StartTime.ToString("HH:mm")–@schedAfternoon.EndTime.ToString("HH:mm")</small>
                                     </div>
                                 }
 
@@ -596,7 +671,7 @@ else if (tab == "schedule")
                                 @if (!hasAnyShift)
                                 {
                                     <div style="color:#94a3b8; font-size:11px; text-align:center; padding-top:40px;">
-                                        Nghỉ cuối tuần
+                                        @(dOfWeek == DayOfWeek.Saturday || dOfWeek == DayOfWeek.Sunday ? "Nghỉ cuối tuần" : "Không có lịch khám")
                                     </div>
                                 }
                             </div>
@@ -845,11 +920,12 @@ else
                                 data-gender="@p.Gender"
                                 data-queue="@p.QueueNumber"
                                 data-reason="@p.Reason"
-                                data-pulse="@p.Pulse"
-                                data-bp="@p.BloodPressure"
-                                data-temp="@p.Temperature"
-                                data-spo2="@p.Spo2"
-                                data-weight="@p.Weight"
+                                data-allergy="@(p.Allergy ?? "")"
+                                data-pulse="@(p.Pulse?.ToString() ?? "")"
+                                data-bp="@(p.BloodPressure ?? "")"
+                                data-temp="@(p.Temperature?.ToString() ?? "")"
+                                data-spo2="@(p.Spo2?.ToString() ?? "")"
+                                data-weight="@(p.Weight?.ToString() ?? "")"
                                 onclick="selectConsultPatient(this)"
                                 style="border:none; background:none; cursor:pointer; width:100%; border-bottom:1px solid #f1f5f9; text-align:left;">
                             <div class="avatar" style="width:30px; height:30px; border-radius:50%; background:#e0f2fe; color:#0369a1; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:10px;">@initials</div>
@@ -901,17 +977,17 @@ else
                 <div class="clinical-inner">
                     <!-- Thông báo dị ứng & lý do khám lấy từ Database -->
                     <div class="notice amber" id="patient-notice-display">
-                        <strong>Dị ứng / Lưu ý:</strong> @currentPatient.Allergy<br />
+                        <strong>Dị ứng / Lưu ý:</strong> <span id="patient-allergy-display">@(string.IsNullOrWhiteSpace(currentPatient.Allergy) ? "Không ghi nhận" : currentPatient.Allergy)</span><br />
                         <span id="patient-reason-display">Lý do khám: @currentPatient.Reason</span>
                     </div>
 
                     <!-- Sinh hiệu lấy trực tiếp từ Database -->
                     <div class="vitals-strip">
-                        <div><small>Mạch</small><strong id="vital-pulse">@currentPatient.Pulse <span>l/p</span></strong></div>
-                        <div><small>Huyết áp</small><strong id="vital-bp">@currentPatient.BloodPressure <span>mmHg</span></strong></div>
-                        <div><small>Nhiệt độ</small><strong id="vital-temp">@currentPatient.Temperature <span>°C</span></strong></div>
-                        <div><small>SpO₂</small><strong id="vital-spo2">@currentPatient.Spo2 <span>%</span></strong></div>
-                        <div><small>Cân nặng</small><strong id="vital-weight">@currentPatient.Weight <span>kg</span></strong></div>
+                        <div><small>Mạch</small><strong id="vital-pulse">@(currentPatient.Pulse.HasValue ? $"{currentPatient.Pulse} " : "— ")<span>l/p</span></strong></div>
+                        <div><small>Huyết áp</small><strong id="vital-bp">@(currentPatient.BloodPressure != null ? $"{currentPatient.BloodPressure} " : "— ")<span>mmHg</span></strong></div>
+                        <div><small>Nhiệt độ</small><strong id="vital-temp">@(currentPatient.Temperature.HasValue ? $"{currentPatient.Temperature} " : "— ")<span>°C</span></strong></div>
+                        <div><small>SpO₂</small><strong id="vital-spo2">@(currentPatient.Spo2.HasValue ? $"{currentPatient.Spo2} " : "— ")<span>%</span></strong></div>
+                        <div><small>Cân nặng</small><strong id="vital-weight">@(currentPatient.Weight.HasValue ? $"{currentPatient.Weight} " : "— ")<span>kg</span></strong></div>
                     </div>
 
                     <!-- Hộp Bắt đầu khám -->
@@ -1059,6 +1135,7 @@ else
             const gender = btn.getAttribute('data-gender');
             const queue = btn.getAttribute('data-queue');
             const reason = btn.getAttribute('data-reason');
+            const allergy = btn.getAttribute('data-allergy');
             const pulse = btn.getAttribute('data-pulse');
             const bp = btn.getAttribute('data-bp');
             const temp = btn.getAttribute('data-temp');
@@ -1067,12 +1144,14 @@ else
 
             const nameDisplay = document.getElementById('patient-name-display');
             const infoDisplay = document.getElementById('patient-info-display');
+            const allergyDisplay = document.getElementById('patient-allergy-display');
             const reasonDisplay = document.getElementById('patient-reason-display');
             const inputId = document.getElementById('active-appointment-id');
             const symptomsField = document.getElementById('symptoms');
 
             if (nameDisplay) nameDisplay.textContent = name;
             if (infoDisplay) infoDisplay.textContent = code + ' · ' + gender + ' · ' + age + ' tuổi · ' + queue;
+            if (allergyDisplay) allergyDisplay.textContent = allergy ? allergy : 'Không ghi nhận';
             if (reasonDisplay) reasonDisplay.textContent = 'Lý do khám: ' + reason;
             if (inputId) inputId.value = id;
             if (symptomsField && !symptomsField.value) symptomsField.value = reason;
@@ -1083,11 +1162,11 @@ else
             const spo2El = document.getElementById('vital-spo2');
             const weightEl = document.getElementById('vital-weight');
 
-            if (pulseEl) pulseEl.innerHTML = pulse + ' <span>l/p</span>';
-            if (bpEl) bpEl.innerHTML = bp + ' <span>mmHg</span>';
-            if (tempEl) tempEl.innerHTML = temp + ' <span>°C</span>';
-            if (spo2El) spo2El.innerHTML = spo2 + ' <span>%</span>';
-            if (weightEl) weightEl.innerHTML = weight + ' <span>kg</span>';
+            if (pulseEl) pulseEl.innerHTML = (pulse ? pulse + ' ' : '— ') + '<span>l/p</span>';
+            if (bpEl) bpEl.innerHTML = (bp ? bp + ' ' : '— ') + '<span>mmHg</span>';
+            if (tempEl) tempEl.innerHTML = (temp ? temp + ' ' : '— ') + '<span>°C</span>';
+            if (spo2El) spo2El.innerHTML = (spo2 ? spo2 + ' ' : '— ') + '<span>%</span>';
+            if (weightEl) weightEl.innerHTML = (weight ? weight + ' ' : '— ') + '<span>kg</span>';
         }
 
         function startExamNow() {
@@ -1164,6 +1243,17 @@ else
             });
         }
 
+        function openLabResultModalFromBtn(btn) {
+            const d = btn.dataset;
+            document.getElementById('dialog-lab-patient').textContent = `Người khám: ${d.patient} (${d.code} · ${d.age} tuổi)`;
+            document.getElementById('dialog-lab-service').textContent = d.service;
+            document.getElementById('dialog-lab-time').textContent = d.time;
+            document.getElementById('dialog-lab-status').textContent = d.status;
+            document.getElementById('dialog-lab-result-text').textContent = d.result;
+
+            openAppDialog('labResultDialog');
+        }
+
         function openLabResultModal(patient, code, age, service, time, status, result) {
             document.getElementById('dialog-lab-patient').textContent = `Người khám: ${patient} (${code} · ${age} tuổi)`;
             document.getElementById('dialog-lab-service').textContent = service;
@@ -1194,6 +1284,25 @@ else
             if (countBadge) {
                 countBadge.textContent = visibleCount + ' phiếu khám';
             }
+        }
+
+        function openRecordModalFromBtn(btn) {
+            const d = btn.dataset;
+            document.getElementById('dialog-record-header-sub').textContent = `Mã hồ sơ: #BA-${d.id} | Lượt hẹn: ${d.code}`;
+            document.getElementById('dialog-record-patient').textContent = d.patient;
+            document.getElementById('dialog-record-date').textContent = d.date;
+            document.getElementById('dialog-record-age-gender').textContent = `${d.age} tuổi · Giới tính: ${d.gender}`;
+            document.getElementById('dialog-record-doctor').textContent = d.doctor;
+            document.getElementById('dialog-record-dept').textContent = d.dept;
+            document.getElementById('dialog-record-code').textContent = d.code;
+
+            document.getElementById('dialog-record-symptoms').textContent = d.symptoms;
+            document.getElementById('dialog-record-exam').textContent = d.exam;
+            document.getElementById('dialog-record-icd').textContent = d.icd;
+            document.getElementById('dialog-record-diagnosis').textContent = d.diagnosis;
+            document.getElementById('dialog-record-conclusion').textContent = d.conclusion;
+
+            openAppDialog('recordDetailDialog');
         }
 
         function openRecordModal(id, patient, code, age, gender, date, doctor, dept, symptoms, exam, icd, diagnosis, conclusion) {
