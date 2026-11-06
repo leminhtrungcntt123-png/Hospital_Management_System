@@ -370,6 +370,15 @@ public class SlotConstraintTests
             await ctx.Database.ExecuteSqlRawAsync(
                 "DELETE FROM appointment_status_history WHERE appointment_id IN " +
                 "(SELECT id FROM appointments WHERE appointment_code LIKE {0})", [$"{CodePrefix}%"]);
+            await ctx.Database.ExecuteSqlRawAsync(
+                "DELETE FROM invoice_items WHERE invoice_id IN " +
+                "(SELECT id FROM invoices WHERE appointment_id IN (SELECT id FROM appointments WHERE appointment_code LIKE {0}))", [$"{CodePrefix}%"]);
+            await ctx.Database.ExecuteSqlRawAsync(
+                "DELETE FROM payments WHERE invoice_id IN " +
+                "(SELECT id FROM invoices WHERE appointment_id IN (SELECT id FROM appointments WHERE appointment_code LIKE {0}))", [$"{CodePrefix}%"]);
+            await ctx.Database.ExecuteSqlRawAsync(
+                "DELETE FROM invoices WHERE appointment_id IN " +
+                "(SELECT id FROM appointments WHERE appointment_code LIKE {0})", [$"{CodePrefix}%"]);
             await ctx.Database.ExecuteSqlRawAsync("DELETE FROM appointments WHERE appointment_code LIKE {0}", [$"{CodePrefix}%"]);
 
             await ctx.Database.ExecuteSqlRawAsync("DELETE FROM appointment_slots WHERE id = {0}", [SlotId]);

@@ -1,4 +1,4 @@
-﻿-- Khung rỗng của CSDL HIS, sinh từ model EF Core (HIS.DAL/AppDbContext + Configurations/).
+-- Khung rỗng của CSDL HIS, sinh từ model EF Core (HIS.DAL/AppDbContext + Configurations/).
 -- Lý do CI không chạy `dotnet ef database update`: 20261103165420_AlignToGroupSpec viết tay để
 -- PATCH CSDL hospital_his sẵn có của nhóm (rename constraint, remap id, di trú dữ liệu),
 -- nên nó không chạy được trên CSDL trống. File này là ảnh chụp "model => schema" cho một DB mới,
@@ -347,7 +347,7 @@ CREATE TABLE invoices (
     CONSTRAINT pk_invoices PRIMARY KEY (id),
     CONSTRAINT ck_invoices_coverage_pct_applied CHECK (coverage_pct_applied IS NULL OR coverage_pct_applied BETWEEN 0 AND 100),
     CONSTRAINT ck_invoices_status CHECK (status IN ('UNPAID','PARTIALLY_PAID','PAID')),
-    CONSTRAINT fk_invoices_appointments_appointment_id FOREIGN KEY (appointment_id) REFERENCES appointments (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_invoices_appointments_appointment_id FOREIGN KEY (appointment_id) REFERENCES appointments (id) ON DELETE CASCADE,
     CONSTRAINT fk_invoices_insurance_cards_insurance_card_id FOREIGN KEY (insurance_card_id) REFERENCES insurance_cards (id) ON DELETE RESTRICT,
     CONSTRAINT fk_invoices_insurance_plans_insurance_plan_id FOREIGN KEY (insurance_plan_id) REFERENCES insurance_plans (id) ON DELETE RESTRICT,
     CONSTRAINT fk_invoices_patients_patient_id FOREIGN KEY (patient_id) REFERENCES patients (id) ON DELETE RESTRICT
@@ -409,7 +409,7 @@ CREATE TABLE invoice_items (
     amount numeric(12,2) NOT NULL,
     CONSTRAINT pk_invoice_items PRIMARY KEY (id),
     CONSTRAINT ck_invoice_items_category CHECK (category IN ('EXAMINATION','MEDICATION','SERVICE')),
-    CONSTRAINT fk_invoice_items_invoices_invoice_id FOREIGN KEY (invoice_id) REFERENCES invoices (id) ON DELETE RESTRICT
+    CONSTRAINT fk_invoice_items_invoices_invoice_id FOREIGN KEY (invoice_id) REFERENCES invoices (id) ON DELETE CASCADE
 );
 
 CREATE TABLE payments (
@@ -427,7 +427,7 @@ CREATE TABLE payments (
     CONSTRAINT ck_payments_payment_method CHECK (payment_method IN ('CASH','BANK_TRANSFER')),
     CONSTRAINT ck_payments_payment_type CHECK (payment_type IN ('DEPOSIT','PAYMENT','REFUND')),
     CONSTRAINT fk_payments_accounts_cashier_id FOREIGN KEY (cashier_id) REFERENCES accounts (id) ON DELETE RESTRICT,
-    CONSTRAINT fk_payments_invoices_invoice_id FOREIGN KEY (invoice_id) REFERENCES invoices (id) ON DELETE RESTRICT
+    CONSTRAINT fk_payments_invoices_invoice_id FOREIGN KEY (invoice_id) REFERENCES invoices (id) ON DELETE CASCADE
 );
 
 CREATE TABLE access_logs (
