@@ -59,5 +59,25 @@ public static class PasswordChangeHttpScenario
         }));
         Assert.Equal(HttpStatusCode.Redirect, newLogin.StatusCode);
         Assert.Equal("/Patient/Booking", newLogin.Headers.Location?.OriginalString);
+        foreach (var returnUrl in new[] { "/Account/Logout", "/account/logout", "~/Account/Logout" })
+        {
+            var signedInRedirect = await client.GetAsync("/Account/Login?ReturnUrl=" + Uri.EscapeDataString(returnUrl));
+            Assert.Equal(HttpStatusCode.Redirect, signedInRedirect.StatusCode);
+            Assert.Equal("/Patient/Booking", signedInRedirect.Headers.Location?.OriginalString);
+        }
+
+        using var expired = RegistrationHttpScenario.Client(factory);
+        var logout = await expired.PostAsync("/Account/Logout", new FormUrlEncodedContent(new Dictionary<string, string>()));
+        Assert.Equal(HttpStatusCode.Redirect, logout.StatusCode);
+        Assert.Contains("ReturnUrl=", logout.Headers.Location?.OriginalString);
+        await RegistrationHttpScenario.AddTokenAsync(expired);
+        var relogin = await expired.PostAsync("/Account/Login", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Username"] = username,
+            ["Password"] = "QA_changed_password_2026!",
+            ["ReturnUrl"] = "/Account/Logout"
+        }));
+        Assert.Equal(HttpStatusCode.Redirect, relogin.StatusCode);
+        Assert.Equal("/Patient/Booking", relogin.Headers.Location?.OriginalString);
     }
 }

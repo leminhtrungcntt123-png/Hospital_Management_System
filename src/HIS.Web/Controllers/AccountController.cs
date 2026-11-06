@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Diagnostics.CodeAnalysis;
 using HIS.BLL.DTOs;
 using HIS.BLL.Common;
 using HIS.BLL.Services;
@@ -42,7 +43,7 @@ public class AccountController : Controller
     {
         if (loggedOut != 1 && User.Identity?.IsAuthenticated == true)
         {
-            if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) && returnUrl != "/" && !returnUrl.StartsWith("/Account/Login", StringComparison.OrdinalIgnoreCase))
+            if (IsAllowedReturnUrl(returnUrl))
             {
                 return Redirect(returnUrl);
             }
@@ -100,7 +101,7 @@ public class AccountController : Controller
 
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, authProperties);
 
-        if (!string.IsNullOrEmpty(model.ReturnUrl) && Url.IsLocalUrl(model.ReturnUrl) && model.ReturnUrl != "/" && !model.ReturnUrl.StartsWith("/Account/Login", StringComparison.OrdinalIgnoreCase))
+        if (IsAllowedReturnUrl(model.ReturnUrl))
         {
             return Redirect(model.ReturnUrl);
         }
@@ -249,6 +250,15 @@ public class AccountController : Controller
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         TempData["SuccessMessage"] = "Đã đổi mật khẩu. Vui lòng đăng nhập lại.";
         return RedirectToAction(nameof(Login));
+    }
+
+    private bool IsAllowedReturnUrl([NotNullWhen(true)] string? returnUrl)
+    {
+        if (string.IsNullOrEmpty(returnUrl) || !Url.IsLocalUrl(returnUrl)) return false;
+        var path = Url.Content(returnUrl);
+        return path != "/"
+            && !path.StartsWith(Url.Content("~/Account/Login"), StringComparison.OrdinalIgnoreCase)
+            && !path.StartsWith(Url.Content("~/Account/Logout"), StringComparison.OrdinalIgnoreCase);
     }
 
     private IActionResult RedirectToDashboard(string? role)
