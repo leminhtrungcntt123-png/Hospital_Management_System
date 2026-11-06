@@ -104,8 +104,8 @@ async function handleRegisterSubmit(e) {
             return;
         }
 
-        // Đăng ký thành công -> Thông báo, chuyển tab Login và điền sẵn thông tin
-        alert('Đăng ký tài khoản thành công! Bạn có thể đăng nhập ngay bây giờ.');
+        // Display the server acknowledgement without confirming whether an account already exists.
+        alert(data.message);
         switchToLogin();
 
         var u = document.getElementById('login-username');

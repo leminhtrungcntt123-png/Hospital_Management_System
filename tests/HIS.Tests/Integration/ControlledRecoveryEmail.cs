@@ -18,6 +18,6 @@ public sealed class ControlledRecoveryEmail : IEmailSender
             await Release.Task.WaitAsync(ct);
             throw new InvalidOperationException("Synthetic SMTP failure with private details");
         }
-        LastOtp = Regex.Match(body, @"(?<!\d)\d{6}(?!\d)").Value;
+        LastOtp = Regex.Match(body, @"\(OTP\)[^\r\n]*:\s*([0-9]{6})\b").Groups[1].Value;
     }
 }

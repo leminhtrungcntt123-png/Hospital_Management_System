@@ -3,6 +3,7 @@ using HIS.BLL.Common;
 using HIS.BLL.DTOs;
 using HIS.BLL.Services;
 using HIS.Web.Areas.Admin.Controllers;
+using HIS.Tests.Integration;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -13,6 +14,23 @@ namespace HIS.Tests.Unit;
 public class ReviewRegressionTests
 {
     private static readonly DateTime Now = new(2026, 11, 6, 9, 0, 0);
+
+    [Theory]
+    [InlineData("qa_123456abcdef")]
+    [InlineData("qa_a654321b")]
+    public async Task TestEmailReaders_DoNotConfuseAccountDigitsWithOtp(string username)
+    {
+        var body = $"Xin chào {username},\nMã xác thực (OTP) đặt lại mật khẩu MediCare của bạn là: 987654\nMã này có hiệu lực trong 5 phút.";
+        var captured = new CapturedEmailSender();
+        await captured.SendEmailAsync("qa@example.invalid", "Synthetic reset email", body);
+        Assert.Equal("987654", captured.LastOtp);
+
+        var controlled = new ControlledRecoveryEmail();
+        controlled.Release.TrySetResult();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => controlled.SendEmailAsync("qa@example.invalid", "Synthetic reset email", body));
+        await controlled.SendEmailAsync("qa@example.invalid", "Synthetic reset email", body);
+        Assert.Equal("987654", controlled.LastOtp);
+    }
 
     [Fact]
     public void ParallelIncorrectOtpAttempts_StopAtFive()

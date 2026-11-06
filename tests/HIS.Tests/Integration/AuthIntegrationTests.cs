@@ -189,7 +189,7 @@ public sealed class CapturedEmailSender : IEmailSender
     public TaskCompletionSource<string> Received { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public Task SendEmailAsync(string toEmail, string subject, string body, CancellationToken ct = default)
     {
-        LastOtp = Regex.Match(body, @"(?<!\d)\d{6}(?!\d)").Value;
+        LastOtp = Regex.Match(body, @"\(OTP\)[^\r\n]*:\s*([0-9]{6})\b").Groups[1].Value;
         Received.TrySetResult(LastOtp);
         return Task.CompletedTask;
     }

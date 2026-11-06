@@ -14,6 +14,8 @@ namespace HIS.Web.Controllers;
 
 public class AccountController : Controller
 {
+    private const string RegistrationMessage = "Yêu cầu đăng ký đã được xử lý. Vui lòng đăng nhập hoặc khôi phục mật khẩu nếu bạn đã có tài khoản.";
+
     private readonly IAuthService _authService;
     private readonly ILogger<AccountController> _logger;
     private readonly PasswordResetQueue _passwordResets;
@@ -119,15 +121,17 @@ public class AccountController : Controller
     public IActionResult Register() => RedirectToAction("Login", "Account", new { mode = "register" });
 
     [HttpPost]
-    public async Task<IActionResult> RegisterApi([FromBody] RegisterPatientRequest request)
+    [EnableRateLimiting("register")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> RegisterApi([FromBody] RegisterPatientRequest request, CancellationToken ct)
     {
         if (!ModelState.IsValid || request == null)
         {
             return Json(new { success = false, message = "Dữ liệu đăng ký không hợp lệ." });
         }
 
-        var result = await _authService.RegisterPatientAsync(request);
-        if (!result.IsSuccess)
+        var result = await _authService.RegisterPatientAsync(request, ct);
+        if (!result.IsSuccess && result.Error.Code != "AUTH_REGISTRATION_CONFLICT")
         {
             return Json(new { success = false, message = result.Error.Message });
         }
@@ -135,15 +139,15 @@ public class AccountController : Controller
         return Json(new
         {
             success = true,
-            username = result.Value!.Username,
-            fullName = result.Value.FullName,
-            message = "Đăng ký tài khoản người khám thành công!"
+            message = RegistrationMessage
         });
     }
 
     [HttpPost]
+    [EnableRateLimiting("register")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Register(RegisterViewModel model)
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> Register(RegisterViewModel model, CancellationToken ct)
     {
         if (!ModelState.IsValid)
         {
@@ -157,15 +161,15 @@ public class AccountController : Controller
             model.DateOfBirth,
             model.PhoneNumber,
             model.Email
-        ));
+        ), ct);
 
-        if (!result.IsSuccess)
+        if (!result.IsSuccess && result.Error.Code != "AUTH_REGISTRATION_CONFLICT")
         {
             ModelState.AddModelError(string.Empty, result.Error.Message);
             return View(model);
         }
 
-        TempData["SuccessMessage"] = "Đăng ký tài khoản thành công! Vui lòng đăng nhập.";
+        TempData["SuccessMessage"] = RegistrationMessage;
         return RedirectToAction("Login", "Account");
     }
 

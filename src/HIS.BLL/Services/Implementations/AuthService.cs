@@ -9,11 +9,14 @@ using HIS.DAL;
 using HIS.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 
 namespace HIS.BLL.Services;
 
 public class AuthService : IAuthService
 {
+    private static readonly string DummyPasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString("N"));
+
     // shortcut: OTP state is per process; use a shared store before running multiple app instances.
     private static readonly ConcurrentDictionary<string, PasswordResetChallenge> _resetOtps = new();
 
@@ -64,6 +67,8 @@ public class AuthService : IAuthService
 
             if (account == null || !account.IsActive || account.LockedUntil > now)
             {
+                // Use the same BCrypt cost as account creation instead of returning before password verification.
+                BCrypt.Net.BCrypt.Verify(request.Password, DummyPasswordHash);
                 return InvalidLogin();
             }
 
@@ -75,6 +80,7 @@ public class AuthService : IAuthService
             catch (Exception error) when (error is BCrypt.Net.SaltParseException or ArgumentException or FormatException)
             {
                 // Invalid legacy hashes must not become successful logins or leak an exception to the page.
+                BCrypt.Net.BCrypt.Verify(request.Password, DummyPasswordHash);
             }
 
             if (account.LockedUntil.HasValue)
@@ -146,24 +152,22 @@ public class AuthService : IAuthService
         }
         var normalizedUsername = request.Username.Trim().ToLowerInvariant();
         var normalizedEmail = request.Email?.Trim().ToLowerInvariant();
+        // Conflicts must perform the same expensive password operation as a new registration.
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
 
         // 1. Kiểm tra Username đã tồn tại chưa
         var isUsernameTaken = await _db.Accounts
             .AnyAsync(a => a.Username.ToLower() == normalizedUsername.ToLower(), ct);
-        if (isUsernameTaken)
-        {
-            return Result.Failure<AuthResponse>("AUTH_USERNAME_EXISTS", $"Tên đăng nhập '{normalizedUsername}' đã được sử dụng. Vui lòng chọn tên khác.");
-        }
-
         // 2. Kiểm tra Email đã tồn tại chưa (nếu người dùng có nhập email)
+        var isEmailTaken = false;
         if (!string.IsNullOrWhiteSpace(normalizedEmail))
         {
-            var isEmailTaken = await _db.Accounts
+            isEmailTaken = await _db.Accounts
                 .AnyAsync(a => a.Email != null && a.Email.ToLower() == normalizedEmail.ToLower(), ct);
-            if (isEmailTaken)
-            {
-                return Result.Failure<AuthResponse>("AUTH_EMAIL_EXISTS", $"Địa chỉ email '{normalizedEmail}' đã được đăng ký cho tài khoản khác.");
-            }
+        }
+        if (isUsernameTaken || isEmailTaken)
+        {
+            return RegistrationConflict();
         }
 
         // 3. Tìm Role Bệnh nhân (PATIENT)
@@ -181,7 +185,7 @@ public class AuthService : IAuthService
         {
             Username = normalizedUsername,
             Email = string.IsNullOrWhiteSpace(normalizedEmail) ? null : normalizedEmail,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+            PasswordHash = passwordHash,
             RoleId = patientRole.Id,
             IsActive = true,
             FailedLoginCount = 0,
@@ -218,10 +222,24 @@ public class AuthService : IAuthService
         _db.Patients.Add(patient);
         _db.AccountPatientProfiles.Add(link);
 
-        await _db.SaveChangesAsync(ct);
-
-        return Result.Success(new AuthResponse(account.Id, account.Username, patientRole.Code, patient.FullName));
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+            return Result.Success(new AuthResponse(account.Id, account.Username, patientRole.Code, patient.FullName));
+        }
+        catch (DbUpdateException error) when (error.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation,
+            ConstraintName: "ix_accounts_username" or "ix_accounts_email" or "accounts_username_key" or "accounts_email_key"
+        })
+        {
+            _db.ChangeTracker.Clear();
+            return RegistrationConflict();
+        }
     }
+
+    private static Result<AuthResponse> RegistrationConflict() =>
+        Result.Failure<AuthResponse>("AUTH_REGISTRATION_CONFLICT", "Không thể tạo tài khoản với thông tin này.");
 
     public async Task<Result> ChangePasswordAsync(int accountId, string oldPassword, string newPassword, CancellationToken ct = default)
     {
