@@ -1,0 +1,633 @@
+@{
+    Layout = "_MediCareAuthLayout";
+    ViewData["Title"] = "404 - Không tìm thấy trang";
+}
+
+@section Styles {
+    <style>
+        /* Khóa cứng kích thước và chống tràn tạo thanh cuộn */
+        body.mvc-auth {
+            overflow-y: auto;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .mvc-auth-main.his-auth-main {
+            padding: 8px 14px !important;
+            flex: 1 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            box-sizing: border-box;
+        }
+
+        .his-404-wrapper {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-sizing: border-box;
+        }
+
+        /* Thẻ hiển thị cao cấp, bo góc mềm mại, bóng đổ đa tầng */
+        .his-404-card {
+            width: min(510px, 94vw);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.96) 100%);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border-radius: 24px;
+            padding: 18px 24px 16px;
+            box-shadow: 
+                0 25px 50px -12px rgba(2, 132, 199, 0.22),
+                0 10px 20px -6px rgba(15, 23, 42, 0.06),
+                inset 0 1px 0 rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(226, 232, 240, 0.9);
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            box-sizing: border-box;
+            transition: box-shadow 0.3s ease;
+        }
+
+        .his-404-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3.5px;
+            background: linear-gradient(90deg, #0ea5e9, #0284c7, #10b981, #0ea5e9);
+            background-size: 200% 100%;
+            animation: gradientSlide 4s linear infinite;
+        }
+
+        @@keyframes gradientSlide {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 200% 50%; }
+        }
+
+        /* 1. Huy hiệu nhỏ nhắn */
+        .his-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3.5px 11px;
+            background: #f0fdf4;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.4px;
+            margin-bottom: 6px;
+        }
+
+        .his-badge-pulse {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #ef4444;
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            animation: pulseDot 1.8s infinite;
+        }
+
+        @@keyframes pulseDot {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        /* 2. Hình 404 nhịp tim phía trên */
+        .his-art-top {
+            width: 100%;
+            max-width: 320px;
+            height: 98px;
+            margin: 0 auto 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .his-art-top svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* Keyframes ECG & Heart */
+        @@keyframes ecgAnim {
+            0% { stroke-dashoffset: 500; }
+            100% { stroke-dashoffset: 0; }
+        }
+
+        .anim-ecg {
+            stroke-dasharray: 500;
+            animation: ecgAnim 2.5s linear infinite;
+        }
+
+        @@keyframes heartLubDub {
+            0%, 100% { transform: scale(1); }
+            15% { transform: scale(1.22); }
+            30% { transform: scale(1); }
+            45% { transform: scale(1.15); }
+            60% { transform: scale(1); }
+        }
+
+        .anim-heart {
+            transform-origin: 250px 75px;
+            animation: heartLubDub 1.6s ease-in-out infinite;
+        }
+
+        @@keyframes floatPill {
+            0%, 100% { transform: translateY(0) rotate(15deg); }
+            50% { transform: translateY(-5px) rotate(25deg); }
+        }
+
+        .anim-pill {
+            transform-origin: 45px 30px;
+            animation: floatPill 3s ease-in-out infinite;
+        }
+
+        @@keyframes floatCross {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+
+        .anim-cross {
+            transform-origin: 455px 30px;
+            animation: floatCross 3.2s ease-in-out infinite;
+        }
+
+        @@keyframes eyeBlink {
+            0%, 92%, 100% { transform: scaleY(1); }
+            96% { transform: scaleY(0.1); }
+        }
+
+        .anim-eye {
+            transform-origin: center;
+            animation: eyeBlink 3.6s infinite;
+        }
+
+        @@keyframes magnifyingScan {
+            0%, 100% { transform: rotate(-6deg) translate(0, 0); }
+            50% { transform: rotate(8deg) translate(3px, -2px); }
+        }
+
+        .anim-glass {
+            transform-origin: 210px 48px;
+            animation: magnifyingScan 2.6s ease-in-out infinite;
+        }
+
+        /* Định dạng tiêu đề & thông điệp - Tinh chỉnh hài hòa */
+        .his-title {
+            font-size: 18px;
+            font-weight: 800;
+            color: #0f172a;
+            margin: 4px 0 3px;
+            letter-spacing: 0.6px;
+            line-height: 1.3;
+        }
+
+        .his-desc {
+            font-size: 13px;
+            color: #64748b;
+            font-weight: 500;
+            line-height: 1.4;
+            margin: 0 auto 8px;
+            max-width: 420px;
+        }
+
+        /* 3. Hoạt họa xuất hồn phía dưới - Có vệt chiếu sàn êm dịu */
+        .his-art-bottom {
+            width: 100%;
+            max-width: 380px;
+            height: 112px;
+            margin: 0 auto 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(ellipse at center bottom, rgba(224, 242, 254, 0.45) 0%, rgba(248, 250, 252, 0) 70%);
+            border-radius: 16px;
+        }
+
+        .his-art-bottom svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* Keyframes */
+        @@keyframes soulAscend {
+            0%, 100% {
+                transform: translateY(0) rotate(0deg);
+            }
+            50% {
+                transform: translateY(-9px) rotate(2.5deg);
+            }
+        }
+
+        .anim-soul {
+            transform-origin: 190px 45px;
+            animation: soulAscend 2.8s ease-in-out infinite;
+        }
+
+        @@keyframes haloFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
+        }
+
+        .anim-halo {
+            transform-origin: 190px 22px;
+            animation: haloFloat 2.6s ease-in-out infinite;
+        }
+
+        @@keyframes bubbleFloat {
+            0%, 100% { transform: translate(220px, 12px) scale(1); }
+            50% { transform: translate(220px, 8px) scale(1.03); }
+        }
+
+        .anim-bubble {
+            animation: bubbleFloat 2.6s ease-in-out infinite;
+        }
+
+        @@keyframes dripFall {
+            0% { transform: translateY(0); opacity: 1; }
+            70% { transform: translateY(14px); opacity: 1; }
+            100% { transform: translateY(17px); opacity: 0; }
+        }
+
+        .anim-drip {
+            animation: dripFall 1.7s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @@keyframes flatlineBlink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.35; }
+        }
+
+        .anim-flatline {
+            animation: flatlineBlink 1.4s ease-in-out infinite;
+        }
+
+        @@keyframes floatQ {
+            0%, 100% { transform: translateY(0); opacity: 0.7; }
+            50% { transform: translateY(-5px); opacity: 1; }
+        }
+
+        .anim-float-q {
+            animation: floatQ 2.4s ease-in-out infinite;
+        }
+
+        /* 4. Nút quay lại sang trọng */
+        .his-actions {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .his-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            padding: 9px 26px;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            border-radius: 12px;
+            text-decoration: none;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            border: none;
+            box-sizing: border-box;
+        }
+
+        .his-btn-primary {
+            background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+            color: #ffffff !important;
+            box-shadow: 0 4px 14px -2px rgba(2, 132, 199, 0.42);
+        }
+
+        .his-btn-primary:hover {
+            box-shadow: 0 6px 20px -2px rgba(2, 132, 199, 0.55);
+            background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
+            transform: translateY(-2px);
+        }
+
+        .his-btn-primary:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 8px -1px rgba(2, 132, 199, 0.4);
+        }
+
+        /* 5. Chân trang hotline */
+        .his-emergency-bar {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(226, 232, 240, 0.8);
+            font-size: 11.5px;
+            color: #94a3b8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .his-emergency-bar strong {
+            color: #0284c7;
+            font-weight: 700;
+        }
+
+        @@media (max-width: 576px) {
+            .his-404-card {
+                padding: 14px 14px 12px;
+                border-radius: 18px;
+            }
+
+            .his-title {
+                font-size: 16px;
+            }
+
+            .his-desc {
+                font-size: 12px;
+                margin-bottom: 6px;
+            }
+
+            .his-art-top {
+                max-width: 280px;
+                height: 85px;
+            }
+
+            .his-art-bottom {
+                max-width: 320px;
+                height: 98px;
+            }
+
+            .his-btn {
+                width: 100%;
+                padding: 9px 16px;
+            }
+        }
+
+        @@media (prefers-reduced-motion: reduce) {
+            .anim-ecg, .anim-heart, .anim-pill, .anim-cross, .anim-eye, .anim-glass,
+            .anim-soul, .anim-halo, .anim-bubble, .anim-drip, .anim-flatline,
+            .anim-float-q, .his-404-card::before {
+                animation: none !important;
+            }
+        }
+    </style>
+}
+
+<div class="his-404-wrapper">
+    <div class="his-404-card">
+        <!-- Huy hiệu nhỏ -->
+        <div class="his-badge">
+            <span class="his-badge-pulse" aria-hidden="true"></span>
+            <span>LỖI 404</span>
+        </div>
+
+        <!-- 1. HÌNH 404 NHỊP TIM ĐIỆN TÂM ĐỒ (ECG) PHÍA TRÊN -->
+        <div class="his-art-top" aria-label="Hình 404 nhịp tim ECG">
+            <svg viewBox="0 0 500 150" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <linearGradient id="hisTealGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#38bdf8" />
+                        <stop offset="100%" stop-color="#0284c7" />
+                    </linearGradient>
+
+                    <linearGradient id="hisScreenGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stop-color="#0f172a" />
+                        <stop offset="100%" stop-color="#090d16" />
+                    </linearGradient>
+
+                    <linearGradient id="hisHeartGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#fb7185" />
+                        <stop offset="100%" stop-color="#e11d48" />
+                    </linearGradient>
+
+                    <filter id="ecgGlow" x="-20%" y="-20%" width="140%" height="140%">
+                        <feDropShadow dx="0" dy="0" stdDeviation="2.5" flood-color="#10b981" flood-opacity="0.8" />
+                    </filter>
+                </defs>
+
+                <!-- Quả thuốc nổi bên trái -->
+                <g class="anim-pill">
+                    <rect x="36" y="24" width="24" height="12" rx="6" fill="#38bdf8" />
+                    <rect x="48" y="24" width="12" height="12" rx="6" fill="#f8fafc" />
+                    <line x1="48" y1="24" x2="48" y2="36" stroke="#cbd5e1" stroke-width="0.8" />
+                </g>
+
+                <!-- Chữ thập cứu thương bên phải -->
+                <g class="anim-cross">
+                    <circle cx="460" cy="30" r="12" fill="#fee2e2" />
+                    <path d="M 460 23 V 37 M 453 30 H 467" stroke="#ef4444" stroke-width="3" stroke-linecap="round" />
+                </g>
+
+                <!-- Số 4 bên trái (Ống nghe y tế) -->
+                <g id="digit-left-4">
+                    <path d="M 120 28 L 78 92 L 140 92 M 120 28 L 120 130" stroke="#bae6fd" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M 120 25 L 78 89 L 140 89 M 120 25 L 120 127" stroke="url(#hisTealGrad)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M 120 30 L 83 86 L 134 86 M 120 30 L 120 122" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.45" />
+
+                    <!-- Dây ống nghe -->
+                    <path d="M 66 124 Q 78 100 100 106 T 125 80" fill="none" stroke="#64748b" stroke-width="3" stroke-linecap="round" />
+                    <circle cx="65" cy="126" r="5.5" fill="#94a3b8" stroke="#475569" stroke-width="1.5" />
+                    <circle cx="65" cy="126" r="2.5" fill="#e2e8f0" />
+                </g>
+
+                <!-- Số 0 ở giữa: Màn hình Monitor nhịp tim ECG -->
+                <g id="monitor-center-0">
+                    <rect x="175" y="18" width="150" height="118" rx="20" fill="#1e293b" stroke="#38bdf8" stroke-width="2.5" />
+                    <rect x="183" y="26" width="134" height="102" rx="14" fill="url(#hisScreenGrad)" />
+
+                    <!-- Header monitor -->
+                    <circle cx="195" cy="38" r="3" fill="#10b981" />
+                    <text x="203" y="41" fill="#38bdf8" font-size="8" font-weight="700" font-family="'Segoe UI', Roboto, sans-serif">MEDICARE·ECG</text>
+                    <text x="286" y="41" fill="#f43f5e" font-size="8" font-weight="800" font-family="'Segoe UI', Roboto, sans-serif">404 ERR</text>
+
+                    <!-- Sóng nhịp tim điện tâm đồ chạy liên tục -->
+                    <path class="anim-ecg" d="M 185 80 L 210 80 L 215 70 L 220 90 L 227 50 L 234 105 L 240 72 L 245 84 L 252 80 L 278 80 L 284 68 L 290 92 L 295 80 L 315 80"
+                          fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" filter="url(#ecgGlow)" />
+
+                    <!-- Quả tim đập theo nhịp sinh học -->
+                    <g class="anim-heart">
+                        <path d="M 250 72 C 250 68 245 65 241 65 C 236 65 233 68 233 73 C 233 80 240 85 250 92 C 260 85 267 80 267 73 C 267 68 264 65 259 65 C 255 65 250 68 250 72 Z"
+                              fill="url(#hisHeartGrad)" />
+                    </g>
+                </g>
+
+                <!-- Bác sĩ chibi đội mũ phẫu thuật chớp mắt -->
+                <g id="doctor-character">
+                    <path d="M 235 10 Q 250 2 265 10 C 268 13 268 19 265 21 L 235 21 C 232 19 232 13 235 10 Z" fill="#0284c7" />
+                    <rect x="245" y="10" width="10" height="3" rx="1.5" fill="#38bdf8" />
+                    <path d="M 237 20 Q 250 22 263 20 Q 265 30 250 31 Q 235 30 237 20 Z" fill="#fde047" opacity="0.9" />
+                    <g class="anim-eye">
+                        <circle cx="245" cy="24" r="1.8" fill="#0f172a" />
+                        <circle cx="255" cy="24" r="1.8" fill="#0f172a" />
+                    </g>
+                    <ellipse cx="250" cy="28" rx="1.6" ry="1" fill="#b45309" />
+                </g>
+
+                <!-- Kính lúp tìm kiếm -->
+                <g class="anim-glass">
+                    <circle cx="212" cy="58" r="11" fill="#e0f2fe" fill-opacity="0.35" stroke="#0284c7" stroke-width="2.2" />
+                    <line x1="220" y1="66" x2="229" y2="76" stroke="#0369a1" stroke-width="3.5" stroke-linecap="round" />
+                </g>
+
+                <!-- Số 4 bên phải (Miếng băng urgo) -->
+                <g id="digit-right-4">
+                    <path d="M 380 28 L 338 92 L 400 92 M 380 28 L 380 130" stroke="#bae6fd" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M 380 25 L 338 89 L 400 89 M 380 25 L 380 127" stroke="url(#hisTealGrad)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M 380 30 L 343 86 L 394 86 M 380 30 L 380 122" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.45" />
+
+                    <!-- Băng urgo -->
+                    <g transform="translate(366, 76) rotate(-22)">
+                        <rect x="0" y="0" width="30" height="12" rx="4" fill="#fde68a" stroke="#d97706" stroke-width="1" />
+                        <rect x="10" y="1" width="10" height="10" rx="1.5" fill="#fffbeb" />
+                        <circle cx="4" cy="6" r="0.8" fill="#b45309" />
+                        <circle cx="26" cy="6" r="0.8" fill="#b45309" />
+                    </g>
+                </g>
+            </svg>
+        </div>
+
+        <!-- Tiêu đề & Thông điệp tối giản, đúng chuẩn 404 -->
+        <h1 class="his-title">KHÔNG TÌM THẤY TRANG</h1>
+        <p class="his-desc">Đường dẫn không tồn tại</p>
+
+        <!-- 2. HÌNH HOẠT HỌA "XUẤT HỒN" PHÍA DƯỚI -->
+        <div class="his-art-bottom" aria-label="Hoạt họa xuất hồn trên giường bệnh">
+            <svg viewBox="0 0 460 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <linearGradient id="soulGrad3" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stop-color="#e0f2fe" stop-opacity="0.95" />
+                        <stop offset="60%" stop-color="#7dd3fc" stop-opacity="0.85" />
+                        <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.2" />
+                    </linearGradient>
+
+                    <linearGradient id="blanketGrad3" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="#0ea5e9" />
+                        <stop offset="100%" stop-color="#0284c7" />
+                    </linearGradient>
+
+                    <filter id="soulGlow3" x="-20%" y="-20%" width="140%" height="140%">
+                        <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#38bdf8" flood-opacity="0.55" />
+                    </filter>
+
+                    <filter id="haloGlow3" x="-30%" y="-30%" width="160%" height="160%">
+                        <feDropShadow dx="0" dy="0" stdDeviation="2.5" flood-color="#fde047" flood-opacity="0.9" />
+                    </filter>
+
+                    <filter id="bubbleShadow3" x="-10%" y="-10%" width="120%" height="130%">
+                        <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#0284c7" flood-opacity="0.12" />
+                    </filter>
+                </defs>
+
+                <!-- Vệt bóng sàn giường mờ -->
+                <ellipse cx="230" cy="132" rx="150" ry="6" fill="#cbd5e1" opacity="0.4" />
+
+                <!-- Cột truyền dịch bên trái -->
+                <g id="iv-stand-compact">
+                    <line x1="72" y1="28" x2="72" y2="132" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" />
+                    <line x1="60" y1="132" x2="84" y2="132" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" />
+                    <path d="M 66 30 Q 72 24 78 30" fill="none" stroke="#94a3b8" stroke-width="1.8" />
+                    <rect x="66" y="34" width="12" height="18" rx="3" fill="#bae6fd" opacity="0.85" stroke="#0284c7" stroke-width="1" />
+                    <circle cx="72" cy="56" r="1.8" fill="#0284c7" class="anim-drip" />
+                    <path d="M 72 52 C 72 80 110 95 145 101" fill="none" stroke="#e0f2fe" stroke-width="1.2" stroke-dasharray="2.5 1.5" />
+                </g>
+
+                <!-- Máy đo nhịp tim Flatline bên phải -->
+                <g id="heart-monitor-compact">
+                    <rect x="368" y="70" width="46" height="38" rx="6" fill="#0f172a" stroke="#475569" stroke-width="1.5" />
+                    <rect x="371" y="73" width="40" height="30" rx="3.5" fill="#020617" />
+                    <line x1="373" y1="88" x2="409" y2="88" stroke="#ef4444" stroke-width="1.8" class="anim-flatline" />
+                    <text x="391" y="81" text-anchor="middle" font-size="5.5" font-weight="700" fill="#ef4444" font-family="monospace">00 BPM</text>
+                    <text x="391" y="98" text-anchor="middle" font-size="5" font-weight="700" fill="#f87171" font-family="monospace">404 LOST</text>
+                    <line x1="391" y1="108" x2="391" y2="132" stroke="#94a3b8" stroke-width="2" />
+                    <line x1="380" y1="132" x2="402" y2="132" stroke="#64748b" stroke-width="2.5" />
+                </g>
+
+                <!-- Giường bệnh nhân -->
+                <g id="hospital-bed-compact">
+                    <rect x="110" y="108" width="4" height="24" rx="1.5" fill="#94a3b8" />
+                    <rect x="315" y="108" width="4" height="24" rx="1.5" fill="#94a3b8" />
+                    <circle cx="112" cy="131" r="3.5" fill="#64748b" />
+                    <circle cx="317" cy="131" r="3.5" fill="#64748b" />
+                    <rect x="98" y="104" width="232" height="7" rx="2" fill="#cbd5e1" />
+                    <path d="M 99 84 L 99 113" stroke="#94a3b8" stroke-width="3.5" stroke-linecap="round" />
+                    <path d="M 329 94 L 329 113" stroke="#94a3b8" stroke-width="3.5" stroke-linecap="round" />
+                    <rect x="102" y="96" width="224" height="11" rx="4" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1" />
+                    <rect x="108" y="89" width="38" height="9" rx="4.5" fill="#ffffff" stroke="#cbd5e1" stroke-width="0.8" />
+                </g>
+
+                <!-- Thân xác bệnh nhân nằm bẹp dí (mắt x_x) -->
+                <g id="patient-body-compact">
+                    <circle cx="130" cy="91" r="10" fill="#fde047" opacity="0.9" />
+                    <path d="M 120 88 Q 130 79 140 88" stroke="#0f172a" stroke-width="1.8" stroke-linecap="round" fill="none" />
+                    <!-- Mắt x_x -->
+                    <path d="M 124 89 L 128 93 M 128 89 L 124 93" stroke="#475569" stroke-width="1.3" stroke-linecap="round" />
+                    <path d="M 132 89 L 136 93 M 136 89 L 132 93" stroke="#475569" stroke-width="1.3" stroke-linecap="round" />
+                    <ellipse cx="130" cy="96" rx="1.6" ry="1.2" fill="#94a3b8" />
+                    <!-- Chăn đắp -->
+                    <path d="M 138 93 C 150 86 180 86 200 89 C 240 89 285 93 325 99 L 325 106 L 138 106 Z" fill="url(#blanketGrad3)" />
+                    <path d="M 138 93 C 150 89 165 89 175 93" stroke="#ffffff" stroke-width="2" stroke-linecap="round" fill="none" />
+                    <path d="M 160 100 Q 160 109 157 111" stroke="#fde047" stroke-width="2.6" stroke-linecap="round" fill="none" />
+                </g>
+
+                <!-- Luồng khói linh hồn bay lên -->
+                <path d="M 134 81 Q 128 68 138 56" fill="none" stroke="#7dd3fc" stroke-width="1.4" stroke-linecap="round" opacity="0.5" stroke-dasharray="2.5 2.5" />
+                <path d="M 146 83 Q 152 70 148 58" fill="none" stroke="#7dd3fc" stroke-width="1.2" stroke-linecap="round" opacity="0.4" stroke-dasharray="2.5 2.5" />
+
+                <!-- LINH HỒN XUẤT HỒN BAY LÊN -->
+                <g class="anim-soul" id="ascending-soul-compact">
+                    <!-- Thân linh hồn mềm mại -->
+                    <path d="M 160 28 C 142 28 135 42 135 52 C 135 60 126 64 121 67 C 117 70 120 75 125 73 C 132 70 136 64 140 68 C 144 77 139 86 147 90 C 152 93 158 86 161 91 C 166 94 174 88 176 83 C 178 75 174 68 181 70 C 186 73 190 69 188 65 C 183 61 177 58 178 52 C 178 42 175 28 160 28 Z"
+                          fill="url(#soulGrad3)" filter="url(#soulGlow3)" />
+
+                    <!-- Vòng thiên thần vàng -->
+                    <g class="anim-halo">
+                        <ellipse cx="160" cy="22" rx="11" ry="3.2" fill="none" stroke="#fde047" stroke-width="2" filter="url(#haloGlow3)" />
+                    </g>
+
+                    <!-- Khuôn mặt linh hồn -->
+                    <circle cx="154" cy="46" r="2.2" fill="#0369a1" />
+                    <circle cx="166" cy="46" r="2.2" fill="#0369a1" />
+                    <circle cx="155" cy="45" r="0.8" fill="#ffffff" />
+                    <circle cx="167" cy="45" r="0.8" fill="#ffffff" />
+                    <ellipse cx="150" cy="50" rx="2.2" ry="1.2" fill="#f472b6" opacity="0.65" />
+                    <ellipse cx="170" cy="50" rx="2.2" ry="1.2" fill="#f472b6" opacity="0.65" />
+                    <ellipse cx="160" cy="52" rx="1.8" ry="2.2" fill="#0369a1" />
+
+                    <!-- Dấu hỏi chấm lơ lửng -->
+                    <text x="126" y="26" font-size="10.5" font-weight="900" fill="#38bdf8" class="anim-float-q">?</text>
+
+                    <!-- Bong bóng thoại: "Ủa... trang đâu rồi?" -->
+                    <g class="anim-bubble">
+                        <rect x="0" y="0" width="118" height="24" rx="7" fill="#ffffff" stroke="#38bdf8" stroke-width="1.3" filter="url(#bubbleShadow3)" />
+                        <polygon points="-4,12 2,8 2,16" fill="#ffffff" stroke="#38bdf8" stroke-width="0.9" />
+                        <text x="9" y="15" font-size="9.5" font-weight="700" fill="#0284c7" font-family="'Segoe UI', Roboto, sans-serif">Ủa... trang đâu rồi? 👻</text>
+                    </g>
+                </g>
+            </svg>
+        </div>
+
+        <!-- 3. NÚT QUAY LẠI DUY NHẤT -->
+        <div class="his-actions">
+            <button type="button" onclick="window.history.length > 1 ? window.history.back() : window.location.href = '/';" class="his-btn his-btn-primary">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Quay Lại
+            </button>
+        </div>
+
+        <!-- 4. CHÂN TRANG HỖ TRỢ TINH GIẢN -->
+        <div class="his-emergency-bar">
+            <span>Hotline: <strong>1900 6868</strong></span>
+        </div>
+    </div>
+</div>

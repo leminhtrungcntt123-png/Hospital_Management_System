@@ -83,6 +83,8 @@ else
     app.UseDeveloperExceptionPage();
 }
 
+app.UseStatusCodePagesWithReExecute("/Home/NotFound", "?statusCode={0}");
+
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
