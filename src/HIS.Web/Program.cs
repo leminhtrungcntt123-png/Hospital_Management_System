@@ -42,6 +42,10 @@ builder.Services.AddAuthorization(options =>
 });
 
 // MVC & Antiforgery
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "RequestVerificationToken";
+});
 builder.Services.AddControllersWithViews(options =>
 {
     options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute());

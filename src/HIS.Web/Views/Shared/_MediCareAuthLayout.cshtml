@@ -4,13 +4,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#079bc9" />
+    <link rel="icon" type="image/jpeg" href="~/images/medicare-logo.jpg" />
     <title>@ViewData["Title"] — MediCare HIS</title>
     <partial name="MediCare/_Styles" />
+    @await RenderSectionAsync("Styles", required: false)
 </head>
-<body class="mvc-auth">
-    <partial name="MediCare/_AuthHeader" />
-
-    <main class="mvc-auth-main">
+<body class="mvc-auth his-auth-bg">
+    <main class="mvc-auth-main his-auth-main">
         @RenderBody()
     </main>
 

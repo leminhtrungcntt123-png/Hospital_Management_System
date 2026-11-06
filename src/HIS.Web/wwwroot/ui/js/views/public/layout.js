@@ -1,3 +1,30 @@
+
+function headerUserActions() {
+    const isAuth = !!window.hisUiConfig?.authenticated;
+    if (!isAuth) {
+        return /* HTML */ `<a href="/Account/Login" class="btn ghost" style="text-decoration:none; font-weight:600;">Đăng nhập</a>` +
+            link('Đặt lịch khám', 'patient/booking', 'calendar', 'btn primary header-book');
+    }
+
+    const role = (window.hisUiConfig?.role || 'PATIENT').toUpperCase();
+    const isPatient = role === 'PATIENT';
+    const name = window.hisUiConfig?.displayName || (typeof acc === 'function' ? acc()?.name : '') || 'Tài khoản';
+    const shortName = name.split(' ').slice(-2).join(' ') || 'Tài khoản';
+    const roleTitle = (typeof roleInfo !== 'undefined' && roleInfo[role]?.name) ? roleInfo[role].name : role;
+
+    const staffAction = !isPatient
+        ? /* HTML */ `<a href="${esc(window.hisUiConfig.home || '/Account/Dashboard')}" class="btn primary header-book" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; font-weight:600;" title="Vào không gian ${esc(roleTitle)}">${icon(role === 'ADMIN' ? 'shield' : role === 'DOCTOR' ? 'stethoscope' : 'building')}<span>Không gian ${esc(roleTitle)}</span></a>`
+        : '';
+
+    const patientAction = isPatient
+        ? link('Đặt lịch khám', 'patient/booking', 'calendar', 'btn primary header-book')
+        : '';
+
+    const accountBtn = /* HTML */ `<button class="patient-account" data-act="account-menu" aria-label="Mở tài khoản ${esc(name)}" title="${esc(name)} (${esc(roleTitle)})">${avatar(name)}<span>${esc(shortName)}</span>${icon('down')}</button>`;
+
+    return staffAction + patientAction + accountBtn;
+}
+
 /* views / public / layout */
 function publicShell() {
     const r = ui.route,
@@ -34,7 +61,7 @@ function publicShell() {
                         .join('')}
                 </nav>
                 <div class="public-header-actions">
-                    ${button('', 'search', 'search', 'icon-btn', 'aria-label="Tìm dịch vụ hoặc bác sĩ"')}${session.authenticated ? /* HTML */ `<button class="patient-account" data-act="account-menu" aria-label="Mở tài khoản ${esc(acc()?.name)}">${avatar(acc()?.name || 'Khách')}<span>${esc(acc()?.name?.split(' ').slice(-2).join(' ') || 'Tài khoản')}</span>${icon('down')}</button>` : link('Đăng nhập', 'account/login', '', 'btn ghost')}${link('Đặt lịch khám', 'patient/booking', 'calendar', 'btn primary header-book')}${button('', 'menu', 'menu', 'icon-btn mobile-only', 'aria-label="Mở menu"')}
+                    ${button('', 'search', 'search', 'icon-btn', 'aria-label="Tìm dịch vụ hoặc bác sĩ"')}${headerUserActions()}${button('', 'menu', 'menu', 'icon-btn mobile-only', 'aria-label="Mở menu"')}
                 </div>
             </div>
         </header>

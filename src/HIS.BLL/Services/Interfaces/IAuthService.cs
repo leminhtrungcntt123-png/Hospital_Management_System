@@ -12,4 +12,6 @@ public interface IAuthService
     Task<Result<AuthResponse>> RegisterPatientAsync(RegisterPatientRequest request, CancellationToken ct = default);
     Task<Result> ChangePasswordAsync(int accountId, string oldPassword, string newPassword, CancellationToken ct = default);
     Task<Result> ResetPasswordByAdminAsync(int accountId, string newPassword, int adminAccountId, CancellationToken ct = default);
+    Task<Result<ForgotPasswordResponse>> SendPasswordResetOtpAsync(string emailOrUsername, CancellationToken ct = default);
+    Task<Result> ResetPasswordWithOtpAsync(string emailOrUsername, string otp, string newPassword, CancellationToken ct = default);
 }
