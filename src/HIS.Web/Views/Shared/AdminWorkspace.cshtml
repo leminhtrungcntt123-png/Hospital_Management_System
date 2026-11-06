@@ -33,12 +33,28 @@
                     @await Html.PartialAsync("_AdminIcon", "calendar")
                     <span>Nghỉ / đổi ca</span>
                 </a>
+                <a href="#audit" data-section="audit">
+                    @await Html.PartialAsync("_AdminIcon", "clipboard")
+                    <span>Nhật ký truy vết</span>
+                </a>
             </div>
             <div class="nav-group">
                 <span>QUẢN TRỊ</span>
                 <a href="#departments" data-section="departments">
                     @await Html.PartialAsync("_AdminIcon", "building")
                     <span>Phòng ban</span>
+                </a>
+                <a href="#rooms" data-section="rooms">
+                    @await Html.PartialAsync("_AdminIcon", "building")
+                    <span>Phòng khám</span>
+                </a>
+                <a href="#services" data-section="services">
+                    @await Html.PartialAsync("_AdminIcon", "pulse")
+                    <span>Dịch vụ &amp; bảng giá</span>
+                </a>
+                <a href="#medications" data-section="medications">
+                    @await Html.PartialAsync("_AdminIcon", "wallet")
+                    <span>Danh mục thuốc</span>
                 </a>
                 <a href="#staff" data-section="staff">
                     @await Html.PartialAsync("_AdminIcon", "users")
@@ -134,6 +150,13 @@
                     </div>
                     <div class="table-scroll" id="report-table"></div>
                 </div>
+                <div class="card">
+                    <div class="card-heading">
+                        <h2>Lượt tiếp nhận &amp; doanh thu theo chuyên khoa</h2>
+                        <span>Số liệu thống kê trong kỳ</span>
+                    </div>
+                    <div class="table-scroll" id="department-stats-table"></div>
+                </div>
             </section>
 
             <section data-panel="requests" aria-label="Yêu cầu nghỉ và đổi ca" hidden>
@@ -193,6 +216,46 @@
                     </button>
                 </div>
                 <div class="card"><div class="table-scroll" id="accounts-table"></div></div>
+            </section>
+
+            <section data-panel="rooms" aria-label="Danh sách phòng khám" hidden>
+                <div class="section-actions">
+                    <span>Phòng khám / buồng bệnh theo khoa chuyên môn</span>
+                    <button class="btn button primary" data-open="room-dialog" type="button">
+                        + Thêm phòng khám
+                    </button>
+                </div>
+                <div class="card"><div class="table-scroll" id="rooms-table"></div></div>
+            </section>
+
+            <section data-panel="services" aria-label="Dịch vụ y tế và bảng giá" hidden>
+                <div class="section-actions">
+                    <span>Danh mục dịch vụ khám, xét nghiệm và chẩn đoán</span>
+                    <button class="btn button primary" data-open="service-dialog" id="new-service" type="button">
+                        + Thêm dịch vụ y tế
+                    </button>
+                </div>
+                <div class="card"><div class="table-scroll" id="services-table"></div></div>
+            </section>
+
+            <section data-panel="medications" aria-label="Danh mục thuốc" hidden>
+                <div class="section-actions">
+                    <span>Danh mục thuốc, hoạt chất và đơn giá</span>
+                    <button class="btn button primary" data-open="medication-dialog" id="new-medication" type="button">
+                        + Thêm thuốc
+                    </button>
+                </div>
+                <div class="card"><div class="table-scroll" id="medications-table"></div></div>
+            </section>
+
+            <section data-panel="audit" aria-label="Nhật ký truy vết bảo mật" hidden>
+                <div class="card">
+                    <div class="card-heading">
+                        <h2>Nhật ký truy vết hệ thống (Audit Trail)</h2>
+                        <span>Ghi nhận thời gian, địa chỉ IP và hành vi truy cập bệnh án / phân quyền</span>
+                    </div>
+                    <div class="table-scroll" id="audit-table"></div>
+                </div>
             </section>
         </main>
     </div>
@@ -287,6 +350,117 @@
         <div class="dialog-actions">
             <button type="button" class="btn button secondary" data-close>Hủy</button>
             <button class="btn button primary" type="submit">Tạo tài khoản</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="room-dialog" aria-labelledby="room-title">
+    <form id="room-form">
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">CƠ CẤU BỆNH VIỆN</p>
+                <h2 id="room-title">Thêm phòng khám</h2>
+            </div>
+            <button type="button" data-close aria-label="Đóng">×</button>
+        </div>
+        <div class="form-grid">
+            <label>
+                Khoa / Phòng ban *
+                <select name="departmentId" required></select>
+            </label>
+            <label>
+                Số phòng (Mã phòng) *
+                <input name="roomNumber" placeholder="VD: P.101" maxlength="20" required />
+            </label>
+            <label style="grid-column: span 2;">
+                Tên phòng khám *
+                <input name="roomName" placeholder="VD: Phòng khám Nội Tim mạch" maxlength="100" required />
+            </label>
+        </div>
+        <p class="form-error" role="alert"></p>
+        <div class="dialog-actions">
+            <button type="button" class="btn button secondary" data-close>Hủy</button>
+            <button class="btn button primary" type="submit">Lưu phòng khám</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="service-dialog" aria-labelledby="service-title">
+    <form id="service-form">
+        <input type="hidden" name="id" value="" />
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">DANH MỤC VIỆN PHÍ</p>
+                <h2 id="service-title">Dịch vụ y tế &amp; Bảng giá</h2>
+            </div>
+            <button type="button" data-close aria-label="Đóng">×</button>
+        </div>
+        <div class="form-grid">
+            <label>
+                Loại dịch vụ *
+                <select name="serviceTypeId" required></select>
+            </label>
+            <label>
+                Đơn giá (VNĐ) *
+                <input name="price" type="number" min="0" max="1000000000" step="1000" required />
+            </label>
+            <label style="grid-column: span 2;">
+                Tên dịch vụ kỹ thuật *
+                <input name="name" placeholder="VD: Siêu âm Doppler màu tim" maxlength="150" required />
+            </label>
+            <label style="grid-column: span 2; display: flex; align-items: center; gap: 8px;">
+                <input name="isActive" type="checkbox" checked />
+                <span>Đang áp dụng khám / chỉ định viện phí</span>
+            </label>
+        </div>
+        <p class="form-error" role="alert"></p>
+        <div class="dialog-actions">
+            <button type="button" class="btn button secondary" data-close>Hủy</button>
+            <button class="btn button primary" type="submit">Lưu dịch vụ</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="medication-dialog" aria-labelledby="medication-title">
+    <form id="medication-form">
+        <input type="hidden" name="id" value="" />
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">DANH MỤC DƯỢC PHẨM</p>
+                <h2 id="medication-title">Thuốc &amp; Biệt dược</h2>
+            </div>
+            <button type="button" data-close aria-label="Đóng">×</button>
+        </div>
+        <div class="form-grid">
+            <label>
+                Tên thuốc / biệt dược *
+                <input name="name" placeholder="VD: Panadol Extra" maxlength="150" required />
+            </label>
+            <label>
+                Hoạt chất chính
+                <input name="activeIngredient" placeholder="VD: Paracetamol, Caffeine" maxlength="150" />
+            </label>
+            <label>
+                Hàm lượng / nồng độ
+                <input name="strength" placeholder="VD: 500mg/65mg" maxlength="50" />
+            </label>
+            <label>
+                Đơn vị tính *
+                <input name="unit" placeholder="VD: Viên, Hộp, Chai" maxlength="30" required />
+            </label>
+            <label>
+                Đơn giá (VNĐ) *
+                <input name="price" type="number" min="0" max="1000000000" step="100" required />
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; margin-top: 24px;">
+                <input name="isActive" type="checkbox" checked />
+                <span>Cho phép kê đơn</span>
+            </label>
+        </div>
+        <p class="form-error" role="alert"></p>
+        <div class="dialog-actions">
+            <button type="button" class="btn button secondary" data-close>Hủy</button>
+            <button class="btn button primary" type="submit">Lưu thuốc</button>
         </div>
     </form>
 </dialog>

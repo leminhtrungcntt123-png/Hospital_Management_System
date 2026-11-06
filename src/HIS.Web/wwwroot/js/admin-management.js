@@ -28,12 +28,17 @@
         ],
         requests: ['Nghỉ / đổi ca', 'Duyệt đề nghị và sắp xếp lại lịch khám trong khoa.'],
         departments: ['Phòng ban', 'Danh sách khoa và đơn vị chuyên môn trong bệnh viện.'],
+        rooms: ['Phòng khám', 'Quản lý buồng / phòng khám thuộc từng khoa chuyên môn.'],
+        services: ['Dịch vụ & bảng giá', 'Thiết lập danh mục dịch vụ kỹ thuật, xét nghiệm và giá niêm yết.'],
+        medications: ['Danh mục thuốc', 'Quản lý danh mục thuốc, hoạt chất, hàm lượng và đơn giá.'],
         staff: ['Quản lý nhân sự', 'Danh sách bác sĩ, y tá và trưởng khoa theo phòng ban.'],
         doctors: ['Danh sách bác sĩ', 'Theo dõi chuyên môn và đơn vị công tác.'],
         accounts: ['Quản lý tài khoản', 'Tạo tài khoản, kích hoạt và ngừng hoạt động truy cập.'],
+        audit: ['Nhật ký truy vết', 'Theo dõi lịch sử truy cập hồ sơ bệnh án và phân quyền y tế.'],
     };
 
     let directory = null;
+    let catalog = null;
     let busy = false;
     let reportVersion = 0;
 
@@ -212,6 +217,96 @@
                 ),
             ]),
         );
+
+        try {
+            const deptStats = await request('DepartmentStats' + query);
+            table(
+                '#department-stats-table',
+                ['Khoa chuyên môn', 'Lượt tiếp nhận', 'Doanh thu thực thu'],
+                deptStats.map((row) => [
+                    /* HTML */ `<strong>${escape(row.departmentName)}</strong>`,
+                    /* HTML */ `<span class="number">${escape(money(row.visits))} lượt</span>`,
+                    /* HTML */ `<span class="number">${escape(money(row.revenue))} ₫</span>`,
+                ]),
+            );
+        } catch {
+            // bỏ qua lỗi phụ nếu chưa có dữ liệu khoa
+        }
+    }
+
+    async function loadCatalog() {
+        catalog = await request('CatalogDirectory');
+
+        table(
+            '#rooms-table',
+            ['Khoa / Phòng ban', 'Số phòng', 'Tên phòng khám', 'Lịch trực liên kết', 'Thao tác'],
+            catalog.rooms.map((row) => [
+                escape(row.departmentName),
+                /* HTML */ `<strong>${escape(row.roomNumber)}</strong>`,
+                escape(row.roomName),
+                /* HTML */ `<span class="status ${row.activeSchedulesCount > 0 ? '' : 'inactive'}">${row.activeSchedulesCount} lịch phân công</span>`,
+                row.activeSchedulesCount === 0
+                    ? /* HTML */ `<button type="button" class="btn button sm small-button danger" data-delete-room="${row.id}">Xóa</button>`
+                    : '<span>Đang sử dụng</span>',
+            ]),
+        );
+
+        table(
+            '#services-table',
+            ['Mã', 'Loại dịch vụ', 'Tên dịch vụ kỹ thuật', 'Đơn giá niêm yết', 'Trạng thái', 'Thao tác'],
+            catalog.services.map((row) => [
+                escape(row.id),
+                /* HTML */ `<span class="status">${escape(row.serviceTypeName)}</span>`,
+                /* HTML */ `<strong>${escape(row.name)}</strong>`,
+                /* HTML */ `<span class="number">${escape(money(row.price))} ₫</span>`,
+                /* HTML */ `<span class="status ${row.isActive ? '' : 'inactive'}">${row.isActive ? 'Áp dụng' : 'Tạm ngưng'}</span>`,
+                /* HTML */ `<button type="button" class="btn button sm small-button secondary" data-edit-service="${row.id}">Sửa</button>`,
+            ]),
+        );
+
+        table(
+            '#medications-table',
+            ['Mã', 'Tên thuốc', 'Hoạt chất', 'Hàm lượng', 'Đơn vị', 'Đơn giá', 'Trạng thái', 'Thao tác'],
+            catalog.medications.map((row) => [
+                escape(row.id),
+                /* HTML */ `<strong>${escape(row.name)}</strong>`,
+                escape(row.activeIngredient || '—'),
+                escape(row.strength || '—'),
+                escape(row.unit),
+                /* HTML */ `<span class="number">${escape(money(row.price))} ₫</span>`,
+                /* HTML */ `<span class="status ${row.isActive ? '' : 'inactive'}">${row.isActive ? 'Kê đơn' : 'Tạm ngưng'}</span>`,
+                /* HTML */ `<button type="button" class="btn button sm small-button secondary" data-edit-medication="${row.id}">Sửa</button>`,
+            ]),
+        );
+
+        const roomDeptSelect = find('#room-form [name="departmentId"]');
+        if (roomDeptSelect) {
+            roomDeptSelect.innerHTML = '<option value="">Chọn khoa chuyên môn</option>' +
+                catalog.departments.map((d) => /* HTML */ `<option value="${d.id}">${escape(d.name)}</option>`).join('');
+        }
+
+        const serviceTypeSelect = find('#service-form [name="serviceTypeId"]');
+        if (serviceTypeSelect) {
+            serviceTypeSelect.innerHTML = '<option value="">Chọn loại dịch vụ</option>' +
+                catalog.serviceTypes.map((st) => /* HTML */ `<option value="${st.id}">${escape(st.name)}</option>`).join('');
+        }
+    }
+
+    async function loadAudit() {
+        const rows = await request('AuditLogs');
+        table(
+            '#audit-table',
+            ['Thời gian', 'Tài khoản / Nhân sự', 'Hành động', 'Bệnh nhân', 'Bệnh án', 'Địa chỉ IP'],
+            rows.map((row) => [
+                /* HTML */ `<small>${escape(new Date(row.occurredAt).toLocaleString('vi-VN'))}</small>`,
+                /* HTML */ `<strong>${escape(row.fullName)}</strong><br /><small style="color:#64748b;">${escape(row.username)}</small>`,
+                /* HTML */ `<span class="status">${escape(row.action)}</span>`,
+                escape(row.patientName || '—'),
+                escape(row.medicalRecordId ? '#' + row.medicalRecordId : '—'),
+                /* HTML */ `<code>${escape(row.ipAddress || '—')}</code>`,
+            ]),
+        );
+    }
     }
 
     async function loadRequests() {
@@ -346,7 +441,7 @@
             form?.reset();
             notify(result.message);
             try {
-                await Promise.all([loadDirectory(), loadRequests()]);
+                await Promise.all([loadDirectory(), loadRequests(), loadCatalog(), loadAudit()]);
             } catch {
                 notify(result.message + ' Danh sách chưa tải lại được; hãy bấm Làm mới.', true);
             }
@@ -375,6 +470,34 @@
         );
     });
 
+    find('#room-form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const data = Object.fromEntries(new FormData(event.currentTarget));
+        data.departmentId = Number(data.departmentId);
+        mutate('Rooms', data, event.currentTarget);
+    });
+
+    find('#service-form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const data = Object.fromEntries(new FormData(form));
+        data.id = data.id ? Number(data.id) : null;
+        data.serviceTypeId = Number(data.serviceTypeId);
+        data.price = Number(data.price);
+        data.isActive = form.elements.isActive.checked;
+        mutate('Services', data, form);
+    });
+
+    find('#medication-form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const data = Object.fromEntries(new FormData(form));
+        data.id = data.id ? Number(data.id) : null;
+        data.price = Number(data.price);
+        data.isActive = form.elements.isActive.checked;
+        mutate('Medications', data, form);
+    });
+
     find('#account-form').addEventListener('submit', (event) => {
         event.preventDefault();
         const data = Object.fromEntries(new FormData(event.currentTarget));
@@ -398,6 +521,14 @@
             const dialog = document.getElementById(open.dataset.open);
             dialog.querySelector('form').reset();
             dialog.querySelector('.form-error').textContent = '';
+            if (open.id === 'new-service') {
+                dialog.querySelector('#service-title').textContent = 'Thêm dịch vụ y tế & Bảng giá';
+                dialog.querySelector('form').elements.id.value = '';
+            }
+            if (open.id === 'new-medication') {
+                dialog.querySelector('#medication-title').textContent = 'Thêm thuốc & Biệt dược';
+                dialog.querySelector('form').elements.id.value = '';
+            }
             dialog.showModal();
         }
         if (event.target.closest('[data-close]')) event.target.closest('dialog').close();
@@ -407,6 +538,44 @@
                 accountId: Number(account.dataset.account),
                 isActive: account.dataset.active === 'true',
             });
+        }
+        const deleteRoom = event.target.closest('[data-delete-room]');
+        if (deleteRoom && confirm('Xác nhận xóa phòng khám này khỏi khoa?')) {
+            mutate('Rooms/Delete', { roomId: Number(deleteRoom.dataset.deleteRoom) });
+        }
+        const editService = event.target.closest('[data-edit-service]');
+        if (editService) {
+            const item = catalog?.services.find((s) => s.id === Number(editService.dataset.editService));
+            if (item) {
+                const dialog = document.getElementById('service-dialog');
+                const form = dialog.querySelector('form');
+                form.reset();
+                form.elements.id.value = item.id;
+                form.elements.serviceTypeId.value = item.serviceTypeId;
+                form.elements.name.value = item.name;
+                form.elements.price.value = item.price;
+                form.elements.isActive.checked = item.isActive;
+                dialog.querySelector('#service-title').textContent = 'Cập nhật dịch vụ y tế';
+                dialog.showModal();
+            }
+        }
+        const editMedication = event.target.closest('[data-edit-medication]');
+        if (editMedication) {
+            const item = catalog?.medications.find((m) => m.id === Number(editMedication.dataset.editMedication));
+            if (item) {
+                const dialog = document.getElementById('medication-dialog');
+                const form = dialog.querySelector('form');
+                form.reset();
+                form.elements.id.value = item.id;
+                form.elements.name.value = item.name;
+                form.elements.activeIngredient.value = item.activeIngredient || '';
+                form.elements.strength.value = item.strength || '';
+                form.elements.unit.value = item.unit;
+                form.elements.price.value = item.price;
+                form.elements.isActive.checked = item.isActive;
+                dialog.querySelector('#medication-title').textContent = 'Cập nhật thuốc & biệt dược';
+                dialog.showModal();
+            }
         }
         const decision = event.target.closest('[data-decision]');
         if (
@@ -462,6 +631,8 @@
             loadDirectory(),
             loadRequests(),
             loadReport(!!find('#report-filter').elements.from.value),
+            loadCatalog(),
+            loadAudit(),
         ]);
     }
 

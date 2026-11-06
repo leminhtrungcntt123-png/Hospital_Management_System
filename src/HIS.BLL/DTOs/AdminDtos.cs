@@ -108,3 +108,98 @@ public record ScheduleDecisionResult(
     int Transferred,
     int NeedsRebooking,
     int ExpiredHolds);
+
+public record AdminRoomRow(
+    int Id,
+    int DepartmentId,
+    string DepartmentName,
+    string RoomName,
+    string RoomNumber,
+    int ActiveSchedulesCount);
+
+public sealed class CreateRoomRequest
+{
+    [Required, Range(1, int.MaxValue, ErrorMessage = "Vui lòng chọn phòng ban/khoa hợp lệ.")]
+    public int DepartmentId { get; set; }
+
+    [Required(ErrorMessage = "Tên phòng khám không được để trống."), StringLength(100, MinimumLength = 2, ErrorMessage = "Tên phòng từ 2 đến 100 ký tự.")]
+    public string RoomName { get; set; } = "";
+
+    [Required(ErrorMessage = "Số phòng không được để trống."), StringLength(20, MinimumLength = 1, ErrorMessage = "Số phòng từ 1 đến 20 ký tự.")]
+    public string RoomNumber { get; set; } = "";
+}
+
+public record DeleteRoomRequest(int RoomId);
+
+public record AdminServiceRow(
+    int Id,
+    int ServiceTypeId,
+    string ServiceTypeName,
+    string Name,
+    decimal Price,
+    bool IsActive);
+
+public sealed class UpsertServiceRequest
+{
+    public int? Id { get; set; }
+
+    [Required, Range(1, int.MaxValue, ErrorMessage = "Vui lòng chọn loại dịch vụ hợp lệ.")]
+    public int ServiceTypeId { get; set; }
+
+    [Required(ErrorMessage = "Tên dịch vụ không được để trống."), StringLength(150, MinimumLength = 2, ErrorMessage = "Tên dịch vụ từ 2 đến 150 ký tự.")]
+    public string Name { get; set; } = "";
+
+    [Range(0, 1000000000, ErrorMessage = "Đơn giá dịch vụ phải từ 0 đến 1.000.000.000 VNĐ.")]
+    public decimal Price { get; set; }
+
+    public bool IsActive { get; set; } = true;
+}
+
+public record AdminMedicationRow(
+    int Id,
+    string Name,
+    string? ActiveIngredient,
+    string? Strength,
+    string Unit,
+    decimal Price,
+    bool IsActive);
+
+public sealed class UpsertMedicationRequest
+{
+    public int? Id { get; set; }
+
+    [Required(ErrorMessage = "Tên thuốc không được để trống."), StringLength(150, MinimumLength = 2, ErrorMessage = "Tên thuốc từ 2 đến 150 ký tự.")]
+    public string Name { get; set; } = "";
+
+    [StringLength(150, ErrorMessage = "Hoạt chất tối đa 150 ký tự.")]
+    public string? ActiveIngredient { get; set; }
+
+    [StringLength(50, ErrorMessage = "Hàm lượng tối đa 50 ký tự.")]
+    public string? Strength { get; set; }
+
+    [Required(ErrorMessage = "Đơn vị tính không được để trống."), StringLength(30, MinimumLength = 1, ErrorMessage = "Đơn vị tính tối đa 30 ký tự.")]
+    public string Unit { get; set; } = "";
+
+    [Range(0, 1000000000, ErrorMessage = "Đơn giá thuốc phải từ 0 đến 1.000.000.000 VNĐ.")]
+    public decimal Price { get; set; }
+
+    public bool IsActive { get; set; } = true;
+}
+
+public record AdminAuditLogRow(
+    int Id,
+    int AccountId,
+    string Username,
+    string FullName,
+    string Action,
+    string? PatientName,
+    int? MedicalRecordId,
+    DateTime OccurredAt,
+    string? IpAddress);
+
+public record DepartmentVisitStat(
+    int DepartmentId,
+    string DepartmentName,
+    int Visits,
+    decimal Revenue);
+

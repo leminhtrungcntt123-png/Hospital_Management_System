@@ -466,6 +466,45 @@ public static class DevDataSeeder
                 }
             }
 
+            // 11. DỊCH VỤ Y TẾ & BẢNG GIÁ (Services)
+            if (!await db.Services.AnyAsync())
+            {
+                db.Services.AddRange(
+                    new Service { ServiceTypeId = (int)ServiceTypeId.Examination, Name = "Khám bệnh chuyên khoa Nội", Price = 150000, IsActive = true },
+                    new Service { ServiceTypeId = (int)ServiceTypeId.Examination, Name = "Khám bệnh chuyên khoa Ngoại", Price = 150000, IsActive = true },
+                    new Service { ServiceTypeId = (int)ServiceTypeId.LabTest, Name = "Tổng phân tích tế bào máu ngoại vi", Price = 85000, IsActive = true },
+                    new Service { ServiceTypeId = (int)ServiceTypeId.LabTest, Name = "Sinh hóa máu (Glucose, Ure, Creatinin)", Price = 120000, IsActive = true },
+                    new Service { ServiceTypeId = (int)ServiceTypeId.Imaging, Name = "Chụp X-Quang ngực thẳng kỹ thuật số", Price = 180000, IsActive = true },
+                    new Service { ServiceTypeId = (int)ServiceTypeId.Imaging, Name = "Siêu âm Doppler tim màu", Price = 350000, IsActive = true },
+                    new Service { ServiceTypeId = (int)ServiceTypeId.Imaging, Name = "Siêu âm ổ bụng tổng quát", Price = 200000, IsActive = true }
+                );
+                await db.SaveChangesAsync();
+            }
+
+            // 12. DANH MỤC THUỐC MẪU (Medications)
+            if (!await db.Medications.AnyAsync())
+            {
+                db.Medications.AddRange(
+                    new Medication { Name = "Panadol Extra", ActiveIngredient = "Paracetamol, Caffeine", Strength = "500mg/65mg", Unit = "Viên", Price = 2500, IsActive = true },
+                    new Medication { Name = "Amoxicillin 500mg", ActiveIngredient = "Amoxicillin", Strength = "500mg", Unit = "Viên", Price = 3000, IsActive = true },
+                    new Medication { Name = "Augmentin 1g", ActiveIngredient = "Amoxicillin, Clavulanic", Strength = "1000mg", Unit = "Gói", Price = 18500, IsActive = true },
+                    new Medication { Name = "Nexium 40mg", ActiveIngredient = "Esomeprazole", Strength = "40mg", Unit = "Viên", Price = 24000, IsActive = true },
+                    new Medication { Name = "Amlor 5mg", ActiveIngredient = "Amlodipine", Strength = "5mg", Unit = "Viên", Price = 8200, IsActive = true },
+                    new Medication { Name = "Glucophage 850mg", ActiveIngredient = "Metformin", Strength = "850mg", Unit = "Viên", Price = 4500, IsActive = true }
+                );
+                await db.SaveChangesAsync();
+            }
+
+            // 13. NHẬT KÝ TRUY VẾT MẪU (AccessLogs)
+            if (!await db.AccessLogs.AnyAsync() && adminAcc != null)
+            {
+                db.AccessLogs.AddRange(
+                    new AccessLog { AccountId = adminAcc.Id, Action = "AdminLogin", OccurredAt = DateTime.UtcNow.AddHours(-3), IpAddress = "127.0.0.1" },
+                    new AccessLog { AccountId = adminAcc.Id, Action = "ViewDepartmentCatalog", OccurredAt = DateTime.UtcNow.AddHours(-2), IpAddress = "127.0.0.1" }
+                );
+                await db.SaveChangesAsync();
+            }
+
             logger.LogInformation("DevDataSeeder: Đã nạp đầy đủ dữ liệu mẫu thực tế cho Bác sĩ, Bệnh nhân, Hàng chờ, Bệnh án và Chỉ định xét nghiệm.");
         }
         catch (Exception ex)
