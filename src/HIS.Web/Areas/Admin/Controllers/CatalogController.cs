@@ -8,11 +8,14 @@ namespace HIS.Web.Areas.Admin.Controllers;
 [Authorize(Policy = "AdminOnly")]
 public class CatalogController : Controller
 {
+    private const string GenericErrorMessage = "Đã xảy ra lỗi trong quá trình xử lý. Vui lòng thử lại sau.";
     private readonly IDepartmentService _departmentService;
+    private readonly ILogger<CatalogController> _logger;
 
-    public CatalogController(IDepartmentService departmentService)
+    public CatalogController(IDepartmentService departmentService, ILogger<CatalogController> logger)
     {
         _departmentService = departmentService;
+        _logger = logger;
     }
 
     // 1. Danh sách chuyên khoa phòng
@@ -41,9 +44,14 @@ public class CatalogController : Controller
             await _departmentService.CreateDepartmentAsync(name, description, ct);
             TempData["SuccessMessage"] = "Thêm chuyên khoa thành công.";
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
         {
             TempData["ErrorMessage"] = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Lỗi không xác định khi tạo chuyên khoa.");
+            TempData["ErrorMessage"] = GenericErrorMessage;
         }
 
         return RedirectToAction(nameof(Index));
@@ -59,9 +67,14 @@ public class CatalogController : Controller
             await _departmentService.UpdateDepartmentAsync(id, name, description, ct);
             TempData["SuccessMessage"] = "Cập nhật chuyên khoa thành công.";
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
         {
             TempData["ErrorMessage"] = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Lỗi không xác định khi cập nhật chuyên khoa {DepartmentId}.", id);
+            TempData["ErrorMessage"] = GenericErrorMessage;
         }
 
         return RedirectToAction(nameof(Index));
@@ -80,9 +93,14 @@ public class CatalogController : Controller
             else
                 TempData["ErrorMessage"] = "Chuyên khoa không tồn tại.";
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
         {
             TempData["ErrorMessage"] = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Lỗi không xác định khi xóa chuyên khoa {DepartmentId}.", id);
+            TempData["ErrorMessage"] = GenericErrorMessage;
         }
 
         return RedirectToAction(nameof(Index));

@@ -18,17 +18,20 @@ public class ConsultationController : Controller
     private readonly IQueueService _queueService;
     private readonly AppDbContext _context;
     private readonly TimeProvider _timeProvider;
+    private readonly ILogger<ConsultationController> _logger;
 
     public ConsultationController(
         IDoctorService doctorService,
         IQueueService queueService,
         AppDbContext context,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        ILogger<ConsultationController> logger)
     {
         _doctorService = doctorService;
         _queueService = queueService;
         _context = context;
         _timeProvider = timeProvider;
+        _logger = logger;
     }
 
     // 1. Màn hình Bác sĩ & Trưởng khoa: Phân luồng dữ liệu chuẩn theo phân quyền
@@ -380,9 +383,14 @@ public class ConsultationController : Controller
             await _doctorService.CreateMedicalRecordAsync(recordRequest, ct);
             TempData["SuccessMessage"] = "Đã lưu hồ sơ bệnh án và hoàn thành lượt khám.";
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is InvalidOperationException)
         {
             TempData["ErrorMessage"] = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Lỗi không xác định khi lưu hồ sơ bệnh án.");
+            TempData["ErrorMessage"] = "Đã xảy ra lỗi trong quá trình lưu bệnh án. Vui lòng thử lại sau.";
         }
 
         return RedirectToAction(nameof(Index));
@@ -463,9 +471,14 @@ public class ConsultationController : Controller
             await _context.SaveChangesAsync(ct);
             TempData["SuccessMessage"] = "Đã gửi đề nghị nghỉ / đổi ca thành công. Đang chờ trưởng khoa phê duyệt.";
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is InvalidOperationException)
         {
             TempData["ErrorMessage"] = "Không thể gửi đề nghị: " + ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Lỗi không xác định khi gửi đề nghị nghỉ/đổi ca.");
+            TempData["ErrorMessage"] = "Đã xảy ra lỗi trong quá trình gửi đề nghị. Vui lòng thử lại sau.";
         }
 
         return RedirectToAction(nameof(Index), new { tab = "exceptions" });

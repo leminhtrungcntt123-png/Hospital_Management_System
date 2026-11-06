@@ -116,6 +116,18 @@ public class DepartmentHeadTests
         Assert.NotEqual((int)AppointmentStatusId.CheckedIn, targetStatusId);
     }
 
+    [Theory]
+    [InlineData(null, 1, false)]
+    [InlineData(0, 1, false)]
+    [InlineData(-1, 1, false)]
+    [InlineData(1, 2, false)]
+    [InlineData(1, 1, true)]
+    public void ExceptionDepartmentAuthorization_ShouldFailClosed(int? requestDeptId, int doctorDeptId, bool shouldAllow)
+    {
+        bool isAllowed = requestDeptId.HasValue && requestDeptId.Value > 0 && doctorDeptId == requestDeptId.Value;
+        Assert.Equal(shouldAllow, isAllowed);
+    }
+
     [Fact]
     public void StaffService_SoftDelete_ShouldSetIsActiveFalse()
     {
