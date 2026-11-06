@@ -268,9 +268,39 @@ tbody tr:hover {
     justify-content: space-between;
     gap: 18px;
     margin-bottom: 20px;
+    flex-wrap: wrap;
 }
 .section-actions > span {
     color: var(--admin-muted);
+}
+.section-filter-group {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+.section-filter-group > span {
+    color: var(--admin-muted);
+}
+.filter-dropdown-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--admin-ink);
+    margin: 0;
+}
+.filter-dropdown-label select {
+    min-width: 220px;
+    width: auto;
+    padding: 6px 12px;
+    height: 38px;
+    border-radius: 6px;
+    border: 1px solid #aabfcf;
+    font-size: 13px;
+    font-weight: normal;
+    background: white;
 }
 .revenue-chart {
     display: flex;

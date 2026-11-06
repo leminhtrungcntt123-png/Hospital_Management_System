@@ -176,7 +176,15 @@
 
             <section data-panel="departments" aria-label="Danh sách phòng ban" hidden>
                 <div class="section-actions">
-                    <span>Khoa / đơn vị chuyên môn của bệnh viện</span>
+                    <div class="section-filter-group">
+                        <span>Khoa / đơn vị chuyên môn của bệnh viện</span>
+                        <label class="filter-dropdown-label" for="filter-department">
+                            Lọc phòng ban:
+                            <select id="filter-department">
+                                <option value="">Tất cả phòng ban</option>
+                            </select>
+                        </label>
+                    </div>
                     <button class="btn button primary" data-open="department-dialog" type="button">
                         + Thêm phòng ban
                     </button>
@@ -220,7 +228,15 @@
 
             <section data-panel="rooms" aria-label="Danh sách phòng khám" hidden>
                 <div class="section-actions">
-                    <span>Phòng khám / buồng bệnh theo khoa chuyên môn</span>
+                    <div class="section-filter-group">
+                        <span>Phòng khám / buồng bệnh theo khoa chuyên môn</span>
+                        <label class="filter-dropdown-label" for="filter-room-department">
+                            Khoa chuyên môn:
+                            <select id="filter-room-department">
+                                <option value="">Tất cả khoa chuyên môn</option>
+                            </select>
+                        </label>
+                    </div>
                     <button class="btn button primary" data-open="room-dialog" type="button">
                         + Thêm phòng khám
                     </button>

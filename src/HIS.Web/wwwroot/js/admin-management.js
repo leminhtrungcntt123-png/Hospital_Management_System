@@ -137,6 +137,23 @@
         ]);
     }
 
+    function renderDepartmentsTable(filterDeptId = '') {
+        if (!directory?.departments) return;
+        const filtered = filterDeptId
+            ? directory.departments.filter((d) => String(d.id) === String(filterDeptId))
+            : directory.departments;
+
+        table(
+            '#departments-table',
+            ['Mã', 'Tên phòng ban', 'Mô tả'],
+            filtered.map((row) => [
+                escape(row.id),
+                /* HTML */ `<strong>${escape(row.name)}</strong>`,
+                escape(row.description || '—'),
+            ]),
+        );
+    }
+
     async function loadDirectory() {
         directory = await request('Directory');
         const headings = [
@@ -148,15 +165,19 @@
         ];
         table('#accounts-table', [...headings, 'Thao tác'], accountRows(directory.accounts, true));
         table('#staff-table', headings, accountRows(directory.staff, false));
-        table(
-            '#departments-table',
-            ['Mã', 'Tên phòng ban', 'Mô tả'],
-            directory.departments.map((row) => [
-                escape(row.id),
-                /* HTML */ `<strong>${escape(row.name)}</strong>`,
-                escape(row.description || '—'),
-            ]),
-        );
+        const filterDept = find('#filter-department');
+        if (filterDept) {
+            const currentVal = filterDept.value;
+            filterDept.innerHTML =
+                '<option value="">Tất cả phòng ban</option>' +
+                directory.departments
+                    .map((d) => /* HTML */ `<option value="${d.id}">${escape(d.name)}</option>`)
+                    .join('');
+            filterDept.value = currentVal;
+            renderDepartmentsTable(filterDept.value);
+        } else {
+            renderDepartmentsTable('');
+        }
         table(
             '#doctors-table',
             ['Họ tên', 'Chuyên môn', 'Phòng ban', 'Chứng chỉ hành nghề'],
@@ -236,13 +257,16 @@
         }
     }
 
-    async function loadCatalog() {
-        catalog = await request('CatalogDirectory');
+    function renderRoomsTable(filterDeptId = '') {
+        if (!catalog?.rooms) return;
+        const filtered = filterDeptId
+            ? catalog.rooms.filter((r) => String(r.departmentId) === String(filterDeptId))
+            : catalog.rooms;
 
         table(
             '#rooms-table',
             ['Khoa / Phòng ban', 'Số phòng', 'Tên phòng khám', 'Lịch trực liên kết', 'Thao tác'],
-            catalog.rooms.map((row) => [
+            filtered.map((row) => [
                 escape(row.departmentName),
                 /* HTML */ `<strong>${escape(row.roomNumber)}</strong>`,
                 escape(row.roomName),
@@ -252,6 +276,27 @@
                     : '<span>Đang sử dụng</span>',
             ]),
         );
+    }
+
+    async function loadCatalog() {
+        catalog = await request('CatalogDirectory');
+
+        const filterRoomDept = find('#filter-room-department');
+        if (filterRoomDept) {
+            const currentVal = filterRoomDept.value;
+            filterRoomDept.innerHTML =
+                '<option value="">Tất cả khoa chuyên môn</option>' +
+                catalog.departments
+                    .map((d) => {
+                        const count = catalog.rooms.filter((r) => r.departmentId === d.id).length;
+                        return /* HTML */ `<option value="${d.id}">${escape(d.name)} (${count} phòng)</option>`;
+                    })
+                    .join('');
+            filterRoomDept.value = currentVal;
+            renderRoomsTable(filterRoomDept.value);
+        } else {
+            renderRoomsTable('');
+        }
 
         table(
             '#services-table',
@@ -516,6 +561,12 @@
     });
 
     find('#account-form [name="roleId"]').addEventListener('change', updateRoleFields);
+    find('#filter-room-department')?.addEventListener('change', (e) => {
+        renderRoomsTable(e.target.value);
+    });
+    find('#filter-department')?.addEventListener('change', (e) => {
+        renderDepartmentsTable(e.target.value);
+    });
     find('#new-staff').addEventListener('click', () => openAccount(true));
     find('#new-account').addEventListener('click', () => openAccount(false));
     find('#refresh-data').addEventListener('click', () =>
@@ -536,6 +587,12 @@
             if (open.id === 'new-medication') {
                 dialog.querySelector('#medication-title').textContent = 'Thêm thuốc & Biệt dược';
                 dialog.querySelector('form').elements.id.value = '';
+            }
+            if (open.dataset.open === 'room-dialog') {
+                const currentFilter = find('#filter-room-department')?.value;
+                if (currentFilter) {
+                    dialog.querySelector('form').elements.departmentId.value = currentFilter;
+                }
             }
             dialog.showModal();
         }
