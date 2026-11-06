@@ -93,6 +93,34 @@ public static class AdminHttpScenario
         Assert.NotEmpty(token);
         client.DefaultRequestHeaders.Add("RequestVerificationToken", token);
         Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/Admin/Management/Departments", payload)).StatusCode);
+        var duplicate = await client.PostAsJsonAsync("/Admin/Management/Departments", payload);
+        Assert.Equal(HttpStatusCode.BadRequest, duplicate.StatusCode);
+        var duplicateBody = await duplicate.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        Assert.Equal("Khoa/phòng 'QA HTTP Department' đã tồn tại.", duplicateBody.GetProperty("message").GetString());
+
+        for (var index = 0; index < 4; index++)
+        {
+            var username = "qa_http_optional_email_" + index;
+            var accountPayload = new Dictionary<string, object?>
+            {
+                ["username"] = username,
+                ["password"] = "QA_password_2026!",
+                ["roleId"] = 1
+            };
+            if (index < 3) accountPayload["email"] = new string?[] { null, "", "   " }[index];
+            Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/Admin/Management/Accounts", accountPayload)).StatusCode);
+            await using var scope = factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert.Null((await db.Accounts.AsNoTracking().SingleAsync(account => account.Username == username)).Email);
+        }
+        var invalidEmail = await client.PostAsJsonAsync("/Admin/Management/Accounts", new
+        {
+            username = "qa_http_invalid_email",
+            password = "QA_password_2026!",
+            roleId = 1,
+            email = "not-an-email"
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, invalidEmail.StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/css/admin-management.css")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/js/admin-management.js")).StatusCode);
     }

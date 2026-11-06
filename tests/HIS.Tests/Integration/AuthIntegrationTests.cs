@@ -171,7 +171,7 @@ public static class AuthIntegrationScenario
         Assert.True((await auth.ResetPasswordWithOtpAsync(registration.Email!, newOtp, newPassword)).IsSuccess);
         Assert.False((await auth.ResetPasswordWithOtpAsync(registration.Username, newOtp, Password)).IsSuccess);
         Assert.True((await auth.LoginAsync(new(registration.Username, newPassword))).IsSuccess);
-        Assert.False((await new AuthService(db, clock).SendPasswordResetOtpAsync(registration.Email!)).IsSuccess);
+        Assert.True((await new AuthService(db, clock).SendPasswordResetOtpAsync(registration.Email!)).IsSuccess);
     }
 
     private static string Token(string html)
@@ -186,14 +186,16 @@ public static class AuthIntegrationScenario
 public sealed class CapturedEmailSender : IEmailSender
 {
     public string LastOtp { get; private set; } = "";
+    public TaskCompletionSource<string> Received { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public Task SendEmailAsync(string toEmail, string subject, string body, CancellationToken ct = default)
     {
         LastOtp = Regex.Match(body, @"(?<!\d)\d{6}(?!\d)").Value;
+        Received.TrySetResult(LastOtp);
         return Task.CompletedTask;
     }
 }
 
-public sealed class IntegratedAuthFactory(string connection, CapturedEmailSender email) : WebApplicationFactory<AccountController>
+public sealed class IntegratedAuthFactory(string connection, IEmailSender email) : WebApplicationFactory<AccountController>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {

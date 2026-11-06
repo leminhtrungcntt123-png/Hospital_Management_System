@@ -8,22 +8,27 @@ using HIS.BLL.DTOs;
 using HIS.DAL;
 using HIS.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HIS.BLL.Services;
 
 public class AuthService : IAuthService
 {
-    private static readonly ConcurrentDictionary<string, (string Otp, DateTime ExpiresAt, int Attempts)> _resetOtps = new();
+    // shortcut: OTP state is per process; use a shared store before running multiple app instances.
+    private static readonly ConcurrentDictionary<string, PasswordResetChallenge> _resetOtps = new();
 
     private readonly AppDbContext _db;
     private readonly TimeProvider _timeProvider;
     private readonly IEmailSender? _emailSender;
+    private readonly ILogger<AuthService>? _logger;
 
-    public AuthService(AppDbContext db, TimeProvider timeProvider, IEmailSender? emailSender = null)
+    public AuthService(AppDbContext db, TimeProvider timeProvider, IEmailSender? emailSender = null,
+        ILogger<AuthService>? logger = null)
     {
         _db = db;
         _timeProvider = timeProvider;
         _emailSender = emailSender;
+        _logger = logger;
     }
 
     private static Result<AuthResponse> InvalidLogin() =>
@@ -246,157 +251,88 @@ public class AuthService : IAuthService
     public Task<Result> ResetPasswordByAdminAsync(int accountId, string newPassword, int adminAccountId, CancellationToken ct = default)
         => throw new NotImplementedException();
 
-    public async Task<Result<ForgotPasswordResponse>> SendPasswordResetOtpAsync(string emailOrUsername, CancellationToken ct = default)
+    public async Task<Result> SendPasswordResetOtpAsync(string emailOrUsername, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(emailOrUsername))
+        if (string.IsNullOrWhiteSpace(emailOrUsername) || emailOrUsername.Length > 100)
         {
-            return Result.Failure<ForgotPasswordResponse>("AUTH_INVALID_INPUT", "Vui lòng nhập email hoặc tên đăng nhập.");
+            return Result.Failure("AUTH_INVALID_INPUT", "Vui lòng nhập email hoặc tên đăng nhập hợp lệ.");
         }
 
         var normalized = emailOrUsername.Trim().ToLowerInvariant();
-        var now = _timeProvider.GetLocalNow().DateTime;
-
-        var account = await _db.Accounts
-            .Include(a => a.Role)
+        var account = await _db.Accounts.AsNoTracking()
             .FirstOrDefaultAsync(a => a.Username.ToLower() == normalized || (a.Email != null && a.Email.ToLower() == normalized), ct);
-
-        if (account == null)
+        if (account == null || !account.IsActive || string.IsNullOrWhiteSpace(account.Email))
         {
-            return Result.Failure<ForgotPasswordResponse>("AUTH_ACCOUNT_NOT_FOUND", "Không tìm thấy tài khoản với email hoặc tên đăng nhập này.");
+            return Result.Success();
         }
 
-        if (!account.IsActive)
-        {
-            return Result.Failure<ForgotPasswordResponse>("AUTH_ACCOUNT_INACTIVE", "Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên.");
-        }
-
-        if (string.IsNullOrWhiteSpace(account.Email))
-        {
-            return Result.Failure<ForgotPasswordResponse>("AUTH_NO_EMAIL", "Tài khoản này chưa cập nhật email liên hệ. Vui lòng liên hệ Ban Quản trị hệ thống (admin@his.local).");
-        }
-
-        // Tạo mã OTP 6 chữ số ngẫu nhiên
+        var now = _timeProvider.GetLocalNow().DateTime;
         var otp = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
         var expiresAt = now.AddMinutes(5);
-
-        var entry = (otp, expiresAt, Attempts: 0);
-        _resetOtps[account.Username.ToLowerInvariant()] = entry;
-
-
-        var maskedEmail = MaskEmail(account.Email);
-        var subject = "[MediCare HIS] Mã xác thực đặt lại mật khẩu";
+        var key = account.Username.ToLowerInvariant();
+        var entry = new PasswordResetChallenge(otp, expiresAt);
+        _resetOtps[key] = entry;
         var body = $"""
             Xin chào {account.Username},
 
-            Hệ thống nhận được yêu cầu đặt lại mật khẩu cho tài khoản MediCare của bạn.
-            Mã xác thực (OTP) của bạn là: {otp}
+            Mã xác thực (OTP) đặt lại mật khẩu MediCare của bạn là: {otp}
             Mã này có hiệu lực trong 5 phút (đến {expiresAt:HH:mm}).
-
-            Nếu bạn không gửi yêu cầu này, vui lòng bỏ qua email hoặc đổi mật khẩu để bảo vệ tài khoản.
-
-            Trân trọng,
-            Hệ thống Quản lý Bệnh viện MediCare
+            Nếu bạn không gửi yêu cầu này, vui lòng bỏ qua email.
             """;
-
         try
         {
             if (_emailSender == null)
             {
                 throw new InvalidOperationException("Chưa cấu hình dịch vụ email.");
             }
-            await _emailSender.SendEmailAsync(account.Email, subject, body, ct);
+            await _emailSender.SendEmailAsync(account.Email, "[MediCare HIS] Mã xác thực đặt lại mật khẩu", body, ct);
         }
         catch (Exception error) when (error is not OperationCanceledException)
         {
-            _resetOtps.TryRemove(account.Username.ToLowerInvariant(), out _);
-            return Result.Failure<ForgotPasswordResponse>("AUTH_EMAIL_UNAVAILABLE", "Chưa gửi được email xác thực. Vui lòng liên hệ quản trị viên hoặc thử lại sau.");
-        }
-
-        return Result.Success(new ForgotPasswordResponse(maskedEmail, null));
-    }
-
-    public async Task<Result> ResetPasswordWithOtpAsync(string emailOrUsername, string otp, string newPassword, CancellationToken ct = default)
-    {
-        if (string.IsNullOrWhiteSpace(emailOrUsername))
-        {
-            return Result.Failure("AUTH_INVALID_INPUT", "Vui lòng nhập email hoặc tên đăng nhập.");
-        }
-
-        if (string.IsNullOrWhiteSpace(otp) || otp.Trim().Length != 6)
-        {
-            return Result.Failure("AUTH_INVALID_OTP", "Vui lòng nhập mã xác thực OTP gồm 6 chữ số.");
-        }
-
-        if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 6 || Encoding.UTF8.GetByteCount(newPassword) > 72)
-        {
-            return Result.Failure("AUTH_INVALID_PASSWORD", "Mật khẩu mới phải có tối thiểu 6 ký tự.");
-        }
-
-        var identifier = emailOrUsername.Trim().ToLowerInvariant();
-        var account = await _db.Accounts.FirstOrDefaultAsync(a => a.Username.ToLower() == identifier
-            || (a.Email != null && a.Email.ToLower() == identifier), ct);
-        if (account == null || !account.IsActive)
-        {
-            return Result.Failure("AUTH_ACCOUNT_NOT_FOUND", "Tài khoản không tồn tại hoặc đã bị vô hiệu hóa.");
-        }
-        var normalized = account.Username.ToLowerInvariant();
-        var cleanOtp = otp.Trim();
-        var now = _timeProvider.GetLocalNow().DateTime;
-
-        if (!_resetOtps.TryGetValue(normalized, out var entry))
-        {
-            return Result.Failure("AUTH_OTP_NOT_FOUND", "Không tìm thấy yêu cầu đặt lại mật khẩu hoặc mã OTP đã hết hạn. Vui lòng gửi lại mã.");
-        }
-
-        if (now > entry.ExpiresAt)
-        {
-            _resetOtps.TryRemove(normalized, out _);
-            return Result.Failure("AUTH_OTP_EXPIRED", "Mã xác thực OTP đã hết hạn (quá 5 phút). Vui lòng yêu cầu mã mới.");
-        }
-
-        if (entry.Attempts >= 5)
-        {
-            _resetOtps.TryRemove(normalized, out _);
-            return Result.Failure("AUTH_OTP_MAX_ATTEMPTS", "Bạn đã nhập sai OTP quá 5 lần. Vui lòng yêu cầu mã mới.");
-        }
-
-        if (entry.Otp != cleanOtp)
-        {
-            _resetOtps[normalized] = (entry.Otp, entry.ExpiresAt, entry.Attempts + 1);
-            int remaining = 5 - (entry.Attempts + 1);
-            return Result.Failure("AUTH_OTP_MISMATCH", $"Mã xác thực OTP không chính xác. Bạn còn {remaining} lần thử.");
-        }
-
-        if (!_resetOtps.TryRemove(normalized, out var consumed) || consumed.Otp != cleanOtp)
-        {
-            return Result.Failure("AUTH_OTP_NOT_FOUND", "Mã xác thực đã được sử dụng. Vui lòng yêu cầu mã mới.");
-        }
-
-        // Băm mật khẩu mới bằng BCrypt và cập nhật
-        account.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
-        account.FailedLoginCount = 0;
-        account.LockedUntil = null;
-        account.UpdatedAt = now;
-
-        await _db.SaveChangesAsync(ct);
-
-        // Xóa OTP sau khi đổi mật khẩu thành công
-        _resetOtps.TryRemove(account.Username.ToLowerInvariant(), out _);
-        if (!string.IsNullOrEmpty(account.Email))
-        {
-            _resetOtps.TryRemove(account.Email.ToLowerInvariant(), out _);
+            // A failed older send must not delete a newer challenge.
+            _resetOtps.TryRemove(new KeyValuePair<string, PasswordResetChallenge>(key, entry));
+            _logger?.LogWarning("Password reset email delivery failed: {Type}", error.GetType().Name);
         }
 
         return Result.Success();
     }
 
-    private static string MaskEmail(string email)
+    public async Task<Result> ResetPasswordWithOtpAsync(string emailOrUsername, string otp, string newPassword, CancellationToken ct = default)
     {
-        var atIndex = email.IndexOf('@');
-        if (atIndex <= 1) return email;
-        var name = email[..atIndex];
-        var domain = email[atIndex..];
-        if (name.Length <= 2) return $"{name[0]}***{domain}";
-        return $"{name[..2]}***{name[^1]}{domain}";
+        if (string.IsNullOrWhiteSpace(emailOrUsername) || emailOrUsername.Length > 100
+            || string.IsNullOrWhiteSpace(otp) || !Regex.IsMatch(otp.Trim(), @"^[0-9]{6}$"))
+        {
+            return InvalidReset();
+        }
+        if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 6 || Encoding.UTF8.GetByteCount(newPassword) > 72)
+        {
+            return Result.Failure("AUTH_INVALID_PASSWORD", "Mật khẩu mới phải có tối thiểu 6 ký tự và không vượt quá 72 byte UTF-8.");
+        }
+
+        var identifier = emailOrUsername.Trim().ToLowerInvariant();
+        var account = await _db.Accounts.FirstOrDefaultAsync(a => a.Username.ToLower() == identifier
+            || (a.Email != null && a.Email.ToLower() == identifier), ct);
+        var now = _timeProvider.GetLocalNow().DateTime;
+        if (account == null || !account.IsActive)
+        {
+            return InvalidReset();
+        }
+
+        var key = account.Username.ToLowerInvariant();
+        if (!_resetOtps.TryGetValue(key, out var entry) || !entry.TryConsume(otp.Trim(), now)
+            || !_resetOtps.TryRemove(new KeyValuePair<string, PasswordResetChallenge>(key, entry)))
+        {
+            return InvalidReset();
+        }
+
+        account.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        account.FailedLoginCount = 0;
+        account.LockedUntil = null;
+        account.UpdatedAt = now;
+        await _db.SaveChangesAsync(ct);
+        return Result.Success();
     }
+
+    private static Result InvalidReset() => Result.Failure("AUTH_INVALID_RESET",
+        "Thông tin xác thực không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu mã mới.");
 }

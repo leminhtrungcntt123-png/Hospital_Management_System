@@ -85,7 +85,15 @@ public sealed class ManagementController(
         ExecuteAsync(async () =>
         {
             AdminValidate(request);
-            var department = await departments.CreateDepartmentAsync(request.Name, request.Description, ct);
+            DepartmentListItemDto department;
+            try
+            {
+                department = await departments.CreateDepartmentAsync(request.Name, request.Description, ct);
+            }
+            catch (InvalidOperationException error) when (error.Message == $"Khoa/phòng '{request.Name.Trim()}' đã tồn tại.")
+            {
+                throw new AdminOperationException(error.Message);
+            }
             return Ok(new
             {
                 id = department.Id,

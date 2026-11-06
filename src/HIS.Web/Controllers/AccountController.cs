@@ -3,6 +3,7 @@ using HIS.BLL.DTOs;
 using HIS.BLL.Common;
 using HIS.BLL.Services;
 using HIS.Web.Models;
+using HIS.Web.Workers;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
@@ -15,11 +16,13 @@ public class AccountController : Controller
 {
     private readonly IAuthService _authService;
     private readonly ILogger<AccountController> _logger;
+    private readonly PasswordResetQueue _passwordResets;
 
-    public AccountController(IAuthService authService, ILogger<AccountController> logger)
+    public AccountController(IAuthService authService, ILogger<AccountController> logger, PasswordResetQueue passwordResets)
     {
         _authService = authService;
         _logger = logger;
+        _passwordResets = passwordResets;
     }
 
     [HttpGet]
@@ -174,37 +177,38 @@ public class AccountController : Controller
 
     // API endpoints cho Interactive Modal tại màn hình Login
     [HttpPost]
-    public async Task<IActionResult> RequestPasswordReset([FromBody] ForgotPasswordRequest request)
+    [EnableRateLimiting("password-reset-request")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public IActionResult RequestPasswordReset([FromBody] ForgotPasswordRequest request)
     {
-        if (request == null || string.IsNullOrWhiteSpace(request.EmailOrUsername))
+        if (request == null || !ModelState.IsValid || string.IsNullOrWhiteSpace(request.EmailOrUsername)
+            || request.EmailOrUsername.Length > 100)
         {
             return Json(new { success = false, message = "Vui lòng nhập email hoặc tên đăng nhập." });
         }
 
-        var result = await _authService.SendPasswordResetOtpAsync(request.EmailOrUsername);
-        if (!result.IsSuccess)
-        {
-            return Json(new { success = false, message = result.Error.Message });
-        }
+        // Queue every valid identifier so account lookup and SMTP timing cannot identify an account.
+        _passwordResets.Enqueue(request.EmailOrUsername);
 
         return Json(new
         {
             success = true,
-            message = "Mã xác thực OTP đã được gửi đến email của bạn.",
-            maskedEmail = result.Value!.MaskedEmail
+            message = "Nếu thông tin tài khoản phù hợp, mã xác thực sẽ được gửi đến email đã đăng ký. Vui lòng kiểm tra hộp thư."
         });
     }
 
     [HttpPost]
-    public async Task<IActionResult> ConfirmPasswordReset([FromBody] ResetPasswordRequest request)
+    [EnableRateLimiting("password-reset-confirm")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> ConfirmPasswordReset([FromBody] ResetPasswordRequest request, CancellationToken ct)
     {
-        if (request == null || string.IsNullOrWhiteSpace(request.EmailOrUsername) ||
+        if (request == null || !ModelState.IsValid || string.IsNullOrWhiteSpace(request.EmailOrUsername) ||
             string.IsNullOrWhiteSpace(request.Otp) || string.IsNullOrWhiteSpace(request.NewPassword))
         {
             return Json(new { success = false, message = "Vui lòng điền đầy đủ thông tin yêu cầu." });
         }
 
-        var result = await _authService.ResetPasswordWithOtpAsync(request.EmailOrUsername, request.Otp, request.NewPassword);
+        var result = await _authService.ResetPasswordWithOtpAsync(request.EmailOrUsername, request.Otp, request.NewPassword, ct);
         if (!result.IsSuccess)
         {
             return Json(new { success = false, message = result.Error.Message });

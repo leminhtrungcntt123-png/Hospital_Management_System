@@ -13,8 +13,14 @@ public sealed class CreateAdminAccountRequest
     [StringLength(100)]
     public string? FullName { get; set; }
 
+    private string? _email;
+
     [EmailAddress, StringLength(100)]
-    public string? Email { get; set; }
+    public string? Email
+    {
+        get => _email;
+        set => _email = string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToLowerInvariant();
+    }
 
     [Range(1, 5)]
     public int RoleId { get; set; }

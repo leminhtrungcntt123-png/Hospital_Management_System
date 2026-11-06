@@ -184,7 +184,6 @@ async function handleForgotSubmit(e) {
 
         // Chuyển sang Bước 2
         document.getElementById('step2AccountHidden').value = account;
-        document.getElementById('step2MaskedEmail').innerText = data.maskedEmail;
 
         document.getElementById('forgotStep1').style.display = 'none';
         document.getElementById('forgotStep2').style.display = 'block';
@@ -219,7 +218,7 @@ async function resendOtp() {
 
         var data = await response.json();
         if (data.success) {
-            alert('Mã OTP mới đã được gửi lại vào email của bạn!');
+            alert(data.message);
         } else {
             alertEl.innerText = '⚠️ ' + data.message;
             alertEl.style.display = 'block';
