@@ -24,6 +24,15 @@ public class OtpOptions
     public int ResendDelaySeconds { get; set; } = 60;
 
     /// <summary>
+    /// Số lần xin mã tối đa của MỘT tài khoản trong cửa sổ IssueWindowMinutes. Chặn người dùng
+    /// (hoặc script) bấm "gửi lại" vô hạn, vì mỗi lần cấp mã đều reset số lần nhập và ghi thêm một dòng notifications.
+    /// </summary>
+    public int MaxIssuesPerWindow { get; set; } = 5;
+
+    /// <summary>Độ dài cửa sổ (phút) đếm số lần xin mã ở trên.</summary>
+    public int IssueWindowMinutes { get; set; } = 15;
+
+    /// <summary>
     /// TRUE = in mã ra màn hình "Nhập mã xác thực" cho bản demo chưa có kênh gửi thật;
     /// bản thật đặt FALSE vì mã chỉ được nằm trong email/SMS của người nhận.
     /// </summary>
@@ -41,6 +50,8 @@ public static class OtpOptionsRegistration
             .Validate(o => o.LifetimeMinutes >= 1, "LifetimeMinutes phải >= 1.")
             .Validate(o => o.MaxAttempts >= 1, "MaxAttempts phải >= 1.")
             .Validate(o => o.ResendDelaySeconds >= 0, "ResendDelaySeconds không được âm.")
+            .Validate(o => o.MaxIssuesPerWindow >= 1, "MaxIssuesPerWindow phải >= 1.")
+            .Validate(o => o.IssueWindowMinutes >= 1, "IssueWindowMinutes phải >= 1.")
             .ValidateOnStart();
 
         return services;

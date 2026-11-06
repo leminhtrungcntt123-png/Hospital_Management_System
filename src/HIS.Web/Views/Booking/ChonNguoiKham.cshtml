@@ -35,22 +35,22 @@
             {
                 var isSelected = p.Id == Model.SelectedPatientId;
                 <button type="button" class="profile-select @(isSelected ? "selected" : "")"
-                        data-id="@p.Id" data-name="@p.FullName" data-bookable="@(p.IsBookable ? "true" : "false")">
+                        data-id="@p.Id" data-name="@p.DisplayName" data-bookable="@(p.IsBookable ? "true" : "false")">
                     <div class="profile-avatar">@p.Initials</div>
                     <div class="profile-body">
                         <div>
-                            <strong>@p.FullName</strong>
+                            <strong>@p.DisplayName</strong>
                             <span class="badge @(p.RelationshipCode == "SELF" ? "badge-blue" : "badge-gray")">@p.Relationship</span>
                         </div>
                         <p>Mã người bệnh: @p.Code</p>
-                        <p>Ngày sinh: @VietnameseFormat.ShortDate(p.DateOfBirth)</p>
+                        <p>Ngày sinh: @p.DisplayDateOfBirth</p>
                         @if (p.IsVerified)
                         {
                             <span class="verified"><i data-lucide="shield-check"></i> Đã xác minh</span>
                         }
                         else if (p.NeedsApproval)
                         {
-                            <span class="needs-verify"><i data-lucide="clock-3"></i> Chờ quầy xác nhận giấy tờ khi tới khám</span>
+                            <span class="needs-verify"><i data-lucide="clock-3"></i> Chưa nhập mã xác thực nên chưa đặt lịch được</span>
                         }
                         else
                         {
@@ -67,7 +67,7 @@
             <i data-lucide="circle-alert"></i>
             <div>
                 <strong>Hồ sơ này không đặt lịch được</strong>
-                <p>Liên kết hồ sơ đã bị thu hồi. Chọn hồ sơ khác, hoặc tạo hồ sơ mới ở mục <a asp-controller="HoSo" asp-action="Them">Hồ sơ của tôi</a>.</p>
+                <p>Hồ sơ chưa nhập xong mã xác thực (hoặc liên kết đã bị thu hồi). Vào <a asp-controller="HoSo" asp-action="Index">Hồ sơ của tôi</a> để bấm "Nhập mã xác thực", hoặc chọn hồ sơ khác.</p>
             </div>
         </div>
 
@@ -77,7 +77,7 @@
         </div>
 
         <div class="booking-footer">
-            <span>Đã chọn: <strong id="nguoi-selected-name">@(selected?.FullName ?? "chưa chọn")</strong></span>
+            <span>Đã chọn: <strong id="nguoi-selected-name">@(selected?.DisplayName ?? "chưa chọn")</strong></span>
             <div class="footer-actions">
                 <a class="btn btn-outline" href="@ViewData["BackUrl"]"><i data-lucide="chevron-left"></i> Quay lại</a>
                 <button type="submit" class="btn btn-primary" id="nguoi-next" disabled="@(selected is null)">

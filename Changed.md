@@ -927,3 +927,47 @@ GitHub Actions fail ở bước **Setup .NET 10** của cả hai job với `Erro
 * `dotnet restore HIS.sln` (bản **không** cờ, đúng như CI chạy) sau khi có lock file: **không** warning/error nào liên quan tới lock — lock file chỉ được dùng khi có cờ/property, nên không làm fragile bản build của nhóm.
 * `grep -P "\t"` trên ci.yml: không có tab; `cache-dependency-path` đã quote.
 * Chưa có bằng chứng runner thật (phải push mới chạy) — người dùng push, theo dõi lần xanh kế tiếp.
+
+## 16. SIẾT LUỒNG XÁC THỰC HỒ SƠ: CHỈ `ACTIVE` ĐẶT ĐƯỢC LỊCH, CHE PII TRƯỚC OTP, GIỚI HẠN PHÁT MÃ, VALIDATE TRƯỚC KHI CẤP MÃ (06/11/2026)
+
+Người dùng review và nêu sáu lỗi còn sót; tất cả đều còn thật và đã sửa. Chi tiết quyết định: `docs/DECISIONS.md` #25, mô hình: `docs/ARCHITECTURE.md` §5.2 và §5.4.
+
+### 16.1 Sáu lỗi và cách sửa
+
+| # | Lỗi | Sửa |
+|---|---|---|
+| 1 | Mã OTP nằm nguyên trong `notifications.content` | `OtpService` chỉ ghi dấu vết "Đã gửi mã 6 số xác thực hồ sơ `BNxxxxxx` tới `m***@...` lúc HH:mm dd/MM/yyyy. Mã không nằm trong thông báo này."; thêm `ProfileEmail.Mask` |
+| 2 | Liên kết `PENDING` đã đặt lịch được trước khi nhập OTP | `PatientAccessService.CanBookAsync` và `BookingController` (`IsBookable`) **chỉ nhận `ACTIVE`** |
+| 3 | Họ tên/ngày sinh/giới tính/SĐT hiện ra trước OTP | `LoadProfilesAsync`/`GetProfilesAsync` trả `IsMasked` + dữ liệu rỗng cho link không `ACTIVE`; view chỉ đọc `Display*`; màn chi tiết **bỏ luôn truy vấn lịch sử khám** |
+| 4 | Comment "duyệt chỉ mở quyền đặt lịch" mâu thuẫn với code | Comment viết lại đúng luật mới; PII trong message của `RequestLinkAsync`/`OtpIssueResult.PatientName` đổi sang **mã BN** |
+| 5 | Không giới hạn tần suất phát mã (mỗi lần cấp lại reset `Attempts`) | `IssueQuotaMessageAsync` đếm dòng `notifications` cùng tài khoản + `TraceTitle` trong 15 phút, chặn từ lần thứ 5 (`OtpOptions.MaxIssuesPerWindow=5`, `IssueWindowMinutes=15`) — **không bảng mới** |
+| 6 | Quy tắc nghiệp vụ chỉ chạy sau OTP; `DbUpdateException` → 500 mất phiếu; luật SĐT lệch nhau | `ValidateNewProfileAsync` (BLL, không ghi DB) gọi trước khi cấp mã; `CreateProfileAsync` + validate dùng chung `ValidateNewProfileDraftAsync`; `DbUpdateException` bắt gọn trong BLL; `RenderThemFormAsync(draft, error)` giữ phiếu; `PhoneNumbers` là luật SĐT duy nhất cho hồ sơ (10–11 số, bắt đầu 0) |
+
+### 16.2 Kiểm chứng tự động
+
+* `dotnet build HIS.sln`: **0 Warning(s), 0 Error(s)**.
+* `dotnet test --filter Category!=Integration`: **89/89** (trước mẻ này 73; thêm 3 lý thuyết cho `ProfileEmail.Mask`, `PhoneNumbers.IsUsable`, `PhoneNumbers.Normalize`).
+* `bash backup/ci_local.sh`: gate cấu trúc **18/18**, integration **24/24** (trước 21). Ba test mới: `Xin_ma_day_dac_hon_nguong_thi_bi_chan` (chặn ở lần thứ N, đúng N dòng `notifications`, không gửi thêm mail), `Lien_ket_pending_khong_dat_lich_duoc_den_khi_chuyen_active` (`RequestLinkAsync` → `CanBookAsync=false`, `VerifyLinkAsync` → `true`), `ValidateNewProfile_noi_dung_mot_loi_CreateProfile_tu_choi_va_khong_ghi` (message giống hệt + `patients`/`account_patient_profiles` không đổi số dòng).
+* Một test cũ **phải đổi expectation** vì thay đổi có chủ đích: `Ho_so_moi_nhan_ma_theo_email_tai_khoan_va_chep_vao_ho_so` từng đòi `To.DisplayName == saved.FullName`, nay là `saved.Id.ToPatientCode()`.
+
+### 16.3 Bằng chứng dữ liệu thật
+
+* Luật SĐT mới chỉ áp dụng cho hồ sơ, nên kiểm trước 8 hồ sơ `hospital_his` và 6 hồ sơ `his_rehearsal`: **dat_luat_moi = 8/8 và 6/6**, `khong_dat = 0` → không phải sửa dòng nào.
+* `ReceptionService`/WinForms giữ nguyên khoảng 9–15 (số bàn của quầy), ghi rõ trong XML doc của `PhoneNumbers`.
+
+### 16.4 Bằng chứng bấm chuột thật (06/11/2026, `https://localhost:7024`, tài khoản `patient.nguyena` = id 7)
+
+Cắm một liên kết demo `account_id=7 → patient_id=2` ở `PENDING` để có đường thử:
+
+* `/HoSo`: card thứ ba hiện `? · Hồ sơ chờ xác thực · Khác · Mã người bệnh: BN000002 · Ngày sinh: ••/••/•••• · chưa cung cấp · Chưa thấy lịch sử khám` + badge "Chờ bạn nhập mã xác thực — chưa đặt lịch được". Họ tên thật (Trần Thị Bình) **không xuất hiện**.
+* `/HoSo/Chitiet?patientId=2`: chỉ mã BN, quan hệ, trạng thái; không có card lịch sử khám; nút mới "Nhập mã xác thực" → `/HoSo/Them?branch=seen&patientCode=BN000002` (form tự chọn nhánh *đã từng khám* và điền sẵn mã) — hết đường cụt.
+* Submit mã BN khi hồ sơ chưa có email: "Hồ sơ BN000002 chưa có email trong hệ thống nên không gửi được mã xác thực. Liên kết vẫn chờ quầy đối chiếu giấy tờ để mở quyền đặt lịch, hotline 0808 0808."
+* Sau khi tạm đặt `patients.email` cho BN000002: màn `/HoSo/XacOtp` ghi "Mã gồm 6 số đã gửi tới **b\*\*\*@example.com**. Nhập mã để hoàn tất hồ sơ của **BN000002**…"; `notifications` đúng 1 dòng: "Đã gửi mã 6 số xác thực hồ sơ BN000002 tới b***@example.com lúc 10:25 ngày 06/11/2026. Mã không nằm trong thông báo này." — **không có mã, không có email thô**.
+* Hạn mức phát mã: thêm 4 dòng `notifications` mồi trong cửa sổ 15 phút rồi bấm "Liên kết hồ sơ" lần nữa → "Bạn đã xin mã xác thực 5 lần trong 15 phút gần đây. Vui lòng quay lại sau khoảng 10 phút hoặc gọi hotline 0808 0808 để được hỗ trợ."
+* Wizard `/Booking/ChonNguoiKham`: hồ sơ `PENDING` vẫn liệt kê nhưng nhãn "Chưa nhập mã xác thực nên chưa đặt lịch được"; bấm vào thì alert "Hồ sơ này không đặt lịch được … Vào *Hồ sơ của tôi* để bấm 'Nhập mã xác thực'" và nút **Tiếp tục bị disable**.
+* Dọn dẹp: 5 dòng `notifications` do test sinh ra đã xóa (bảng về 0 dòng). **Giữ lại** liên kết `7 → 2 (PENDING)` và `patients.email` của BN000002 để người dùng bấm thử lại; muốn về trạng thái cũ thì `DELETE FROM account_patient_profiles WHERE account_id=7 AND patient_id=2; UPDATE patients SET email=NULL WHERE id=2;`
+
+### 16.5 Việc còn treo
+
+* Quầy chưa sửa được khai báo BHYT sai của bệnh nhân (người dùng hẹn xử lý sau).
+* `MaxIssuesPerWindow`/`IssueWindowMinutes` đang là mặc định trong code; chưa đưa vào `appsettings.json` để không đụng file tracked chứa mật khẩu DB dev.

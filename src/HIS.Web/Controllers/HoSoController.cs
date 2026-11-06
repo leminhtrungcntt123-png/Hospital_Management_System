@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text.RegularExpressions;
 using HIS.BLL.DTOs;
 using HIS.BLL.Interfaces;
 using HIS.BLL.Options;
@@ -23,8 +22,6 @@ namespace HIS.Web.Controllers;
 /// </summary>
 public class HoSoController : PatientPageController
 {
-    private static readonly Regex PhoneRegex = new(@"^0\d{9,10}$", RegexOptions.Compiled);
-
     // Mã OTP đang chờ nhập chỉ sống trong Session (không lập bảng mới).
     private const string OtpKey = "PendingProfileOtp";
 
@@ -62,13 +59,22 @@ public class HoSoController : PatientPageController
     // ------------------------------------------------------------------ Tạo hồ sơ (hai nhánh một màn)
 
     [HttpGet]
-    public async Task<IActionResult> Them(string? branch = null)
+    public async Task<IActionResult> Them(string? branch = null, string? patientCode = null)
     {
         if (RequireAccount() is { } signIn) return signIn;
 
+        bool seen = branch == ThemHoSoRequest.SeenBranch;
+
         ViewData["RelationshipOptions"] = RelationshipOptions(excludeSelf: true);
         ViewData["NewRelationshipOptions"] = await SelfOptionAllowedAsync();
-        return View(new ThemHoSoRequest { Branch = branch == ThemHoSoRequest.SeenBranch ? ThemHoSoRequest.SeenBranch : ThemHoSoRequest.NewBranch });
+
+        // Nhánh "đã từng khám" accepts kèm mã bệnh nhân để người dùng quay lại nhập mã OTP còn dở:
+        // RequestLinkAsync gặp link PENDING có sẵn thì cấp mã mới chứ không tạo liên kết trùng.
+        return View(new ThemHoSoRequest
+        {
+            Branch = seen ? ThemHoSoRequest.SeenBranch : ThemHoSoRequest.NewBranch,
+            Keyword = seen ? patientCode : null
+        });
     }
 
     [HttpPost, ValidateAntiForgeryToken]
@@ -119,16 +125,13 @@ public class HoSoController : PatientPageController
     /// <summary>
     /// Nhánh "chưa từng khám": phiếu được giữ trong Session và chỉ được ghi vào DB sau khi nhập đúng mã OTP,
     /// nên lỗi gửi mã hay bỏ giữa chừng không để lại hồ sơ "ma" mà người dùng không biết.
+    /// Toàn bộ quy tắc nghiệp vụ chạy TRƯỚC khi cấp mã (ValidateNewProfileAsync) để không có cảnh
+    /// "đã gửi mã rồi mới báo phiếu sai".
     /// </summary>
     private async Task<IActionResult> CreateNewAsync(ThemHoSoRequest request)
     {
-        var options = await SelfOptionAllowedAsync();
         ViewData["RelationshipOptions"] = RelationshipOptions(excludeSelf: true);
-        ViewData["NewRelationshipOptions"] = options;
-
-        var name = request.FullName?.Trim() ?? string.Empty;
-        var phone = (request.Phone ?? string.Empty).Replace(" ", "");
-        var email = ProfileEmail.Normalize(request.Email);
+        ViewData["NewRelationshipOptions"] = await SelfOptionAllowedAsync();
 
         if (!ModelState.IsValid)
         {
@@ -136,40 +139,22 @@ public class HoSoController : PatientPageController
             return View(request);
         }
 
-        if (name.Length == 0)
-        {
-            TempData["Error"] = "Vui lòng nhập họ và tên người khám.";
-            return View(request);
-        }
-
-        if (!PhoneRegex.IsMatch(phone))
-        {
-            TempData["Error"] = "Số điện thoại phải từ 10-11 số và bắt đầu bằng 0.";
-            return View(request);
-        }
-
-        if (email is null)
+        // Ô email là yêu cầu riêng của luồng Web này (mã gửi về địa chỉ vừa gõ) nên vẫn kiểm ở đây.
+        // Họ tên, ngày sinh, giới tính, SĐT, CCCD người thân, hạn mức hồ sơ thì để BLL quyết:
+        // hai chỗ cùng kiểm là nguồn gốc của việc Web nhận phiếu rồi BLL từ chối sau khi đã gửi mã.
+        string email = ProfileEmail.Normalize(request.Email) ?? string.Empty;
+        if (email.Length == 0)
         {
             TempData["Error"] = "Vui lòng nhập email để hệ thống gửi mã xác thực. Hồ sơ chưa được lưu.";
             return View(request);
         }
 
-        if (!ProfileEmail.IsUsable(email))
-        {
-            TempData["Error"] = $"Email \"{email}\" không hợp lệ. Vui lòng kiểm tra lại. Hồ sơ chưa được lưu.";
-            return View(request);
-        }
+        string? rejected = await _profileService.ValidateNewProfileAsync(
+            AccountId, BuildCreateRequest(request, email));
 
-        if (!DateOnly.TryParseExact(request.DateOfBirth?.Trim(), "dd/MM/yyyy", CultureInfo.InvariantCulture,
-                DateTimeStyles.None, out _))
+        if (rejected is not null)
         {
-            TempData["Error"] = "Ngày sinh không hợp lệ. Vui lòng nhập lại theo định dạng DD/MM/YYYY.";
-            return View(request);
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Gender))
-        {
-            TempData["Error"] = "Vui lòng chọn giới tính.";
+            TempData["Error"] = rejected;
             return View(request);
         }
 
@@ -222,8 +207,10 @@ public class HoSoController : PatientPageController
 
                 if (pending.Draft is null)
                 {
-                    TempData["Error"] = $"Nhập sai {_otpOptions.MaxAttempts} lần nên mã đã bị hủy. Hồ sơ vẫn còn ở danh sách; " +
-                                        "quầy sẽ xác nhận giấy tờ khi bạn tới khám.";
+                    // PENDING chưa xác thực thì chưa đặt lịch được, nên phải chỉ đường quay lại lấy mã mới.
+                    TempData["Error"] = $"Nhập sai {_otpOptions.MaxAttempts} lần nên mã đã bị hủy. " +
+                        $"Hồ sơ {pending.PatientName} vẫn còn trong danh sách nhưng chưa đặt lịch được: " +
+                        "mở lại nó và bấm \"Nhập mã xác thực\", hoặc ra quầy đối chiếu giấy tờ khi tới khám.";
                     return RedirectToAction(nameof(Index));
                 }
 
@@ -247,20 +234,22 @@ public class HoSoController : PatientPageController
 
             if (!created.Success)
             {
-                TempData["Error"] = created.Message;
-                return RedirectToAction(nameof(Them), new { branch = ThemHoSoRequest.NewBranch });
+                // Trả lại đúng phiếu đã khai thay vì redirect về form trống: người dùng không phải
+                // gõ lại từ đầu và không bị mất ô nào.
+                return await RenderThemFormAsync(
+                    draft, created.Message + " Hệ thống chưa lưu hồ sơ nào, mã vừa dùng đã hết hiệu lực.");
             }
 
-            TempData["Message"] = $"Đã tạo hồ sơ {created.PatientCode} và xác thực email {pending.Email}.";
+            TempData["Message"] = $"Đã tạo hồ sơ {created.PatientCode} và xác thực email {ProfileEmail.Mask(pending.Email)}.";
             return RedirectToAction(nameof(Chitiet), new { patientId = created.PatientId });
         }
 
-        // Mã đúng thì liên kết PENDING tự chuyển ACTIVE, khỏi chờ quầy; người dùng bỏ giữa chừng
-        // thì hồ sơ vẫn còn PENDING cho quầy đối chiếu giấy tờ.
+        // Mã đúng thì liên kết PENDING chuyển ACTIVE và chỉ lúc đó hồ sơ mới đặt lịch được;
+        // người dùng bỏ giữa chừng thì liên kết ở nguyên PENDING, quyền xem hồ sơ bệnh án vẫn không mở.
         var verified = await _profileService.VerifyLinkAsync(AccountId, pending.PatientId, AccountId);
         TempData["Message"] = verified.Success
             ? verified.Message
-            : $"Đã xác thực email {pending.Email} cho hồ sơ {pending.PatientName}.";
+            : $"Đã xác thực email {ProfileEmail.Mask(pending.Email)} cho hồ sơ {pending.PatientName}.";
         return RedirectToAction(nameof(Chitiet), new { patientId = pending.PatientId });
     }
 
@@ -283,6 +272,9 @@ public class HoSoController : PatientPageController
             return RedirectToAction(nameof(XacOtp));
         }
 
+        // Mã mới thì Attempts về 0 vì mỗi mã có MaxAttempts lần nhập riêng. Tổng số lần đoán của một
+        // tài khoản đã bị chặn từ gốc trong OtpService (MaxIssuesPerWindow counted on notifications),
+        // nên "gửi lại - nhập sai - gửi lại" không còn là cách rửa số lần nhập nữa.
         return pending.Draft is { } draft
             ? await StartNewProfileOtpAsync(draft, pending.Email)
             : await StartExistingOtpAsync(pending.PatientId);
@@ -302,10 +294,16 @@ public class HoSoController : PatientPageController
             return RedirectToAction(nameof(Index));
         }
 
-        var history = (await _bookingService.GetAppointmentsByAccountAsync(AccountId))
-            .Where(a => a.PatientId == patientId)
-            .Select(a => a.ToVm())
-            .ToList();
+        // Chưa xác thực thì chưa có quyền biết người này từng khám những gì: không tra lịch sử,
+        // không đưa dữ liệu xuống view (docs/DECISIONS.md #25).
+        var history = new List<AppointmentVm>();
+        if (!profile.IsMasked)
+        {
+            history = (await _bookingService.GetAppointmentsByAccountAsync(AccountId))
+                .Where(a => a.PatientId == patientId)
+                .Select(a => a.ToVm())
+                .ToList();
+        }
 
         return View(new HoSoChiTietViewModel { Profile = profile, History = history });
     }
@@ -342,16 +340,26 @@ public class HoSoController : PatientPageController
 
         if (issue.Code is null || issue.ExpiresAt is null)
         {
-            ViewData["RelationshipOptions"] = RelationshipOptions(excludeSelf: true);
-            ViewData["NewRelationshipOptions"] = await SelfOptionAllowedAsync();
-            TempData["Error"] = issue.Message;
-            return View(nameof(Them), draft);
+            return await RenderThemFormAsync(draft, issue.Message);
         }
 
         draft.Email = email;
 
         return await SavePendingAndAskCodeAsync(
             new PendingOtp { PatientName = draft.FullName?.Trim() ?? string.Empty, Draft = draft }, issue);
+    }
+
+    /// <summary>
+    /// Về lại màn "Tạo hồ sơ" với ĐÚNG phiếu người dùng vừa khai kèm một dòng lỗi:
+    /// mọi đường trượt trước khi lưu hồ sơ (phiếu sai, xin mã quá ngưỡng, lưu thất bại) đều không được
+    /// làm mất ô nào người dùng đã gõ.
+    /// </summary>
+    private async Task<IActionResult> RenderThemFormAsync(ThemHoSoRequest draft, string error)
+    {
+        ViewData["RelationshipOptions"] = RelationshipOptions(excludeSelf: true);
+        ViewData["NewRelationshipOptions"] = await SelfOptionAllowedAsync();
+        TempData["Error"] = error;
+        return View(nameof(Them), draft);
     }
 
     private async Task<IActionResult> SavePendingAndAskCodeAsync(PendingOtp pending, OtpIssueResult issue)
@@ -379,7 +387,7 @@ public class HoSoController : PatientPageController
             FullName = draft.FullName?.Trim() ?? string.Empty,
             DateOfBirth = dob,
             Gender = (draft.Gender ?? string.Empty).ToUpperInvariant(),
-            PhoneNumber = (draft.Phone ?? string.Empty).Replace(" ", ""),
+            PhoneNumber = PhoneNumbers.Normalize(draft.Phone),
             Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim(),
             NationalId = string.IsNullOrWhiteSpace(draft.NationalId) ? null : draft.NationalId.Trim(),
             GuardianNationalId = string.IsNullOrWhiteSpace(draft.GuardianNationalId) ? null : draft.GuardianNationalId.Trim(),
@@ -396,7 +404,8 @@ public class HoSoController : PatientPageController
         return new XacOtpViewModel
         {
             PatientName = pending.PatientName,
-            Email = pending.Email,
+            // Màn này hiện ra TRƯỚC khi mã được xác thực nên chỉ hiển thị email đã che.
+            Email = ProfileEmail.Mask(pending.Email),
             ExpiresAt = pending.ExpiresAt,
             AttemptsLeft = Math.Max(0, _otpOptions.MaxAttempts - pending.Attempts),
             ResendWaitSeconds = Math.Max(0, resendWait),
@@ -421,21 +430,28 @@ public class HoSoController : PatientPageController
             .ToDictionary(g => g.Key, g => g.Count());
 
         return links
-            .Select(l => new HoSoItemVm
+            .Select(l =>
             {
-                PatientId = l.PatientId,
-                Code = l.PatientCode,
-                FullName = l.PatientFullName,
-                Relationship = l.RelationshipLabel,
-                RelationshipCode = l.RelationshipCode,
-                DateOfBirth = l.DateOfBirth,
-                GenderLabel = l.GenderLabel,
-                Phone = l.PatientPhone,
-                StatusCode = l.StatusCode,
-                StatusLabel = l.StatusLabel,
-                NeedsApproval = l.StatusCode == "PENDING",
-                CanViewRecords = l.CanViewRecords,
-                AppointmentCount = counts.GetValueOrDefault(l.PatientId)
+                // Link còn PENDING nghĩa là người xin chưa nhập xong mã OTP: nhân thân của người bệnh
+                // ở lại server, chỉ mã BN + quan hệ + trạng thái được xuống view (docs/DECISIONS.md #25).
+                bool masked = l.StatusCode != "ACTIVE";
+
+                return new HoSoItemVm
+                {
+                    PatientId = l.PatientId,
+                    Code = l.PatientCode,
+                    FullName = masked ? string.Empty : l.PatientFullName,
+                    Relationship = l.RelationshipLabel,
+                    RelationshipCode = l.RelationshipCode,
+                    DateOfBirth = masked ? default : l.DateOfBirth,
+                    GenderLabel = masked ? string.Empty : l.GenderLabel,
+                    Phone = masked ? string.Empty : l.PatientPhone,
+                    StatusCode = l.StatusCode,
+                    StatusLabel = l.StatusLabel,
+                    IsMasked = masked,
+                    CanViewRecords = l.CanViewRecords,
+                    AppointmentCount = masked ? 0 : counts.GetValueOrDefault(l.PatientId)
+                };
             })
             .OrderByDescending(p => p.StatusCode == "ACTIVE")
             .ThenBy(p => p.FullName)

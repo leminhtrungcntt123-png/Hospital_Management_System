@@ -44,22 +44,22 @@
                 @foreach (var p in Model.Profiles)
                 {
                     <a class="profile-select" asp-action="Chitiet" asp-route-patientId="@p.PatientId">
-                        <div class="profile-avatar">@p.Initials</div>
+                        <div class="profile-avatar">@p.DisplayInitials</div>
                         <div class="profile-body">
                             <div>
-                                <strong>@p.FullName</strong>
+                                <strong>@p.DisplayName</strong>
                                 <span class="badge @(p.RelationshipCode == "SELF" ? "badge-blue" : "badge-gray")">@p.Relationship</span>
                             </div>
                             <p>Mã người bệnh: @p.Code</p>
-                            <p>Ngày sinh: @VietnameseFormat.ShortDate(p.DateOfBirth) · @p.GenderLabel</p>
-                            <p>@p.AppointmentCount lịch sử khám</p>
+                            <p>Ngày sinh: @p.DisplayDateOfBirth · @p.DisplayGender</p>
+                            <p>@(p.IsMasked ? "Chưa thấy lịch sử khám" : $"{p.AppointmentCount} lịch sử khám")</p>
                             @if (p.StatusCode == "ACTIVE")
                             {
                                 <span class="verified"><i data-lucide="shield-check"></i> Đã xác minh</span>
                             }
                             else
                             {
-                                <span class="needs-verify"><i data-lucide="clock-3"></i> Chờ quầy xác nhận giấy tờ khi tới khám</span>
+                                <span class="needs-verify"><i data-lucide="clock-3"></i> Chờ bạn nhập mã xác thực — chưa đặt lịch được</span>
                             }
                         </div>
                         <div class="check-mark"><i data-lucide="chevron-right"></i></div>

@@ -11,12 +11,18 @@ using Microsoft.Extensions.Options;
 namespace HIS.BLL.Services;
 
 /// <summary>
-/// Cấp mã OTP khi thêm hồ sơ: chọn email nhận, sinh mã, ghi một dòng notifications làm dấu vết
-/// rồi đẩy qua mọi kênh <see cref="IOtpDelivery"/> mà host đã đăng ký.
-/// Mã chưa xác thực không được lưu ở đâu ngoài Session của trình duyệt nên không cần bảng mới.
+/// Cấp mã OTP khi thêm hồ sơ: kiểm tần suất xin mã, chọn email nhận, sinh mã, ghi một dòng notifications
+/// làm dấu vết (chỉ lưu email đã che, không lưu mã) rồi đẩy qua mọi kênh <see cref="IOtpDelivery"/> mà host
+/// đã đăng ký. Mã chưa xác thực không được lưu ở đâu ngoài Session của trình duyệt nên không cần bảng mới.
 /// </summary>
 public class OtpService : IOtpService
 {
+    /// <summary>
+    /// Tiêu đề dòng notifications ghi mỗi lần cấp mã. Cùng một lúc nó là khóa để đếm tần suất xin mã
+    /// (không cần bảng mới) và là bộ lọc để quầy/trợ lý tra lại lịch sử cấp mã.
+    /// </summary>
+    public const string TraceTitle = "Mã xác thực hồ sơ";
+
     private readonly AppDbContext _context;
     private readonly OtpOptions _options;
     private readonly IReadOnlyList<IOtpDelivery> _deliveries;
@@ -49,14 +55,18 @@ public class OtpService : IOtpService
         // Nhánh "đã từng khám": chỉ email đã lưu trong hồ sơ mới được dùng, form không có ô email.
         string? recipient = ProfileEmail.NormalizeUsable(patient.Email);
 
+        // Chủ thể mang đi ghi dấu vết và đề trên email là MÃ BỆNH NHÂN chứ không phải họ tên:
+        // người vừa gõ mã BN chưa chứng minh được quyền biết tên của hồ sơ đó (docs/DECISIONS.md #25).
+        string subject = patient.Id.ToPatientCode();
+
         if (recipient is null)
         {
             return new OtpIssueResult(false,
-                $"Hồ sơ {patient.FullName} chưa có email trong hệ thống nên không gửi được mã xác thực. " +
-                "Hồ sơ vẫn chờ quầy đối chiếu giấy tờ khi bạn tới khám, hotline 0808 0808.");
+                $"Hồ sơ {subject} chưa có email trong hệ thống nên không gửi được mã xác thực. " +
+                "Liên kết vẫn chờ quầy đối chiếu giấy tờ để mở quyền đặt lịch, hotline 0808 0808.");
         }
 
-        return await IssueAndSendAsync(accountId, patient.FullName, recipient, cancellationToken);
+        return await IssueAndSendAsync(accountId, subject, recipient, cancellationToken);
     }
 
     public async Task<OtpIssueResult> IssueNewProfileOtpAsync(
@@ -78,22 +88,34 @@ public class OtpService : IOtpService
         return await IssueAndSendAsync(accountId, name.Length > 0 ? name : "hồ sơ mới", recipient, cancellationToken);
     }
 
-    /// <summary>Phần chung của hai nhánh: sinh mã, ghi dấu vết notifications, đẩy qua các kênh đã đăng ký.</summary>
+    /// <summary>
+    /// Phần chung của hai nhánh: chặn xin mã dày đặc, sinh mã, ghi một dòng notifications KHÔNG chứa mã
+    /// (chỉ để lại email đã che + mốc giờ) rồi đẩy mã qua các kênh <see cref="IOtpDelivery"/> đã đăng ký.
+    /// </summary>
     private async Task<OtpIssueResult> IssueAndSendAsync(
         int accountId,
         string patientName,
         string recipient,
         CancellationToken cancellationToken)
     {
+        string? tooOften = await IssueQuotaMessageAsync(accountId, cancellationToken);
+        if (tooOften is not null)
+        {
+            return new OtpIssueResult(false, tooOften);
+        }
+
         string code = NextCode();
         DateTimeOffset expiresAt = DateTimeOffset.Now.AddMinutes(_options.LifetimeMinutes);
 
+        // Dấu vết chỉ để đối chiếu "đã gửi chưa, gửi lúc nào", không phải nơi cất mã:
+        // ai dump bảng notifications cũng không đọc trộm được mã còn hiệu lực.
         _context.Notifications.Add(new Notification
         {
             AccountId = accountId,
-            Title = "Mã xác thực hồ sơ",
-            Content = $"Mã {code} xác thực hồ sơ {patientName} gửi tới {recipient}, " +
-                      $"có hiệu lực đến {expiresAt:HH:mm} ngày {expiresAt:dd/MM/yyyy}.",
+            Title = TraceTitle,
+            Content = $"Đã gửi mã {_options.CodeLength} số xác thực hồ sơ {patientName} tới " +
+                      $"{ProfileEmail.Mask(recipient)} lúc {expiresAt:HH:mm} ngày {expiresAt:dd/MM/yyyy}. " +
+                      "Mã không nằm trong thông báo này.",
             IsRead = false
         });
 
@@ -130,6 +152,38 @@ public class OtpService : IOtpService
 
         return new OtpIssueResult(
             delivered, message, recipient, code, expiresAt, _options.RevealCodeOnScreen, patientName);
+    }
+
+    /// <summary>
+    /// Đếm số lần cấp mã của chính tài khoản này trong cửa sổ đang cấu hình, dựa trên dấu vết notifications
+    /// vừa ghi ở trên nên không phải thêm bảng. Trả lời tiếng Việt khi vượt ngưỡng, null khi còn xin được.
+    /// </summary>
+    private async Task<string?> IssueQuotaMessageAsync(int accountId, CancellationToken cancellationToken)
+    {
+        DateTime since = DateTime.Now.AddMinutes(-_options.IssueWindowMinutes);
+
+        List<DateTime> recent = await _context.Notifications
+            .Where(n => n.AccountId == accountId && n.Title == TraceTitle && n.CreatedAt >= since)
+            .OrderBy(n => n.CreatedAt)
+            .Select(n => n.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        if (recent.Count < _options.MaxIssuesPerWindow)
+        {
+            return null;
+        }
+
+        // Cột created_at có DEFAULT now() nên bản ghi cũ nhất trong cửa sổ cho biết thời điểm được xin lại.
+        int waitMinutes = (int)Math.Ceiling(
+            (recent[0].AddMinutes(_options.IssueWindowMinutes) - DateTime.Now).TotalMinutes);
+        if (waitMinutes < 1)
+        {
+            waitMinutes = 1;
+        }
+
+        return $"Bạn đã xin mã xác thực {_options.MaxIssuesPerWindow} lần trong " +
+               $"{_options.IssueWindowMinutes} phút gần đây. Vui lòng quay lại sau khoảng {waitMinutes} phút " +
+               "hoặc gọi hotline 0808 0808 để được hỗ trợ.";
     }
 
     private string NextCode()

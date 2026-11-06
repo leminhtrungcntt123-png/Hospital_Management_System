@@ -147,68 +147,37 @@ public class PatientProfileService : IPatientProfileService
             .Select(l => l.Patient.PhoneNumber)
             .FirstOrDefaultAsync(cancellationToken);
 
+    public async Task<string?> ValidateNewProfileAsync(
+        int accountId,
+        CreateProfileRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var (error, draft) = await ValidateNewProfileDraftAsync(accountId, request, cancellationToken);
+        return draft is null ? error ?? "Phiếu tạo hồ sơ không hợp lệ." : null;
+    }
+
     public async Task<ProfileLinkResult> CreateProfileAsync(
         int accountId,
         CreateProfileRequest request,
         CancellationToken cancellationToken = default)
     {
-        string fullName = (request.FullName ?? string.Empty).Trim();
-        string phone = NormalizePhone(request.PhoneNumber);
-        string? nationalId = NullIfWhiteSpace(request.NationalId);
-        string? email = ProfileEmail.Normalize(request.Email);
-        PatientRelationship relationship = ParseRelationship(request.Relationship);
-
-        string? validationError = Validate(fullName, request.DateOfBirth, request.Gender, phone, nationalId);
-        if (validationError != null)
+        var (validationError, draft) = await ValidateNewProfileDraftAsync(accountId, request, cancellationToken);
+        if (draft is null)
         {
-            return new ProfileLinkResult(false, validationError);
-        }
-
-        if (email is not null && !ProfileEmail.IsUsable(email))
-        {
-            return new ProfileLinkResult(false, $"Email \"{email}\" không hợp lệ. Vui lòng kiểm tra lại.");
-        }
-
-        Account account = await _context.Accounts
-            .FirstOrDefaultAsync(a => a.Id == accountId, cancellationToken)
-            ?? throw new ArgumentException("Tài khoản đăng nhập không tồn tại.");
-
-        // Web đã thu ô email ở nhánh "chưa từng khám"; chỗ nào để trống (WinForms, dữ liệu cũ) thì hồ sơ
-        // mới mang email của tài khoản tạo ra nó, nhờ lần sau liên kết lại vẫn gửi được mã OTP.
-        email ??= ProfileEmail.NormalizeUsable(account.Email);
-
-        string? quotaError = await ValidateProfileQuotaAsync(accountId, phone, relationship, cancellationToken);
-        if (quotaError != null)
-        {
-            return new ProfileLinkResult(false, quotaError);
-        }
-
-        string? identityError = await ValidateIdentityDocumentsAsync(
-            accountId, request.DateOfBirth, nationalId, NullIfWhiteSpace(request.GuardianNationalId), cancellationToken);
-        if (identityError != null)
-        {
-            return new ProfileLinkResult(false, identityError);
-        }
-
-        if (relationship == PatientRelationship.Self
-            && await _context.AccountPatientProfiles.AnyAsync(
-                l => l.AccountId == accountId && l.Relationship == PatientRelationship.Self && l.Status != LinkStatus.Revoked,
-                cancellationToken))
-        {
-            return new ProfileLinkResult(false, "Tài khoản này đã có hồ sơ \"Bản thân\". Nếu muốn thêm người đã khám, hãy chọn nhánh \"Đã từng khám\".");
+            return new ProfileLinkResult(false, validationError ?? "Phiếu tạo hồ sơ không hợp lệ.");
         }
 
         DateTime now = DateTime.Now;
 
         var patient = new Patient
         {
-            FullName = fullName,
+            FullName = draft.FullName,
             DateOfBirth = request.DateOfBirth,
             Gender = EnumCodes.ParseDatabaseCode<Gender>(request.Gender) ?? Gender.Other,
-            NationalId = nationalId,
-            PhoneNumber = phone,
+            NationalId = draft.NationalId,
+            PhoneNumber = draft.Phone,
             Address = NullIfWhiteSpace(request.Address),
-            Email = email,
+            Email = draft.Email,
             CreatedAt = now
         };
 
@@ -220,7 +189,7 @@ public class PatientProfileService : IPatientProfileService
         {
             AccountId = accountId,
             Patient = patient,
-            Relationship = relationship,
+            Relationship = draft.Relationship,
             Status = LinkStatus.Active,
             CanViewRecords = true,
             CreatedBy = accountId,
@@ -237,10 +206,15 @@ public class PatientProfileService : IPatientProfileService
         {
             await _context.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException ex)
+        catch (DbUpdateException)
         {
+            // Trước đây chỗ này ném InvalidOperationException sau khi Web đã cấp mã OTP:
+            // người dùng có mã hợp lệ, hồ sơ thì không tạo được và không screen nào bắt được lỗi -> 500.
             _context.ChangeTracker.Clear();
-            throw new InvalidOperationException("Không tạo được hồ sơ mới (CCCD hoặc thông tin trùng lặp).", ex);
+            return new ProfileLinkResult(
+                false,
+                "Không tạo được hồ sơ mới vì CCCD hoặc thông tin định danh đã có trong hệ thống. " +
+                "Vui lòng kiểm tra lại khai báo; nếu đây là người đã từng khám, hãy dùng nhánh \"Đã từng khám\".");
         }
 
         return new ProfileLinkResult(
@@ -250,6 +224,75 @@ public class PatientProfileService : IPatientProfileService
             patient.Id.ToPatientCode(),
             LinkStatus.Active.ToDatabaseCode(),
             true);
+    }
+
+    /// <summary>
+    /// Phiếu "chưa từng khám" sau khi chuẩn hóa. Chỉ có ý nghĩa khi Error của ValidateNewProfileDraftAsync null.
+    /// </summary>
+    private sealed record NewProfileDraft(
+        string FullName,
+        string Phone,
+        string? NationalId,
+        string? Email,
+        PatientRelationship Relationship);
+
+    /// <summary>
+    /// Một mình chỗ này định nghĩa "phiếu tạo hồ sơ mới hợp lệ chưa": nhân thân, email, hạn mức hồ sơ/SĐT,
+    /// CCCD người thân và trùng hồ sơ SELF. CreateProfileAsync gọi trước khi ghi DB, còn Web gọi qua
+    /// ValidateNewProfileAsync trước khi xin mã OTP — hai cửa nhưng một luật nên không thể lệch nhau.
+    /// </summary>
+    private async Task<(string? Error, NewProfileDraft? Draft)> ValidateNewProfileDraftAsync(
+        int accountId,
+        CreateProfileRequest request,
+        CancellationToken cancellationToken)
+    {
+        string fullName = (request.FullName ?? string.Empty).Trim();
+        string phone = PhoneNumbers.Normalize(request.PhoneNumber);
+        string? nationalId = NullIfWhiteSpace(request.NationalId);
+        string? email = ProfileEmail.Normalize(request.Email);
+        PatientRelationship relationship = ParseRelationship(request.Relationship);
+
+        string? validationError = Validate(fullName, request.DateOfBirth, request.Gender, phone, nationalId);
+        if (validationError != null)
+        {
+            return (validationError, null);
+        }
+
+        if (email is not null && !ProfileEmail.IsUsable(email))
+        {
+            return ($"Email \"{email}\" không hợp lệ. Vui lòng kiểm tra lại.", null);
+        }
+
+        Account account = await _context.Accounts
+            .FirstOrDefaultAsync(a => a.Id == accountId, cancellationToken)
+            ?? throw new ArgumentException("Tài khoản đăng nhập không tồn tại.");
+
+        // Web đã thu ô email ở nhánh "chưa từng khám"; chỗ nào để trống (WinForms, dữ liệu cũ) thì hồ sơ
+        // mới mang email của tài khoản tạo ra nó, nhờ lần sau liên kết lại vẫn gửi được mã OTP.
+        email ??= ProfileEmail.NormalizeUsable(account.Email);
+
+        string? quotaError = await ValidateProfileQuotaAsync(accountId, phone, relationship, cancellationToken);
+        if (quotaError != null)
+        {
+            return (quotaError, null);
+        }
+
+        string? identityError = await ValidateIdentityDocumentsAsync(
+            accountId, request.DateOfBirth, nationalId, NullIfWhiteSpace(request.GuardianNationalId), cancellationToken);
+        if (identityError != null)
+        {
+            return (identityError, null);
+        }
+
+        if (relationship == PatientRelationship.Self
+            && await _context.AccountPatientProfiles.AnyAsync(
+                l => l.AccountId == accountId && l.Relationship == PatientRelationship.Self && l.Status != LinkStatus.Revoked,
+                cancellationToken))
+        {
+            return ("Tài khoản này đã có hồ sơ \"Bản thân\". Nếu muốn thêm người đã khám, hãy chọn nhánh \"Đã từng khám\".", null);
+        }
+
+        return (null, new NewProfileDraft(fullName, phone, nationalId, email, relationship));
     }
 
     public async Task<ProfileLinkResult> RequestLinkAsync(
@@ -289,11 +332,13 @@ public class PatientProfileService : IPatientProfileService
 
         if (existing != null && existing.Status != LinkStatus.Revoked)
         {
+            // Lời báo chỉ dùng MÃ BỆNH NHÂN: lúc này người xin chưa nhập xong mã OTP nên chưa có quyền
+            // đọc họ tên của hồ sơ (docs/DECISIONS.md #25).
             return new ProfileLinkResult(
                 true,
                 existing.Status == LinkStatus.Active
-                    ? $"Hồ sơ {patient.FullName} đã liên kết với tài khoản này."
-                    : $"Hồ sơ {patient.FullName} đang chờ quầy xác nhận.",
+                    ? $"Hồ sơ {patient.Id.ToPatientCode()} đã liên kết với tài khoản này."
+                    : $"Hồ sơ {patient.Id.ToPatientCode()} đang chờ bạn nhập mã xác thực.",
                 patient.Id,
                 patient.Id.ToPatientCode(),
                 existing.Status.ToDatabaseCode(),
@@ -352,7 +397,8 @@ public class PatientProfileService : IPatientProfileService
 
         return new ProfileLinkResult(
             true,
-            $"Đã ghi nhận yêu cầu liên kết hồ sơ {patient.FullName}. Quầy sẽ xác nhận khi bạn tới khám.",
+            $"Đã ghi nhận yêu cầu liên kết hồ sơ {patient.Id.ToPatientCode()}. " +
+            "Hệ thống sẽ gửi mã xác thực về email đã lưu trong hồ sơ; chỉ khi nhập đúng mã, hồ sơ mới đặt lịch được.",
             patient.Id,
             patient.Id.ToPatientCode(),
             LinkStatus.Pending.ToDatabaseCode(),
@@ -390,7 +436,8 @@ public class PatientProfileService : IPatientProfileService
         link.VerifiedBy = verifierAccountId;
         link.VerifiedAt = now;
 
-        // Duyệt liên kết chỉ mở quyền ĐẶT LỊCH. Quyền XEM HỒ sơ vẫn theo cách A:
+        // Duyệt liên kết (PENDING -> ACTIVE) là bước mở quyền ĐẶT LỊCH: CanBookAsync chỉ nhận ACTIVE.
+        // Quyền XEM HỒ sơ vẫn theo cách A:
         // chỉ SELF/CHILD giữ quyền đã có, các quan hệ khác phải được cấp riêng (can_view_records ở nguyên FALSE).
         LogAccess(accountId, link.Patient, "LINK_VERIFY", null);
 
@@ -626,9 +673,9 @@ public class PatientProfileService : IPatientProfileService
             return "Vui lòng chọn giới tính.";
         }
 
-        if (phone.Length is < 9 or > 15 || !phone.All(char.IsDigit))
+        if (!PhoneNumbers.IsUsable(phone))
         {
-            return "Số điện thoại phải gồm 9 đến 15 chữ số.";
+            return PhoneNumbers.ErrorMessage;
         }
 
         if (nationalId != null && nationalId.Length > 20)
@@ -638,9 +685,6 @@ public class PatientProfileService : IPatientProfileService
 
         return null;
     }
-
-    private static string NormalizePhone(string? value) =>
-        (value ?? string.Empty).Trim().Replace(" ", string.Empty).Replace(".", string.Empty).Replace("-", string.Empty);
 
     private static string? NullIfWhiteSpace(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

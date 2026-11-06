@@ -142,16 +142,24 @@ public class PatientVm
     public DateOnly DateOfBirth { get; set; }
     public string Phone { get; set; } = string.Empty;
 
-    /// <summary>ACTIVE = hồ sơ đã được xác minh giấy tờ.</summary>
+    /// <summary>ACTIVE = liên kết đã xác nhận, được đặt lịch.</summary>
     public bool IsVerified { get; set; }
 
-    /// <summary>ACTIVE hoặc PENDING: spec cho phép đặt lịch với hồ sơ chờ quầy duyệt giấy tờ.</summary>
+    /// <summary>Chỉ ACTIVE. PENDING còn chờ mã OTP nên chưa chứng minh được quyền dùng hồ sơ.</summary>
     public bool IsBookable { get; set; }
 
-    /// <summary>PENDING: hiển thị note "chờ quầy xác nhận giấy tờ khi bệnh nhân tới".</summary>
+    /// <summary>PENDING: hồ sơ chưa xác thực xong nên chưa đặt lịch được.</summary>
     public bool NeedsApproval { get; set; }
 
-    public string Initials => PersonName.Initials(FullName);
+    /// <summary>PENDING: FullName/DateOfBirth/Phone đã bị controller xóa trước khi xuống view.</summary>
+    public bool IsMasked { get; set; }
+
+    public string DisplayName => IsMasked ? "Hồ sơ chờ xác thực" : FullName;
+    public string DisplayDateOfBirth => IsMasked
+        ? "••/••/••••"
+        : VietnameseFormat.ShortDate(DateOfBirth);
+
+    public string Initials => IsMasked ? "?" : PersonName.Initials(FullName);
 }
 
 /// <summary>Những gì người dùng đã chọn, lưu trong Session giữa các bước.</summary>

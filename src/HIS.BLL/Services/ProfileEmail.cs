@@ -30,6 +30,28 @@ public static class ProfileEmail
         }
     }
 
+    /// <summary>
+    /// Che phần lớn địa chỉ email (minhchi@gmail.com -&gt; m***@gmail.com) cho nội dung lưu lại trong DB
+    /// hoặc hiển thị trên màn hình: người đọc vẫn nhận ra địa chỉ của mình nhưng file dump không còn
+    /// chứa một email đầy đủ để dùng lại.
+    /// </summary>
+    public static string Mask(string? email)
+    {
+        string? normalized = Normalize(email);
+        if (normalized is null)
+        {
+            return "(trống)";
+        }
+
+        int at = normalized.IndexOf('@');
+        if (at <= 0)
+        {
+            return normalized.Length <= 1 ? "***" : $"{normalized[0]}***";
+        }
+
+        return $"{normalized[0]}***{normalized[at..]}";
+    }
+
     /// <summary>Chuẩn hóa và giữ lại chỉ khi địa chỉ dùng được; dữ liệu cũ bẩn coi như chưa có email.</summary>
     public static string? NormalizeUsable(string? value)
     {

@@ -39,4 +39,36 @@ public class OtpCodeTests
     [Fact]
     public void Email_dai_hon_cot_thi_boi_tuc()
         => Assert.False(ProfileEmail.IsUsable(new string('a', 196) + "@x.vn"));
+
+    /// <summary>
+    /// Định dạng dùng cho dấu vết notifications và màn "Nhập mã xác thực": giữ chữ cái đầu + domain
+    /// để người nhận còn nhận ra địa chỉ của mình, nhưng dump DB không còn email đầy đủ.
+    /// </summary>
+    [Theory]
+    [InlineData("minhchi1009@gmail.com", "m***@gmail.com")]
+    [InlineData("  Nguyen.A@Gmail.COM  ", "n***@gmail.com")]
+    [InlineData("a@b.co", "a***@b.co")]
+    [InlineData("khong.phai.email", "k***")]
+    [InlineData("x", "***")]
+    [InlineData(null, "(trống)")]
+    [InlineData("   ", "(trống)")]
+    public void Mask_email_chi_giu_chu_dau_va_domain(string? input, string expected)
+        => Assert.Equal(expected, ProfileEmail.Mask(input));
+
+    // Luật SĐT của hồ sơ giờ chỉ có MỘT chỗ (PhoneNumbers) nên Web không còn tự viết regex riêng.
+    [Theory]
+    [InlineData("0912345678", true)]
+    [InlineData("01234567890", true)]
+    [InlineData("091234567", false)]
+    [InlineData("091234567890", false)]
+    [InlineData("1912345678", false)]
+    [InlineData("091234567a", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void So_dien_tho_ho_so_chi_nhan_10_hoac_11_so_bat_dau_bang_0(string? phone, bool ok)
+        => Assert.Equal(ok, PhoneNumbers.IsUsable(phone));
+
+    [Fact]
+    public void So_dien_tho_chuan_hoa_bo_khoang_trang_dau_cham_va_gach()
+        => Assert.Equal("0912345678", PhoneNumbers.Normalize(" 09 12.34-56 78 "));
 }

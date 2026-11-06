@@ -442,7 +442,9 @@ public class BookingController : PatientPageController
         }
         if (!patient.IsBookable)
         {
-            TempData["Error"] = "Hồ sơ này đã bị thu hồi quyền đặt lịch. Vui lòng chọn hồ sơ khác.";
+            TempData["Error"] = patient.NeedsApproval
+                ? "Hồ sơ này chưa xác thực xong nên chưa đặt lịch được. Vào mục Hồ sơ để nhập mã xác thực, hoặc chọn hồ sơ khác."
+                : "Hồ sơ này đã bị thu hồi quyền đặt lịch. Vui lòng chọn hồ sơ khác.";
             return RedirectToAction(nameof(ChonNguoiKham));
         }
 
@@ -745,21 +747,28 @@ public class BookingController : PatientPageController
     }
 
     // Hồ sơ của tài khoản đang đăng nhập, kèm nhãn quan hệ và trạng thái liên kết từ DB.
+    // Link PENDING (chưa nhập xong mã OTP) chỉ được đưa vào danh sách với mã BN + quan hệ:
+    // tên/ngày sinh/SĐT của người chưa xác thực phải ở lại server, xem docs/DECISIONS.md #25.
     private async Task<List<PatientVm>> GetProfilesAsync()
         => (await _profileService.GetLinksForAccountAsync(AccountId))
             .Where(l => l.StatusCode != "REVOKED")
-            .Select(l => new PatientVm
+            .Select(l =>
             {
-                Id = l.PatientId,
-                FullName = l.PatientFullName,
-                Relationship = l.RelationshipLabel,
-                RelationshipCode = l.RelationshipCode,
-                Code = l.PatientCode,
-                DateOfBirth = l.DateOfBirth,
-                Phone = l.PatientPhone,
-                IsVerified = l.StatusCode == "ACTIVE",
-                IsBookable = l.StatusCode is "ACTIVE" or "PENDING",
-                NeedsApproval = l.StatusCode == "PENDING"
+                bool pending = l.StatusCode != "ACTIVE";
+                return new PatientVm
+                {
+                    Id = l.PatientId,
+                    FullName = pending ? string.Empty : l.PatientFullName,
+                    Relationship = l.RelationshipLabel,
+                    RelationshipCode = l.RelationshipCode,
+                    Code = l.PatientCode,
+                    DateOfBirth = pending ? default : l.DateOfBirth,
+                    Phone = pending ? string.Empty : l.PatientPhone,
+                    IsVerified = l.StatusCode == "ACTIVE",
+                    IsBookable = l.StatusCode == "ACTIVE",
+                    NeedsApproval = pending,
+                    IsMasked = pending
+                };
             })
             .OrderByDescending(p => p.IsVerified)
             .ThenBy(p => p.FullName)

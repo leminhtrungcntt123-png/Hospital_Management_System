@@ -20,10 +20,12 @@ public class PatientAccessService : IPatientAccessService
 
     public async Task<bool> CanBookAsync(int accountId, int patientId, CancellationToken cancellationToken = default)
     {
+        // PENDING bị loại có chủ đích: liên kết dạng này còn chờ mã OTP của chính người xin,
+        // nếu cho đặt lịch thì bỏ form giữa chừng (hoặc nhập sai 5 lần) vẫn dùng được hồ sơ người khác.
         return await _context.AccountPatientProfiles.AnyAsync(
             l => l.AccountId == accountId
                  && l.PatientId == patientId
-                 && (l.Status == LinkStatus.Active || l.Status == LinkStatus.Pending),
+                 && l.Status == LinkStatus.Active,
             cancellationToken);
     }
 

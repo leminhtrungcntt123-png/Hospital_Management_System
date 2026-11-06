@@ -6,7 +6,10 @@ namespace HIS.BLL.Interfaces;
 /// </summary>
 public interface IPatientAccessService
 {
-    /// <summary>Đặt lịch được cho hồ sơ đang ACTIVE hoặc PENDING (PENDING vẫn khám được, quầy sẽ duyệt khi tới).</summary>
+    /// <summary>
+    /// Chỉ liên kết ACTIVE mới đặt được lịch. PENDING nghĩa là người dùng chưa nhập xong mã OTP
+    /// (hoặc quầy chưa duyệt), nên chưa được coi là đã chứng minh quyền dùng hồ sơ.
+    /// </summary>
     Task<bool> CanBookAsync(int accountId, int patientId, CancellationToken cancellationToken = default);
 
     /// <summary>Chỉ ACTIVE và được cấp quyền xem hồ sơ.</summary>

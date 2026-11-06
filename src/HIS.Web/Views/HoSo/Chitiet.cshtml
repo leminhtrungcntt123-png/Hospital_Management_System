@@ -10,22 +10,32 @@
         <div class="content-head">
             <div>
                 <div class="eyebrow">HỒ SƠ @p.Code</div>
-                <div class="page-title">@p.FullName</div>
-                <p>@p.Relationship · sinh ngày @VietnameseFormat.ShortDate(p.DateOfBirth) · @p.GenderLabel · @p.Phone</p>
+                <div class="page-title">@p.DisplayName</div>
+                <p>@p.Relationship · sinh ngày @p.DisplayDateOfBirth · @p.DisplayGender · @p.DisplayPhone</p>
             </div>
             <div class="head-actions">
                 <a class="btn btn-outline" asp-action="Index"><i data-lucide="chevron-left"></i> Danh sách hồ sơ</a>
-                <a class="btn btn-primary" asp-controller="Booking" asp-action="Index"><i data-lucide="calendar-plus"></i> Đặt lịch khám</a>
+                @if (p.IsMasked)
+                {
+                    @* Chưa nhập xong mã OTP thì chưa đặt lịch được: nút duy nhất ở đây là nối lại việc xác thực. *@
+                    <a class="btn btn-primary" asp-action="Them" asp-route-branch="@ThemHoSoRequest.SeenBranch" asp-route-patientCode="@p.Code">
+                        <i data-lucide="shield-check"></i> Nhập mã xác thực
+                    </a>
+                }
+                else
+                {
+                    <a class="btn btn-primary" asp-controller="Booking" asp-action="Index"><i data-lucide="calendar-plus"></i> Đặt lịch khám</a>
+                }
             </div>
         </div>
 
-        @if (p.NeedsApproval)
+        @if (p.IsMasked)
         {
             <div class="alert warning">
                 <i data-lucide="clock-3"></i>
                 <div>
-                    <strong>Hồ sơ đang chờ quầy xác nhận giấy tờ</strong>
-                    <p>Bạn vẫn đặt được lịch, nhưng khi tới khám hãy mang theo CCCD/thẻ BHYT của người bệnh để quầy đối chiếu. Trang này chỉ hiện lịch sử khám và trạng thái, chưa hiện bệnh án.</p>
+                    <strong>Hồ sơ chưa xác thực xong nên chưa đặt lịch được</strong>
+                    <p>Mã xác thực gửi về email đã lưu trong hồ sơ này; chỉ khi nhập đúng mã, hệ thống mới mở quyền đặt lịch. Khi chưa xác thực, trang chỉ hiện mã bệnh nhân, quan hệ và trạng thái — không hiện họ tên, ngày sinh, liên hệ hay lịch sử khám. Không có email trong hồ sơ thì ra quầy đối chiếu giấy tờ, hotline 0808 0808.</p>
                 </div>
             </div>
         }
@@ -44,16 +54,18 @@
             <div class="card-head"><strong>Thông tin định danh</strong></div>
             <div class="detail-grid">
                 <label><span>Mã người bệnh</span><strong>@p.Code</strong></label>
-                <label><span>Họ và tên</span><strong>@p.FullName</strong></label>
+                <label><span>Họ và tên</span><strong>@p.DisplayName</strong></label>
                 <label><span>Quan hệ với bạn</span><strong>@p.Relationship</strong></label>
-                <label><span>Ngày sinh</span><strong>@VietnameseFormat.ShortDate(p.DateOfBirth)</strong></label>
-                <label><span>Giới tính</span><strong>@p.GenderLabel</strong></label>
-                <label><span>Điện thoại</span><strong>@p.Phone</strong></label>
+                <label><span>Ngày sinh</span><strong>@p.DisplayDateOfBirth</strong></label>
+                <label><span>Giới tính</span><strong>@p.DisplayGender</strong></label>
+                <label><span>Điện thoại</span><strong>@p.DisplayPhone</strong></label>
                 <label><span>Trạng thái liên kết</span><strong>@p.StatusLabel</strong></label>
                 <label><span>Được xem bệnh án</span><strong>@(p.CanViewRecords ? "Có" : "Không")</strong></label>
             </div>
         </div>
 
+        @if (!p.IsMasked)
+        {
         <div class="card-section">
             <div class="card-head">
                 <strong>Lịch sử khám của hồ sơ này</strong>
@@ -88,5 +100,6 @@
                 }
             }
         </div>
+        }
     </section>
 </main>

@@ -5,7 +5,8 @@ namespace HIS.BLL.Interfaces;
 
 /// <summary>
 /// Hồ sơ do tài khoản tự tạo trên Web (cách A đã chốt):
-/// tạo mới => link ACTIVE + được xem hồ sơ ngay; xin liên kết hồ sơ đã có => PENDING, quầy duyệt.
+/// tạo mới => link ACTIVE + được xem hồ sơ ngay; xin liên kết hồ sơ đã có => PENDING, chỉ đặt lịch được
+/// sau khi người xin nhập đúng mã OTP gửi về email trong hồ sơ (đường khác: quầy xác nhận giấy tờ ở WinForms).
 /// </summary>
 public sealed class CreateProfileRequest
 {
@@ -46,6 +47,17 @@ public interface IPatientProfileService
 {
     /// <summary>Hồ sơ mới hoàn toàn + link SELF/... ACTIVE cho chính tài khoản vừa tạo.</summary>
     Task<ProfileLinkResult> CreateProfileAsync(
+        int accountId,
+        CreateProfileRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Chạy TOÀN BỘ quy tắc của hồ sơ "chưa từng khám" (nhân thân, hạn mức hồ sơ, CCCD người thân, trùng SELF)
+    /// mà không ghi gì xuống DB. Web gọi trước khi xin mã OTP để người dùng không nhận mã rồi mới biết phiếu sai;
+    /// CreateProfileAsync vẫn kiểm lại y hệt vì nó là cổng duy nhất ghi patients.
+    /// Trả null khi phiếu hợp lệ, ngược lại là câu tiếng Việt chỉ rõ nguyên nhân.
+    /// </summary>
+    Task<string?> ValidateNewProfileAsync(
         int accountId,
         CreateProfileRequest request,
         CancellationToken cancellationToken = default);

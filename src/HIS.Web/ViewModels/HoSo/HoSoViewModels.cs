@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using HIS.BLL.Interfaces;
+using HIS.Web.Helpers;
 using HIS.Web.ViewModels.Booking;
 
 namespace HIS.Web.ViewModels.HoSo;
@@ -25,8 +26,17 @@ public class HoSoItemVm
     public string StatusCode { get; set; } = string.Empty;
     public string StatusLabel { get; set; } = string.Empty;
 
-    // PENDING: hồ sơ chỉ dùng để đặt lịch, quầy duyệt giấy tờ rồi mới khám.
-    public bool NeedsApproval { get; set; }
+    /// <summary>
+    /// PENDING: controller đã xóa FullName/DateOfBirth/GenderLabel/Phone/AppointmentCount khỏi model
+    /// vì người xin chưa chứng minh quyền dùng hồ sơ. View hiển thị placeholder của IsMasked, không tự bịa số liệu.
+    /// </summary>
+    public bool IsMasked { get; set; }
+
+    public string DisplayName => IsMasked ? "Hồ sơ chờ xác thực" : FullName;
+    public string DisplayDateOfBirth => IsMasked ? "••/••/••••" : VietnameseFormat.ShortDate(DateOfBirth);
+    public string DisplayGender => IsMasked ? "chưa cung cấp" : GenderLabel;
+    public string DisplayPhone => IsMasked ? "chưa cung cấp" : Phone;
+    public string DisplayInitials => IsMasked ? "?" : Initials;
 
     // Theo quyết định #10: hồ sơ người khác chỉ hiện bệnh án khi người bệnh đồng ý.
     public bool CanViewRecords { get; set; }
@@ -44,11 +54,11 @@ public class HoSoChiTietViewModel
 }
 
 // Dữ liệu form "Tạo hồ sơ" (màn Hồ sơ): MỘT màn hình, HAI nhánh.
-// Branch = "seen"  -> người này đã từng khám, chỉ nhập mã bệnh nhân để xin liên kết hồ sơ có sẵn.
-// Branch = "new"   -> chưa từng khám, khai đầy đủ nhân thân.
-// Form không có ô email: mã OTP lấy theo email tài khoản (nhánh new) hoặc email đã lưu trong hồ sơ (nhánh seen).
+// Branch = "seen"  -> người này đã từng khám, chỉ nhập mã bệnh nhân; mã OTP gửi về email ĐÃ LƯU trong hồ sơ.
+// Branch = "new"   -> chưa từng khám, khai đầy đủ nhân thân + ô email; chính email đó nhận mã OTP.
 // Không dùng [Required]/[RegularExpression] vì trường của nhánh kia luôn rỗng khi submit;
-// HoSoController kiểm tra theo từng nhánh rồi mới gọi BLL.
+// HoSoController chỉ kiểm ô email của luồng Web, còn mọi luật nghiệp vụ do
+// IPatientProfileService.ValidateNewProfileAsync quyết định TRƯỚC khi cấp mã.
 public class ThemHoSoRequest
 {
     public const string SeenBranch = "seen";

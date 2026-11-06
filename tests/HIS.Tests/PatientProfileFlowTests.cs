@@ -309,6 +309,119 @@ public class PatientProfileFlowTests
         }
     }
 
+    /// <summary>
+    /// Quy tắc mới (docs/DECISIONS.md #25): liên kết PENDING chưa đặt lịch được, vì lúc đó người xin
+    /// chưa nhập xong mã OTP. Chỉ ACTIVE (nhập đúng mã hoặc quầy duyệt giấy tờ) mới qua CanBookAsync.
+    /// </summary>
+    [Fact]
+    public async Task Lien_ket_pending_khong_dat_lich_duoc_den_khi_chuyen_active()
+    {
+        var cs = Connection;
+        if (cs is null) { _out.WriteLine("Bỏ qua: chưa đặt HIS_REHEARSAL_CONNECTION"); return; }
+
+        var bookingOptions = new BookingOptions();
+        await using var ctx = NewContext(cs);
+        var profiles = new PatientProfileService(ctx, Options.Create(bookingOptions));
+        var access = new PatientAccessService(ctx);
+
+        int linkedCount = await ctx.AccountPatientProfiles.AsNoTracking()
+            .CountAsync(l => l.AccountId == RelativeAccountId && l.Status != LinkStatus.Revoked);
+        if (linkedCount >= bookingOptions.MaxProfilesPerAccount)
+        {
+            _out.WriteLine($"Bỏ qua: tài khoản #{RelativeAccountId} đã dùng hết {linkedCount} hồ sơ.");
+            return;
+        }
+
+        int[] alreadyLinked = await ctx.AccountPatientProfiles.AsNoTracking()
+            .Where(l => l.AccountId == RelativeAccountId)
+            .Select(l => l.PatientId)
+            .ToArrayAsync();
+
+        Patient? target = await ctx.Patients.AsNoTracking()
+            .Where(p => !alreadyLinked.Contains(p.Id))
+            .OrderBy(p => p.Id)
+            .FirstOrDefaultAsync();
+        if (target is null) { _out.WriteLine("Bỏ qua: DB thử nghiệm không còn hồ sơ chưa liên kết."); return; }
+
+        int patientId = target.Id;
+        try
+        {
+            ProfileLinkResult pending = await profiles.RequestLinkAsync(RelativeAccountId, patientId.ToPatientCode(), "OTHER");
+            _out.WriteLine($"RequestLinkAsync: {pending.Success} | {pending.Message} | status={pending.LinkStatus}");
+            Assert.True(pending.Success, pending.Message);
+            Assert.Equal("PENDING", pending.LinkStatus);
+
+            Assert.False(await access.CanBookAsync(RelativeAccountId, patientId));
+
+            ProfileLinkResult verified = await profiles.VerifyLinkAsync(RelativeAccountId, patientId, CounterAccountId);
+            _out.WriteLine($"VerifyLinkAsync: {verified.Success} | status={verified.LinkStatus}");
+            Assert.True(verified.Success, verified.Message);
+            Assert.Equal("ACTIVE", verified.LinkStatus);
+
+            Assert.True(await access.CanBookAsync(RelativeAccountId, patientId));
+        }
+        finally
+        {
+            // Hồ sơ này là dữ liệu thật của DB nên chỉ gỡ liên kết test, không xoá bệnh nhân.
+            await using var clean = NewContext(cs);
+            await clean.Database.ExecuteSqlRawAsync(
+                "DELETE FROM account_patient_profiles WHERE patient_id = {0} AND account_id = {1}",
+                patientId, RelativeAccountId);
+        }
+    }
+
+    /// <summary>
+    /// ValidateNewProfileAsync phải trả đúng lời từ chối mà CreateProfileAsync sẽ trả (quy tắc nghiệp vụ
+    /// chạy TRƯỚC khi cấp mã OTP) và không được ghi dòng nào xuống DB.
+    /// </summary>
+    [Fact]
+    public async Task ValidateNewProfile_noi_dung_mot_loi_CreateProfile_tu_choi_va_khong_ghi()
+    {
+        var cs = Connection;
+        if (cs is null) { _out.WriteLine("Bỏ qua: chưa đặt HIS_REHEARSAL_CONNECTION"); return; }
+
+        await using var ctx = NewContext(cs);
+        var profiles = new PatientProfileService(ctx, Options.Create(new BookingOptions()));
+
+        int patientsBefore = await ctx.Patients.CountAsync();
+        int linksBefore = await ctx.AccountPatientProfiles.CountAsync();
+
+        // 1) Người lớn thiếu CCCD.
+        var adultWithoutId = new CreateProfileRequest
+        {
+            FullName = "Test Validate Thieu CCCD",
+            DateOfBirth = new DateOnly(1990, 5, 5),
+            Gender = "MALE",
+            PhoneNumber = "0987654101",
+            Relationship = "OTHER"
+        };
+        string? adultError = await profiles.ValidateNewProfileAsync(OwnerAccountId, adultWithoutId);
+        ProfileLinkResult adultCreate = await profiles.CreateProfileAsync(OwnerAccountId, adultWithoutId);
+        _out.WriteLine($"Thiếu CCCD -> validate: {adultError} | create: {adultCreate.Message}");
+        Assert.NotNull(adultError);
+        Assert.False(adultCreate.Success);
+        Assert.Equal(adultError, adultCreate.Message);
+
+        // 2) Số điện thoại sai (luật 10-11 chữ số bắt đầu bằng 0, dùng chung cho Web và BLL).
+        var badPhone = new CreateProfileRequest
+        {
+            FullName = "Test Validate Sdt Sai",
+            DateOfBirth = new DateOnly(2000, 1, 1),
+            Gender = "MALE",
+            PhoneNumber = "12345",
+            NationalId = $"95{Random.Shared.Next(1000000000):D9}",
+            Relationship = "OTHER"
+        };
+        string? phoneError = await profiles.ValidateNewProfileAsync(OwnerAccountId, badPhone);
+        ProfileLinkResult phoneCreate = await profiles.CreateProfileAsync(OwnerAccountId, badPhone);
+        _out.WriteLine($"SĐT sai -> validate: {phoneError} | create: {phoneCreate.Message}");
+        Assert.Equal(PhoneNumbers.ErrorMessage, phoneError);
+        Assert.Equal(phoneError, phoneCreate.Message);
+
+        Assert.Equal(patientsBefore, await ctx.Patients.CountAsync());
+        Assert.Equal(linksBefore, await ctx.AccountPatientProfiles.CountAsync());
+    }
+
     /// <summary>Xóa hồ sơ do test tạo theo thứ tự ngược của FK; không đụng lượt khám của các hồ sơ thật.</summary>
     private static async Task CleanupAsync(string connectionString, int patientId)
     {

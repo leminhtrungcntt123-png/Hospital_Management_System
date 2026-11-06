@@ -14,8 +14,9 @@ namespace HIS.Tests;
 /// Mã OTP khi thêm hồ sơ, chạy trên CSDL thật (HIS_REHEARSAL_CONNECTION).
 /// Nhánh "chưa từng khám" gõ email ngay trên form và mã gửi về đúng địa chỉ đó KHI hồ sơ còn chưa tồn tại
 /// (bản ghi patients chỉ được tạo sau khi nhập đúng mã); nhánh "đã từng khám" gửi về email ĐÃ LƯU trong
-/// patients.email, form không có ô email và không được ghi đè. Mỗi lần cấp mã để lại một dòng notifications;
-/// liên kết PENDING thành ACTIVE qua VerifyLinkAsync ở màn "Nhập mã xác thực".
+/// patients.email, form không có ô email và không được ghi đè. Mỗi lần cấp mã để lại một dòng notifications
+/// chứa email đã che nhưng KHÔNG chứa mã; tài khoản xin mã dày hơn ngưỡng thì bị chặn.
+/// Liên kết PENDING thành ACTIVE qua VerifyLinkAsync ở màn "Nhập mã xác thực".
 /// </summary>
 [Trait("Category", "Integration")]
 [Collection("RehearsalPostgres")]
@@ -44,6 +45,9 @@ public class OtpProfileFlowTests
 
     private static OtpService NewOtp(AppDbContext ctx, RecordingOtpDelivery channel)
         => new(ctx, Options.Create(new OtpOptions()), new IOtpDelivery[] { channel });
+
+    private static OtpService NewOtp(AppDbContext ctx, RecordingOtpDelivery channel, OtpOptions options)
+        => new(ctx, Options.Create(options), new IOtpDelivery[] { channel });
 
     /// <summary>Đặt email cho tài khoản rồi trả lại giá trị cũ khi test xong.</summary>
     private static async Task<string?> SetAccountEmailAsync(AppDbContext ctx, int accountId, string? email)
@@ -105,17 +109,21 @@ public class OtpProfileFlowTests
                 Assert.Single(channel.Sent);
                 Assert.Equal(issued.Code, channel.Sent[0].Code);
                 Assert.Equal(accountEmail, channel.Sent[0].To.Email);
-                Assert.Equal(saved.FullName, channel.Sent[0].To.DisplayName);
+                // Tiêu đề thư chỉ dùng MÃ BỆNH NHÂN: người nhận email chưa chắc là chủ hồ sơ
+                // (docs/DECISIONS.md #25 - không lộ họ tên trước khi xác thực).
+                Assert.Equal(saved.Id.ToPatientCode(), channel.Sent[0].To.DisplayName);
                 Assert.True(channel.Sent[0].ExpiresAt > DateTimeOffset.Now);
 
                 // Dấu vết trong DB để quầy/trợ lý tra được mà không cần log application.
                 Notification note = await ctx.Notifications.AsNoTracking()
-                    .Where(n => n.AccountId == OwnerAccountId && n.Title == "Mã xác thực hồ sơ")
+                    .Where(n => n.AccountId == OwnerAccountId && n.Title == OtpService.TraceTitle)
                     .OrderByDescending(n => n.Id)
                     .FirstAsync();
                 _out.WriteLine($"notifications #{note.Id}: {note.Content}");
-                Assert.Contains(issued.Code, note.Content);
-                Assert.Contains(accountEmail, note.Content);
+                // Dấu vết để counter tra được nhưng dump DB không đọc trộm được mã còn hiệu lực.
+                Assert.DoesNotContain(issued.Code, note.Content);
+                Assert.DoesNotContain(accountEmail, note.Content);
+                Assert.Contains(ProfileEmail.Mask(accountEmail), note.Content);
 
                 // Gửi lại mã: email không đổi và patients.email không bị ghi đè.
                 OtpIssueResult resent = await otp.IssueProfileOtpAsync(OwnerAccountId, patientId);
@@ -172,12 +180,56 @@ public class OtpProfileFlowTests
             Assert.Equal(patientsBefore, await ctx.Patients.CountAsync());
 
             Notification note = await ctx.Notifications.AsNoTracking()
-                .Where(n => n.AccountId == OwnerAccountId && n.Title == "Mã xác thực hồ sơ")
+                .Where(n => n.AccountId == OwnerAccountId && n.Title == OtpService.TraceTitle)
                 .OrderByDescending(n => n.Id)
                 .FirstAsync();
             _out.WriteLine($"notifications #{note.Id}: {note.Content}");
-            Assert.Contains(issued.Code, note.Content);
-            Assert.Contains(draftEmail, note.Content);
+            Assert.DoesNotContain(issued.Code, note.Content);
+            Assert.DoesNotContain(draftEmail, note.Content);
+            Assert.Contains(ProfileEmail.Mask(draftEmail), note.Content);
+
+            await CleanupNotificationsAsync(ctx);
+        }
+    }
+
+    /// <summary>
+    /// Mỗi lần cấp mã đều reset lại số lần nhập, nên xin mã không giới hạn làm "5 lần sai" mất nghĩa.
+    /// Ngưỡng đếm từ chính dấu vết notifications của tài khoản đó: lần thứ MaxIssuesPerWindow + 1 phải bị chặn.
+    /// </summary>
+    [Fact]
+    public async Task Xin_ma_day_dac_hon_nguong_thi_bi_chan()
+    {
+        var cs = Connection;
+        if (cs is null) { _out.WriteLine("Bỏ qua: chưa đặt HIS_REHEARSAL_CONNECTION"); return; }
+
+        var options = new OtpOptions { MaxIssuesPerWindow = 2, IssueWindowMinutes = 15 };
+        string draftEmail = TestEmail("quota");
+
+        await using (var ctx = NewContext(cs))
+        {
+            await CleanupNotificationsAsync(ctx);
+
+            var channel = new RecordingOtpDelivery();
+            OtpService otp = NewOtp(ctx, channel, options);
+
+            for (int lan = 1; lan <= options.MaxIssuesPerWindow; lan++)
+            {
+                OtpIssueResult issued = await otp.IssueNewProfileOtpAsync(
+                    OwnerAccountId, draftEmail, "Test OTP Henh Quota");
+                Assert.True(issued.Success, $"lần {lan}: {issued.Message}");
+            }
+
+            OtpIssueResult blocked = await otp.IssueNewProfileOtpAsync(
+                OwnerAccountId, draftEmail, "Test OTP Henh Quota");
+            _out.WriteLine($"Lần thứ {options.MaxIssuesPerWindow + 1}: {blocked.Message}");
+
+            Assert.False(blocked.Success);
+            Assert.Contains("xin mã xác thực", blocked.Message);
+            Assert.Equal(options.MaxIssuesPerWindow, channel.Sent.Count);
+            Assert.Equal(
+                options.MaxIssuesPerWindow,
+                await ctx.Notifications.CountAsync(
+                    n => n.AccountId == OwnerAccountId && n.Title == OtpService.TraceTitle));
 
             await CleanupNotificationsAsync(ctx);
         }
