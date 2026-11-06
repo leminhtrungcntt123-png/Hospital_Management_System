@@ -18,3 +18,4 @@ public interface IHospitalCatalogService
     Task<IReadOnlyList<AdminMedicationRow>> GetMedicationsAsync(CancellationToken ct = default);
     Task<int> UpsertMedicationAsync(UpsertMedicationRequest request, CancellationToken ct = default);
 }
+

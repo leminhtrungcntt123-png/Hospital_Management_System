@@ -107,3 +107,4 @@ public class AdminCatalogTests
         Assert.NotNull(okResult.Value);
     }
 }
+

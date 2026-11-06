@@ -82,6 +82,8 @@
     }
 
     function table(id, headers, rows) {
+        const target = find(id);
+        if (!target) return;
         const heading = headers
             .map((heading) => /* HTML */ `<th scope="col">${escape(heading)}</th>`)
             .join('');
@@ -97,7 +99,7 @@
             : /* HTML */ `<tr>
                   <td class="empty" colspan="${headers.length}">Chưa có dữ liệu phù hợp.</td>
               </tr>`;
-        find(id).innerHTML = /* HTML */ `<table>
+        target.innerHTML = /* HTML */ `<table>
             <thead>
                 <tr>
                     ${heading}
@@ -307,7 +309,6 @@
             ]),
         );
     }
-    }
 
     async function loadRequests() {
         const rows = await request('Requests');
@@ -360,15 +361,22 @@
     });
     find('.admin-sidebar-scrim').addEventListener('click', closeNavigation);
     find('#admin-sidebar nav').addEventListener('click', (event) => {
-        if (event.target.closest('[data-section]')) closeNavigation();
+        const link = event.target.closest('[data-section]');
+        if (link) {
+            closeNavigation();
+            const section = link.dataset.section;
+            if (section && titles[section]) {
+                selectSection(section);
+            }
+        }
     });
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') closeNavigation();
     });
 
-    function selectSection() {
+    function selectSection(explicitSection) {
         closeNavigation();
-        const selected = location.hash.slice(1) || workspace.dataset.section;
+        const selected = explicitSection || location.hash.slice(1) || workspace.dataset.section;
         const section = titles[selected] ? selected : 'dashboard';
         document
             .querySelectorAll('[data-panel]')

@@ -218,3 +218,4 @@ public sealed class HospitalCatalogService(AppDbContext db) : IHospitalCatalogSe
         }
     }
 }
+
