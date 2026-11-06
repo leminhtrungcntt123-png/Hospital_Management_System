@@ -125,7 +125,9 @@
     align-items: center;
     gap: 9px;
     padding: 15px 10px;
-    border-top: 1px solid #2b3b52;
+    border: 1px solid #a9c6d9;
+    border-radius: 7px;
+    justify-content: center;
     font-size: 10px;
     color: #5e6a77;
     width: 100%;

@@ -1,101 +1,96 @@
-/* interactions */
-function beginBooking(did = '', pid = '', parentId = '') {
-    if (session.role !== 'PATIENT') {
-        switchRole('PATIENT');
-    }
-    if (!session.authenticated) {
-        go('account/login');
+function accountMenu() {
+    if (!config.authenticated) {
+        location.assign(config.login);
         return;
     }
-    const d = doctor(did) || db.doctors[0];
-    ui.booking = {
-        step: pid ? 2 : did ? 2 : 1,
-        patientId: pid || selfPatient() || myLinks()[0]?.patientId,
-        doctorId: d.id,
-        method: 'specialty',
-        date: workingDays()[1],
-        time: '',
-        shift: 'MORNING',
-        reason: '',
-        holdId: null,
-        parentId,
-    };
-    go('patient/booking');
+    openModal(
+        'Tài khoản của bạn',
+        `<div class="menu-links">
+        <p>${esc(config.displayName)}</p>
+        <a href="${esc(config.home)}">${icon('grid')}Không gian làm việc</a>
+        <a href="${esc(config.changePassword)}">${icon('shield')}Đổi mật khẩu</a>
+    </div>`,
+        button('Đóng', 'close') +
+            button('Đăng xuất', 'logout', 'logout', 'outline'),
+    );
 }
 
 function bindEvents() {
-    document.addEventListener('click', handleUiClick);
-    document.addEventListener('submit', handleUiSubmit);
-    document.addEventListener('input', (e) => {
-        const t = e.target;
-        if (t.hasAttribute('data-booking-reason')) {
-            ui.booking.reason = t.value;
+    document.addEventListener('click', (event) => {
+        const target = event.target.closest('[data-act], [data-route]');
+        if (!target || target.disabled) return;
+        if (target.dataset.route) {
+            if (
+                event.ctrlKey ||
+                event.metaKey ||
+                event.shiftKey ||
+                event.altKey
+            )
+                return;
+            event.preventDefault();
+            go(target.dataset.route);
             return;
         }
-        if (t.matches('[data-search]')) {
-            const q = t.value,
-                start = t.selectionStart,
-                kind = t.dataset.search;
-            ui.query = q;
-            render();
-            const input = $(`[data-search="${kind}"]`);
-            input?.focus();
-            input?.setSelectionRange(start, start);
+        switch (target.dataset.act) {
+            case 'menu':
+                ui.mobileMenu = !ui.mobileMenu;
+                render();
+                $(ui.mobileMenu ? '.sidebar a, .public-nav a' : '[data-act="menu"]')?.focus();
+                break;
+            case 'account-menu':
+                accountMenu();
+                break;
+            case 'logout':
+                document.getElementById('his-server-logout').requestSubmit();
+                break;
+            case 'close':
+                closeModal();
+                break;
+            case 'reload-catalog':
+                loadCatalog();
+                break;
         }
     });
-    document.addEventListener('change', (e) => {
-        const t = e.target,
-            key = t.dataset.change;
-        if (!key) return;
-        if (key === 'walk-existing') {
-            $('#walk-new-fields').hidden = t.value !== 'NEW';
-            $$('#walk-new-fields input,#walk-new-fields select').forEach(
-                (i) => (i.disabled = t.value !== 'NEW')
-            );
-            return;
-        }
-        ui[key] = t.value;
+    document.addEventListener('input', (event) => {
+        if (!event.target.matches('[data-search]')) return;
+        const cursor = event.target.selectionStart;
+        ui.query = event.target.value;
+        render();
+        const input = $('[data-search]');
+        input?.focus();
+        input?.setSelectionRange(cursor, cursor);
+    });
+    document.addEventListener('change', (event) => {
+        if (!event.target.matches('[data-department]')) return;
+        ui.department = event.target.value;
         render();
     });
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
             closeModal();
             if (ui.mobileMenu) {
                 ui.mobileMenu = false;
                 render();
             }
         }
-        if (e.key === 'Tab' && $('.modal')) {
-            const all = [
-                    ...$('.modal').querySelectorAll(
-                        'button:not([disabled]),a[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled])'
-                    ),
-                ].filter((e) => e.offsetParent !== null),
-                first = all[0],
-                last = all[all.length - 1];
-            if (e.shiftKey && document.activeElement === first) {
-                e.preventDefault();
-                last?.focus();
-            } else if (!e.shiftKey && document.activeElement === last) {
-                e.preventDefault();
-                first?.focus();
-            }
+        const modal = $('#overlay-root .modal');
+        if (event.key !== 'Tab' || !modal) return;
+        const controls = [...modal.querySelectorAll('button, a[href]')];
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first?.focus();
         }
     });
-    document.addEventListener('pointerdown', (e) => {
-        if (e.target.classList.contains('modal-backdrop')) closeModal();
+    document.addEventListener('pointerdown', (event) => {
+        if (event.target.classList.contains('modal-backdrop')) closeModal();
     });
     window.addEventListener('hashchange', () => {
         const route = location.hash.replace(/^#\//, '') || 'public/home';
-        if (ui.route !== route) {
-            persistDraft();
-            closeModal();
-            ui.route = route;
-            ui.query = '';
-            ui.filter = 'ALL';
-            render();
-            window.scrollTo(0, 0);
-        }
+        if (ui.route !== route) go(route);
     });
-    window.addEventListener('beforeunload', persistDraft);
 }

@@ -30,134 +30,71 @@ const pageTitles = {
     'account/settings': 'Tài khoản',
 };
 
-const relationNames = {
-    SELF: 'Bản thân',
-    SPOUSE: 'Vợ / Chồng',
-    CHILD: 'Con',
-    PARENT: 'Bố / Mẹ',
-    SIBLING: 'Anh / Chị / Em',
-    OTHER: 'Người thân khác',
-};
-
-const typeNames = {
-    EXAMINATION: 'Khám bệnh',
-    LAB_TEST: 'Xét nghiệm',
-    IMAGING: 'Chẩn đoán hình ảnh',
-};
-
-function button(label, act, ic = '', cls = '', extra = '') {
-    return /* HTML */ `<button type="button" class="btn ${cls}" data-act="${act}" ${extra}>
-        ${ic ? icon(ic) : ''}<span>${label}</span>
+function button(label, action, name = '', classes = '', attributes = '') {
+    return `<button type="button" class="btn ${classes}" data-act="${action}" ${attributes}>
+        ${name ? icon(name) : ''}<span>${esc(label)}</span>
     </button>`;
 }
 
-function link(label, route, ic = '', cls = '') {
-    return /* HTML */ `<a href="#/${route}" data-route="${route}" class="${cls}"
-        >${ic ? icon(ic) : ''}${label}</a
-    >`;
+function link(label, route, name = '', classes = '') {
+    return `<a href="${esc(routeUrl(route))}" data-route="${esc(route)}" class="${classes}">
+        ${name ? icon(name) : ''}${label}
+    </a>`;
 }
 
-function avatar(name, color = 'cyan', large = false) {
-    return /* HTML */ `<span class="avatar ${color} ${large ? 'large' : ''}" aria-hidden="true"
-        >${esc(initials(name))}</span
-    >`;
+function avatar(name) {
+    return `<span class="avatar" aria-hidden="true">${esc(initials(name))}</span>`;
 }
 
-function badge(status, label) {
-    const names = {
-        ...statusNames,
-        ACTIVE: 'Đã xác minh',
-        PENDING_LINK: 'Chờ xác minh',
-        REVOKED: 'Đã thu hồi',
-        UNPAID: 'Chưa thanh toán',
-        PARTIALLY_PAID: 'Đã thu một phần',
-        PAID: 'Đã thanh toán',
-        APPROVED: 'Đã duyệt',
-        REJECTED: 'Từ chối',
-    };
-    return /* HTML */ `<span class="badge s-${status.toLowerCase()}"
-        ><i></i>${label || names[status] || esc(status)}</span
-    >`;
+function heading(title, description = '', actions = '') {
+    return `<div class="page-heading"><div><h1>${esc(title)}</h1>
+        <p>${esc(description)}</p></div><div class="heading-actions">${actions}</div></div>`;
 }
 
 function empty(title, description = '', action = '') {
-    return /* HTML */ `<div class="empty">
-        ${icon('clipboard')}
-        <h3>${title}</h3>
-        ${description ? /* HTML */ `<p>${description}</p>` : ''}${action}
+    return `<div class="empty">${icon('clipboard')}<h3>${esc(title)}</h3>
+        <p>${esc(description)}</p>${action}</div>`;
+}
+
+function unavailableNotice() {
+    return `<div class="notice" role="status">${icon('info')}
+        <span>Chức năng đang được hoàn thiện. Hiện chưa có dữ liệu để hiển thị hoặc lưu thay đổi.</span>
     </div>`;
 }
 
-function heading(title, description = '', actions = '', eyebrow = '') {
-    return /* HTML */ `<div class="page-heading">
-        <div>
-            ${eyebrow ? /* HTML */ `<span class="eyebrow">${eyebrow}</span>` : ''}
-            <h1>${title}</h1>
-            ${description ? /* HTML */ `<p>${description}</p>` : ''}
-        </div>
-        ${actions ? /* HTML */ `<div class="heading-actions">${actions}</div>` : ''}
+function unavailableButton(label, name = 'plus') {
+    return `<button type="button" class="btn outline" disabled title="Chức năng chưa sẵn sàng">
+        ${icon(name)}${esc(label)}
+    </button>`;
+}
+
+function pendingTable(title, columns, action = '') {
+    return `<section class="card">
+        <header class="card-header"><h2>${esc(title)}</h2>${action}</header>
+        <div class="table-wrap"><table><thead><tr>
+            ${columns.map((column) => `<th scope="col">${esc(column)}</th>`).join('')}
+        </tr></thead><tbody><tr><td colspan="${columns.length}">
+            ${empty('Chức năng chưa sẵn sàng', 'Dữ liệu sẽ hiển thị sau khi hệ thống hoàn tất tích hợp.')}
+        </td></tr></tbody></table></div>
+    </section>`;
+}
+
+function pendingStats(labels) {
+    return `<div class="stats-grid ${labels.length === 3 ? 'three' : ''}">
+        ${labels
+            .map(
+                (
+                    label,
+                ) => `<div class="stat-card"><span class="stat-label">${esc(label)}</span>
+            <strong aria-label="Chưa có dữ liệu">—</strong><small>Chưa có dữ liệu</small></div>`,
+            )
+            .join('')}
     </div>`;
 }
 
-function cardHeader(title, sub = '', action = '', ic = '') {
-    return /* HTML */ `<header class="card-header">
-        <div class="section-title">
-            ${ic ? /* HTML */ `<span class="section-icon">${icon(ic)}</span>` : ''}
-            <div>
-                <h2>${title}</h2>
-                ${sub ? /* HTML */ `<p>${sub}</p>` : ''}
-            </div>
-        </div>
-        ${action}
-    </header>`;
-}
-
-function stat(label, value, ic, sub = '', color = 'cyan', act = '', extra = '') {
-    return /* HTML */ `<${act ? 'button' : 'div'} ${act ? `type="button" data-act="${act}" ${extra}` : ''} class="stat-card ${color}"><div class="stat-label"><span class="stat-icon">${icon(ic)}</span><span>${label}</span>${act ? icon('arrow', 'stat-arrow') : ''}</div><strong>${value}</strong>${sub ? /* HTML */ `<small>${sub}</small>` : ''}</${act ? 'button' : 'div'}>`;
-}
-
-function tabs(options, current, kind = 'filter') {
-    return /* HTML */ `<div class="tabs" role="tablist">
-        ${options.map(([value, label, count]) => /* HTML */ `<button type="button" role="tab" aria-selected="${current === value}" class="tab ${current === value ? 'active' : ''}" data-act="tab" data-kind="${kind}" data-value="${value}">${label}${count !== undefined ? /* HTML */ `<span>${count}</span>` : ''}</button>`).join('')}
-    </div>`;
-}
-
-function searchInput(label = 'Tìm tên, mã hoặc số điện thoại…') {
-    return /* HTML */ `<label class="search-input"
-        >${icon('search')}<input
-            data-search="page"
-            aria-label="${esc(label)}"
-            placeholder="${esc(label)}"
-            value="${esc(ui.query)}"
-    /></label>`;
-}
-
-function notice(text, type = 'info') {
-    return /* HTML */ `<div class="notice ${type}">${icon('info')}<span>${text}</span></div>`;
-}
-
-function personCell(p, sub = '') {
-    return /* HTML */ `<div class="person-cell">
-        ${avatar(p.name)}
-        <div>
-            <strong>${esc(p.name)}</strong
-            ><small>${sub || p.id + (p.dob ? ' · ' + age(p.dob) + ' tuổi' : '')}</small>
-        </div>
-    </div>`;
-}
-
-function dateChip(date) {
-    return /* HTML */ `<span class="date-chip"
-        ><small>THÁNG ${Number(date.slice(5, 7))}</small><strong>${date.slice(8)}</strong></span
-    >`;
-}
-
-function moneyText(t) {
-    return /* HTML */ `<span class="money">${money(t)}</span>`;
-}
-
-function matched(text) {
-    return (
-        !ui.query || String(text).toLocaleLowerCase('vi').includes(ui.query.toLocaleLowerCase('vi'))
-    );
+function pageIntro(kicker, title, description) {
+    return `<section class="page-intro"><div class="breadcrumb">
+        ${link('Trang chủ', 'public/home')}${icon('chevron')}<span>${esc(title)}</span>
+        </div><span class="eyebrow">${esc(kicker)}</span><h1>${esc(title)}</h1><p>${esc(description)}</p>
+    </section>`;
 }

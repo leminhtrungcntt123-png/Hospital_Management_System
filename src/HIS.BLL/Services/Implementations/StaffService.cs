@@ -5,15 +5,17 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HIS.BLL.Services;
 
-public class StaffService : IStaffService
+public partial class StaffService : IStaffService
 {
     private readonly AppDbContext _context;
     private readonly IDoctorService _doctorService;
+    private readonly TimeProvider _adminClock;
 
-    public StaffService(AppDbContext context, IDoctorService doctorService)
+    public StaffService(AppDbContext context, IDoctorService doctorService, TimeProvider adminClock)
     {
         _context = context;
         _doctorService = doctorService;
+        _adminClock = adminClock;
     }
 
     // Lấy danh sách tài khoản nhân sự và vai trò tương ứng trong hệ thống

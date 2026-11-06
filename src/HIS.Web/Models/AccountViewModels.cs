@@ -5,10 +5,12 @@ namespace HIS.Web.Models;
 public class LoginViewModel
 {
     [Required(ErrorMessage = "Vui lòng nhập tên đăng nhập")]
+    [StringLength(100, ErrorMessage = "Tên đăng nhập hoặc email tối đa 100 ký tự")]
     [Display(Name = "Tên đăng nhập")]
     public string Username { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Vui lòng nhập mật khẩu")]
+    [StringLength(72, ErrorMessage = "Mật khẩu tối đa 72 ký tự")]
     [DataType(DataType.Password)]
     [Display(Name = "Mật khẩu")]
     public string Password { get; set; } = string.Empty;
@@ -55,3 +57,15 @@ public class RegisterViewModel
     public string ConfirmPassword { get; set; } = string.Empty;
 }
 
+
+public class ChangePasswordViewModel
+{
+    [Required(ErrorMessage = "Vui lòng nhập mật khẩu hiện tại")]
+    [DataType(DataType.Password)]
+    public string OldPassword { get; set; } = "";
+
+    [Required(ErrorMessage = "Vui lòng nhập mật khẩu mới")]
+    [StringLength(72, MinimumLength = 6, ErrorMessage = "Mật khẩu mới từ 6 đến 72 ký tự")]
+    [DataType(DataType.Password)]
+    public string NewPassword { get; set; } = "";
+}

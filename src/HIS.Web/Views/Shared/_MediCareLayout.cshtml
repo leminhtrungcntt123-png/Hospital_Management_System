@@ -2,33 +2,30 @@
 @using System.Text.Json
 
 @{
-    string? dataError = null;
-
-    var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "ADMIN";
-    var home = role switch
+    var isAuthenticated = User.Identity?.IsAuthenticated == true;
+    var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "PATIENT";
+    var home = (role?.ToUpperInvariant()) switch
     {
-        "ADMIN" => "/Admin/Accounts",
-        "DEPARTMENT_HEAD" => "/Admin/Catalog",
+        "ADMIN" => "/Admin/Management",
+        "DEPARTMENT_HEAD" or "DEPT_HEAD" => "/Staff/Schedule",
         "DOCTOR" => "/Staff/Consultation",
         "NURSE" => "/Staff/Reception",
-        "PATIENT" => "/Patient/MyAppointments",
+        "CASHIER" => "/Staff/Cashier",
+        "PATIENT" => "/Patient/Booking",
         _ => "/Admin/Accounts"
     };
     var config = new
     {
-        preview = true,
-        live = false,
         role,
-        authenticated = true,
-        displayName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? "Quản trị viên",
-        initialRoute = ViewData["MediCareRoute"]?.ToString() ?? "admin/accounts",
+        authenticated = isAuthenticated,
+        displayName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? (isAuthenticated ? "Thành viên" : ""),
+        initialRoute = ViewData["MediCareRoute"]?.ToString() ?? "public/home",
         pathBase = Context.Request.PathBase.ToString(),
         assetBase = Url.Content("~/ui/assets/"),
-        apiBase = Url.Content("~/api/hospital/"),
+        catalogUrl = Url.Action("Catalog", "Home", new { area = "" }),
         home = Url.Content("~" + home),
         login = Url.Action("Login", "Account", new { area = "" }),
-        changePassword = Url.Action("ChangePassword", "Account", new { area = "" }),
-        denied = Url.Action("AccessDenied", "Account", new { area = "" })
+        changePassword = Url.Action("ChangePassword", "Account", new { area = "" })
     };
 }
 <!DOCTYPE html>
@@ -41,14 +38,7 @@
     <partial name="MediCare/_Styles" />
 </head>
 <body>
-    @if (dataError != null)
-    {
-        <partial name="MediCare/_DataError" model="dataError" />
-    }
-    else
-    {
-        @RenderBody()
-    }
+    @RenderBody()
     <partial name="MediCare/_Overlays" />
     <partial name="MediCare/_SessionControls" />
 

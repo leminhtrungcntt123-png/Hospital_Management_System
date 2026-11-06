@@ -5,44 +5,209 @@
     ViewData["Title"] = "Đăng nhập";
 }
 
-<section class="mvc-auth-card card">
-    <span class="eyebrow">CHÀO MỪNG BẠN TRỞ LẠI</span>
-    <h1>Đăng nhập MediCare</h1>
-    <p class="mvc-auth-intro">Tiếp tục quản lý lịch khám và công việc của bạn.</p>
-    <form asp-area="" asp-controller="Account" asp-action="Login" method="post">
-        <div asp-validation-summary="ModelOnly" class="mvc-validation" role="alert"></div>
-        <input asp-for="ReturnUrl" type="hidden" />
+@section Styles {
+    <link rel="stylesheet" href="~/css/auth/login.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/auth/password-reset.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/auth/responsive.css" asp-append-version="true" />
+}
 
-        <div class="field">
-            <label asp-for="Username"></label>
-            <input asp-for="Username"
-                   placeholder="Nhập tên đăng nhập"
-                   autocomplete="username"
-                   autofocus />
-            <span asp-validation-for="Username" class="mvc-validation"></span>
+<!-- Nút Quay lại trang chủ ở góc -->
+<a asp-controller="Home" asp-action="Index" class="his-back-home" title="Quay lại trang chủ">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M19 12H5M12 19l-7-7 7-7" />
+    </svg>
+    <span>Về trang chủ</span>
+</a>
+
+<div class="his-slider-container" id="hisSliderContainer"
+     data-register-url="@Url.Action("RegisterApi", "Account")"
+     data-request-reset-url="@Url.Action("RequestPasswordReset", "Account")"
+     data-confirm-reset-url="@Url.Action("ConfirmPasswordReset", "Account")">
+    <!-- 1. CỘT FORM ĐĂNG NHẬP (Bên phải mặc định) -->
+    <div class="his-form-box his-login-box">
+        <h2 class="his-form-title">Đăng Nhập</h2>
+        <p class="his-form-subtitle">Hệ thống thông tin bệnh viện MediCare</p>
+
+        <form asp-area="" asp-controller="Account" asp-action="Login" method="post" id="loginForm">
+            @if (TempData["SuccessMessage"] != null)
+            {
+                <div class="his-alert-success" role="alert">
+                    ✅ @TempData["SuccessMessage"]
+                </div>
+            }
+
+            @if (!ViewData.ModelState.IsValid && ViewData.ModelState[string.Empty]?.Errors.Count > 0)
+            {
+                <div class="his-alert-error" role="alert">
+                    @foreach (var error in ViewData.ModelState[string.Empty]!.Errors)
+                    {
+                        <div>⚠️ @error.ErrorMessage</div>
+                    }
+                </div>
+            }
+
+            <input asp-for="ReturnUrl" type="hidden" />
+
+            <!-- Input Tên đăng nhập -->
+            <div class="his-input-group">
+                <span class="his-input-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                </span>
+                <input asp-for="Username"
+                       id="login-username"
+                       class="his-input-field"
+                       aria-label="Tên đăng nhập hoặc Email" placeholder="Tên đăng nhập hoặc Email"
+                       autocomplete="username"
+                       autofocus />
+            </div>
+            <span asp-validation-for="Username" class="his-field-error"></span>
+
+            <!-- Input Mật khẩu -->
+            <div class="his-input-group">
+                <span class="his-input-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                </span>
+                <input asp-for="Password"
+                       id="login-password"
+                       type="password"
+                       class="his-input-field"
+                       aria-label="Mật khẩu" placeholder="Mật khẩu"
+                       autocomplete="current-password" />
+                <button type="button" class="his-pass-toggle" data-auth-action="password-toggle" data-input="login-password" data-icon="eye-icon-login" title="Hiện/ẩn mật khẩu">
+                    <svg id="eye-icon-login" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                </button>
+            </div>
+            <span asp-validation-for="Password" class="his-field-error"></span>
+
+            <!-- Ghi nhớ & Quên mật khẩu -->
+            <div class="his-form-options">
+                <label class="his-checkbox-label">
+                    <input asp-for="RememberMe" />
+                    <span>Ghi nhớ đăng nhập</span>
+                </label>
+                <a href="#" data-auth-action="openForgotModal" class="his-forgot-link">
+                    Quên mật khẩu?
+                </a>
+            </div>
+
+            <!-- Nút Đăng nhập -->
+            <button type="submit" class="his-btn-solid">Đăng Nhập</button>
+        </form>
+
+
+        <div class="his-mobile-switch">
+            Chưa có tài khoản? <a href="#" data-auth-action="switchToRegister">Đăng ký ngay</a>
+        </div>
+    </div>
+
+    <!-- 2. CỘT FORM ĐĂNG KÝ (Bên trái khi active) -->
+    <div class="his-form-box his-register-box">
+        <h2 class="his-form-title">Đăng Ký Người Khám</h2>
+        <p class="his-form-subtitle">Hồ sơ khám chữa bệnh thông minh MediCare</p>
+
+        <form id="registerForm">
+            <div id="regAlert" class="auth-register-alert his-alert-error"></div>
+            <div class="his-input-group">
+                <span class="his-input-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                </span>
+                <input id="reg-fullname" class="his-input-field" aria-label="Họ và tên bệnh nhân" placeholder="Họ và tên bệnh nhân" required />
+            </div>
+            <div class="his-registration-details">
+                <label for="regDateOfBirth">
+                    Ngày sinh
+                    <input id="regDateOfBirth" type="date" class="his-input-field" required />
+                </label>
+            </div>
+
+            <div class="his-input-group">
+                <span class="his-input-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                    </svg>
+                </span>
+                <input id="reg-phone" type="tel" class="his-input-field" aria-label="Số điện thoại liên hệ" placeholder="Số điện thoại liên hệ" required />
+            </div>
+
+            <div class="his-input-group">
+                <span class="his-input-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect width="20" height="16" x="2" y="4" rx="2"></rect>
+                        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path>
+                    </svg>
+                </span>
+                <input id="reg-email" type="email" class="his-input-field" aria-label="Địa chỉ email liên hệ" placeholder="Địa chỉ email liên hệ" autocomplete="email" required />
+            </div>
+
+            <div class="his-input-group">
+                <span class="his-input-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="4"></circle>
+                        <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"></path>
+                    </svg>
+                </span>
+                <input id="reg-username" class="his-input-field" aria-label="Tên tài khoản mong muốn" placeholder="Tên tài khoản mong muốn" autocomplete="username" required />
+            </div>
+
+            <div class="his-input-group">
+                <span class="his-input-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                </span>
+                <input id="reg-password" type="password" class="his-input-field" aria-label="Mật khẩu (tối thiểu 6 ký tự)" placeholder="Mật khẩu (tối thiểu 6 ký tự)" autocomplete="new-password" required />
+                <button type="button" class="his-pass-toggle" data-auth-action="password-toggle" data-input="reg-password" data-icon="eye-icon-reg" title="Hiện/ẩn mật khẩu">
+                    <svg id="eye-icon-reg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                </button>
+            </div>
+
+            <button type="submit" class="his-btn-solid">Đăng Ký Tài Khoản</button>
+        </form>
+
+        <div class="his-mobile-switch">
+            Đã có tài khoản? <a href="#" data-auth-action="switchToLogin">Đăng nhập ngay</a>
+        </div>
+    </div>
+
+    <!-- 3. KHỐI TRƯỢT MÀU XANH CÓ ĐƯỜNG CONG UỐN LƯỢN (TOGGLE BOX SLIDER) -->
+    <div class="his-toggle-box">
+        <!-- Panel 1: Nằm bên trái (khi ở form Đăng Nhập) -->
+        <div class="his-toggle-panel his-toggle-left">
+            <img src="~/images/medicare-logo.jpg" alt="MediCare Logo" class="his-toggle-logo" />
+            <h2 class="his-toggle-title">Hello, Welcome!</h2>
+            <p class="his-toggle-desc">Chưa có tài khoản người khám bệnh tại hệ thống MediCare?</p>
+            <button type="button" class="his-btn-outline" id="btnGoRegister">Đăng Ký</button>
         </div>
 
-        <div class="field">
-            <label asp-for="Password"></label>
-            <input asp-for="Password"
-                   placeholder="Nhập mật khẩu"
-                   autocomplete="current-password" />
-            <span asp-validation-for="Password" class="mvc-validation"></span>
+        <!-- Panel 2: Nằm bên phải (khi ở form Đăng Ký) -->
+        <div class="his-toggle-panel his-toggle-right">
+            <img src="~/images/medicare-logo.jpg" alt="MediCare Logo" class="his-toggle-logo" />
+            <h2 class="his-toggle-title">Welcome Back!</h2>
+            <p class="his-toggle-desc">Đã có tài khoản khám chữa bệnh tại bệnh viện MediCare?</p>
+            <button type="button" class="his-btn-outline" id="btnGoLogin">Đăng Nhập</button>
         </div>
+    </div>
+</div>
 
-        <label class="check-line">
-            <input asp-for="RememberMe" />
-            <span>@Html.DisplayNameFor(m => m.RememberMe)</span>
-        </label>
-
-        <button type="submit" class="btn primary full large">Đăng nhập</button>
-    </form>
-    <p class="mvc-auth-switch">
-        Chưa có tài khoản?
-        <a asp-area="" asp-controller="Account" asp-action="Register">Đăng ký người khám</a>
-    </p>
-</section>
+<partial name="_ForgotPasswordModal" />
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/auth/login.js" asp-append-version="true" defer></script>
 }

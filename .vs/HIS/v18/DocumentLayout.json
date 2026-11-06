@@ -1,17 +1,25 @@
 {
   "Version": 1,
-  "WorkspaceRootPath": "C:\\BTLonWeb\\",
+  "WorkspaceRootPath": "D:\\N3K1\\LapTrinhWeb\\BaiTapLon\\BanThuNghiem2\\Hospital_Management_System\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{4AAA5137-B501-41E4-89CA-D2377980AF46}|src\\HIS.Web\\HIS.Web.csproj|c:\\btlonweb\\src\\his.web\\views\\shared\\_medicarelayout.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "AbsoluteMoniker": "D:0:0:{4AAA5137-B501-41E4-89CA-D2377980AF46}|src\\HIS.Web\\HIS.Web.csproj|d:\\n3k1\\laptrinhweb\\baitaplon\\banthunghiem2\\hospital_management_system\\src\\his.web\\views\\account\\login.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{4AAA5137-B501-41E4-89CA-D2377980AF46}|src\\HIS.Web\\HIS.Web.csproj|solutionrelative:src\\his.web\\views\\account\\login.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4AAA5137-B501-41E4-89CA-D2377980AF46}|src\\HIS.Web\\HIS.Web.csproj|d:\\n3k1\\laptrinhweb\\baitaplon\\banthunghiem2\\hospital_management_system\\src\\his.web\\appsettings.development.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
+      "RelativeMoniker": "D:0:0:{4AAA5137-B501-41E4-89CA-D2377980AF46}|src\\HIS.Web\\HIS.Web.csproj|solutionrelative:src\\his.web\\appsettings.development.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4AAA5137-B501-41E4-89CA-D2377980AF46}|src\\HIS.Web\\HIS.Web.csproj|d:\\n3k1\\laptrinhweb\\baitaplon\\banthunghiem2\\hospital_management_system\\src\\his.web\\views\\shared\\_medicarelayout.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
       "RelativeMoniker": "D:0:0:{4AAA5137-B501-41E4-89CA-D2377980AF46}|src\\HIS.Web\\HIS.Web.csproj|solutionrelative:src\\his.web\\views\\shared\\_medicarelayout.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{4AAA5137-B501-41E4-89CA-D2377980AF46}|src\\HIS.Web\\HIS.Web.csproj|c:\\btlonweb\\src\\his.web\\views\\home\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "AbsoluteMoniker": "D:0:0:{4AAA5137-B501-41E4-89CA-D2377980AF46}|src\\HIS.Web\\HIS.Web.csproj|d:\\n3k1\\laptrinhweb\\baitaplon\\banthunghiem2\\hospital_management_system\\src\\his.web\\views\\home\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
       "RelativeMoniker": "D:0:0:{4AAA5137-B501-41E4-89CA-D2377980AF46}|src\\HIS.Web\\HIS.Web.csproj|solutionrelative:src\\his.web\\views\\home\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{4AAA5137-B501-41E4-89CA-D2377980AF46}|src\\HIS.Web\\HIS.Web.csproj|c:\\btlonweb\\src\\his.web\\views\\home\\privacy.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "AbsoluteMoniker": "D:0:0:{4AAA5137-B501-41E4-89CA-D2377980AF46}|src\\HIS.Web\\HIS.Web.csproj|d:\\n3k1\\laptrinhweb\\baitaplon\\banthunghiem2\\hospital_management_system\\src\\his.web\\views\\home\\privacy.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
       "RelativeMoniker": "D:0:0:{4AAA5137-B501-41E4-89CA-D2377980AF46}|src\\HIS.Web\\HIS.Web.csproj|solutionrelative:src\\his.web\\views\\home\\privacy.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
     }
   ],
@@ -21,55 +29,82 @@
       "VerticalTabListWidth": 256,
       "DocumentGroups": [
         {
-          "DockedWidth": 200,
-          "SelectedChildIndex": 2,
+          "DockedWidth": 211,
+          "SelectedChildIndex": 4,
           "Children": [
             {
               "$type": "Bookmark",
-              "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
+              "Name": "ST:0:0:{eefa5220-e298-11d0-8f78-00a0c9110057}"
             },
             {
               "$type": "Bookmark",
               "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
             },
             {
-              "$type": "Document",
-              "DocumentIndex": 0,
-              "Title": "_MediCareLayout.cshtml",
-              "DocumentMoniker": "C:\\BTLonWeb\\src\\HIS.Web\\Views\\Shared\\_MediCareLayout.cshtml",
-              "RelativeDocumentMoniker": "src\\HIS.Web\\Views\\Shared\\_MediCareLayout.cshtml",
-              "ToolTip": "C:\\BTLonWeb\\src\\HIS.Web\\Views\\Shared\\_MediCareLayout.cshtml",
-              "RelativeToolTip": "src\\HIS.Web\\Views\\Shared\\_MediCareLayout.cshtml",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAoAAAAuAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2026-11-04T15:16:33.407Z",
-              "EditorCaption": ""
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
             },
             {
               "$type": "Document",
               "DocumentIndex": 1,
-              "Title": "Index.cshtml",
-              "DocumentMoniker": "C:\\BTLonWeb\\src\\HIS.Web\\Views\\Home\\Index.cshtml",
-              "RelativeDocumentMoniker": "src\\HIS.Web\\Views\\Home\\Index.cshtml",
-              "ToolTip": "C:\\BTLonWeb\\src\\HIS.Web\\Views\\Home\\Index.cshtml",
-              "RelativeToolTip": "src\\HIS.Web\\Views\\Home\\Index.cshtml",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Title": "appsettings.Development.json",
+              "DocumentMoniker": "D:\\N3K1\\LapTrinhWeb\\BaiTapLon\\BanThuNghiem2\\Hospital_Management_System\\src\\HIS.Web\\appsettings.Development.json",
+              "RelativeDocumentMoniker": "src\\HIS.Web\\appsettings.Development.json",
+              "ToolTip": "D:\\N3K1\\LapTrinhWeb\\BaiTapLon\\BanThuNghiem2\\Hospital_Management_System\\src\\HIS.Web\\appsettings.Development.json",
+              "RelativeToolTip": "src\\HIS.Web\\appsettings.Development.json",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABUAAAAkAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2026-11-05T10:29:44.382Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Login.cshtml",
+              "DocumentMoniker": "D:\\N3K1\\LapTrinhWeb\\BaiTapLon\\BanThuNghiem2\\Hospital_Management_System\\src\\HIS.Web\\Views\\Account\\Login.cshtml",
+              "RelativeDocumentMoniker": "src\\HIS.Web\\Views\\Account\\Login.cshtml",
+              "ToolTip": "D:\\N3K1\\LapTrinhWeb\\BaiTapLon\\BanThuNghiem2\\Hospital_Management_System\\src\\HIS.Web\\Views\\Account\\Login.cshtml",
+              "RelativeToolTip": "src\\HIS.Web\\Views\\Account\\Login.cshtml",
+              "ViewState": "AgIAALkCAAAAAAAAAAAAANICAABKAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2026-11-04T15:15:56.936Z",
+              "WhenOpened": "2026-11-05T06:52:55.565Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
               "DocumentIndex": 2,
+              "Title": "_MediCareLayout.cshtml",
+              "DocumentMoniker": "D:\\N3K1\\LapTrinhWeb\\BaiTapLon\\BanThuNghiem2\\Hospital_Management_System\\src\\HIS.Web\\Views\\Shared\\_MediCareLayout.cshtml",
+              "RelativeDocumentMoniker": "src\\HIS.Web\\Views\\Shared\\_MediCareLayout.cshtml",
+              "ToolTip": "D:\\N3K1\\LapTrinhWeb\\BaiTapLon\\BanThuNghiem2\\Hospital_Management_System\\src\\HIS.Web\\Views\\Shared\\_MediCareLayout.cshtml",
+              "RelativeToolTip": "src\\HIS.Web\\Views\\Shared\\_MediCareLayout.cshtml",
+              "ViewState": "AgIAAAwAAAAAAAAAAAAAAAoAAAAuAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-11-04T15:16:33.407Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "Index.cshtml",
+              "DocumentMoniker": "D:\\N3K1\\LapTrinhWeb\\BaiTapLon\\BanThuNghiem2\\Hospital_Management_System\\src\\HIS.Web\\Views\\Home\\Index.cshtml",
+              "RelativeDocumentMoniker": "src\\HIS.Web\\Views\\Home\\Index.cshtml",
+              "ToolTip": "D:\\N3K1\\LapTrinhWeb\\BaiTapLon\\BanThuNghiem2\\Hospital_Management_System\\src\\HIS.Web\\Views\\Home\\Index.cshtml",
+              "RelativeToolTip": "src\\HIS.Web\\Views\\Home\\Index.cshtml",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-11-04T15:15:56.936Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
               "Title": "Privacy.cshtml",
-              "DocumentMoniker": "C:\\BTLonWeb\\src\\HIS.Web\\Views\\Home\\Privacy.cshtml",
+              "DocumentMoniker": "D:\\N3K1\\LapTrinhWeb\\BaiTapLon\\BanThuNghiem2\\Hospital_Management_System\\src\\HIS.Web\\Views\\Home\\Privacy.cshtml",
               "RelativeDocumentMoniker": "src\\HIS.Web\\Views\\Home\\Privacy.cshtml",
-              "ToolTip": "C:\\BTLonWeb\\src\\HIS.Web\\Views\\Home\\Privacy.cshtml",
+              "ToolTip": "D:\\N3K1\\LapTrinhWeb\\BaiTapLon\\BanThuNghiem2\\Hospital_Management_System\\src\\HIS.Web\\Views\\Home\\Privacy.cshtml",
               "RelativeToolTip": "src\\HIS.Web\\Views\\Home\\Privacy.cshtml",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2026-11-04T15:15:58.021Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-11-04T15:15:58.021Z"
             }
           ]
         }

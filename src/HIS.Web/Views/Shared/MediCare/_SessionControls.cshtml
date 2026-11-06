@@ -1,5 +1,3 @@
-@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment HostEnvironment
-
 <form id="his-server-logout"
       asp-area=""
       asp-controller="Account"
@@ -8,13 +6,3 @@
       hidden>
     @Html.AntiForgeryToken()
 </form>
-
-@if (HostEnvironment.EnvironmentName == "Development" && ViewData["UiPreview"] is not true)
-{
-    <a class="ui-preview-shortcut"
-       asp-area=""
-       asp-controller="UiPreview"
-       asp-action="Index">
-        Xem bản mẫu 5 vai trò
-    </a>
-}
