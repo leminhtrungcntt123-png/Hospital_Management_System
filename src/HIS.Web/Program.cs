@@ -8,12 +8,14 @@ using HIS.Web.Workers;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add DAL & BLL
 builder.Services.AddHisDataAccess(builder.Configuration);
 builder.Services.AddHisBusiness(builder.Configuration);
+builder.Services.ConfigureOptions<HIS.Web.Common.AccountStatusCookieOptions>();
 
 // Cookie Authentication
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -51,9 +53,28 @@ builder.Services.AddControllersWithViews(options =>
     options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute());
 });
 
-// Rate limiting for login
+// Rate limiting for authentication endpoints
 builder.Services.AddRateLimiter(options =>
 {
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, ct) =>
+    {
+        context.HttpContext.Response.Headers.RetryAfter = "60";
+        var policy = context.HttpContext.GetEndpoint()?.Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName;
+        if (policy is "register" or "password-reset-request" or "password-reset-confirm")
+        {
+            await context.HttpContext.Response.WriteAsJsonAsync(new
+            {
+                success = false,
+                message = "Bạn đã gửi quá nhiều yêu cầu. Vui lòng đợi một phút rồi thử lại."
+            }, cancellationToken: ct);
+            return;
+        }
+
+        context.HttpContext.Response.ContentType = "text/plain; charset=utf-8";
+        await context.HttpContext.Response.WriteAsync(
+            "Bạn đã thử đăng nhập quá nhiều lần. Vui lòng đợi một phút rồi thử lại.", ct);
+    };
     options.AddPolicy("login", context =>
         RateLimitPartition.GetFixedWindowLimiter(
             context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
@@ -63,6 +84,17 @@ builder.Services.AddRateLimiter(options =>
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));
+    foreach (var (name, limit) in new[] { ("register", 3), ("password-reset-request", 3), ("password-reset-confirm", 10) })
+    {
+        options.AddPolicy(name, context => RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = limit,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+    }
 });
 
 // Health checks
@@ -73,6 +105,8 @@ builder.Services.AddHealthChecks()
 builder.Services.AddHostedService<SlotGenerationWorker>();
 builder.Services.AddHostedService<HoldExpirationWorker>();
 builder.Services.AddHostedService<NoShowWorker>();
+builder.Services.AddSingleton<PasswordResetQueue>();
+builder.Services.AddHostedService(provider => provider.GetRequiredService<PasswordResetQueue>());
 
 var app = builder.Build();
 

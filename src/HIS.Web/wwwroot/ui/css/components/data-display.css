@@ -73,6 +73,9 @@
     min-width: 0;
     max-width: 100%;
 }
+.table-wrap .empty {
+    white-space: normal;
+}
 table {
     border-collapse: collapse;
     width: 100%;

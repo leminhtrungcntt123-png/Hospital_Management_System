@@ -23,8 +23,7 @@ public class SmtpEmailSender : IEmailSender
 
         if (!options.Enabled || string.IsNullOrWhiteSpace(options.UserName) || string.IsNullOrWhiteSpace(options.Password))
         {
-            _logger.LogInformation("[EmailSender Stub] Email thật chưa bật cấu hình. Log gửi tới {ToEmail} | Tiêu đề: {Subject}", toEmail, subject);
-            return;
+            throw new InvalidOperationException("Chưa cấu hình dịch vụ email.");
         }
 
         try
@@ -51,9 +50,10 @@ public class SmtpEmailSender : IEmailSender
             await client.SendMailAsync(message, ct);
             _logger.LogInformation("[SmtpEmailSender] Gửi email THẬT thành công tới {ToEmail} | Tiêu đề: {Subject}", toEmail, subject);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogError(ex, "[SmtpEmailSender] Lỗi gửi email tới {ToEmail}: {Message}", toEmail, ex.Message);
+            _logger.LogError("Email delivery failed: {Type}", ex.GetType().Name);
+            throw;
         }
     }
 }

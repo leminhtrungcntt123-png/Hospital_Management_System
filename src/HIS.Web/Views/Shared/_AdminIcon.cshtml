@@ -1,0 +1,27 @@
+@model string
+
+@{
+    var path = Model switch
+    {
+        "grid" => "M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z",
+        "calendar" => "M8 2v4 M16 2v4 M3 10h18 M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2 M7 14h3 M14 14h3 M7 18h3",
+        "building" => "M4 22V4h16v18 M2 22h20 M8 8h1 M15 8h1 M8 12h1 M15 12h1 M10 22v-6h4v6",
+        "users" => "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M17 4a4 4 0 0 1 0 8 M22 21v-2a4 4 0 0 0-3-3.87",
+        "stethoscope" => "M5 3v5a5 5 0 0 0 10 0V3 M3 3h4 M13 3h4 M10 13v3a5 5 0 0 0 10 0v-2 M22 11a2 2 0 1 1-4 0 2 2 0 0 1 4 0",
+        "shield" => "M12 3 3 7v5c0 5 9 9 9 9s9-4 9-9V7z M8 12l3 3 5-6",
+        "external" => "M14 3h7v7 M21 3l-9 9 M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5",
+        "down" => "m6 9 6 6 6-6",
+        "plus" => "M12 5v14 M5 12h14",
+        "menu" => "M3 6h18 M3 12h18 M3 18h18",
+        "refresh" => "M21 3v6h-6 M3 21v-6h6 M3.5 8a9 9 0 0 1 15-4L21 9 M3 15l2.5 5a9 9 0 0 0 15-4",
+        "download" => "M12 3v12 m-5-5 5 5 5-5 M5 15v6h14v-6",
+        "pulse" => "M2 12h4l3-9 6 18 3-9h4",
+        "wallet" => "M3 7V4h17v4 M3 7h18v14H3z M16 12h5v5h-5z",
+        "clipboard" => "M9 4H5v18h14V4h-4 M9 2h6v4H9z M8 11h8 M8 16h6",
+        _ => "M12 5v14 M5 12h14"
+    };
+}
+
+<svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <path d="@path" />
+</svg>

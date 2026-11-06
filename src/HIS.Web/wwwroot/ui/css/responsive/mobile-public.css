@@ -47,6 +47,9 @@
         display: none;
     }
     .public-header-actions > .patient-account {
+        display: flex;
+    }
+    .public-header-actions > .patient-account > .icon {
         display: none;
     }
     .public-header-actions > .header-book {

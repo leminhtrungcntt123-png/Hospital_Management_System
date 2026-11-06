@@ -1,21 +1,31 @@
 using System.Security.Claims;
+using System.Diagnostics.CodeAnalysis;
 using HIS.BLL.DTOs;
+using HIS.BLL.Common;
 using HIS.BLL.Services;
 using HIS.Web.Models;
+using HIS.Web.Workers;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
 
 namespace HIS.Web.Controllers;
 
 public class AccountController : Controller
 {
-    private readonly IAuthService _authService;
+    private const string RegistrationMessage = "Yêu cầu đăng ký đã được xử lý. Vui lòng đăng nhập hoặc khôi phục mật khẩu nếu bạn đã có tài khoản.";
 
-    public AccountController(IAuthService authService)
+    private readonly IAuthService _authService;
+    private readonly ILogger<AccountController> _logger;
+    private readonly PasswordResetQueue _passwordResets;
+
+    public AccountController(IAuthService authService, ILogger<AccountController> logger, PasswordResetQueue passwordResets)
     {
         _authService = authService;
+        _logger = logger;
+        _passwordResets = passwordResets;
     }
 
     [HttpGet]
@@ -33,7 +43,7 @@ public class AccountController : Controller
     {
         if (loggedOut != 1 && User.Identity?.IsAuthenticated == true)
         {
-            if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) && returnUrl != "/" && !returnUrl.StartsWith("/Account/Login", StringComparison.OrdinalIgnoreCase))
+            if (IsAllowedReturnUrl(returnUrl))
             {
                 return Redirect(returnUrl);
             }
@@ -53,7 +63,18 @@ public class AccountController : Controller
             return View(model);
         }
 
-        var result = await _authService.LoginAsync(new LoginRequest(model.Username, model.Password));
+        Result<AuthResponse> result;
+        try
+        {
+            result = await _authService.LoginAsync(new LoginRequest(model.Username, model.Password), HttpContext.RequestAborted);
+        }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            _logger.LogError("Login failed: {Type}", error.GetType().Name);
+            Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            ModelState.AddModelError(string.Empty, "Chưa kết nối được hệ thống đăng nhập. Vui lòng thử lại sau.");
+            return View(model);
+        }
         if (!result.IsSuccess)
         {
             ModelState.AddModelError(string.Empty, result.Error.Message);
@@ -80,7 +101,7 @@ public class AccountController : Controller
 
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, authProperties);
 
-        if (!string.IsNullOrEmpty(model.ReturnUrl) && Url.IsLocalUrl(model.ReturnUrl) && model.ReturnUrl != "/" && !model.ReturnUrl.StartsWith("/Account/Login", StringComparison.OrdinalIgnoreCase))
+        if (IsAllowedReturnUrl(model.ReturnUrl))
         {
             return Redirect(model.ReturnUrl);
         }
@@ -88,21 +109,11 @@ public class AccountController : Controller
         return RedirectToDashboard(auth.Role);
     }
 
-    [HttpGet, HttpPost]
+    [HttpPost]
+    [Authorize]
     public async Task<IActionResult> Logout()
     {
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-
-        Response.Cookies.Delete(".AspNetCore.Cookies");
-        Response.Cookies.Delete(".AspNetCore.Cookies", new CookieOptions { Path = "/" });
-        foreach (var cookie in Request.Cookies.Keys)
-        {
-            if (cookie.StartsWith(".AspNetCore", StringComparison.OrdinalIgnoreCase))
-            {
-                Response.Cookies.Delete(cookie);
-                Response.Cookies.Delete(cookie, new CookieOptions { Path = "/" });
-            }
-        }
 
         return RedirectToAction("Login", "Account", new { loggedOut = 1 });
     }
@@ -111,18 +122,17 @@ public class AccountController : Controller
     public IActionResult Register() => RedirectToAction("Login", "Account", new { mode = "register" });
 
     [HttpPost]
-    public IActionResult Register(string username, string password) => RedirectToAction("Login", "Account", new { mode = "register" });
-
-    [HttpPost]
-    public async Task<IActionResult> RegisterApi([FromBody] RegisterPatientRequest request)
+    [EnableRateLimiting("register")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> RegisterApi([FromBody] RegisterPatientRequest request, CancellationToken ct)
     {
-        if (request == null)
+        if (!ModelState.IsValid || request == null)
         {
             return Json(new { success = false, message = "Dữ liệu đăng ký không hợp lệ." });
         }
 
-        var result = await _authService.RegisterPatientAsync(request);
-        if (!result.IsSuccess)
+        var result = await _authService.RegisterPatientAsync(request, ct);
+        if (!result.IsSuccess && result.Error.Code != "AUTH_REGISTRATION_CONFLICT")
         {
             return Json(new { success = false, message = result.Error.Message });
         }
@@ -130,15 +140,15 @@ public class AccountController : Controller
         return Json(new
         {
             success = true,
-            username = result.Value!.Username,
-            fullName = result.Value.FullName,
-            message = "Đăng ký tài khoản người khám thành công!"
+            message = RegistrationMessage
         });
     }
 
     [HttpPost]
+    [EnableRateLimiting("register")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Register(RegisterViewModel model)
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> Register(RegisterViewModel model, CancellationToken ct)
     {
         if (!ModelState.IsValid)
         {
@@ -152,15 +162,15 @@ public class AccountController : Controller
             model.DateOfBirth,
             model.PhoneNumber,
             model.Email
-        ));
+        ), ct);
 
-        if (!result.IsSuccess)
+        if (!result.IsSuccess && result.Error.Code != "AUTH_REGISTRATION_CONFLICT")
         {
             ModelState.AddModelError(string.Empty, result.Error.Message);
             return View(model);
         }
 
-        TempData["SuccessMessage"] = "Đăng ký tài khoản thành công! Vui lòng đăng nhập.";
+        TempData["SuccessMessage"] = RegistrationMessage;
         return RedirectToAction("Login", "Account");
     }
 
@@ -172,37 +182,38 @@ public class AccountController : Controller
 
     // API endpoints cho Interactive Modal tại màn hình Login
     [HttpPost]
-    public async Task<IActionResult> RequestPasswordReset([FromBody] ForgotPasswordRequest request)
+    [EnableRateLimiting("password-reset-request")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public IActionResult RequestPasswordReset([FromBody] ForgotPasswordRequest request)
     {
-        if (request == null || string.IsNullOrWhiteSpace(request.EmailOrUsername))
+        if (request == null || !ModelState.IsValid || string.IsNullOrWhiteSpace(request.EmailOrUsername)
+            || request.EmailOrUsername.Length > 100)
         {
             return Json(new { success = false, message = "Vui lòng nhập email hoặc tên đăng nhập." });
         }
 
-        var result = await _authService.SendPasswordResetOtpAsync(request.EmailOrUsername);
-        if (!result.IsSuccess)
-        {
-            return Json(new { success = false, message = result.Error.Message });
-        }
+        // Queue every valid identifier so account lookup and SMTP timing cannot identify an account.
+        _passwordResets.Enqueue(request.EmailOrUsername);
 
         return Json(new
         {
             success = true,
-            message = "Mã xác thực OTP đã được gửi đến email của bạn.",
-            maskedEmail = result.Value!.MaskedEmail
+            message = "Nếu thông tin tài khoản phù hợp, mã xác thực sẽ được gửi đến email đã đăng ký. Vui lòng kiểm tra hộp thư."
         });
     }
 
     [HttpPost]
-    public async Task<IActionResult> ConfirmPasswordReset([FromBody] ResetPasswordRequest request)
+    [EnableRateLimiting("password-reset-confirm")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> ConfirmPasswordReset([FromBody] ResetPasswordRequest request, CancellationToken ct)
     {
-        if (request == null || string.IsNullOrWhiteSpace(request.EmailOrUsername) ||
+        if (request == null || !ModelState.IsValid || string.IsNullOrWhiteSpace(request.EmailOrUsername) ||
             string.IsNullOrWhiteSpace(request.Otp) || string.IsNullOrWhiteSpace(request.NewPassword))
         {
             return Json(new { success = false, message = "Vui lòng điền đầy đủ thông tin yêu cầu." });
         }
 
-        var result = await _authService.ResetPasswordWithOtpAsync(request.EmailOrUsername, request.Otp, request.NewPassword);
+        var result = await _authService.ResetPasswordWithOtpAsync(request.EmailOrUsername, request.Otp, request.NewPassword, ct);
         if (!result.IsSuccess)
         {
             return Json(new { success = false, message = result.Error.Message });
@@ -218,16 +229,43 @@ public class AccountController : Controller
     public IActionResult AccessDenied() => View();
 
     [HttpGet]
-    public IActionResult ChangePassword() => View();
+    [Authorize]
+    public IActionResult ChangePassword() => View(new ChangePasswordViewModel());
 
     [HttpPost]
-    public IActionResult ChangePassword(string oldPassword, string newPassword) => View();
+    [Authorize]
+    public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model, CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+        var accountId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var result = await _authService.ChangePasswordAsync(accountId, model.OldPassword, model.NewPassword, ct);
+        if (!result.IsSuccess)
+        {
+            ModelState.AddModelError(string.Empty, result.Error.Message);
+            return View(model);
+        }
+        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        TempData["SuccessMessage"] = "Đã đổi mật khẩu. Vui lòng đăng nhập lại.";
+        return RedirectToAction(nameof(Login));
+    }
+
+    private bool IsAllowedReturnUrl([NotNullWhen(true)] string? returnUrl)
+    {
+        if (string.IsNullOrEmpty(returnUrl) || !Url.IsLocalUrl(returnUrl)) return false;
+        var path = Url.Content(returnUrl);
+        return path != "/"
+            && !path.StartsWith(Url.Content("~/Account/Login"), StringComparison.OrdinalIgnoreCase)
+            && !path.StartsWith(Url.Content("~/Account/Logout"), StringComparison.OrdinalIgnoreCase);
+    }
 
     private IActionResult RedirectToDashboard(string? role)
     {
         return (role?.Trim().ToUpperInvariant()) switch
         {
-            "ADMIN" => RedirectToAction("Index", "Accounts", new { area = "Admin" }),
+            "ADMIN" => RedirectToAction("Index", "Management", new { area = "Admin" }),
             "DEPARTMENT_HEAD" or "DEPT_HEAD" => RedirectToAction("Index", "Schedule", new { area = "Staff" }),
             "DOCTOR" => RedirectToAction("Index", "Consultation", new { area = "Staff" }),
             "NURSE" => RedirectToAction("Index", "Reception", new { area = "Staff" }),

@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace HIS.Web.Areas.Staff.Controllers;
 
 [Area("Staff")]
-[Authorize(Policy = "DepartmentHeadOnly")]
+[Authorize(Policy = "StaffAny")]
 public class ScheduleController : Controller
 {
     public IActionResult Index() => View();

@@ -15,8 +15,10 @@ const paths = {
     down: 'm6 9 6 6 6-6',
     plus: 'M12 5v14 M5 12h14',
     arrow: 'M5 12h14 m-5-5 5 5-5 5',
-    external: 'M14 3h7v7 M21 3l-9 9 M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5',
-    building: 'M4 22V4h16v18 M2 22h20 M8 8h1 M15 8h1 M8 12h1 M15 12h1 M10 22v-6h4v6',
+    external:
+        'M14 3h7v7 M21 3l-9 9 M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5',
+    building:
+        'M4 22V4h16v18 M2 22h20 M8 8h1 M15 8h1 M8 12h1 M15 12h1 M10 22v-6h4v6',
     check: 'm5 12 4 4L19 6',
     close: 'm6 6 12 12 M18 6 6 18',
     download: 'M12 3v12 m-5-5 5 5 5-5 M5 15v6h14v-6',
@@ -37,89 +39,18 @@ const paths = {
     trash: 'M3 6h18 M8 6V3h8v3 M5 6l1 15h12l1-15 M10 10v7 M14 10v7',
     edit: 'm16 3 5 5-12 12-6 1 1-6z M14 5l5 5',
     mail: 'M3 4h18v16H3z M3 4l9 8 9-8',
-    location: 'M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0 M15 10a3 3 0 1 1-6 0 3 3 0 0 1 6 0',
+    location:
+        'M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0 M15 10a3 3 0 1 1-6 0 3 3 0 0 1 6 0',
     info: 'M12 11v6 M12 7h.01 M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',
-    refresh: 'M21 3v6h-6 M3 21v-6h6 M3.5 8a9 9 0 0 1 15-4L21 9 M3 15l2.5 5a9 9 0 0 0 15-4',
+    refresh:
+        'M21 3v6h-6 M3 21v-6h6 M3.5 8a9 9 0 0 1 15-4L21 9 M3 15l2.5 5a9 9 0 0 0 15-4',
     volume: 'M11 5 6 9H2v6h4l5 4z M15 8a6 6 0 0 1 0 8 M18 5a10 10 0 0 1 0 14',
 };
 
-('use strict');
-
-window.hisLive = !!document.getElementById('his-db-data');
-
-window.hisSnapshotAt = Date.now();
-
-const TODAY = window.hisLive
-        ? JSON.parse(document.getElementById('his-db-data').textContent).today
-        : '2026-11-04',
-    STORAGE_KEY = 'his-visualstudio-ui-v1';
-
-const CONFIG = {
-    holdMinutes: 10,
-    maxProfiles: 5,
-    maxActiveAppointments: 5,
-    maxLinkRequestsPerDay: 5,
-    cancelCutoff: 120,
-    checkinEarly: 60,
-};
-
 const roleInfo = {
-    PATIENT: {
-        name: 'Bệnh nhân',
-        icon: 'heart',
-        description: 'Đặt khám, hồ sơ người thân và kết quả của bạn',
-        accountId: 'ac-p',
-    },
-    NURSE: {
-        name: 'Y tá / Lễ tân',
-        icon: 'users',
-        description: 'Tiếp nhận, sinh hiệu, hàng chờ và thu phí',
-        accountId: 'ac-n',
-    },
-    DOCTOR: {
-        name: 'Bác sĩ',
-        icon: 'stethoscope',
-        description: 'Khám bệnh, chỉ định, kê đơn và lịch cá nhân',
-        accountId: 'ac-d1',
-    },
-    DEPARTMENT_HEAD: {
-        name: 'Trưởng khoa',
-        icon: 'building',
-        description: 'Điều phối lịch, phân trực và duyệt thay đổi',
-        accountId: 'ac-h',
-    },
-    ADMIN: {
-        name: 'Quản trị viên',
-        icon: 'shield',
-        description: 'Tài khoản, danh mục, doanh thu và nhật ký',
-        accountId: 'ac-a',
-    },
+    PATIENT: { name: 'Bệnh nhân', icon: 'heart' },
+    NURSE: { name: 'Y tá / Lễ tân', icon: 'users' },
+    DOCTOR: { name: 'Bác sĩ', icon: 'stethoscope' },
+    DEPARTMENT_HEAD: { name: 'Trưởng khoa', icon: 'building' },
+    ADMIN: { name: 'Quản trị viên', icon: 'shield' },
 };
-
-const statusNames = {
-    PENDING: 'Chờ xác nhận',
-    CONFIRMED: 'Đã xác nhận',
-    CHECKED_IN: 'Đã tiếp nhận',
-    READY_FOR_DOCTOR: 'Chờ bác sĩ',
-    IN_PROGRESS: 'Đang khám',
-    COMPLETED: 'Hoàn thành',
-    CANCELLED: 'Đã hủy',
-    NO_SHOW: 'Không đến',
-    EXPIRED: 'Hết hạn giữ chỗ',
-    RESCHEDULE_REQUIRED: 'Cần đặt lại lịch',
-};
-
-const transitions = {
-    PENDING: ['CONFIRMED', 'EXPIRED', 'CANCELLED'],
-    CONFIRMED: ['CHECKED_IN', 'CANCELLED', 'NO_SHOW', 'RESCHEDULE_REQUIRED'],
-    CHECKED_IN: ['READY_FOR_DOCTOR', 'CANCELLED'],
-    READY_FOR_DOCTOR: ['IN_PROGRESS'],
-    IN_PROGRESS: ['COMPLETED'],
-    RESCHEDULE_REQUIRED: ['CANCELLED'],
-    COMPLETED: [],
-    CANCELLED: [],
-    NO_SHOW: [],
-    EXPIRED: [],
-};
-
-const liveStates = ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'READY_FOR_DOCTOR', 'IN_PROGRESS'];

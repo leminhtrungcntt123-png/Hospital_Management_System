@@ -1,4 +1,5 @@
 using HIS.BLL.Common;
+using HIS.BLL.DTOs;
 
 namespace HIS.BLL.Services;
 
@@ -10,5 +11,8 @@ namespace HIS.BLL.Services;
 /// </summary>
 public interface IScheduleChangeService
 {
+    Task<IReadOnlyList<ScheduleRequestRow>> GetRequestsAsync(int actorId, CancellationToken ct = default);
+    Task<ScheduleDecisionResult> ReviewAsync(int actorId, ScheduleDecisionRequest request, CancellationToken ct = default);
+
     Task<Result> ProcessDoctorLeaveAsync(int doctorId, DateOnly date, string? shift, int? replacementDoctorId, CancellationToken ct = default);
 }

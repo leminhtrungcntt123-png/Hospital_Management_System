@@ -1,6 +1,6 @@
 @{
-    Layout = "_MediCareLayout";
-    ViewData["Title"] = "Danh mục hệ thống";
-    ViewData["MediCareRoute"] = "admin/catalog";
+    Layout = "_AdminManagementLayout";
+    ViewData["Title"] = "Phòng ban bệnh viện";
+    ViewData["AdminSection"] = "departments";
 }
-<div id="app"></div>
+@await Html.PartialAsync("AdminWorkspace")

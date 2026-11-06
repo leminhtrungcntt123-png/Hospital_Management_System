@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace HIS.BLL.DTOs;
 
 public record RegisterPatientRequest(
@@ -15,8 +17,9 @@ public record LoginRequest(string Username, string Password);
 
 public record AuthResponse(int AccountId, string Username, string Role, string? FullName = null);
 
-public record ForgotPasswordRequest(string EmailOrUsername);
+public record ForgotPasswordRequest([Required, StringLength(100)] string EmailOrUsername);
 
-public record ForgotPasswordResponse(string MaskedEmail, string? DemoOtp = null);
-
-public record ResetPasswordRequest(string EmailOrUsername, string Otp, string NewPassword);
+public record ResetPasswordRequest(
+    [Required, StringLength(100)] string EmailOrUsername,
+    [Required, RegularExpression(@"^[0-9]{6}$")] string Otp,
+    [Required, StringLength(72, MinimumLength = 6)] string NewPassword);

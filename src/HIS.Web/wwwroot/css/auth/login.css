@@ -1,0 +1,538 @@
+/* Nền bệnh viện sắc nét, trong trẻo */
+.his-auth-bg {
+    background: url('../../images/login-bg.jpg') no-repeat center center fixed !important;
+    background-size: cover !important;
+    position: relative;
+    min-height: 100vh;
+}
+
+.his-auth-bg::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.12);
+    z-index: 0;
+}
+
+.mvc-auth-header {
+    display: none !important;
+}
+
+.his-auth-main {
+    position: relative;
+    z-index: 5;
+    display: flex;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 20px 16px;
+    min-height: calc(100vh - 40px);
+}
+
+/* KHỐI CHỨA SLIDER 2 CỘT (CARD TRUNG TÂM) */
+.his-slider-container {
+    position: relative;
+    width: min(780px, 94vw);
+    height: 540px;
+    background: #ffffff;
+    border-radius: 28px;
+    box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.4);
+    overflow: hidden;
+    display: flex;
+}
+
+/* CÁC FORM BOX (LOGIN & REGISTER) */
+.his-form-box {
+    position: absolute;
+    top: 0;
+    width: 50%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 36px 42px;
+    background: #ffffff;
+    box-sizing: border-box;
+    transition:
+        transform 0.65s cubic-bezier(0.65, 0, 0.35, 1),
+        opacity 0.45s ease;
+    z-index: 1;
+}
+
+/* Form Đăng nhập: Mặc định ở bên phải */
+.his-form-box.his-login-box {
+    right: 0;
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Form Đăng ký: Mặc định ẩn ở bên trái */
+.his-form-box.his-register-box {
+    left: 0;
+    transform: translateX(-100%);
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Khi active (chế độ đăng ký) */
+.his-slider-container.active .his-login-box {
+    transform: translateX(100%);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.his-slider-container.active .his-register-box {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
+    z-index: 2;
+}
+
+/* Typography cho form */
+.his-form-title {
+    font-size: 26px;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 6px;
+    text-align: center;
+    letter-spacing: -0.4px;
+}
+
+.his-form-subtitle {
+    font-size: 13px;
+    color: #64748b;
+    margin: 0 0 22px;
+    text-align: center;
+}
+
+.his-register-box .his-form-subtitle {
+    margin: 0 0 16px;
+}
+
+/* Input Groups */
+.his-input-group {
+    position: relative;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+}
+
+.his-register-box .his-input-group {
+    margin-bottom: 11px;
+}
+
+.his-register-box .his-input-field {
+    height: 42px;
+    font-size: 13px;
+}
+
+.his-input-icon {
+    position: absolute;
+    left: 14px;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+    transition: color 0.2s;
+}
+
+.his-input-field {
+    width: 100%;
+    height: 46px;
+    padding: 0 14px 0 42px;
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    font-size: 13.5px;
+    color: #0f172a;
+    outline: none;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+}
+
+.his-input-field::placeholder {
+    color: #94a3b8;
+}
+
+.his-input-field:focus {
+    background: #ffffff;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3.5px rgba(2, 132, 199, 0.12);
+}
+
+.his-input-group:focus-within .his-input-icon {
+    color: var(--primary);
+}
+
+.his-pass-toggle {
+    position: absolute;
+    right: 12px;
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    border-radius: 6px;
+    transition: color 0.2s;
+}
+
+.his-pass-toggle:hover {
+    color: #0f172a;
+}
+
+.his-field-error {
+    display: none;
+}
+
+.his-field-error:not(:empty) {
+    display: block;
+    color: #dc2626;
+    font-size: 11.5px;
+    margin: -10px 0 12px 4px;
+}
+
+/* Checkbox & Quên mật khẩu */
+.his-form-options {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 6px 0 24px;
+    font-size: 12.5px;
+    color: #475569;
+}
+
+.his-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    cursor: pointer;
+    user-select: none;
+    font-weight: 500;
+}
+
+.his-checkbox-label input {
+    accent-color: var(--primary);
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+}
+
+.his-forgot-link {
+    color: var(--primary);
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.his-forgot-link:hover {
+    color: var(--primary-hover);
+    text-decoration: underline;
+}
+
+/* Nút Submit chính */
+.his-btn-solid {
+    width: 100%;
+    height: 46px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
+    color: #ffffff;
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
+    transition: all 0.2s ease;
+    margin-top: 4px;
+}
+
+.his-btn-solid:hover {
+    background: linear-gradient(135deg, var(--primary-hover) 0%, #075985 100%);
+    box-shadow: 0 6px 18px rgba(2, 132, 199, 0.45);
+    transform: translateY(-1px);
+}
+
+.his-btn-solid:active {
+    transform: translateY(0);
+}
+
+/* Lỗi tổng thể ModelState */
+.his-alert-error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #b91c1c;
+    padding: 9px 12px;
+    border-radius: 10px;
+    font-size: 12.5px;
+    margin-bottom: 14px;
+    line-height: 1.4;
+}
+
+.his-alert-success {
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    color: #065f46;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 14px;
+    line-height: 1.4;
+}
+
+/* MODAL KHÔI PHỤC MẬT KHẨU */
+
+.his-step-desc {
+    font-size: 13px;
+    color: #475569;
+    line-height: 1.5;
+    margin: 0 0 16px;
+    text-align: center;
+}
+
+.his-alert-info {
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    color: var(--primary-hover);
+    padding: 9px 12px;
+    border-radius: 10px;
+    font-size: 12.5px;
+    margin-bottom: 12px;
+    line-height: 1.45;
+}
+
+.his-demo-badge {
+    background: #f8fafc;
+    border: 1px dashed var(--primary);
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 12.5px;
+    color: #334155;
+    margin-bottom: 14px;
+    text-align: center;
+}
+
+/* KHỐI PANEL CHUYỂN ĐỘNG TRƯỢT MÀU XANH (TOGGLE BOX SLIDER) */
+.his-toggle-box {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(
+        135deg,
+        var(--cyan) 0%,
+        var(--primary) 55%,
+        var(--primary-hover) 100%
+    );
+    /* Đường cong uốn lượn đặc trưng: mặc định cong lồi sang phải */
+    border-radius: 0 150px 150px 0;
+    z-index: 10;
+    overflow: hidden;
+    transition:
+        transform 0.7s cubic-bezier(0.65, 0, 0.35, 1),
+        border-radius 0.7s cubic-bezier(0.65, 0, 0.35, 1);
+    box-shadow: 0 8px 25px rgba(2, 132, 199, 0.3);
+}
+
+/* Khi active: trượt mượt sang phải và đảo chiều đường cong sang trái */
+.his-slider-container.active .his-toggle-box {
+    transform: translateX(100%);
+    border-radius: 150px 0 0 150px;
+}
+
+/* Nội dung bên trong Toggle Box */
+.his-toggle-panel {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+    text-align: center;
+    color: #ffffff;
+    box-sizing: border-box;
+    transition:
+        transform 0.7s cubic-bezier(0.65, 0, 0.35, 1),
+        opacity 0.5s ease;
+}
+
+/* Panel bên trái (hiển thị khi đang ở form Login) */
+.his-toggle-panel.his-toggle-left {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Panel bên phải (hiển thị khi đang ở form Register) */
+.his-toggle-panel.his-toggle-right {
+    transform: translateX(120%);
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Trạng thái khi active */
+.his-slider-container.active .his-toggle-panel.his-toggle-left {
+    transform: translateX(-120%);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.his-slider-container.active .his-toggle-panel.his-toggle-right {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Chi tiết đồ họa trong panel màu xanh */
+.his-toggle-logo {
+    width: 72px;
+    height: 72px;
+    object-fit: contain;
+    background: #ffffff;
+    border-radius: 18px;
+    padding: 6px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.22);
+    margin-bottom: 16px;
+}
+
+.his-toggle-title {
+    font-size: 26px;
+    font-weight: 800;
+    color: #ffffff;
+    margin: 0 0 8px;
+    letter-spacing: 0.3px;
+}
+
+.his-toggle-desc {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.9);
+    margin: 0 0 24px;
+    max-width: 260px;
+    line-height: 1.5;
+}
+
+/* Nút viền trắng bo tròn (Pill Outline Button) */
+.his-btn-outline {
+    background: transparent;
+    border: 2px solid #ffffff;
+    color: #ffffff;
+    border-radius: 24px;
+    padding: 10px 36px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.his-btn-outline:hover {
+    background: #ffffff;
+    color: var(--primary);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+}
+
+.his-btn-outline:active {
+    transform: translateY(0);
+}
+
+/* Chuyển đổi trên màn hình nhỏ / điện thoại */
+.his-mobile-switch {
+    display: none;
+    margin-top: 16px;
+    text-align: center;
+    font-size: 12.5px;
+    color: #64748b;
+}
+
+.his-mobile-switch a {
+    color: var(--primary);
+    font-weight: 700;
+    text-decoration: none;
+}
+
+/* Nút Về Trang Chủ ở góc */
+.his-back-home {
+    position: fixed;
+    top: 22px;
+    left: 24px;
+    z-index: 100;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: #1e293b;
+    font-weight: 700;
+    font-size: 13.5px;
+    text-decoration: none;
+    border-radius: 999px;
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    transition: all 0.2s ease;
+}
+
+.his-back-home:hover {
+    background: #ffffff;
+    color: var(--primary);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(2, 132, 199, 0.16);
+}
+
+.his-back-home svg {
+    transition: transform 0.2s ease;
+}
+
+.his-back-home:hover svg {
+    transform: translateX(-3px);
+}
+
+.auth-register-alert {
+    display: none;
+    margin-bottom: 12px;
+}
+
+.auth-hidden {
+    display: none;
+}
+
+.auth-link-medium {
+    font-weight: 600;
+}
+
+.auth-link-strong {
+    font-weight: 700;
+}
+
+.his-registration-details {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    margin-bottom: 14px;
+    text-align: left;
+}
+.his-registration-details label {
+    display: grid;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--muted);
+}
+.his-registration-details input {
+    width: 100%;
+    min-width: 0;
+    padding: 10px;
+}
+
+.his-slider-container.active {
+    height: 690px;
+}
