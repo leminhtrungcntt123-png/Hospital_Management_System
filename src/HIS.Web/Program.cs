@@ -121,7 +121,29 @@ else
     app.UseDeveloperExceptionPage();
 }
 
-app.UseStatusCodePagesWithReExecute("/Home/NotFound", "?statusCode={0}");
+app.UseStatusCodePages(async statusCodeContext =>
+{
+    var httpContext = statusCodeContext.HttpContext;
+    if (httpContext.Response.StatusCode == StatusCodes.Status404NotFound
+        && HttpMethods.IsGet(httpContext.Request.Method)
+        && !httpContext.Request.Path.StartsWithSegments("/api"))
+    {
+        var originalPath = httpContext.Request.Path;
+        var originalQueryString = httpContext.Request.QueryString;
+
+        httpContext.Request.Path = "/Home/NotFound";
+        httpContext.Request.QueryString = QueryString.Empty;
+        try
+        {
+            await statusCodeContext.Next(httpContext);
+        }
+        finally
+        {
+            httpContext.Request.Path = originalPath;
+            httpContext.Request.QueryString = originalQueryString;
+        }
+    }
+});
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();

@@ -14,7 +14,7 @@ public class HomeController(
         return View();
     }
 
-    [HttpGet]
+    [HttpGet, HttpPost]
     [ActionName("NotFound")]
     [Route("404")]
     [Route("NotFound")]
