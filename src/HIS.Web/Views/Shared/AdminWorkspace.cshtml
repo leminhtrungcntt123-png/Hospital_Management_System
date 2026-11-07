@@ -1,292 +1,793 @@
 @{
     ViewData["Title"] = "Quản trị bệnh viện";
     var home = Url.Action("Index", "Home", new { area = "" });
+    var adminName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? "Quản trị viên";
+    var parts = adminName.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+    var initials = parts.Length > 1
+        ? string.Concat(parts.TakeLast(2).Select(p => char.ToUpperInvariant(p[0])))
+        : (parts.Length == 1 && parts[0].Length >= 2 ? parts[0][..2].ToUpperInvariant() : "AD");
 }
 
-<div class="admin-workspace staff-app"
+<div class="misa-app admin-workspace"
      data-api="@Url.Action("Index", "Management", new { area = "Admin" })"
      data-section="@(ViewData["AdminSection"] ?? "dashboard")">
-    <aside class="admin-sidebar sidebar" id="admin-sidebar" aria-label="Điều hướng quản trị">
-        <div>
-            <a class="admin-brand brand-link" href="@home" aria-label="MediCare, về trang chủ">
-                <span class="brand">
-                    <span class="brand-mark">@await Html.PartialAsync("_AdminIcon", "plus")</span>
-                    <span>MediCare<sup>+</sup></span>
-                </span>
-            </a>
-            <div class="workspace">
-                @await Html.PartialAsync("_AdminIcon", "building")
-                <span>
-                    <strong>Bệnh viện An Tâm</strong>
-                    <small>Quản trị viên</small>
-                </span>
-            </div>
-        </div>
-        <nav class="staff-nav" aria-label="Chức năng quản trị">
-            <div class="nav-group">
-                <span>ĐIỀU HÀNH</span>
-                <a href="#dashboard" data-section="dashboard">
-                    @await Html.PartialAsync("_AdminIcon", "grid")
-                    <span>Tổng quan &amp; doanh thu</span>
-                </a>
-                <a href="#requests" data-section="requests">
-                    @await Html.PartialAsync("_AdminIcon", "calendar")
-                    <span>Nghỉ / đổi ca</span>
-                </a>
-            </div>
-            <div class="nav-group">
-                <span>QUẢN TRỊ</span>
-                <a href="#departments" data-section="departments">
-                    @await Html.PartialAsync("_AdminIcon", "building")
-                    <span>Phòng ban</span>
-                </a>
-                <a href="#staff" data-section="staff">
-                    @await Html.PartialAsync("_AdminIcon", "users")
-                    <span>Nhân sự</span>
-                </a>
-                <a href="#doctors" data-section="doctors">
-                    @await Html.PartialAsync("_AdminIcon", "stethoscope")
-                    <span>Danh sách bác sĩ</span>
-                </a>
-                <a href="#accounts" data-section="accounts">
-                    @await Html.PartialAsync("_AdminIcon", "shield")
-                    <span>Tài khoản</span>
-                </a>
-            </div>
-        </nav>
-        <div class="sidebar-bottom">
-            <a class="btn portal-link" href="@home">
-                @await Html.PartialAsync("_AdminIcon", "external")
-                <span>Cổng bệnh nhân</span>
-            </a>
-            <div>
-                <span><i></i>MediCare HIS</span>
-            </div>
-        </div>
-    </aside>
-    <button class="admin-sidebar-scrim sidebar-scrim" type="button" aria-label="Đóng điều hướng" hidden></button>
 
-    <div class="admin-content">
-        <header class="admin-topbar staff-topbar">
-            <button class="icon-btn mobile-only" id="admin-menu-toggle" type="button"
-                    aria-label="Mở điều hướng" aria-controls="admin-sidebar" aria-expanded="false">
-                @await Html.PartialAsync("_AdminIcon", "menu")
+    <!-- ====================================================================
+         1. TOPBAR CHÍNH: HIỆN ĐẠI, TRỰC QUAN & ĐỒNG BỘ
+         ==================================================================== -->
+    <header class="misa-topbar">
+        <div class="misa-topbar-left">
+            <!-- Nút toggle sidebar trên mobile -->
+            <button class="misa-icon-btn mobile-only" id="admin-menu-toggle" type="button" aria-label="Menu điều hướng" aria-expanded="false">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
             </button>
-            <div class="staff-breadcrumb">
-                <span>Quản trị viên</span>
-                <i>/</i>
-                <strong id="admin-breadcrumb">Tổng quan &amp; doanh thu</strong>
+
+            <!-- Logo & Tiêu đề hệ thống -->
+            <a class="misa-brand-link" href="@home" title="Về trang chủ MediCare">
+                <div class="misa-brand-logo-wrap">
+                    <img src="~/images/medicare-logo.jpg" alt="MediCare Logo" class="misa-brand-logo" />
+                </div>
+                <div class="misa-brand-text-wrap">
+                    <span class="misa-brand-title">MediCare HIS</span>
+                    <span class="misa-brand-subtitle">Quản trị Bệnh viện</span>
+                </div>
+            </a>
+
+            <!-- Đơn vị bệnh viện & Năm dữ liệu hợp nhất gọn gàng -->
+            <div class="misa-org-compact" title="Cơ sở hoạt động &amp; Kỳ dữ liệu">
+                <span class="org-icon">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4h16v18 M2 22h20 M8 8h1 M15 8h1 M8 12h1 M15 12h1 M10 22v-6h4v6"></path></svg>
+                </span>
+                <span class="org-name">Bệnh viện Đa khoa MediCare</span>
+                <span class="org-dot">•</span>
+                <span class="org-year">Năm 2026</span>
             </div>
-            <div class="admin-session">
-                <span class="admin-identity">@(User.FindFirst("FullName")?.Value ?? User.Identity?.Name)</span>
-                <form asp-area="" asp-controller="Account" asp-action="Logout" method="post">
-                    <button class="btn button secondary sm small-button" type="submit">Đăng xuất</button>
+        </div>
+
+        <!-- Phía phải: Thông tin người dùng đăng nhập & Nút Đăng xuất thực tế -->
+        <div class="misa-topbar-right">
+            <div class="misa-user-wrap">
+                <div class="misa-user-pill">
+                    <div class="misa-avatar">@initials</div>
+                    <div class="misa-user-info">
+                        <span class="misa-user-name">@adminName</span>
+                        <span class="misa-user-role">Quản trị viên hệ thống</span>
+                    </div>
+                </div>
+
+                <!-- Form Đăng xuất thực tế gọi AccountController -->
+                <form asp-area="" asp-controller="Account" asp-action="Logout" method="post" style="display:inline; margin: 0;">
+                    <button class="misa-btn-logout" type="submit" title="Đăng xuất khỏi hệ thống">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" y1="12" x2="9" y2="12"></line>
+                        </svg>
+                        <span>Đăng xuất</span>
+                    </button>
                 </form>
             </div>
-        </header>
+        </div>
+    </header>
 
-        <main class="staff-main">
-            <div class="admin-heading">
-                <div>
-                    <p class="eyebrow">ĐIỀU HÀNH BỆNH VIỆN</p>
-                    <h1 id="page-title">Tổng quan &amp; doanh thu</h1>
-                    <p id="page-description">
-                        Theo dõi số lượt tiếp nhận và dòng tiền theo thời gian.
-                    </p>
+    <!-- ====================================================================
+         2. SUB-BAR: BREADCRUMB & NÚT LÀM MỚI DỮ LIỆU
+         ==================================================================== -->
+    <div class="misa-subbar">
+        <div class="misa-subbar-left">
+            <div class="misa-breadcrumb-sub">
+                <span class="breadcrumb-item">Quản trị</span>
+                <span class="breadcrumb-sep">/</span>
+                <strong id="admin-breadcrumb" class="breadcrumb-current">Tổng quan &amp; Doanh thu</strong>
+            </div>
+        </div>
+
+        <div class="misa-subbar-right">
+            <!-- Nút bật/tắt dữ liệu mẫu thử nghiệm trực quan -->
+            <button class="misa-subbar-btn misa-subbar-demo-btn active" id="toggle-sample-data" type="button" title="Bật/Tắt dữ liệu mẫu thử nghiệm biểu đồ">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="18" y1="20" x2="18" y2="10"></line>
+                    <line x1="12" y1="20" x2="12" y2="4"></line>
+                    <line x1="6" y1="20" x2="6" y2="14"></line>
+                </svg>
+                <span id="demo-toggle-text">Dữ liệu mẫu: BẬT</span>
+            </button>
+
+            <!-- Nút gọi hàm refresh() tải lại Directory, Requests và Report -->
+            <button class="misa-subbar-btn" id="refresh-data" type="button" title="Tải lại dữ liệu mới nhất từ máy chủ">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <polyline points="1 20 1 14 7 14"></polyline>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
+                <span>Làm mới dữ liệu</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- ====================================================================
+         3. BODY: SIDEBAR RỘNG RÃI (245px) CÓ MÀU SẮC TRỰC QUAN + MAIN
+         ==================================================================== -->
+    <div class="misa-body-layout">
+        <!-- SIDEBAR TRÁI: ĐẦY ĐỦ KHÔNG BỊ TRUNCATE, MỖI MỤC CÓ MÀU BIỂU TƯỢNG RIÊNG -->
+        <aside class="misa-sidebar" id="admin-sidebar" aria-label="Điều hướng quản trị">
+            <div class="misa-sidebar-top">
+                <!-- Nút + Thêm nhanh gradient xanh biển rực rỡ -->
+                <div class="misa-quick-add-container">
+                    <button class="misa-btn-quick-add" id="misa-quick-add-btn" type="button" title="Thêm nhanh tác vụ">
+                        <span class="misa-plus-icon-pill">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                        </span>
+                        <span>Thêm nhanh</span>
+                    </button>
+                    <!-- Menu thả xuống mở các dialog thực tế -->
+                    <div class="misa-quick-add-menu" id="misa-quick-add-menu" hidden>
+                        <button type="button" data-open="department-dialog">
+                            <span class="quick-icon icon-dept">
+                                @await Html.PartialAsync("_AdminIcon", "building")
+                            </span>
+                            <span>Thêm Khoa phòng</span>
+                        </button>
+                        <button type="button" id="quick-add-staff-trigger">
+                            <span class="quick-icon icon-user">
+                                @await Html.PartialAsync("_AdminIcon", "users")
+                            </span>
+                            <span>Thêm Nhân sự</span>
+                        </button>
+                        <button type="button" id="quick-add-account-trigger">
+                            <span class="quick-icon icon-shield">
+                                @await Html.PartialAsync("_AdminIcon", "shield")
+                            </span>
+                            <span>Tạo Tài khoản</span>
+                        </button>
+                    </div>
                 </div>
-                <button class="btn button secondary" id="refresh-data" type="button">@await Html.PartialAsync("_AdminIcon", "refresh")<span>Làm mới</span></button>
+
+                <!-- Tiêu đề nhóm danh mục -->
+                <div class="misa-nav-header">
+                    <span>DANH MỤC</span>
+                </div>
+
+                <!-- 6 Menu điều hướng - gọn gàng, súc tích, trực quan -->
+                <nav class="misa-nav" aria-label="Chức năng quản trị">
+                    <a href="#dashboard" class="misa-nav-item active" data-section="dashboard" title="Tổng quan &amp; Doanh thu">
+                        <span class="misa-nav-icon nav-icon-blue">
+                            @await Html.PartialAsync("_AdminIcon", "grid")
+                        </span>
+                        <span class="misa-nav-text">Tổng quan</span>
+                    </a>
+                    <a href="#departments" class="misa-nav-item" data-section="departments" title="Khoa phòng ban chuyên môn">
+                        <span class="misa-nav-icon nav-icon-purple">
+                            @await Html.PartialAsync("_AdminIcon", "building")
+                        </span>
+                        <span class="misa-nav-text">Khoa phòng</span>
+                    </a>
+                    <a href="#staff" class="misa-nav-item" data-section="staff" title="Nhân sự y tế bệnh viện">
+                        <span class="misa-nav-icon nav-icon-emerald">
+                            @await Html.PartialAsync("_AdminIcon", "users")
+                        </span>
+                        <span class="misa-nav-text">Nhân sự</span>
+                    </a>
+                    <a href="#doctors" class="misa-nav-item" data-section="doctors" title="Đội ngũ Bác sĩ chuyên khoa">
+                        <span class="misa-nav-icon nav-icon-teal">
+                            @await Html.PartialAsync("_AdminIcon", "stethoscope")
+                        </span>
+                        <span class="misa-nav-text">Bác sĩ</span>
+                    </a>
+                    <a href="#accounts" class="misa-nav-item" data-section="accounts" title="Tài khoản &amp; Phân quyền hệ thống">
+                        <span class="misa-nav-icon nav-icon-indigo">
+                            @await Html.PartialAsync("_AdminIcon", "shield")
+                        </span>
+                        <span class="misa-nav-text">Tài khoản</span>
+                    </a>
+                    <a href="#requests" class="misa-nav-item" data-section="requests" title="Đề nghị Nghỉ &amp; Đổi ca trực">
+                        <span class="misa-nav-icon nav-icon-amber">
+                            @await Html.PartialAsync("_AdminIcon", "calendar")
+                        </span>
+                        <span class="misa-nav-text">Nghỉ / Đổi ca</span>
+                    </a>
+                </nav>
             </div>
 
+            <!-- Chân Sidebar: Trạng thái & Link cổng bệnh nhân -->
+            <div class="misa-sidebar-bottom">
+                <div class="misa-sys-status">
+                    <span class="misa-status-dot-live"></span>
+                    <span>Trực tuyến 24/7</span>
+                </div>
+                <a class="misa-portal-link" href="@home" title="Cổng dịch vụ bệnh nhân">
+                    @await Html.PartialAsync("_AdminIcon", "external")
+                    <span>Cổng bệnh nhân</span>
+                </a>
+            </div>
+        </aside>
+
+        <button class="misa-sidebar-scrim sidebar-scrim" type="button" aria-label="Đóng điều hướng" hidden></button>
+
+        <!-- MAIN WORKSPACE KHU VỰC NỘI DUNG -->
+        <main class="misa-main-content">
+            <!-- Thông báo & AntiForgeryToken ẩn -->
             <div id="admin-message" role="status" aria-live="polite" hidden></div>
             <div id="admin-token" hidden>@Html.AntiForgeryToken()</div>
 
+            <!-- Header ẩn để tương thích JS cập nhật title -->
+            <div style="display:none;">
+                <h1 id="page-title">Tổng quan &amp; Doanh thu</h1>
+                <p id="page-description">Theo dõi thời gian thực số lượt tiếp nhận bệnh nhân và dòng tiền vận hành.</p>
+            </div>
+
+            <!-- ============================================================
+                 PANEL 1: DASHBOARD BÁO CÁO & BIỂU ĐỒ (TRỰC QUAN, SINH ĐỘNG)
+                 ============================================================ -->
             <section data-panel="dashboard" aria-label="Báo cáo doanh thu">
-                <form id="report-filter" class="filter-bar">
-                    <label>
-                        Từ ngày
-                        <input name="from" type="date" required />
-                    </label>
-                    <label>
-                        Đến ngày
-                        <input name="to" type="date" required />
-                    </label>
-                    <button class="btn button primary" type="submit">Xem báo cáo</button>
-                    <button class="btn button secondary" id="export-revenue" type="button">
-                        @await Html.PartialAsync("_AdminIcon", "download")<span>Xuất CSV / Excel</span>
-                    </button>
-                </form>
-                <p class="definition">
-                    Doanh thu thực thu = tạm ứng + thanh toán − hoàn tiền. Lượng khách tính theo
-                    lượt đã tiếp nhận; một người khám nhiều lần được tính nhiều lượt.
-                </p>
-                <div class="admin-stats" id="report-stats" aria-live="polite"></div>
-                <div class="card chart-card">
-                    <div class="card-heading">
-                        <h2>Doanh thu theo ngày</h2>
-                        <span>Tiền thực thu · VNĐ</span>
+                <!-- Thanh Bộ lọc thời gian nổi bật: Bố cục 2 đầu cân đối, Lịch có màu sắc trực quan -->
+                <div class="misa-filter-card">
+                    <div class="misa-filter-left">
+                        <div class="misa-branch-pill">
+                            <span class="pill-icon">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4h16v18 M2 22h20 M8 8h1 M15 8h1 M8 12h1 M15 12h1 M10 22v-6h4v6"></path></svg>
+                            </span>
+                            <span class="label">Chi nhánh:</span>
+                            <strong class="value">Bệnh viện Đa khoa MediCare</strong>
+                        </div>
+                        <div class="misa-unit-pill">
+                            <span>ĐVT: VNĐ</span>
+                        </div>
                     </div>
-                    <div id="revenue-chart" class="revenue-chart"></div>
+
+                    <!-- Form chọn khoảng thời gian căn phải trực quan, đồng bộ -->
+                    <form id="report-filter" class="misa-filter-right misa-date-form">
+                        <div class="misa-date-group">
+                            <span class="misa-date-badge-icon" title="Khoảng thời gian báo cáo">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                                </svg>
+                            </span>
+                            <label class="misa-date-label">
+                                <span class="date-chip">Từ</span>
+                                <input name="from" type="date" required />
+                            </label>
+                            <span class="misa-date-arrow">
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#0068ff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                            </span>
+                            <label class="misa-date-label">
+                                <span class="date-chip">Đến</span>
+                                <input name="to" type="date" required />
+                            </label>
+                        </div>
+                        <button class="btn misa-btn-filter-submit" type="submit">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            <span>Xem báo cáo</span>
+                        </button>
+                        <button class="btn misa-btn-export-excel" id="export-revenue" type="button">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            <span>Xuất File Excel</span>
+                        </button>
+                    </form>
                 </div>
-                <div class="card">
-                    <div class="card-heading">
-                        <h2>Chi tiết theo thời gian</h2>
-                        <span id="report-period"></span>
+
+                <!-- 4 THẺ KPI NỀN TRẮNG, CHỮ ĐEN IN ĐẬM, ICON CÓ Ô BAO MÀU SẮC (CHUẨN DASHBOARD) -->
+                <div class="misa-kpi-quad-grid">
+                    <!-- Card 1: Doanh thu thực thu (Ô xanh dương Zalo) -->
+                    <div class="misa-kpi-card">
+                        <div class="misa-kpi-icon-box box-blue" title="Doanh thu thực thu">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="18" y1="20" x2="18" y2="10"></line>
+                                <line x1="12" y1="20" x2="12" y2="4"></line>
+                                <line x1="6" y1="20" x2="6" y2="14"></line>
+                            </svg>
+                        </div>
+                        <div class="misa-kpi-info">
+                            <div class="misa-kpi-val" id="kpi-revenue">0 ₫</div>
+                            <span class="misa-kpi-label">Doanh thu thực thu</span>
+                        </div>
                     </div>
-                    <div class="table-scroll" id="report-table"></div>
+
+                    <!-- Card 2: Lượt đã tiếp nhận (Ô xanh lá) -->
+                    <div class="misa-kpi-card">
+                        <div class="misa-kpi-icon-box box-green" title="Lượt đã tiếp nhận">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="9" cy="21" r="1"></circle>
+                                <circle cx="20" cy="21" r="1"></circle>
+                                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                            </svg>
+                        </div>
+                        <div class="misa-kpi-info">
+                            <div class="misa-kpi-val" id="kpi-visits">0 lượt</div>
+                            <span class="misa-kpi-label">Lượt đã tiếp nhận</span>
+                        </div>
+                    </div>
+
+                    <!-- Card 3: Tạm ứng viện phí (Ô cam) -->
+                    <div class="misa-kpi-card">
+                        <div class="misa-kpi-icon-box box-orange" title="Tạm ứng viện phí">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect width="20" height="14" x="2" y="5" rx="2"></rect>
+                                <line x1="2" y1="10" x2="22" y2="10"></line>
+                            </svg>
+                        </div>
+                        <div class="misa-kpi-info">
+                            <div class="misa-kpi-val" id="kpi-deposits">0 ₫</div>
+                            <span class="misa-kpi-label">Tạm ứng viện phí</span>
+                        </div>
+                    </div>
+
+                    <!-- Card 4: Hoàn tiền / Miễn giảm (Ô tím) -->
+                    <div class="misa-kpi-card">
+                        <div class="misa-kpi-icon-box box-purple" title="Hoàn tiền &amp; Miễn giảm">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                        </div>
+                        <div class="misa-kpi-info">
+                            <div class="misa-kpi-val" id="kpi-refunds">0 ₫</div>
+                            <span class="misa-kpi-label">Hoàn tiền / Miễn giảm</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LƯỚI BIỂU ĐỒ CHÍNH & CƠ CẤU DÒNG TIỀN -->
+                <div class="misa-charts-row">
+                    <!-- Khối trái: Biểu đồ Dòng tiền & Lượt khám theo ngày (Chart.js) -->
+                    <div class="misa-card misa-cashflow-card">
+                        <div class="misa-chart-card-header">
+                            <div class="misa-chart-title-wrap">
+                                <span class="chart-header-icon">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0068ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="18" y1="20" x2="18" y2="10"></line>
+                                        <line x1="12" y1="20" x2="12" y2="4"></line>
+                                        <line x1="6" y1="20" x2="6" y2="14"></line>
+                                    </svg>
+                                </span>
+                                <h2 class="misa-chart-title">Biểu đồ Dòng tiền &amp; Lượt khám theo ngày</h2>
+                            </div>
+                            <div class="misa-chart-actions">
+                                <button class="misa-chart-icon-btn" id="chart-refresh-trigger" type="button" title="Làm mới lại biểu đồ">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Subtabs chuyển đổi góc nhìn dữ liệu trực quan: DOANH THU | HOÀN TIỀN | DÒNG TIỀN THUẦN -->
+                        <div class="misa-chart-subtabs">
+                            <button class="misa-chart-subtab active" type="button">DOANH THU</button>
+                            <button class="misa-chart-subtab" type="button">HOÀN TIỀN</button>
+                            <button class="misa-chart-subtab" type="button">DÒNG TIỀN THUẦN</button>
+                        </div>
+
+                        <!-- Vùng vẽ Chart.js Dual-Axis -->
+                        <div class="misa-chart-canvas-wrap">
+                            <canvas id="revenueChartCanvas" height="195"></canvas>
+                        </div>
+                        <div id="revenue-chart" class="revenue-chart fallback-chart" style="display: none;"></div>
+
+                        <!-- Banner tổng thu sinh động với gradient đa sắc -->
+                        <div class="misa-highlight-banner">
+                            <div class="misa-highlight-icon-circle">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="12" y1="1" x2="12" y2="23"></line>
+                                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                </svg>
+                            </div>
+                            <div class="misa-highlight-info">
+                                <span class="misa-highlight-label">Tổng doanh thu thực thu trong kỳ lọc</span>
+                                <div class="misa-highlight-amount" id="highlightTotalRevenue">0 ₫</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Khối phải: Cơ cấu Dòng tiền & Chi phí với Donut Chart đa sắc -->
+                    <div class="misa-card misa-donut-card">
+                        <div class="misa-chart-card-header">
+                            <div class="misa-chart-title-wrap">
+                                <span class="chart-header-icon">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path>
+                                        <path d="M22 12A10 10 0 0 0 12 2v10z"></path>
+                                    </svg>
+                                </span>
+                                <h2 class="misa-chart-title">Cơ cấu dòng tiền</h2>
+                            </div>
+                        </div>
+                        <span class="misa-kpi-subtitle">Phân bổ tỷ trọng các luồng tiền phát sinh</span>
+
+                        <!-- Canvas vẽ Biểu đồ tròn Donut -->
+                        <div class="misa-donut-canvas-wrap">
+                            <canvas id="cashflowDonutCanvas" height="170"></canvas>
+                            <div class="misa-donut-center-info">
+                                <span class="donut-center-sub">Cơ cấu</span>
+                                <strong class="donut-center-val" id="donut-center-total">100%</strong>
+                            </div>
+                        </div>
+
+                        <!-- Chú giải danh mục số liệu thật từ API -->
+                        <div class="misa-donut-legend-list">
+                            <div class="misa-legend-item">
+                                <div class="misa-legend-left">
+                                    <span class="misa-legend-dot dot-deposit"></span>
+                                    <span class="misa-legend-label">Tạm ứng viện phí</span>
+                                </div>
+                                <strong class="misa-legend-val text-blue" id="kpi-deposits-text">0 ₫</strong>
+                            </div>
+                            <div class="misa-legend-item">
+                                <div class="misa-legend-left">
+                                    <span class="misa-legend-dot dot-payment"></span>
+                                    <span class="misa-legend-label">Thanh toán viện phí</span>
+                                </div>
+                                <strong class="misa-legend-val text-emerald" id="kpi-payments">0 ₫</strong>
+                            </div>
+                            <div class="misa-legend-item">
+                                <div class="misa-legend-left">
+                                    <span class="misa-legend-dot dot-refund"></span>
+                                    <span class="misa-legend-label">Hoàn tiền / Miễn giảm</span>
+                                </div>
+                                <strong class="misa-legend-val text-amber" id="kpi-refunds-text">0 ₫</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Thẻ chứa #report-stats ẩn để tương thích bộ mã gốc -->
+                <div id="report-stats" style="display:none;" aria-live="polite"></div>
+
+                <!-- Thẻ Bảng kê chi tiết tài chính theo ngày -->
+                <div class="misa-card misa-table-card">
+                    <div class="misa-table-card-header">
+                        <div class="misa-table-title-group">
+                            <span class="table-header-icon">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                                    <polyline points="10 9 9 9 8 9"></polyline>
+                                </svg>
+                            </span>
+                            <div>
+                                <h3 class="misa-table-title">Bảng kê chi tiết doanh thu theo từng ngày</h3>
+                                <span class="misa-table-subtitle">Số liệu giao dịch đã đối soát trong kỳ báo cáo</span>
+                            </div>
+                        </div>
+                        <span id="report-period" class="misa-period-badge"></span>
+                    </div>
+                    <div class="misa-table-scroll-wrap" id="report-table"></div>
                 </div>
             </section>
 
+            <!-- ============================================================
+                 PANEL 2: NGHỈ / ĐỔI CA TRỰC
+                 ============================================================ -->
             <section data-panel="requests" aria-label="Yêu cầu nghỉ và đổi ca" hidden>
-                <p class="definition">
-                    Duyệt trước khi ca bắt đầu. Hệ thống chuyển lịch sang khung giờ còn chỗ trong khoa;
-                    lịch không còn chỗ được đánh dấu cần đặt lại và gửi thông báo. Khung giờ cũ được khóa
-                    để giữ lịch sử.
-                </p>
-                <div class="card">
-                    <div class="card-heading">
-                        <h2>Đề nghị nghỉ / đổi ca</h2>
-                        <span>Hiển thị tối đa 200 đề nghị gần nhất</span>
+                <div class="misa-section-header">
+                    <div>
+                        <h2 class="misa-section-title">Danh sách đề nghị nghỉ / đổi ca trực</h2>
+                        <span class="misa-section-desc">Duyệt đề nghị trước khi ca trực bắt đầu. Hệ thống tự động chuyển lịch sang khung giờ còn trống trong khoa.</span>
                     </div>
-                    <div class="table-scroll" id="requests-table"></div>
+                </div>
+                <div class="misa-card misa-table-card">
+                    <div class="misa-table-scroll-wrap" id="requests-table"></div>
                 </div>
             </section>
 
+            <!-- ============================================================
+                 PANEL 3: KHOA PHÒNG BAN
+                 ============================================================ -->
             <section data-panel="departments" aria-label="Danh sách phòng ban" hidden>
-                <div class="section-actions">
-                    <span>Khoa / đơn vị chuyên môn của bệnh viện</span>
-                    <button class="btn button primary" data-open="department-dialog" type="button">
-                        + Thêm phòng ban
-                    </button>
-                </div>
-                <div class="card"><div class="table-scroll" id="departments-table"></div></div>
-            </section>
-
-            <section data-panel="staff" aria-label="Danh sách nhân sự" hidden>
-                <div class="section-actions">
-                    <span>Bác sĩ, y tá và trưởng khoa</span>
-                    <button class="btn button primary" id="new-staff" type="button">
-                        + Thêm nhân sự
-                    </button>
-                </div>
-                <p class="definition">
-                    Hồ sơ nhân sự được tạo cùng tài khoản để bảo đảm liên kết đúng vai trò và phòng
-                    ban.
-                </p>
-                <div class="card"><div class="table-scroll" id="staff-table"></div></div>
-            </section>
-
-            <section data-panel="doctors" aria-label="Danh sách bác sĩ" hidden>
-                <div class="card">
-                    <div class="card-heading">
-                        <h2>Đội ngũ bác sĩ</h2>
-                        <span>Thông tin nhân sự, không bao gồm bệnh án</span>
+                <div class="misa-section-header">
+                    <div>
+                        <h2 class="misa-section-title">Khoa / Phòng ban chuyên môn</h2>
+                        <span class="misa-section-desc">Cơ cấu tổ chức các chuyên khoa, phòng cận lâm sàng và khu vực kỹ thuật</span>
                     </div>
-                    <div class="table-scroll" id="doctors-table"></div>
+                    <button class="btn misa-btn-primary" data-open="department-dialog" type="button">
+                        <span class="plus-icon">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                        </span>
+                        <span>Thêm Khoa Phòng Mới</span>
+                    </button>
+                </div>
+                <div class="misa-card misa-table-card">
+                    <div class="misa-table-scroll-wrap" id="departments-table"></div>
                 </div>
             </section>
 
-            <section data-panel="accounts" aria-label="Danh sách tài khoản" hidden>
-                <div class="section-actions">
-                    <span>Quản lý quyền truy cập và trạng thái hoạt động</span>
-                    <button class="btn button primary" id="new-account" type="button">
-                        + Tạo tài khoản
-                    </button>
+            <!-- ============================================================
+                 PANEL 4: NHÂN SỰ Y TẾ
+                 ============================================================ -->
+            <section data-panel="staff" aria-label="Danh sách nhân sự" hidden>
+                <div class="misa-section-header">
+                    <div>
+                        <h2 class="misa-section-title">Danh sách nhân sự y tế</h2>
+                        <span class="misa-section-desc">Đội ngũ Bác sĩ, Y tá, Kỹ thuật viên và Điều dưỡng theo từng khoa phòng ban</span>
+                    </div>
+                    <div class="misa-section-header-actions">
+                        <div class="misa-view-toggle-pills" role="tablist" aria-label="Kiểu hiển thị">
+                            <button type="button" class="misa-toggle-pill active" data-view-target="staff-split" title="Chế độ Thẻ hồ sơ Master-Detail (Google Contacts/Gmail)">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <rect x="3" y="3" width="7" height="18" rx="1"></rect>
+                                    <rect x="14" y="3" width="7" height="18" rx="1"></rect>
+                                </svg>
+                                <span>Hồ sơ chi tiết</span>
+                            </button>
+                            <button type="button" class="misa-toggle-pill" data-view-target="staff-grid" title="Chế độ Bảng danh sách">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <line x1="8" y1="6" x2="21" y2="6"></line>
+                                    <line x1="8" y1="12" x2="21" y2="12"></line>
+                                    <line x1="8" y1="18" x2="21" y2="18"></line>
+                                    <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                                    <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                                    <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                                </svg>
+                                <span>Bảng lưới</span>
+                            </button>
+                        </div>
+                        <button class="btn misa-btn-primary" id="new-staff" type="button">
+                            <span class="plus-icon">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                            </span>
+                            <span>Thêm Nhân Sự Mới</span>
+                        </button>
+                    </div>
                 </div>
-                <div class="card"><div class="table-scroll" id="accounts-table"></div></div>
+
+                <!-- Chế độ Master-Detail (Chuẩn phong cách Google / Gmail Contacts) -->
+                <div class="misa-profile-split-view" id="staff-split-view">
+                    <!-- Danh sách bên trái -->
+                    <div class="misa-split-master">
+                        <div class="misa-split-master-header">
+                            <div class="master-header-info">
+                                <h3 class="master-header-title">Nhân sự</h3>
+                                <span class="master-header-count" id="staff-count-badge">0</span>
+                            </div>
+                            <div class="master-search-wrap">
+                                <span class="master-search-icon">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="11" cy="11" r="8"></circle>
+                                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                    </svg>
+                                </span>
+                                <input type="text" class="master-search-input" id="staff-split-search" placeholder="Tìm theo họ tên, chức danh..." />
+                            </div>
+                        </div>
+                        <div class="misa-split-list" id="staff-master-list" role="listbox" aria-label="Danh sách nhân sự"></div>
+                    </div>
+
+                    <!-- Thẻ hồ sơ bên phải -->
+                    <div class="misa-split-detail" id="staff-detail-pane"></div>
+                </div>
+
+                <!-- Chế độ Bảng danh sách (Dự phòng khi chuyển chế độ) -->
+                <div class="misa-card misa-table-card" id="staff-grid-view" style="display: none;">
+                    <div class="misa-table-scroll-wrap" id="staff-table"></div>
+                </div>
+            </section>
+
+            <!-- ============================================================
+                 PANEL 5: DANH SÁCH BÁC SĨ
+                 ============================================================ -->
+            <section data-panel="doctors" aria-label="Danh sách bác sĩ" hidden>
+                <div class="misa-section-header">
+                    <div>
+                        <h2 class="misa-section-title">Đội ngũ Bác sĩ chuyên khoa</h2>
+                        <span class="misa-section-desc">Hồ sơ chuyên môn, số hiệu chứng chỉ hành nghề và đơn vị công tác</span>
+                    </div>
+                </div>
+                <div class="misa-card misa-table-card">
+                    <div class="misa-table-scroll-wrap" id="doctors-table"></div>
+                </div>
+            </section>
+
+            <!-- ============================================================
+                 PANEL 6: TÀI KHOẢN & PHÂN QUYỀN
+                 ============================================================ -->
+            <section data-panel="accounts" aria-label="Danh sách tài khoản" hidden>
+                <div class="misa-section-header">
+                    <div>
+                        <h2 class="misa-section-title">Tài khoản &amp; Phân quyền hệ thống</h2>
+                        <span class="misa-section-desc">Quản lý quyền truy cập chuyên môn, trạng thái kích hoạt và bảo mật</span>
+                    </div>
+                    <div class="misa-section-header-actions">
+                        <div class="misa-view-toggle-pills" role="tablist" aria-label="Kiểu hiển thị">
+                            <button type="button" class="misa-toggle-pill active" data-view-target="accounts-split" title="Chế độ Thẻ hồ sơ Master-Detail (Google Contacts/Gmail)">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <rect x="3" y="3" width="7" height="18" rx="1"></rect>
+                                    <rect x="14" y="3" width="7" height="18" rx="1"></rect>
+                                </svg>
+                                <span>Hồ sơ chi tiết</span>
+                            </button>
+                            <button type="button" class="misa-toggle-pill" data-view-target="accounts-grid" title="Chế độ Bảng danh sách">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <line x1="8" y1="6" x2="21" y2="6"></line>
+                                    <line x1="8" y1="12" x2="21" y2="12"></line>
+                                    <line x1="8" y1="18" x2="21" y2="18"></line>
+                                    <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                                    <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                                    <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                                </svg>
+                                <span>Bảng lưới</span>
+                            </button>
+                        </div>
+                        <button class="btn misa-btn-primary" id="new-account" type="button">
+                            <span class="plus-icon">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                            </span>
+                            <span>Tạo Tài Khoản Mới</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Chế độ Master-Detail (Chuẩn phong cách Google / Gmail Contacts) -->
+                <div class="misa-profile-split-view" id="accounts-split-view">
+                    <!-- Danh sách bên trái -->
+                    <div class="misa-split-master">
+                        <div class="misa-split-master-header">
+                            <div class="master-header-info">
+                                <h3 class="master-header-title">Tài khoản</h3>
+                                <span class="master-header-count" id="accounts-count-badge">0</span>
+                            </div>
+                            <div class="master-search-wrap">
+                                <span class="master-search-icon">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="11" cy="11" r="8"></circle>
+                                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                    </svg>
+                                </span>
+                                <input type="text" class="master-search-input" id="accounts-split-search" placeholder="Tìm theo username, tên, vai trò..." />
+                            </div>
+                        </div>
+                        <div class="misa-split-list" id="accounts-master-list" role="listbox" aria-label="Danh sách tài khoản"></div>
+                    </div>
+
+                    <!-- Thẻ hồ sơ bên phải -->
+                    <div class="misa-split-detail" id="accounts-detail-pane"></div>
+                </div>
+
+                <!-- Chế độ Bảng danh sách (Dự phòng khi chuyển chế độ) -->
+                <div class="misa-card misa-table-card" id="accounts-grid-view" style="display: none;">
+                    <div class="misa-table-scroll-wrap" id="accounts-table"></div>
+                </div>
             </section>
         </main>
     </div>
 </div>
 
-<dialog id="department-dialog" aria-labelledby="department-title">
+<!-- ====================================================================
+     4. MODAL DIALOGS (CHUẨN FORM BACKEND)
+     ==================================================================== -->
+
+<!-- MODAL THÊM PHÒNG BAN -->
+<dialog id="department-dialog" class="misa-modal" aria-labelledby="department-title">
     <form id="department-form">
-        <div class="dialog-heading">
+        <div class="misa-modal-header">
             <div>
-                <p class="eyebrow">CƠ CẤU BỆNH VIỆN</p>
-                <h2 id="department-title">Thêm phòng ban</h2>
+                <p class="misa-modal-eyebrow">CƠ CẤU BỆNH VIỆN</p>
+                <h2 id="department-title" class="misa-modal-title">Thêm Khoa / Phòng Ban Mới</h2>
             </div>
-            <button type="button" data-close aria-label="Đóng">×</button>
+            <button type="button" data-close class="misa-modal-close-btn" aria-label="Đóng">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
         </div>
-        <label>
-            Tên phòng ban *
-            <input name="name" maxlength="100" minlength="2" required />
-        </label>
-        <label>
-            Mô tả
-            <textarea name="description" maxlength="255" rows="3"></textarea>
-        </label>
-        <p class="form-error" role="alert"></p>
-        <div class="dialog-actions">
-            <button type="button" class="btn button secondary" data-close>Hủy</button>
-            <button class="btn button primary" type="submit">Lưu phòng ban</button>
+        <div class="misa-modal-body">
+            <label class="misa-form-label">
+                <span>Tên khoa / phòng ban *</span>
+                <input name="name" maxlength="100" minlength="2" placeholder="Ví dụ: Khoa Cấp Cứu, Khoa Tim Mạch..." required />
+            </label>
+            <label class="misa-form-label">
+                <span>Mô tả chức năng</span>
+                <textarea name="description" maxlength="255" rows="3" placeholder="Mô tả phạm vi hoạt động của khoa phòng..."></textarea>
+            </label>
+            <p class="form-error" role="alert"></p>
+        </div>
+        <div class="misa-modal-footer">
+            <button type="button" class="btn misa-btn-secondary" data-close>Hủy Bỏ</button>
+            <button class="btn misa-btn-primary" type="submit">Lưu Phòng Ban</button>
         </div>
     </form>
 </dialog>
 
-<dialog id="account-dialog" aria-labelledby="account-title">
+<!-- MODAL TẠO TÀI KHOẢN -->
+<dialog id="account-dialog" class="misa-modal" aria-labelledby="account-title">
     <form id="account-form">
-        <div class="dialog-heading">
+        <div class="misa-modal-header">
             <div>
-                <p class="eyebrow">QUẢN LÝ TRUY CẬP</p>
-                <h2 id="account-title">Tạo tài khoản</h2>
+                <p class="misa-modal-eyebrow">QUẢN LÝ TRUY CẬP</p>
+                <h2 id="account-title" class="misa-modal-title">Tạo Tài Khoản Mới</h2>
             </div>
-            <button type="button" data-close aria-label="Đóng">×</button>
+            <button type="button" data-close class="misa-modal-close-btn" aria-label="Đóng">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
         </div>
-        <div class="form-grid">
-            <label>
-                Tên đăng nhập *
-                <input
-                    name="username"
-                    minlength="3"
-                    maxlength="50"
-                    pattern="[a-zA-Z0-9_.]+"
-                    autocomplete="off"
-                    required
-                />
-            </label>
-            <label>
-                Mật khẩu ban đầu *
-                <input
-                    name="password"
-                    type="password"
-                    minlength="8"
-                    maxlength="72"
-                    autocomplete="new-password"
-                    required
-                />
-            </label>
-            <label>
-                Vai trò *
-                <select name="roleId" required></select>
-            </label>
-            <label>
-                Email
-                <input name="email" type="email" maxlength="100" />
-            </label>
-            <label data-name-field>
-                Họ tên *
-                <input name="fullName" minlength="2" maxlength="100" />
-            </label>
-            <label data-department-field>
-                Phòng ban *
-                <select name="departmentId"></select>
-            </label>
-            <label data-patient-field>
-                Ngày sinh người khám *
-                <input name="dateOfBirth" type="date" />
-            </label>
-            <label data-patient-field>
-                Điện thoại người khám *
-                <input name="phoneNumber" type="tel" maxlength="15" />
-            </label>
+        <div class="misa-modal-body">
+            <div class="misa-form-grid">
+                <label class="misa-form-label">
+                    <span>Tên đăng nhập *</span>
+                    <input
+                        name="username"
+                        minlength="3"
+                        maxlength="50"
+                        pattern="[a-zA-Z0-9_.]+"
+                        autocomplete="off"
+                        placeholder="Tên tài khoản (viết liền không dấu)"
+                        required
+                    />
+                </label>
+                <label class="misa-form-label">
+                    <span>Mật khẩu ban đầu *</span>
+                    <input
+                        name="password"
+                        type="password"
+                        minlength="8"
+                        maxlength="72"
+                        autocomplete="new-password"
+                        placeholder="Ít nhất 8 ký tự"
+                        required
+                    />
+                </label>
+                <label class="misa-form-label">
+                    <span>Vai trò truy cập *</span>
+                    <select name="roleId" required></select>
+                </label>
+                <label class="misa-form-label">
+                    <span>Địa chỉ Email</span>
+                    <input name="email" type="email" maxlength="100" placeholder="email@medicare.vn" />
+                </label>
+                <label class="misa-form-label" data-name-field>
+                    <span>Họ và tên nhân sự *</span>
+                    <input name="fullName" minlength="2" maxlength="100" placeholder="Họ và tên đầy đủ" />
+                </label>
+                <label class="misa-form-label" data-department-field>
+                    <span>Khoa / Phòng ban công tác *</span>
+                    <select name="departmentId"></select>
+                </label>
+                <label class="misa-form-label" data-patient-field>
+                    <span>Ngày sinh người khám *</span>
+                    <input name="dateOfBirth" type="date" />
+                </label>
+                <label class="misa-form-label" data-patient-field>
+                    <span>Điện thoại người khám *</span>
+                    <input name="phoneNumber" type="tel" maxlength="15" placeholder="Số điện thoại" />
+                </label>
+            </div>
+            <p class="misa-form-hint" id="account-hint">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-right:4px;" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                </svg>
+                <span>Tài khoản mới sẽ được tự động kích hoạt ngay sau khi tạo thành công.</span>
+            </p>
+            <p class="form-error" role="alert"></p>
         </div>
-        <p class="definition" id="account-hint">
-            Tài khoản mới được kích hoạt sau khi tạo. Mật khẩu không được hiển thị trong danh sách.
-        </p>
-        <p class="form-error" role="alert"></p>
-        <div class="dialog-actions">
-            <button type="button" class="btn button secondary" data-close>Hủy</button>
-            <button class="btn button primary" type="submit">Tạo tài khoản</button>
+        <div class="misa-modal-footer">
+            <button type="button" class="btn misa-btn-secondary" data-close>Hủy Bỏ</button>
+            <button class="btn misa-btn-primary" type="submit">Xác Nhận Tạo</button>
         </div>
     </form>
 </dialog>
