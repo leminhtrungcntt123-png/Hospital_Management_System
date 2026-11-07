@@ -1,458 +1,2317 @@
+/* ==========================================================================
+   MEDICARE HIS - GIAO DIỆN QUẢN TRỊ BỆNH VIỆN HIỆN ĐẠI & TRỰC QUAN
+   Theme chủ đạo: Xanh Dương Zalo Tươi Sáng (Vibrant Zalo Blue #0068ff)
+   Kết hợp hài hòa màu sắc trực quan (Emerald #10b981, Indigo #6366f1, Amber #f59e0b)
+   ========================================================================== */
+
 :root {
-    --admin-navy: var(--navy);
-    --admin-sidebar-width: 224px;
-    --admin-cyan: var(--primary);
-    --admin-ink: var(--ink);
-    --admin-muted: var(--muted);
-    --admin-line: var(--line);
-    --admin-bg: var(--bg);
+    --misa-primary: #0068ff;
+    --misa-primary-hover: #0056cc;
+    --misa-primary-light: #edf4ff;
+    --misa-primary-border: #b3d4ff;
+    --misa-primary-gradient: linear-gradient(135deg, #0068ff 0%, #0056cc 100%);
+    --misa-emerald: #10b981;
+    --misa-emerald-light: #ecfdf5;
+    --misa-emerald-border: #a7f3d0;
+    --misa-indigo: #6366f1;
+    --misa-indigo-light: #eef2ff;
+    --misa-amber: #f59e0b;
+    --misa-amber-light: #fffbeb;
+    --misa-bg: #f4f6fa;
+    --misa-card-bg: #ffffff;
+    --misa-border: #e2e8f0;
+    --misa-border-light: #f1f5f9;
+    --misa-text-main: #1e293b;
+    --misa-text-heading: #0f172a;
+    --misa-text-muted: #64748b;
+    --misa-text-subtle: #94a3b8;
+    --misa-sidebar-width: 195px;
+    --misa-topbar-height: 48px;
+    --misa-subbar-height: 36px;
+    --misa-radius: 12px;
+    --misa-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
+    --misa-shadow-card: 0 2px 10px rgba(0, 104, 255, 0.06);
 }
 
-* {
+*, *::before, *::after {
     box-sizing: border-box;
 }
-body {
+
+/* ==========================================================================
+   0.0 THANH CUỘN (SCROLLBAR) HIỆN ĐẠI, TINH GỌN & ĐỒNG BỘ THEME ZALO BLUE
+   ========================================================================== */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+}
+
+*::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 9999px;
+    border: 1px solid transparent;
+    background-clip: content-box;
+    transition: background-color 0.2s ease;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background: #0068ff;
+}
+
+*::-webkit-scrollbar-thumb:active {
+    background: #0056cc;
+}
+
+*::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+body.misa-theme, body {
     margin: 0;
-    font:
-        13px/1.65 "Be Vietnam Pro",
-        "Segoe UI",
-        sans-serif;
-    font-weight: 450;
-    color: var(--admin-ink);
-    background: var(--admin-bg);
+    padding: 0;
+    font-family: 'Inter', 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--misa-text-main);
+    background-color: var(--misa-bg);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
-button,
-input,
-select,
-textarea {
-    font: inherit;
+
+/* ==========================================================================
+   0. ICON SVG TOÀN CỤC (SỬA TRIỆT ĐỂ LỖI ĐEN NGUYÊN KHỐI)
+   ========================================================================== */
+svg.icon, .icon {
+    width: 17px;
+    height: 17px;
+    fill: none !important;
+    stroke: currentColor !important;
+    stroke-width: 2 !important;
+    stroke-linecap: round !important;
+    stroke-linejoin: round !important;
+    display: inline-block;
+    vertical-align: middle;
+    flex-shrink: 0;
 }
-button,
-a {
-    touch-action: manipulation;
-}
-button {
-    cursor: pointer;
-}
-button:disabled {
-    opacity: 0.55;
-    cursor: wait;
-}
-button:focus-visible,
-a:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
-    outline: 3px solid #55b7d5;
-    outline-offset: 3px;
-}
-[hidden] {
-    display: none !important;
-}
-h1,
-h2,
-p {
-    margin: 0;
-}
-a {
-    color: inherit;
-}
-.admin-workspace {
-    display: grid;
-    grid-template-columns: var(--admin-sidebar-width) minmax(0, 1fr);
-    min-height: 100vh;
-}
-.admin-sidebar {
-    width: var(--admin-sidebar-width);
-}
-.admin-brand .brand-mark > .icon {
-    display: block;
-    width: 24px;
-    height: 24px;
-    stroke-width: 3;
-}
-.admin-content {
-    min-width: 0;
-    grid-column: 2;
-    grid-row: 1;
-}
-.admin-sidebar-scrim {
-    display: none;
-}
-.admin-identity {
-    max-width: min(180px, 40vw);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    background: #e5f3f8;
-    color: #006588;
-    padding: 5px 13px;
-    border-radius: 30px;
-    font-weight: 650;
-}
-main {
-    padding: 30px 32px;
-    max-width: 1600px;
-    margin: 0 auto;
-}
-.admin-heading {
+
+/* ==========================================================================
+   1. TOPBAR TOÀN MÀN HÌNH: ĐỒNG BỘ & TRỰC QUAN
+   ========================================================================== */
+.misa-topbar {
+    position: sticky;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--misa-topbar-height);
+    background: #ffffff;
+    border-bottom: 1px solid #e0e7ff;
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    gap: 18px;
-    margin-bottom: 25px;
+    justify-content: space-between;
+    padding: 0 20px;
+    z-index: 100;
+    box-shadow: 0 1px 4px rgba(0, 104, 255, 0.05);
 }
-.eyebrow {
-    color: var(--admin-cyan);
-    font-weight: 750;
-    font-size: 10px;
-    letter-spacing: 1.5px;
-    margin-bottom: 7px;
+
+.misa-topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
 }
-h1 {
-    font-size: 28px;
-    font-weight: 750;
-    line-height: 1.3;
+
+.misa-brand-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
 }
-h2 {
-    font-size: 17px;
+
+.misa-brand-logo-wrap {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+    box-shadow: 0 2px 6px rgba(0, 104, 255, 0.2);
+    border: 1.5px solid #bae6fd;
+}
+
+.misa-brand-logo {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.misa-brand-text-wrap {
+    display: flex;
+    flex-direction: column;
+}
+
+.misa-brand-title {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--misa-primary);
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+}
+
+.misa-brand-subtitle {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--misa-text-subtle);
+}
+
+.misa-org-compact {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 3px 12px;
+    border-radius: 9999px;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    font-size: 12px;
+}
+
+.misa-org-compact .org-icon {
+    font-size: 13px;
+    line-height: 1;
+    color: #16a34a;
+}
+
+.misa-org-compact .org-name {
     font-weight: 700;
+    color: #166534;
 }
-#page-description {
-    color: var(--admin-muted);
-    margin-top: 8px;
+
+.misa-org-compact .org-dot {
+    color: #86efac;
+    font-size: 10px;
 }
-.small-button {
-    min-height: 34px;
-    padding: 6px 10px;
+
+.misa-org-compact .org-year {
+    font-size: 11px;
+    font-weight: 700;
+    color: #0068ff;
+    background: #edf4ff;
+    border: 1px solid #b3d4ff;
+    padding: 1px 7px;
+    border-radius: 8px;
+}
+
+/* User Profile & Đăng xuất */
+.misa-topbar-right {
+    display: flex;
+    align-items: center;
+}
+
+.misa-user-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.misa-user-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #f8faff;
+    border: 1px solid #d0e2ff;
+    padding: 3px 10px 3px 4px;
+    border-radius: 9999px;
+    box-shadow: 0 1px 3px rgba(0, 104, 255, 0.08);
+}
+
+.misa-avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #0068ff 0%, #0056cc 100%);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 11px;
+    box-shadow: 0 2px 5px rgba(0, 104, 255, 0.35);
+}
+
+.misa-user-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.misa-user-name {
+    font-size: 12px;
+    font-weight: 700;
+    color: #0068ff;
+    line-height: 1.2;
+}
+
+.misa-user-role {
+    font-size: 10px;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.misa-btn-logout {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border: 1px solid #fecaca;
+    background: #fef2f2;
+    color: #dc2626;
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-family: inherit;
+    box-shadow: 0 1px 2px rgba(220, 38, 38, 0.05);
+}
+
+.misa-btn-logout:hover {
+    background: #dc2626;
+    border-color: #dc2626;
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+}
+
+/* ==========================================================================
+   2. SUBBAR: BREADCRUMB & NÚT LÀM MỚI DỮ LIỆU
+   ========================================================================== */
+.misa-subbar {
+    height: var(--misa-subbar-height);
+    background: #ffffff;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    position: sticky;
+    top: var(--misa-topbar-height);
+    z-index: 90;
+}
+
+.misa-breadcrumb-sub {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    color: var(--misa-text-subtle);
+}
+
+.breadcrumb-item {
+    color: #64748b;
+    font-weight: 500;
+}
+
+.breadcrumb-sep {
+    color: #cbd5e1;
     font-size: 11px;
 }
-.filter-bar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: end;
-    gap: 14px;
-    background: white;
-    border: 1px solid var(--admin-line);
-    border-radius: 10px;
-    padding: 19px;
+
+.breadcrumb-current {
+    color: var(--misa-primary);
+    font-weight: 700;
 }
-label {
-    display: grid;
-    gap: 7px;
-    font-weight: 650;
-    font-size: 13px;
-}
-input,
-select,
-textarea {
-    width: 100%;
-    min-width: 0;
-    padding: 9px 11px;
-    border: 1px solid #aabfcf;
+
+.misa-subbar-btn {
+    border: 1px solid #b3d4ff;
+    background: linear-gradient(135deg, #f0f7ff 0%, #edf4ff 100%);
+    color: #0068ff;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 11px;
     border-radius: 6px;
-    background: white;
-    color: var(--admin-ink);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-family: inherit;
+    box-shadow: 0 1px 3px rgba(0, 104, 255, 0.1);
 }
-input:disabled,
-select:disabled {
-    background: #eff3f6;
+
+.misa-subbar-btn:hover {
+    background: #0068ff;
+    border-color: #0068ff;
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(0, 104, 255, 0.25);
 }
-.definition {
-    font-size: 12px;
-    color: var(--admin-muted);
-    margin: 13px 0 20px;
-    line-height: 1.8;
+
+.misa-subbar-btn:active {
+    transform: translateY(1px);
 }
-.admin-stats {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 15px;
-    margin-bottom: 22px;
+
+.misa-subbar-demo-btn {
+    border: 1px solid #bbf7d0;
+    background: #f0fdf4;
+    color: #166534;
 }
-.stat {
-    padding: 20px;
-    border: 1px solid var(--admin-line);
-    background: white;
-    border-radius: 10px;
-    border-top: 3px solid #8faec4;
+
+.misa-subbar-demo-btn.active {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border-color: #059669;
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
 }
-.stat.highlight {
-    border-top-color: var(--admin-cyan);
-    background: #e7f5fb;
+
+.misa-subbar-demo-btn:hover:not(.active) {
+    background: #dcfce7;
+    color: #15803d;
 }
-.stat span {
+
+/* ==========================================================================
+   3. SIDEBAR RỘNG RÃI (245px) CÓ MÀU SẮC TRỰC QUAN TỪNG MỤC
+   ========================================================================== */
+.misa-body-layout {
+    display: flex;
+    min-height: calc(100vh - var(--misa-topbar-height) - var(--misa-subbar-height));
+    background: var(--misa-bg);
+}
+
+.misa-sidebar {
+    width: var(--misa-sidebar-width);
+    flex-shrink: 0;
+    background: #ffffff;
+    border-right: 1px solid #e2e8f0;
+    padding: 12px 8px;
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: calc(var(--misa-topbar-height) + var(--misa-subbar-height));
+    height: calc(100vh - var(--misa-topbar-height) - var(--misa-subbar-height));
+    align-self: flex-start;
+    box-shadow: 2px 0 8px rgba(0, 104, 255, 0.03);
+    z-index: 80;
+    overflow-y: auto;
+}
+
+.misa-sidebar::-webkit-scrollbar {
+    width: 4px;
+}
+
+.misa-sidebar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+    transition: background 0.2s ease;
+}
+
+.misa-sidebar::-webkit-scrollbar-thumb:hover {
+    background: #0068ff;
+}
+
+.misa-sidebar-top {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Nút + Thêm nhanh gradient xanh biển rực rỡ */
+.misa-quick-add-container {
+    position: relative;
+    width: 100%;
+}
+
+.misa-btn-quick-add {
+    width: 100%;
+    height: 38px;
+    background: linear-gradient(135deg, #0068ff 0%, #0056cc 100%);
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    cursor: pointer;
+    box-shadow: 0 3px 8px rgba(0, 104, 255, 0.28);
+    transition: all 0.15s ease;
+    font-family: inherit;
+}
+
+.misa-btn-quick-add:hover {
+    background: linear-gradient(135deg, #0056cc 0%, #004099 100%);
+    box-shadow: 0 5px 14px rgba(0, 104, 255, 0.38);
+    transform: translateY(-1px);
+}
+
+.misa-btn-quick-add:active {
+    transform: translateY(0);
+}
+
+.misa-plus-icon-pill {
+    width: 19px;
+    height: 19px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    line-height: 1;
+}
+
+.misa-plus-icon-pill svg {
     display: block;
-    color: var(--admin-muted);
+}
+
+.misa-quick-add-menu {
+    position: absolute;
+    top: 44px;
+    left: 0;
+    width: 185px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    box-shadow: 0 10px 20px -3px rgba(0, 104, 255, 0.15);
+    padding: 5px;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.misa-quick-add-menu[hidden] {
+    display: none;
+}
+
+.misa-quick-add-menu button {
+    width: 100%;
+    text-align: left;
+    padding: 7px 9px;
+    border: none;
+    background: transparent;
     font-size: 12px;
-    font-weight: 650;
+    font-weight: 600;
+    color: var(--misa-text-main);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.12s;
 }
-.stat strong {
-    display: block;
-    font-size: clamp(20px, 2vw, 29px);
-    margin: 9px 0 3px;
-    font-weight: 750;
-    word-break: break-word;
+
+.misa-quick-add-menu button:hover {
+    background: #f0f9ff;
+    color: var(--misa-primary);
 }
-.stat small {
-    color: var(--admin-muted);
+
+.quick-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
 }
-.card {
-    background: white;
-    border: 1px solid var(--admin-line);
+
+.quick-icon svg {
+    width: 15px;
+    height: 15px;
+}
+
+.quick-icon.icon-dept { color: #9333ea; }
+.quick-icon.icon-user { color: #059669; }
+.quick-icon.icon-shield { color: #4f46e5; }
+
+/* Tiêu đề nhóm danh mục */
+.misa-nav-header {
+    font-size: 10.5px;
+    font-weight: 800;
+    color: #94a3b8;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 6px;
+}
+
+/* Menu danh mục: Gọn gàng, súc tích, icon pastel sống động */
+.misa-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.misa-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    height: 38px;
+    padding: 0 8px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    color: #334155 !important;
+    transition: all 0.15s ease;
+    position: relative;
+    border: 1.5px solid transparent;
+}
+
+.misa-nav-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+}
+
+/* Màu sắc trực quan riêng cho từng biểu tượng phân hệ */
+.nav-icon-blue {
+    background: #edf4ff;
+    color: #0068ff;
+}
+
+.nav-icon-purple {
+    background: #f3e8ff;
+    color: #9333ea;
+}
+
+.nav-icon-emerald {
+    background: #d1fae5;
+    color: #059669;
+}
+
+.nav-icon-teal {
+    background: #ccfbf1;
+    color: #0d9488;
+}
+
+.nav-icon-indigo {
+    background: #e0e7ff;
+    color: #4f46e5;
+}
+
+.nav-icon-amber {
+    background: #fef3c7;
+    color: #d97706;
+}
+
+.misa-nav-text {
+    white-space: nowrap;
+}
+
+.misa-nav-item:hover:not(.active) {
+    background: #f1f5f9;
+    color: var(--misa-text-heading) !important;
+    transform: translateX(2px);
+}
+
+/* Trạng thái Active: Chuẩn phong cách Zalo / Modern Dashboard trong hình tham khảo */
+.misa-nav-item.active {
+    background: #0068ff !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    border-radius: 9px !important;
+    border: none !important;
+    box-shadow: 0 4px 12px rgba(0, 104, 255, 0.35) !important;
+}
+
+.misa-nav-item.active .misa-nav-text {
+    color: #ffffff !important;
+}
+
+.misa-nav-item.active .misa-nav-icon {
+    background: rgba(255, 255, 255, 0.2) !important;
+    color: #ffffff !important;
+    box-shadow: none !important;
+}
+
+.misa-nav-item.active .misa-nav-icon svg {
+    stroke: #ffffff !important;
+}
+
+/* Chân Sidebar: gắn liền bên dưới danh mục với đường phân cách */
+.misa-sidebar-bottom {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid #f1f5f9;
+}
+
+.misa-sys-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--misa-text-subtle);
+    margin-bottom: 8px;
+    padding-left: 4px;
+}
+
+.misa-status-dot-live {
+    width: 6.5px;
+    height: 6.5px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
+}
+
+.misa-portal-link {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--misa-primary);
+    text-decoration: none;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.misa-portal-link:hover {
+    background: #e0f2fe;
+}
+
+/* ==========================================================================
+   4. MAIN WORKSPACE (KHU VỰC NỘI DUNG CHÍNH)
+   ========================================================================== */
+.misa-main-content {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 16px 20px;
+    background: var(--misa-bg);
+}
+
+/* ==========================================================================
+   4. BỘ LỌC THỜI GIAN: BỐ CỤC 2 ĐẦU CÂN ĐỐI, LỊCH MÀU SẮC TRỰC QUAN
+   ========================================================================== */
+.misa-filter-card {
+    background: #ffffff;
+    border: 1px solid var(--misa-border);
     border-radius: 10px;
-    margin-bottom: 23px;
-    overflow: hidden;
-}
-.card-heading {
-    padding: 18px 20px;
+    padding: 8px 14px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    border-bottom: 1px solid #d6e1e9;
+    flex-wrap: wrap;
 }
-.card-heading > span {
-    color: var(--admin-muted);
-    font-size: 12px;
-}
-.table-scroll {
-    overflow: auto;
-}
-table {
-    width: 100%;
-    border-collapse: collapse;
-    text-align: left;
-}
-th {
-    background: #eaf1f7;
-    padding: 13px 16px;
-    color: #344f66;
-    font-size: 12px;
-    white-space: nowrap;
-}
-td {
-    padding: 15px 16px;
-    border-top: 1px solid #e2eaf1;
-    font-size: 13px;
-}
-tbody tr:hover {
-    background: #f5f9fc;
-}
-.number {
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
-.status {
-    padding: 4px 9px;
-    background: #e5f4ec;
-    color: #23674b;
-    border-radius: 5px;
-    white-space: nowrap;
-    font-weight: 650;
-    font-size: 11px;
-}
-.status.inactive {
-    color: #7b5251;
-    background: #f8eae7;
-}
-.empty {
-    text-align: center;
-    color: var(--admin-muted);
-    padding: 35px 18px;
-}
-.section-actions {
+
+.misa-filter-left {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 18px;
-    margin-bottom: 20px;
-}
-.section-actions > span {
-    color: var(--admin-muted);
-}
-.revenue-chart {
-    display: flex;
-    align-items: stretch;
-    height: 220px;
-    gap: 9px;
-    overflow-x: auto;
-    padding: 20px;
-}
-.chart-day {
-    min-width: 27px;
-    flex: 1 0 27px;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
     gap: 8px;
-    text-align: center;
+    flex-wrap: nowrap;
 }
-.chart-bar {
-    background: #168eb6;
-    border-radius: 4px 4px 0 0;
-    min-height: 2px;
+
+.misa-branch-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #1e293b;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    padding: 0 10px;
+    height: 34px;
+    border-radius: 8px;
+    white-space: nowrap;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
-.chart-bar.negative {
-    background: #b85b50;
+
+.misa-branch-pill .pill-icon {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    background: #eff6ff;
+    color: #0068ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
 }
-.chart-day small {
-    font-size: 9px;
-    color: var(--admin-muted);
+
+.misa-branch-pill .label {
+    color: #64748b;
+    font-weight: 500;
+    font-size: 11.5px;
+}
+
+.misa-branch-pill .value {
+    color: #0f172a;
+    font-weight: 700;
+    font-size: 12px;
+}
+
+.misa-unit-pill {
+    font-size: 11px;
+    font-weight: 700;
+    color: #475569;
+    background: #f1f5f9;
+    padding: 0 9px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
     white-space: nowrap;
 }
-#admin-message {
-    margin-bottom: 20px;
-    padding: 13px 17px;
-    border-radius: 7px;
-    background: #e1f3e9;
-    color: #245d45;
-    border: 1px solid #b6d9c5;
+
+.misa-filter-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;
 }
-#admin-message.error {
-    background: #fff0ed;
-    color: #8f352c;
-    border-color: #e4b7ad;
+
+.misa-date-form {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;
+    white-space: nowrap;
 }
-dialog {
-    width: min(650px, calc(100vw - 28px));
-    border: 1px solid var(--admin-line);
-    border-radius: 13px;
-    padding: 25px;
-    color: var(--admin-ink);
-    max-height: calc(100vh - 40px);
+
+/* KHỐI LỊCH MÀU SẮC TRỰC QUAN & ĐỒNG BỘ THEME */
+.misa-date-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: linear-gradient(135deg, #f0f7ff 0%, #edf5ff 100%);
+    border: 1.5px solid #b3d4ff;
+    border-radius: 8px;
+    padding: 0 8px;
+    height: 34px;
+    box-shadow: 0 1px 2px rgba(0, 104, 255, 0.05);
+    transition: all 0.15s ease;
 }
-dialog::backdrop {
-    background: #102d46a3;
+
+.misa-date-group:hover {
+    border-color: #0068ff;
+    background: #e6f1ff;
 }
-.dialog-heading {
+
+.misa-date-group:focus-within {
+    border-color: #0068ff;
+    background: #ffffff;
+    box-shadow: 0 0 0 3px rgba(0, 104, 255, 0.16);
+}
+
+.misa-date-badge-icon {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    background: #0068ff;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 1px 3px rgba(0, 104, 255, 0.3);
+}
+
+.misa-date-label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin: 0;
+}
+
+.misa-date-label .date-chip {
+    font-size: 11px;
+    font-weight: 700;
+    color: #0056cc;
+    background: rgba(0, 104, 255, 0.1);
+    padding: 1px 6px;
+    border-radius: 4px;
+    line-height: 1.3;
+}
+
+.misa-date-label input[type="date"] {
+    border: none;
+    outline: none;
+    font-size: 12.5px;
+    color: #0f172a;
+    background: transparent;
+    font-family: inherit;
+    font-weight: 700;
+    padding: 0;
+    cursor: pointer;
+    min-width: 105px;
+}
+
+.misa-date-label input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    filter: invert(30%) sepia(90%) saturate(2400%) hue-rotate(205deg) brightness(96%) contrast(105%);
+}
+
+.misa-date-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #0068ff;
+    flex-shrink: 0;
+    opacity: 0.85;
+}
+
+.misa-btn-filter-submit {
+    background: linear-gradient(135deg, #0068ff 0%, #0056cc 100%);
+    color: #ffffff;
+    font-size: 12.5px;
+    font-weight: 700;
+    border: none;
+    padding: 0 14px;
+    height: 34px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 2px 6px rgba(0, 104, 255, 0.25);
+    transition: all 0.15s ease;
+    font-family: inherit;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.misa-btn-filter-submit:hover {
+    background: linear-gradient(135deg, #0056cc 0%, #004099 100%);
+    box-shadow: 0 3px 10px rgba(0, 104, 255, 0.35);
+    transform: translateY(-1px);
+}
+
+/* Nút Xuất Excel Xanh Lá Chuẩn Đẹp */
+.misa-btn-export-excel {
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+    color: #ffffff !important;
+    font-size: 12.5px;
+    font-weight: 700;
+    border: none;
+    padding: 0 14px;
+    height: 34px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.22);
+    transition: all 0.15s ease;
+    font-family: inherit;
+    flex-shrink: 0;
+}
+
+.misa-btn-export-excel svg {
+    stroke: #ffffff !important;
+    width: 14px;
+    height: 14px;
+}
+
+.misa-btn-export-excel:hover {
+    background: linear-gradient(135deg, #047857 0%, #059669 100%);
+    box-shadow: 0 3px 10px rgba(16, 185, 129, 0.3);
+    transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   5. 4 THẺ KPI NỀN TRẮNG, CHỮ ĐEN IN ĐẬM, ICON CÓ Ô BAO MÀU SẮC (DASHBOARD)
+   ========================================================================== */
+.misa-kpi-quad-grid {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    margin-bottom: 10px !important;
+}
+
+.misa-kpi-card {
+    background: #ffffff !important;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    padding: 10px 12px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+    display: grid !important;
+    grid-template-columns: 40px 1fr !important;
+    grid-template-rows: auto auto !important;
+    column-gap: 10px !important;
+    row-gap: 2px !important;
+    align-items: center !important;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    min-width: 0;
+}
+
+.misa-kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+    border-color: #cbd5e1;
+}
+
+/* Icon Box có ô màu bao quanh theo chuẩn hình tham khảo */
+.misa-kpi-icon-box,
+.misa-kpi-icon-pill {
+    grid-column: 1 !important;
+    grid-row: 1 / span 2 !important;
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    border-radius: 10px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #ffffff !important;
+    flex-shrink: 0 !important;
+    border: none !important;
+}
+
+.misa-kpi-icon-box svg,
+.misa-kpi-icon-pill svg {
+    display: block !important;
+    width: 20px !important;
+    height: 20px !important;
+    stroke: #ffffff !important;
+    stroke-width: 2.2 !important;
+}
+
+.misa-kpi-icon-box.box-blue,
+.pill-emerald,
+.pill-blue {
+    background: #0068ff !important;
+    box-shadow: 0 4px 12px rgba(0, 104, 255, 0.28) !important;
+}
+
+.misa-kpi-icon-box.box-green,
+.kpi-card-blue .misa-kpi-icon-pill {
+    background: #10b981 !important;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.28) !important;
+}
+
+.misa-kpi-icon-box.box-orange,
+.pill-indigo {
+    background: #f59e0b !important;
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.28) !important;
+}
+
+.misa-kpi-icon-box.box-purple,
+.pill-amber {
+    background: #8b5cf6 !important;
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.28) !important;
+}
+
+/* Khối thông tin chữ */
+.misa-kpi-info {
+    grid-column: 2 !important;
+    grid-row: 1 / span 2 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    min-width: 0;
+}
+
+.misa-kpi-val {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    font-size: clamp(14.5px, 1.1vw, 17px) !important;
+    font-weight: 800 !important;
+    color: #0f172a !important;
+    line-height: 1.2 !important;
+    margin: 0 !important;
+    letter-spacing: -0.3px !important;
+    white-space: nowrap !important;
+}
+
+.misa-kpi-label {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+    font-size: 11.5px !important;
+    font-weight: 500 !important;
+    color: #64748b !important;
+    margin: 0 !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+}
+
+/* Hỗ trợ hiển thị mượt mà trên cả bản build cũ lẫn mới */
+.misa-kpi-card .misa-kpi-top {
+    display: contents !important;
+}
+
+.misa-kpi-card .misa-kpi-footer {
+    display: none !important;
+}
+
+/* ==========================================================================
+   6. HÀNG BIỂU ĐỒ (DÒNG TIỀN + DONUT CƠ CẤU)
+   ========================================================================== */
+.misa-charts-row {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(290px, 1fr);
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.misa-card {
+    background: var(--misa-card-bg);
+    border-radius: 8px;
+    border: 1px solid var(--misa-border);
+    padding: 11px 14px;
+    box-shadow: var(--misa-shadow-card);
+}
+
+.misa-chart-card-header {
     display: flex;
     justify-content: space-between;
-    align-items: start;
-    gap: 20px;
-    margin-bottom: 23px;
+    align-items: center;
+    margin-bottom: 6px;
 }
-.dialog-heading > button {
-    border: 0;
+
+.misa-chart-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.chart-header-icon {
+    font-size: 15px;
+}
+
+.misa-chart-title {
+    font-size: 13.5px;
+    font-weight: 800;
+    color: var(--misa-text-heading);
+    margin: 0;
+}
+
+.misa-chart-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.misa-chart-icon-btn {
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: var(--misa-text-subtle);
+    padding: 4px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.12s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.misa-chart-icon-btn:hover {
+    background: #e0f2fe;
+    color: var(--misa-primary);
+    border-color: #bae6fd;
+}
+
+/* Subtabs chuyển đổi góc nhìn dữ liệu (DOANH THU | HOÀN TIỀN | DÒNG TIỀN THUẦN) */
+.misa-chart-subtabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.misa-chart-subtab {
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: var(--misa-text-muted);
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 9999px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-family: inherit;
+}
+
+.misa-chart-subtab:hover {
+    background: #e2e8f0;
+    color: var(--misa-text-heading);
+}
+
+.misa-chart-subtab.active {
+    background: var(--misa-primary);
+    color: #ffffff;
+    border-color: var(--misa-primary);
+    box-shadow: 0 1px 4px rgba(0, 104, 255, 0.25);
+}
+
+.misa-chart-canvas-wrap {
+    height: 195px;
+    position: relative;
+    width: 100%;
+}
+
+/* Banner tổng thu tinh gọn */
+.misa-highlight-banner {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #ecfdf5 0%, #eff6ff 100%);
+    border: 1.5px solid #a7f3d0;
+    border-radius: 9999px;
+    padding: 4px 12px;
+    margin-top: 6px;
+    align-self: flex-start;
+    box-shadow: 0 1px 4px rgba(16, 185, 129, 0.1);
+}
+
+.misa-highlight-icon-circle {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+    box-shadow: 0 1px 3px rgba(16, 185, 129, 0.25);
+}
+
+.misa-highlight-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.misa-highlight-label {
+    font-size: 10.5px;
+    color: #1e293b;
+    font-weight: 600;
+}
+
+.misa-highlight-amount {
+    font-size: 16px;
+    font-weight: 800;
+    color: #047857;
+    letter-spacing: -0.01em;
+}
+
+/* CỘT PHẢI: THẺ CƠ CẤU DÒNG TIỀN VÀ BIỂU ĐỒ DONUT */
+.misa-donut-card {
+    display: flex;
+    flex-direction: column;
+}
+
+.misa-kpi-subtitle {
+    font-size: 11px;
+    color: var(--misa-text-subtle);
+    margin-bottom: 6px;
+}
+
+.misa-donut-canvas-wrap {
+    height: 170px;
+    position: relative;
+    width: 100%;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.misa-donut-center-info {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.donut-center-sub {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--misa-text-subtle);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.donut-center-val {
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--misa-text-heading);
+}
+
+.misa-donut-legend-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    border-top: 1px solid #f1f5f9;
+    padding-top: 6px;
+}
+
+.misa-legend-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11.5px;
+}
+
+.misa-legend-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.misa-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.misa-legend-dot.dot-deposit {
+    background-color: var(--misa-primary);
+}
+
+.misa-legend-dot.dot-payment {
+    background-color: var(--misa-emerald);
+}
+
+.misa-legend-dot.dot-refund {
+    background-color: var(--misa-amber);
+}
+
+.misa-legend-label {
+    font-weight: 600;
+    color: var(--misa-text-main);
+}
+
+.misa-legend-val {
+    font-weight: 800;
+}
+
+/* ==========================================================================
+   7. BẢNG DỮ LIỆU CHUẨN (TABLE CARDS)
+   ========================================================================== */
+.misa-table-card {
+    margin-top: 16px;
+}
+
+.misa-table-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.misa-table-title-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.table-header-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: #e0f2fe;
+    color: #0284c7;
+    flex-shrink: 0;
+}
+
+.table-header-icon svg {
+    width: 14px;
+    height: 14px;
+    display: block;
+}
+
+.misa-table-title {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--misa-text-heading);
+    margin: 0 0 2px 0;
+}
+
+.misa-table-subtitle {
+    font-size: 12px;
+    color: var(--misa-text-subtle);
+}
+
+.misa-period-badge {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--misa-primary);
+    background: var(--misa-primary-light);
+    border: 1px solid var(--misa-primary-border);
+    padding: 4px 10px;
+    border-radius: 6px;
+}
+
+.misa-table-scroll-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--misa-border);
+    border-radius: 8px;
+}
+
+.misa-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.misa-table th {
+    background: #f8fafc;
+    color: var(--misa-text-muted);
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 11px 14px;
+    border-bottom: 1.5px solid var(--misa-border);
+}
+
+.misa-table td {
+    padding: 11px 14px;
+    border-bottom: 1px solid #f1f5f9;
+    color: var(--misa-text-main);
+    vertical-align: middle;
+}
+
+.misa-table tr:hover td {
+    background: #f0f9ff;
+}
+
+.misa-table .number {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    color: var(--misa-text-heading);
+}
+
+.misa-table td.empty {
+    text-align: center;
+    padding: 30px;
+    color: var(--misa-text-subtle);
+    font-style: italic;
+}
+
+/* Badges & Tags */
+.username-tag {
+    background: #f1f5f9;
+    color: #0f172a;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.dept-code {
+    background: #eff6ff;
+    color: #0369a1;
+    border: 1px solid #bae6fd;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.specialty-badge {
+    background: #f0fdfa;
+    color: #0f766e;
+    border: 1px solid #99f6e4;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11.5px;
+    font-weight: 700;
+}
+
+.misa-badge-role {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11.5px;
+    font-weight: 700;
+}
+
+.misa-badge-role.role-admin {
+    background: #eef2ff;
+    color: #4338ca;
+    border: 1px solid #c7d2fe;
+}
+
+.misa-badge-role.role-doctor {
+    background: #fdf2f8;
+    color: #be185d;
+    border: 1px solid #fbcfe8;
+}
+
+.misa-badge-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: 9999px;
+    font-size: 11.5px;
+    font-weight: 700;
+}
+
+.misa-badge-status.active {
+    background: #ecfdf5;
+    color: #059669;
+}
+
+.misa-badge-status.inactive {
+    background: #f1f5f9;
+    color: var(--misa-text-subtle);
+}
+
+.status-pending {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.status-approved {
+    background: #ecfdf5;
+    color: #059669;
+}
+
+.status-rejected {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.misa-btn-table-action {
+    border: none;
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.12s;
+}
+
+.misa-btn-table-action.danger {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.misa-btn-table-action.danger:hover {
+    background: #fca5a5;
+    color: #991b1b;
+}
+
+.misa-btn-table-action.success {
+    background: var(--misa-primary-light);
+    color: var(--misa-primary);
+}
+
+.misa-btn-table-action.success:hover {
+    background: #bae6fd;
+}
+
+/* Tiêu đề phân hệ (Departments, Staff, Doctors, Accounts) */
+.misa-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.misa-section-title {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--misa-text-heading);
+    margin: 0 0 2px 0;
+}
+
+.misa-section-desc {
+    font-size: 12.5px;
+    color: var(--misa-text-subtle);
+}
+
+.misa-btn-primary {
+    background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 104, 255, 0.25);
+    transition: all 0.15s;
+    font-family: inherit;
+}
+
+.misa-btn-primary:hover {
+    background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
+    box-shadow: 0 4px 12px rgba(0, 104, 255, 0.35);
+}
+
+.misa-btn-primary .plus-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.misa-btn-primary .plus-icon svg {
+    display: block;
+}
+
+/* ==========================================================================
+   8. MODAL DIALOGS (CHUẨN FORM BACKEND)
+   ========================================================================== */
+.misa-modal {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 20px 30px -5px rgba(0, 0, 0, 0.15);
+    width: 100%;
+    max-width: 520px;
+    padding: 0;
+    background: #ffffff;
+    overflow: hidden;
+}
+
+.misa-modal::backdrop {
+    background: rgba(15, 23, 42, 0.5);
+    backdrop-filter: blur(2px);
+}
+
+.misa-modal-header {
+    background: #f8fafc;
+    border-bottom: 1px solid var(--misa-border);
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.misa-modal-eyebrow {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--misa-primary);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin: 0 0 2px 0;
+}
+
+.misa-modal-title {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--misa-text-heading);
+    margin: 0;
+}
+
+.misa-modal-close-btn {
+    border: none;
     background: transparent;
-    font-size: 27px;
-    color: #466278;
+    color: var(--misa-text-subtle);
+    cursor: pointer;
+    padding: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all 0.15s ease;
 }
-.form-grid {
+
+.misa-modal-close-btn:hover {
+    color: var(--misa-text-heading);
+    background: #f1f5f9;
+}
+
+.misa-modal-close-btn svg {
+    display: block;
+}
+
+.misa-modal-body {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.misa-form-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 17px;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
 }
-#department-form > label {
-    margin: 15px 0;
+
+.misa-form-label {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #334155;
 }
-.dialog-actions {
+
+.misa-form-label input,
+.misa-form-label select,
+.misa-form-label textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1.5px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: inherit;
+    color: var(--misa-text-main);
+    background: #ffffff;
+    transition: all 0.15s ease;
+}
+
+.misa-form-label input:focus,
+.misa-form-label select:focus,
+.misa-form-label textarea:focus {
+    border-color: var(--misa-primary);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 104, 255, 0.15);
+}
+
+.misa-modal-footer {
+    padding: 14px 20px;
+    background: #f8fafc;
+    border-top: 1px solid var(--misa-border);
     display: flex;
     justify-content: flex-end;
     gap: 10px;
-    padding-top: 19px;
-    border-top: 1px solid #d8e2eb;
-    margin-top: 20px;
-}
-.form-error {
-    color: #a13a32;
-    margin-top: 14px;
-}
-.request-actions {
-    display: grid;
-    gap: 8px;
-    min-width: 200px;
-}
-.request-actions > div {
-    display: flex;
-    gap: 8px;
-}
-.request-actions select {
-    font-size: 12px;
-    padding: 6px;
 }
 
-@media (max-width: 1250px) {
-    :root {
-        --admin-sidebar-width: 210px;
-    }
+.misa-btn-secondary {
+    border: 1px solid #d1d5db;
+    background: #ffffff;
+    color: #374151;
+    font-size: 12.5px;
+    font-weight: 700;
+    padding: 7px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s ease;
 }
 
-@media (max-width: 850px) {
-    :root {
-        --admin-sidebar-width: 224px;
-    }
-    .admin-workspace {
-        display: block;
-    }
-    .admin-sidebar-scrim:not([hidden]) {
-        display: block;
-    }
-    .admin-content {
-        grid-column: auto;
-    }
+.misa-btn-secondary:hover {
+    background: #f1f5f9;
 }
 
-@media (max-width: 1100px) {
-    main {
-        padding: 24px;
-    }
-    .admin-stats {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
+/* ==========================================================================
+   9. RESPONSIVE DESIGN (TABLET & MOBILE)
+   ========================================================================== */
+.mobile-only {
+    display: none;
 }
 
-@media (max-width: 720px) {
-    .admin-topbar {
-        padding: 13px 18px;
-        font-size: 12px;
-    }
-    .admin-topbar .staff-breadcrumb {
-        display: none;
-    }
-    .admin-session {
-        margin-left: auto;
-    }
-    main {
-        padding: 22px 16px;
-    }
-    .admin-heading,
-    .section-actions,
-    .card-heading {
-        align-items: flex-start;
-        flex-direction: column;
-    }
-    h1 {
-        font-size: 25px;
-    }
-    .form-grid {
+@media (max-width: 1024px) {
+    .misa-charts-row {
         grid-template-columns: 1fr;
     }
-    .filter-bar > label {
-        flex: 1 1 130px;
+}
+
+@media (max-width: 768px) {
+    .mobile-only {
+        display: flex;
     }
-    .filter-bar .button {
-        flex: 1 1 140px;
+    .misa-org-badge,
+    .misa-status-badge,
+    .misa-breadcrumb-sub,
+    .misa-user-info {
+        display: none;
     }
-    .admin-stats {
-        gap: 10px;
+    .misa-sidebar {
+        position: fixed;
+        left: -220px;
+        top: calc(var(--misa-topbar-height) + var(--misa-subbar-height));
+        bottom: 0;
+        z-index: 100;
+        transition: left 0.25s ease;
+        box-shadow: 10px 0 25px rgba(0, 0, 0, 0.15);
     }
-    .stat {
-        padding: 14px;
+    .misa-sidebar.open {
+        left: 0;
     }
-    td,
-    th {
-        padding: 12px;
+    .sidebar-scrim {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.4);
+        z-index: 95;
+    }
+    .misa-form-grid {
+        grid-template-columns: 1fr;
+    }
+    .misa-main-content {
+        padding: 14px 14px 28px;
     }
 }
 
-.admin-session {
+@media (max-width: 576px) {
+    .misa-kpi-quad-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 8px !important;
+    }
+}
+
+@media (max-width: 380px) {
+    .misa-kpi-quad-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* ==========================================================================
+   10. GOOGLE / GMAIL PROFILE SPLIT VIEW (CRM MASTER-DETAIL)
+   ========================================================================== */
+.misa-section-header-actions {
     display: flex;
     align-items: center;
     gap: 12px;
 }
 
-.admin-session form {
+.misa-view-toggle-pills {
+    display: inline-flex;
+    align-items: center;
+    background: #f1f5f9;
+    padding: 3px;
+    border-radius: 9999px;
+    border: 1px solid #e2e8f0;
+}
+
+.misa-toggle-pill {
+    border: none;
+    background: transparent;
+    padding: 5px 12px;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #64748b;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s ease;
+    user-select: none;
+}
+
+.misa-toggle-pill:hover {
+    color: #0f172a;
+}
+
+.misa-toggle-pill.active {
+    background: #ffffff;
+    color: #0f172a;
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.misa-profile-split-view {
+    display: grid;
+    grid-template-columns: 290px 1fr;
+    gap: 16px;
+    align-items: start;
+    margin-top: 14px;
+}
+
+/* Master List (Left Pane) */
+.misa-split-master {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.misa-split-master-header {
+    margin-bottom: 12px;
+}
+
+.master-header-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding: 0 4px;
+}
+
+.master-header-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #0f172a;
     margin: 0;
+}
+
+.master-header-count {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.master-search-wrap {
+    position: relative;
+    width: 100%;
+}
+
+.master-search-icon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+}
+
+.master-search-input {
+    width: 100%;
+    padding: 7px 10px 7px 32px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 12.5px;
+    background: #f8fafc;
+    transition: all 0.15s ease;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.master-search-input:focus {
+    background: #ffffff;
+    border-color: #0284c7;
+    box-shadow: 0 0 0 3px rgba(0, 104, 255, 0.12);
+}
+
+.misa-split-list {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    max-height: 560px;
+    overflow-y: auto;
+    padding-right: 2px;
+}
+
+.misa-split-list::-webkit-scrollbar {
+    width: 5px;
+}
+.misa-split-list::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 9999px;
+    transition: background 0.2s ease;
+}
+.misa-split-list::-webkit-scrollbar-thumb:hover {
+    background: #0068ff;
+}
+
+.misa-split-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border-radius: 9999px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: 1px solid transparent;
+    user-select: none;
+}
+
+.misa-split-item:hover {
+    background: #f8fafc;
+}
+
+/* Selected state matching user screenshot (soft mint green pill background) */
+.misa-split-item.active {
+    background: #ecfdf5;
+    border-color: #a7f3d0;
+}
+
+.misa-split-avatar {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    user-select: none;
+}
+
+.misa-split-item-info {
+    min-width: 0;
+    flex: 1;
+}
+
+.misa-split-item-name {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #1e293b;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.misa-split-item-name.active {
+    color: #065f46;
+    font-weight: 700;
+}
+
+/* Detail Pane (Right Pane) */
+.misa-split-detail {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+    min-height: 540px;
+}
+
+.profile-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+
+.profile-header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.profile-large-avatar {
+    width: 58px;
+    height: 58px;
+    min-width: 58px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    user-select: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.profile-header-title-wrap h2 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 4px 0;
+    line-height: 1.2;
+}
+
+.profile-header-subline {
+    font-size: 13px;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.profile-header-badges {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.badge-vip {
+    background: #f3e8ff;
+    color: #7e22ce;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 9999px;
+    border: 1px solid #e9d5ff;
+}
+
+.badge-warning-soft {
+    background: #fee2e2;
+    color: #b91c1c;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 9999px;
+    border: 1px solid #fecaca;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.badge-active-soft {
+    background: #dcfce7;
+    color: #15803d;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 9999px;
+    border: 1px solid #bbf7d0;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* Pill Tabs Bar */
+.profile-subtabs-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 22px;
+    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 16px;
+    overflow-x: auto;
+}
+
+.profile-pill-tab {
+    border: none;
+    background: #f8fafc;
+    color: #475569;
+    padding: 7px 18px;
+    border-radius: 9999px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.profile-pill-tab:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.profile-pill-tab.active {
+    background: #15803d;
+    color: #ffffff;
+    font-weight: 600;
+}
+
+/* Grid Layout: Left Timeline (60%) + Right Cards (40%) */
+.profile-content-grid {
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    gap: 28px;
+    align-items: start;
+}
+
+.timeline-block-title,
+.profile-cards-title {
+    font-size: 14.5px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 16px 0;
+}
+
+.timeline-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.timeline-item {
+    display: grid;
+    grid-template-columns: 75px 1fr auto;
+    gap: 12px;
+    align-items: baseline;
+    padding-bottom: 12px;
+    border-bottom: 1px dashed #f1f5f9;
+}
+
+.timeline-item:last-child {
+    border-bottom: none;
+}
+
+.timeline-date {
+    font-size: 13px;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.timeline-date.today {
+    color: #15803d;
+    font-weight: 700;
+}
+
+.timeline-text-title {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 2px;
+}
+
+.timeline-text-sub {
+    font-size: 12px;
+    color: #64748b;
+}
+
+.timeline-status-badge {
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 9999px;
+    white-space: nowrap;
+}
+
+.timeline-status-badge.active {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.timeline-status-badge.done {
+    background: #e0f2fe;
+    color: #0284c7;
+}
+
+/* Right Stacked Alert Cards (Pink, Yellow, Blue) */
+.profile-cards-block {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.misa-detail-alert-card {
+    border-radius: 12px;
+    padding: 13px 16px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.misa-detail-alert-card.card-pink {
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+}
+
+.misa-detail-alert-card.card-yellow {
+    background: #fef3c7;
+    border: 1px solid #fde68a;
+    color: #92400e;
+}
+
+.misa-detail-alert-card.card-blue {
+    background: #e0f2fe;
+    border: 1px solid #bae6fd;
+    color: #075985;
+}
+
+.alert-card-title {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.alert-card-desc {
+    margin: 0;
+    font-size: 12.5px;
+    opacity: 0.92;
+}
+
+.alert-card-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 12.5px;
+    opacity: 0.95;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.profile-detail-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+.misa-btn-outline-primary {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    color: #334155;
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.misa-btn-outline-primary:hover {
+    background: #f8fafc;
+    border-color: #94a3b8;
+    color: #0f172a;
+}
+
+.profile-subtab-empty-box {
+    text-align: center;
+    padding: 40px 20px;
+    background: #f8fafc;
+    border-radius: 12px;
+    border: 1px dashed #cbd5e1;
+}
+
+.profile-subtab-empty-box svg {
+    margin-bottom: 12px;
+}
+
+.profile-subtab-empty-box p {
+    font-size: 14px;
+    color: #334155;
+    margin-bottom: 4px;
+}
+
+.profile-subtab-info-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+}
+
+.profile-subtab-info-card h4 {
+    margin: 0 0 12px 0;
+    font-size: 15px;
+    color: #0f172a;
+}
+
+.profile-subtab-info-card p {
+    margin: 6px 0;
+    font-size: 13.5px;
+    color: #334155;
+}
+
+@media (max-width: 992px) {
+    .misa-profile-split-view {
+        grid-template-columns: 1fr;
+    }
+    .profile-content-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
 }

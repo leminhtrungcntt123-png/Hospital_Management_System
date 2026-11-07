@@ -3,21 +3,21 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#006f98" />
-    <title>@ViewData["Title"] · MediCare</title>
-    <link rel="stylesheet" href="~/ui/css/base/tokens.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/ui/css/base/reset.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/ui/css/components/controls.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/ui/css/components/forms.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/ui/css/staff/layout.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/ui/css/responsive/desktop.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/ui/css/responsive/laptop.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/ui/css/responsive/tablet.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/ui/css/theme/contrast.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/ui/css/staff/readability.css" asp-append-version="true" />
+    <meta name="theme-color" content="#0068ff" />
+    <link rel="icon" type="image/jpeg" href="~/images/medicare-logo.jpg" />
+    <title>@ViewData["Title"] · MediCare HIS</title>
+
+    <!-- Google Fonts: Inter & Plus Jakarta Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet" />
+
     <link rel="stylesheet" href="~/css/admin-management.css" asp-append-version="true" />
+
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
-<body>
+<body class="misa-theme">
     @RenderBody()
     @await RenderSectionAsync("Scripts", required: false)
 </body>
