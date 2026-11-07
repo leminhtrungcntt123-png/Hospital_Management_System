@@ -22,7 +22,7 @@ public sealed class CreateAdminAccountRequest
         set => _email = string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToLowerInvariant();
     }
 
-    [Range(1, 5)]
+    [Range(1, int.MaxValue)]
     public int RoleId { get; set; }
 
     public int? DepartmentId { get; set; }
