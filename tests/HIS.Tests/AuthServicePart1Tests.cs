@@ -307,15 +307,16 @@ public class AuthServicePart1Tests
         await context.SaveChangesAsync();
         Assert.False(await service.IsSessionActiveAsync(reg.AccountId, "PATIENT"));
 
-        // Reactivated but locked
+        // Reactivated but locked -> Login is blocked, but existing active session is NOT revoked (CWE-645 DoS prevention)
         acc.IsActive = true;
         acc.LockedUntil = clock.GetLocalNow().DateTime.AddMinutes(10);
         await context.SaveChangesAsync();
-        Assert.False(await service.IsSessionActiveAsync(reg.AccountId, "PATIENT"));
-
-        // Advance past lock duration
-        clock.Advance(TimeSpan.FromMinutes(11));
         Assert.True(await service.IsSessionActiveAsync(reg.AccountId, "PATIENT"));
+
+        // Session version mismatch (e.g. after password change) revokes session (CWE-613)
+        int currentVersion = service.GetSessionVersion(reg.AccountId);
+        Assert.True(await service.IsSessionActiveAsync(reg.AccountId, "PATIENT", currentVersion));
+        Assert.False(await service.IsSessionActiveAsync(reg.AccountId, "PATIENT", currentVersion + 1));
     }
 }
 

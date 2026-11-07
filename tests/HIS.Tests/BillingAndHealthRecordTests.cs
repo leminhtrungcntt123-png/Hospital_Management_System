@@ -95,7 +95,8 @@ public class BillingAndHealthRecordTests
             AccountId = patientAcc.Id,
             PatientId = patient.Id,
             Relationship = PatientRelationship.Self,
-            Status = LinkStatus.Active
+            Status = LinkStatus.Active,
+            CanViewRecords = true
         };
         context.AccountPatientProfiles.Add(profileLink);
 
@@ -342,5 +343,14 @@ public class BillingAndHealthRecordTests
         // 3. Bác sĩ điều trị lượt khám -> SUCCESS
         var doctorResult = await healthRecord.GetHealthRecordDetailAsync(appId, doctorAccId);
         Assert.True(doctorResult.IsSuccess);
+
+        // 4. Bệnh nhân có liên kết nhưng CanViewRecords = false -> FORBIDDEN (CWE-285, không để BookedBy qua mặt)
+        var (ctx, _, _, hr, patId, patAccId, _, _, _, _) = CreateFixture();
+        var link = await ctx.AccountPatientProfiles.FirstAsync(p => p.AccountId == patAccId && p.PatientId == patId);
+        link.CanViewRecords = false;
+        await ctx.SaveChangesAsync();
+        var noConsentResult = await hr.GetHealthRecordDetailAsync(appId, patAccId);
+        Assert.False(noConsentResult.IsSuccess);
+        Assert.Equal("FORBIDDEN", noConsentResult.Error.Code);
     }
 }

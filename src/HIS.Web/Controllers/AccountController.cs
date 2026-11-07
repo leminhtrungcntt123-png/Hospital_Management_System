@@ -135,7 +135,8 @@ public class AccountController : Controller
             new(ClaimTypes.NameIdentifier, accountId.ToString()),
             new(ClaimTypes.Name, username),
             new(ClaimTypes.Role, targetRole),
-            new(FullNameClaim, fullName)
+            new(FullNameClaim, fullName),
+            new("SessionVersion", _authService.GetSessionVersion(accountId).ToString())
         };
 
         if (!string.IsNullOrEmpty(doctorId))
@@ -190,7 +191,8 @@ public class AccountController : Controller
             new(ClaimTypes.NameIdentifier, user.AccountId.ToString()),
             new(ClaimTypes.Name, user.Username),
             new(ClaimTypes.Role, user.RoleCode),
-            new(FullNameClaim, string.IsNullOrWhiteSpace(user.DisplayName) ? user.Username : user.DisplayName)
+            new(FullNameClaim, string.IsNullOrWhiteSpace(user.DisplayName) ? user.Username : user.DisplayName),
+            new("SessionVersion", _authService.GetSessionVersion(user.AccountId).ToString())
         };
 
         if (!string.IsNullOrEmpty(user.DepartmentName))

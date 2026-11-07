@@ -64,5 +64,18 @@ public interface IAuthService
         string? roleCode = null,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Kiểm tra tài khoản và phiên bản session còn hợp lệ.</summary>
+    Task<bool> IsSessionActiveAsync(
+        int accountId,
+        string? roleCode,
+        int? sessionVersion,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Lấy phiên bản session hiện tại của tài khoản (dùng để thu hồi cookie khi đổi mật khẩu).</summary>
+    int GetSessionVersion(int accountId);
+
+    /// <summary>Thu hồi tất cả phiên cookie đang đăng nhập của tài khoản (khi đổi hoặc đặt lại mật khẩu).</summary>
+    void InvalidateSessions(int accountId);
+
     Task LogoutAsync(int accountId, CancellationToken cancellationToken = default);
 }

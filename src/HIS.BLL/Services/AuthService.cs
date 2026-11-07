@@ -24,6 +24,18 @@ public class AuthService : IAuthService
     /// </summary>
     private static readonly ConcurrentDictionary<string, PasswordResetChallenge> ResetOtps = new();
 
+    /// <summary>
+    /// Phiên bản session phía máy chủ (CWE-613): tự động tăng khi đổi mật khẩu hoặc OTP reset
+    /// để hủy lập tức mọi cookie cũ/bị đánh cắp trên các trình duyệt khác.
+    /// </summary>
+    private static readonly ConcurrentDictionary<int, int> SessionVersions = new();
+
+    public int GetSessionVersion(int accountId) =>
+        SessionVersions.GetOrAdd(accountId, 1);
+
+    public void InvalidateSessions(int accountId) =>
+        SessionVersions.AddOrUpdate(accountId, 2, (_, v) => v + 1);
+
     private readonly AppDbContext _context;
     private readonly IReadOnlyList<IOtpDelivery> _deliveries;
     private readonly OtpOptions _otpOptions;
@@ -446,6 +458,9 @@ public class AuthService : IAuthService
 
         await _context.SaveChangesAsync(cancellationToken);
 
+        // CWE-613: Hủy tất cả phiên đăng nhập cũ trên mọi trình duyệt sau khi đặt lại mật khẩu thành công
+        InvalidateSessions(account.Id);
+
         ResetOtps.TryRemove(new KeyValuePair<string, PasswordResetChallenge>(account.Username.ToLowerInvariant(), challenge));
         if (account.Email is not null)
         {
@@ -514,17 +529,33 @@ public class AuthService : IAuthService
         });
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        // CWE-613: Hủy tất cả phiên đăng nhập cũ trên mọi trình duyệt sau khi đổi mật khẩu thành công
+        InvalidateSessions(account.Id);
+
         return ChangePasswordResult.Success();
     }
 
-    public async Task<bool> IsSessionActiveAsync(
+    public Task<bool> IsSessionActiveAsync(
         int accountId,
         string? roleCode = null,
+        CancellationToken cancellationToken = default) =>
+        IsSessionActiveAsync(accountId, roleCode, sessionVersion: null, cancellationToken);
+
+    public async Task<bool> IsSessionActiveAsync(
+        int accountId,
+        string? roleCode,
+        int? sessionVersion,
         CancellationToken cancellationToken = default)
     {
         if (accountId <= 0) return false;
 
-        DateTime now = _timeProvider.GetLocalNow().DateTime;
+        // CWE-613: Đối soát phiên bản session trong cookie với server-side version (thu hồi nếu mật khẩu đã bị đổi)
+        if (sessionVersion.HasValue && sessionVersion.Value != GetSessionVersion(accountId))
+        {
+            return false;
+        }
+
         var account = await _context.Accounts
             .AsNoTracking()
             .Include(a => a.Role)
@@ -535,10 +566,8 @@ public class AuthService : IAuthService
             return false;
         }
 
-        if (account.LockedUntil is DateTime lockedUntil && lockedUntil > now)
-        {
-            return false;
-        }
+        // CWE-645 Fix: Tách biệt khóa đăng nhập tạm thời (LockedUntil) khỏi việc thu hồi phiên đang hoạt động.
+        // Điều này ngăn chặn kẻ xấu cố tình gõ sai mật khẩu nhiều lần để ép người dùng bị văng phiên (Denial of Service).
 
         if (!string.IsNullOrWhiteSpace(roleCode)
             && !string.Equals(account.Role?.Code, roleCode.Trim(), StringComparison.OrdinalIgnoreCase))

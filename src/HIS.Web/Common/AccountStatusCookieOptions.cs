@@ -34,10 +34,12 @@ public sealed class AccountStatusCookieOptions : IPostConfigureOptions<CookieAut
             }
 
             var auth = context.HttpContext.RequestServices.GetRequiredService<IAuthService>();
+            int.TryParse(principal.FindFirstValue("SessionVersion"), out var sessionVersion);
             var valid = int.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var accountId)
                 && await auth.IsSessionActiveAsync(
                     accountId,
                     principal.FindFirstValue(ClaimTypes.Role),
+                    sessionVersion > 0 ? sessionVersion : null,
                     context.HttpContext.RequestAborted);
 
             if (!valid)

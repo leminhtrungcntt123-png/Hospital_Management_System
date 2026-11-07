@@ -11,11 +11,16 @@ public class HealthRecordService : IHealthRecordService
 {
     private readonly AppDbContext _context;
     private readonly TimeProvider _timeProvider;
+    private readonly IPatientAccessService _patientAccessService;
 
-    public HealthRecordService(AppDbContext context, TimeProvider? timeProvider = null)
+    public HealthRecordService(
+        AppDbContext context,
+        TimeProvider? timeProvider = null,
+        IPatientAccessService? patientAccessService = null)
     {
         _context = context;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _patientAccessService = patientAccessService ?? new PatientAccessService(context);
     }
 
     private DateTime Now => DateTime.SpecifyKind(_timeProvider.GetLocalNow().DateTime, DateTimeKind.Unspecified);
@@ -55,12 +60,12 @@ public class HealthRecordService : IHealthRecordService
             string roleCode = account.Role.Code.ToUpperInvariant();
             if (roleCode == "PATIENT")
             {
-                bool hasAccess = await _context.AccountPatientProfiles
-                    .AnyAsync(p => p.AccountId == currentAccountId && p.PatientId == app.PatientId && p.Status == LinkStatus.Active, ct);
-
-                if (!hasAccess && app.BookedBy != currentAccountId)
+                // CWE-285 Fix: Sử dụng IPatientAccessService.CanViewRecordsAsync cho tài khoản bệnh nhân.
+                // Tuyệt đối không để BookedBy qua mặt bước kiểm tra này vì đặt lịch được không đồng nghĩa với có quyền xem bệnh án.
+                bool hasAccess = await _patientAccessService.CanViewRecordsAsync(currentAccountId, app.PatientId, ct);
+                if (!hasAccess)
                 {
-                    return Result.Failure<HealthRecordDetailDto>("FORBIDDEN", "Bạn không có quyền truy cập hồ sơ sức khỏe này.");
+                    return Result.Failure<HealthRecordDetailDto>("FORBIDDEN", "Bạn không có quyền truy cập hồ sơ sức khỏe này do chưa được cấp quyền xem bệnh án.");
                 }
             }
             else if (roleCode == "ADMIN")
