@@ -1,0 +1,700 @@
+/* responsive / tablet */
+@media (max-width: 850px) {
+    .sidebar {
+        transform: translateX(-100%);
+        visibility: hidden;
+        transition: transform 0.2s;
+        width: 224px;
+        padding: 24px 14px 18px;
+    }
+    .sidebar.open {
+        transform: translateX(0);
+        visibility: visible;
+        box-shadow: 15px 0 70px #152e4b22;
+    }
+    .sidebar-scrim {
+        position: fixed;
+        inset: 0;
+        background: #10284055;
+        z-index: 45;
+        display: block;
+        backdrop-filter: blur(2px);
+    }
+    .staff-shell {
+        margin-left: 0;
+    }
+    .staff-topbar {
+        height: 63px;
+        padding: 0 20px;
+    }
+    .staff-topbar > .mobile-only {
+        display: inline-grid !important;
+    }
+    .staff-breadcrumb {
+        margin-right: auto;
+    }
+    .topbar-right {
+        margin-left: auto;
+    }
+    .demo-clock {
+        display: flex;
+        font-size: 9px;
+    }
+    .staff-profile > span:not(.avatar) {
+        display: block;
+    }
+    .staff-profile strong {
+        font-size: 10px;
+    }
+    .staff-main {
+        padding: 22px;
+    }
+    .stats-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+    }
+    .stat-card {
+        padding: 13px;
+        gap: 8px;
+    }
+    .stat-icon {
+        display: none;
+    }
+    .stat-label {
+        font-size: 10px;
+        min-height: 17px;
+    }
+    .stat-card > strong {
+        font-size: 25px;
+    }
+    .stat-card > small {
+        font-size: 8px;
+    }
+    .staff-main .page-heading h1 {
+        font-size: 23px;
+    }
+    .staff-main .page-heading p {
+        font-size: 10px;
+    }
+    .staff-main .page-heading .heading-actions {
+        gap: 7px;
+    }
+    .staff-main .heading-actions .btn {
+        padding: 8px 10px;
+        font-size: 9px;
+    }
+    .clinical-layout {
+        grid-template-columns: 190px minmax(0, 1fr);
+        gap: 16px;
+    }
+    .consultation-person strong {
+        font-size: 11px;
+    }
+    .consultation-list .card-header h2 {
+        font-size: 12px;
+    }
+    .clinical-inner {
+        padding: 0 16px;
+    }
+    .clinical-actions .btn {
+        font-size: 10px;
+    }
+    .doctor-strip strong {
+        font-size: 10px;
+    }
+    .doctor-strip small {
+        font-size: 9px;
+    }
+    .public-header {
+        z-index: 35;
+    }
+    .utility-bar > div {
+        padding: 6px 22px;
+        gap: 15px;
+    }
+    .utility-bar {
+        font-size: 9px;
+    }
+    .utility-bar button {
+        font-size: 9px;
+    }
+    .utility-demo {
+        font-size: 8px;
+    }
+    .header-inner {
+        padding: 16px 22px;
+    }
+    .brand {
+        font-size: 24px;
+    }
+    .public-header-actions {
+        gap: 10px;
+    }
+    .public-header-actions .patient-account > span:not(.avatar) {
+        display: none;
+    }
+    .home-hero {
+        grid-template-columns: 1fr 1fr;
+        padding: 31px 24px;
+        gap: 21px;
+    }
+    .hero-copy h1 {
+        font-size: 30px;
+        letter-spacing: -1px;
+    }
+    .hero-copy > .eyebrow {
+        font-size: 6px;
+        letter-spacing: 1px;
+        margin-bottom: 13px;
+    }
+    .hero-copy > p {
+        font-size: 10px;
+        line-height: 1.9;
+        margin-top: 14px;
+    }
+    .hero-actions {
+        gap: 8px;
+        margin-top: 20px;
+    }
+    .hero-actions .btn {
+        font-size: 10px;
+        padding: 10px 12px;
+        min-height: 39px;
+    }
+    .hero-actions .btn > .icon {
+        width: 14px;
+        height: 14px;
+    }
+    .hero-trust {
+        display: none;
+    }
+    .hero-photo {
+        aspect-ratio: 1.02;
+        border-radius: 13px;
+    }
+    .photo-note {
+        font-size: 7px;
+        padding: 7px 9px;
+        left: 10px;
+        bottom: 10px;
+    }
+    .quick-access {
+        margin: 0 24px;
+    }
+    .quick-item {
+        padding: 16px 13px;
+        gap: 8px;
+    }
+    .quick-icon {
+        width: 30px;
+        height: 30px;
+        border-radius: 7px;
+    }
+    .quick-icon .icon {
+        width: 16px;
+        height: 16px;
+    }
+    .quick-item strong {
+        font-size: 10px;
+    }
+    .quick-item small {
+        font-size: 8px;
+    }
+    .quick-item > .icon {
+        width: 12px;
+        height: 12px;
+    }
+    .upcoming-ribbon {
+        margin: 18px 24px 0;
+        padding: 12px 15px;
+        gap: 9px;
+    }
+    .upcoming-ribbon strong,
+    .upcoming-ribbon span {
+        font-size: 9px;
+    }
+    .upcoming-ribbon > .link-button {
+        font-size: 9px;
+    }
+    .home-section {
+        padding: 34px 24px;
+    }
+    .section-heading h2 {
+        font-size: 21px;
+    }
+    .section-heading p {
+        font-size: 10px;
+        max-width: 450px;
+    }
+    .section-heading > .text-link {
+        font-size: 9px;
+        white-space: nowrap;
+    }
+    .section-heading .eyebrow {
+        font-size: 8px;
+    }
+    .specialty-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 14px;
+    }
+    .specialty-card {
+        padding: 18px 18px 18px 69px;
+        min-height: 91px;
+    }
+    .specialty-card > .specialty-icon {
+        position: absolute;
+        left: 18px;
+        top: 23px;
+        margin: 0;
+        height: 34px;
+        width: 34px;
+    }
+    .specialty-card strong {
+        font-size: 12px;
+        margin-top: 6px;
+    }
+    .specialty-card small {
+        font-size: 9px;
+    }
+    .specialty-card > .icon {
+        top: 40px;
+        right: 16px;
+    }
+    .service-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+    }
+    .home-section > .service-grid > .service-card:last-child {
+        display: none;
+    }
+    .service-card-body {
+        padding: 19px;
+    }
+    .service-visual {
+        height: 133px;
+        padding: 23px;
+    }
+    .service-price {
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+    }
+    .service-price strong {
+        font-size: 19px;
+    }
+    .service-price small {
+        font-size: 9px;
+    }
+    .service-card h3 {
+        font-size: 16px;
+    }
+    .service-card-body > p {
+        font-size: 11px;
+    }
+    .service-card-actions .btn {
+        font-size: 10px;
+    }
+    .journey-section {
+        grid-template-columns: 1fr;
+        gap: 25px;
+        padding: 33px 28px;
+    }
+    .journey-section > div:first-child > p {
+        max-width: 100%;
+        margin-bottom: 14px;
+    }
+    .journey-section h2 {
+        font-size: 28px;
+    }
+    .journey-section .eyebrow {
+        font-size: 8px;
+    }
+    .journey-steps {
+        gap: 21px;
+    }
+    .journey-steps p {
+        font-size: 10px;
+    }
+    .family-banner {
+        margin: 30px 24px;
+        gap: 20px;
+        padding: 21px;
+    }
+    .family-banner h2 {
+        font-size: 17px;
+    }
+    .family-banner p {
+        font-size: 10px;
+    }
+    .family-banner .btn {
+        font-size: 9px;
+        padding: 8px 11px;
+    }
+    .family-banner > div {
+        padding-left: 41px;
+    }
+    .family-banner > div > .icon {
+        width: 27px;
+        height: 27px;
+        top: 5px;
+    }
+    .footer-top {
+        grid-template-columns: 1.4fr 1fr 1fr;
+        gap: 23px;
+        padding: 27px 24px;
+    }
+    .footer-top > div:last-child {
+        grid-column: 1/-1;
+        border-top: 1px solid #e1ebf4;
+        padding-top: 17px;
+        display: flex;
+        align-items: center;
+        gap: 23px;
+        flex-wrap: wrap;
+    }
+    .footer-top > div:last-child p {
+        margin: 0;
+        font-size: 9px;
+    }
+    .footer-top > div:last-child h3 {
+        margin: 0;
+    }
+    .footer-staff {
+        margin-left: auto;
+    }
+    .footer-bottom {
+        margin: 0 24px;
+        font-size: 8px;
+    }
+    .footer-bottom button {
+        font-size: 8px;
+    }
+    .detail-layout {
+        grid-template-columns: minmax(0, 1fr) 240px;
+        padding: 25px 24px;
+        gap: 18px;
+    }
+    .sticky-card {
+        padding: 18px;
+    }
+    .sticky-card .btn {
+        font-size: 10px;
+        padding: 8px;
+    }
+    .sticky-card .mini-label {
+        font-size: 8px;
+    }
+    .sticky-card h2 {
+        font-size: 14px;
+    }
+    .sticky-card h3 {
+        font-size: 13px;
+    }
+    .sticky-card p {
+        font-size: 10px;
+    }
+    .detail-price strong {
+        font-size: 22px;
+    }
+    .mini-checks {
+        font-size: 9px;
+        gap: 10px;
+    }
+    .doctor-bio-top {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+    .doctor-bio-top > .doctor-portrait {
+        height: 125px;
+        width: 100%;
+    }
+    .doctor-bio-top h1 {
+        font-size: 23px;
+    }
+    .doctor-bio h2 {
+        font-size: 15px;
+    }
+    .doctor-bio > p {
+        font-size: 11px;
+    }
+    .catalog-layout {
+        grid-template-columns: 160px minmax(0, 1fr);
+        gap: 18px;
+    }
+    .filter-panel {
+        padding: 15px 10px;
+    }
+    .filter-option {
+        font-size: 9px;
+        padding: 9px 6px;
+        gap: 6px;
+    }
+    .filter-option > .icon {
+        height: 13px;
+        width: 13px;
+    }
+    .filter-note {
+        font-size: 8px;
+    }
+    .listing-section {
+        padding: 25px 24px 35px;
+    }
+    .service-grid.two {
+        gap: 14px;
+    }
+    .catalog-layout .service-card-body {
+        padding: 14px;
+    }
+    .catalog-layout .service-card h3 {
+        font-size: 13px;
+    }
+    .catalog-layout .service-card-body > p {
+        font-size: 10px;
+    }
+    .catalog-layout .service-visual {
+        height: 110px;
+        padding: 18px;
+    }
+    .catalog-layout .service-price {
+        flex-direction: column;
+        gap: 4px;
+        align-items: flex-start;
+    }
+    .catalog-layout .service-card-actions {
+        flex-wrap: wrap;
+    }
+    .catalog-layout .service-card-actions .btn {
+        font-size: 9px;
+    }
+    .catalog-layout .service-card-actions .text-link {
+        font-size: 9px;
+        white-space: normal;
+    }
+    .guide-layout {
+        grid-template-columns: 1fr;
+        gap: 20px;
+        padding: 25px;
+    }
+    .guide-aside {
+        position: static;
+    }
+    .guide-aside .check-list {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+    .guide-aside > .btn {
+        width: auto;
+    }
+    .specialty-detail-grid {
+        gap: 16px;
+    }
+    .specialty-detail {
+        padding: 20px;
+        gap: 13px;
+    }
+    .specialty-detail h2 {
+        font-size: 18px;
+    }
+    .specialty-detail .specialty-icon {
+        height: 32px;
+        width: 32px;
+    }
+    .specialty-detail .specialty-icon .icon {
+        width: 18px;
+        height: 18px;
+    }
+    .specialty-detail .flex {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 13px;
+    }
+    .specialty-detail .mini-label {
+        font-size: 8px;
+    }
+    .page-intro {
+        padding: 22px 24px 28px;
+    }
+    .page-intro h1 {
+        font-size: 27px;
+    }
+    .page-intro > .eyebrow {
+        font-size: 8px;
+    }
+    .page-intro > p {
+        font-size: 11px;
+    }
+    .booking-layout {
+        grid-template-columns: 1fr;
+    }
+    .booking-summary {
+        position: static;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0 30px;
+    }
+    .booking-summary > .mini-label {
+        grid-column: 1/-1;
+    }
+    .summary-person {
+        padding: 15px 0;
+        border: 0;
+    }
+    .summary-row {
+        padding-top: 15px;
+    }
+    .summary-price {
+        margin-top: 16px;
+        padding-top: 15px;
+    }
+    .booking-summary > .fine-print {
+        margin-top: 14px;
+    }
+    .summary-help {
+        margin-top: 0;
+        grid-column: 1/-1;
+    }
+    .profile-options {
+        grid-template-columns: 1fr 1fr;
+    }
+    .profile-option {
+        padding: 15px;
+    }
+    .time-grid {
+        grid-template-columns: repeat(6, 1fr);
+    }
+    .booking-doctor > div > strong {
+        font-size: 12px;
+    }
+    .booking-doctor > div > small {
+        font-size: 9px;
+    }
+    .booking-doctor .doctor-fee {
+        font-size: 12px;
+    }
+    .booking-doctor > .avatar {
+        height: 34px;
+        width: 34px;
+        font-size: 11px;
+    }
+    .booking-panel {
+        padding: 24px;
+    }
+    .method-toggle button {
+        font-size: 11px;
+        padding: 12px;
+    }
+    .booking-section-head h2 {
+        font-size: 18px;
+    }
+    .shift-toggle button {
+        font-size: 11px;
+        padding: 11px;
+    }
+    .shift-toggle button > small {
+        font-size: 9px;
+    }
+    .family-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+    }
+    .family-card {
+        padding: 18px;
+    }
+    .family-card-top {
+        gap: 10px;
+    }
+    .family-card h2 {
+        font-size: 14px;
+    }
+    .family-card-top .avatar.large {
+        width: 40px;
+        height: 40px;
+        font-size: 13px;
+    }
+    .family-card-top > .badge {
+        margin-left: 50px;
+    }
+    .family-summary {
+        font-size: 9px;
+        gap: 17px;
+        padding: 12px 15px;
+    }
+    .family-summary .icon {
+        width: 14px;
+        height: 14px;
+    }
+    .patient-record-layout {
+        grid-template-columns: 210px minmax(0, 1fr);
+        gap: 18px;
+    }
+    .record-identity {
+        padding: 19px;
+    }
+    .record-identity h2 {
+        font-size: 15px;
+    }
+    .record-identity dl {
+        font-size: 9px;
+        gap: 13px;
+    }
+    .record-preview {
+        padding: 19px;
+    }
+    .record-preview h3 {
+        font-size: 14px;
+    }
+    .record-preview > p {
+        font-size: 10px;
+    }
+    .record-tags {
+        gap: 10px;
+    }
+    .record-tags > span {
+        font-size: 8px;
+    }
+    .record-tags .icon {
+        width: 12px;
+        height: 12px;
+    }
+    .patient-nav > div {
+        gap: 24px;
+    }
+    .patient-nav a {
+        font-size: 10px;
+    }
+    .patient-mobile-nav {
+        display: flex;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: #fffffff2;
+        backdrop-filter: blur(10px);
+        border-top: 1px solid #d8e8f3;
+        z-index: 40;
+        justify-content: space-around;
+        gap: 10px;
+        padding: 9px 12px calc(9px + env(safe-area-inset-bottom));
+    }
+    .patient-mobile-nav a {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 10px;
+        color: #556d81;
+        padding: 7px 15px;
+        border-radius: 7px;
+    }
+    .patient-mobile-nav a .icon {
+        width: 17px;
+        height: 17px;
+    }
+    .patient-mobile-nav a.active {
+        background: #e7f6fc;
+        color: #087399;
+    }
+    .public-app:has(.patient-mobile-nav) {
+        padding-bottom: 70px;
+    }
+}

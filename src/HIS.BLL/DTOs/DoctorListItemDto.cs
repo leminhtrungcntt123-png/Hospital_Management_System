@@ -5,4 +5,5 @@ public record DoctorListItemDto(
     string FullName,
     string Specialty,
     string DepartmentName,
-    string LicenseNumber);
+    string LicenseNumber,
+    int AccountId = 0);

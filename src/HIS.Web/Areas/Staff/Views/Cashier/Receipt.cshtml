@@ -1,0 +1,139 @@
+@model HIS.BLL.DTOs.InvoiceDetailDto
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <title>Biên lai viện phí · @Model.InvoiceNumber</title>
+    <link rel="stylesheet" href="~/ui/css/base/tokens.css" />
+    <link rel="stylesheet" href="~/ui/css/base/reset.css" />
+    <link rel="stylesheet" href="~/ui/css/staff/billing.css" />
+    <style>
+        body {
+            background: #eceff1;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            padding: 30px 15px;
+        }
+        .receipt-card {
+            background: white;
+            max-width: 540px;
+            width: 100%;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+        .print-btn {
+            background: #0288d1;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+        @@media print {
+            body { background: white; padding: 0; }
+            .receipt-card { box-shadow: none; border-radius: 0; max-width: 100%; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+        <div class="no-print" style="margin-bottom: 15px;">
+            <button class="print-btn" onclick="window.print()">🖨️ In biên lai thu tiền</button>
+            <button class="print-btn" style="background: #546e7a;" onclick="window.close()">Đóng cửa sổ</button>
+        </div>
+
+        <div class="receipt-card">
+            <div class="receipt-paper">
+                <div class="receipt-brand">
+                    <h1 style="font-size: 18px; font-weight: 800; color: #0277bd; margin: 0 0 4px;">BỆNH VIỆN ĐA KHOA MEDICARE</h1>
+                    <p style="font-size: 11px; color: #546e7a; margin: 0;">Đ/c: Số 1 Tôn Thất Tùng, Đống Đa, Hà Nội · Hotline: 1900 1234</p>
+                </div>
+
+                <h2>PHIẾU THU TIỀN VIỆN PHÍ &amp; BHYT</h2>
+
+                <div>
+                    <span>Số hóa đơn:</span>
+                    <strong class="code-tag">@Model.InvoiceNumber</strong>
+                </div>
+                <div>
+                    <span>Mã lượt khám:</span>
+                    <strong>@Model.AppointmentCode</strong>
+                </div>
+                <div>
+                    <span>Họ và tên người bệnh:</span>
+                    <strong>@Model.PatientName.ToUpperInvariant()</strong>
+                </div>
+                <div>
+                    <span>Mã NB:</span>
+                    <strong>@Model.PatientCode</strong>
+                </div>
+                <div>
+                    <span>Giới tính / Tuổi:</span>
+                    <span>@Model.Gender, @Model.Age tuổi</span>
+                </div>
+                <div>
+                    <span>Chuyên khoa:</span>
+                    <span>@Model.DepartmentName (BS: @Model.DoctorName)</span>
+                </div>
+
+                @if (Model.HasInsurance && !string.IsNullOrEmpty(Model.InsuranceCardNumber))
+                {
+                    <div style="background: #f0f9ff; padding: 10px;">
+                        <span>Số thẻ BHYT (@Model.CoveragePct.ToString("0.#")%):</span>
+                        <strong style="color: #0288d1;">@Model.InsuranceCardNumber</strong>
+                    </div>
+                }
+
+                <div style="flex-direction: column; align-items: stretch; border-bottom: 1px dashed #cfd8dc; padding: 12px 0;">
+                    <div style="font-weight: 700; color: #37474f; margin-bottom: 6px;">DANH SÁCH DỊCH VỤ / THUỐC ĐÃ THU:</div>
+                    @foreach (var item in Model.Items)
+                    {
+                        <div style="display: flex; justify-content: space-between; font-size: 11px; padding: 3px 0; border-bottom: none;">
+                            <span>• @item.Description (@item.Quantity)</span>
+                            <span class="font-monospace">@item.Total.ToString("N0") đ</span>
+                        </div>
+                    }
+                </div>
+
+                <div>
+                    <span>Tổng chi phí phát sinh:</span>
+                    <span class="font-monospace">@Model.TotalAmount.ToString("N0") đ</span>
+                </div>
+                @if (Model.InsuranceCoveredAmount > 0)
+                {
+                    <div style="color: #00897b;">
+                        <span>BHYT chi trả (@Model.CoveragePct.ToString("0.#")%):</span>
+                        <span class="font-monospace">-@Model.InsuranceCoveredAmount.ToString("N0") đ</span>
+                    </div>
+                }
+
+                <div class="receipt-total">
+                    <span style="font-weight: 700; font-size: 14px;">NGƯỜI BỆNH THỰC TRẢ:</span>
+                    <strong class="font-monospace">@Model.PatientAmount.ToString("N0") đ</strong>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; margin-top: 25px; padding-top: 10px; border-bottom: none;">
+                    <div style="text-align: center; width: 45%;">
+                        <div style="font-weight: 600; font-size: 11px;">NGƯỜI NỘP TIỀN</div>
+                        <div style="font-size: 10px; color: #90a4ae; margin-top: 40px;">(Ký, ghi rõ họ tên)</div>
+                    </div>
+                    <div style="text-align: center; width: 45%;">
+                        <div style="font-weight: 600; font-size: 11px;">NGƯỜI THU TIỀN</div>
+                        <div style="font-size: 10px; color: #90a4ae; margin-top: 40px;">Đã ký điện tử</div>
+                    </div>
+                </div>
+
+                <p>Phiếu thu điện tử hợp lệ theo quy định của Bộ Y tế. Cảm ơn Quý khách đã tin tưởng sử dụng dịch vụ khám chữa bệnh!</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

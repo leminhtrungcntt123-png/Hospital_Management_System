@@ -1,4 +1,5 @@
 using HIS.Domain;
+using HIS.BLL.Common;
 using HIS.BLL.DTOs;
 
 namespace HIS.BLL.Interfaces;
@@ -60,4 +61,9 @@ public interface IReceptionService
     /// mỗi người bị chen tăng overtaken_count và không bị chen quá MaxTimesOvertaken lần.
     /// </summary>
     Task<ReceptionActionResult> AssignStaffPriorityAsync(int appointmentId, int? operatorAccountId = null, CancellationToken cancellationToken = default);
+
+    // --- Web Quầy Tiếp Nhận (Reception Desk) ---
+    Task<Result<ReceptionDesk>> GetDeskAsync(int staffAccountId, string? search, CancellationToken ct = default);
+    Task<Result<string>> CheckInAsync(int staffAccountId, int appointmentId, bool identityVerified, CancellationToken ct = default);
+    Task<Result<string>> RegisterWalkInAsync(int staffAccountId, WalkInReceptionRequest request, CancellationToken ct = default);
 }

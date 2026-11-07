@@ -6,7 +6,9 @@ public sealed record AuthUserDto(
     string RoleCode,
     string RoleName,
     string DisplayName,
-    IReadOnlyList<string> Permissions);
+    IReadOnlyList<string> Permissions,
+    string? DepartmentName = null,
+    string? DoctorId = null);
 
 public sealed class LoginResult
 {
@@ -100,6 +102,25 @@ public sealed class PasswordResetResult
     public static PasswordResetResult Success() => new() { Succeeded = true };
 
     public static PasswordResetResult Fail(string message) => new()
+    {
+        ErrorMessage = message
+    };
+}
+
+public sealed record ChangePasswordRequest(
+    int AccountId,
+    string OldPassword,
+    string NewPassword);
+
+public sealed class ChangePasswordResult
+{
+    public bool Succeeded { get; private init; }
+
+    public string? ErrorMessage { get; private init; }
+
+    public static ChangePasswordResult Success() => new() { Succeeded = true };
+
+    public static ChangePasswordResult Fail(string message) => new()
     {
         ErrorMessage = message
     };

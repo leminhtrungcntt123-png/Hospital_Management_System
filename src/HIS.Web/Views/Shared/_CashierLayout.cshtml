@@ -1,0 +1,155 @@
+@{
+    var displayName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? "Thu ngân";
+    var initials = string.Concat(displayName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+        .TakeLast(2).Select(part => part[..1])).ToUpperInvariant();
+    if (string.IsNullOrWhiteSpace(initials)) initials = "TN";
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#079bc9" />
+    <title>@ViewData["Title"] — MediCare HIS</title>
+    <partial name="MediCare/_Styles" />
+    <link rel="stylesheet" href="~/css/reception.css" asp-append-version="true" />
+    <style>
+        .cashier-grid {
+            display: grid;
+            grid-template-columns: 1.15fr 1fr;
+            gap: 20px;
+            align-items: start;
+        }
+        @@media (max-width: 1024px) {
+            .cashier-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .invoice-card {
+            background: #fff;
+            border-radius: 12px;
+            border: 1px solid #dce8f2;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            margin-bottom: 20px;
+        }
+        .invoice-badge-unpaid {
+            background: #fff3cd;
+            color: #856404;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .invoice-badge-paid {
+            background: #d4edda;
+            color: #155724;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .invoice-row-selected {
+            background: #e9f5fc !important;
+            border-left: 3px solid #0087ba;
+        }
+        .cursor-pointer {
+            cursor: pointer;
+        }
+        .item-category-header {
+            font-size: 11px;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: #0077a3;
+            background: #f0f7fb;
+            padding: 6px 12px;
+            border-radius: 4px;
+            margin: 10px 0 6px;
+        }
+        .pay-method-btn {
+            border: 1px solid #c8d9e6;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+            background: #fcfdfe;
+            transition: all 0.2s;
+            font-size: 12px;
+            font-weight: 600;
+            color: #3b5062;
+        }
+        .pay-method-btn.active {
+            border-color: #0087ba;
+            background: #e6f4fa;
+            color: #006890;
+        }
+    </style>
+</head>
+<body>
+    <div class="staff-app reception-workspace">
+        <aside class="sidebar" id="reception-sidebar" aria-label="Điều hướng thu ngân">
+            <div>
+                <a class="brand-link" asp-area="" asp-controller="Home" asp-action="Index" aria-label="MediCare, về trang chủ">
+                    <span class="brand">
+                        <span class="brand-mark">+</span>
+                        <span>MediCare<sup>+</sup></span>
+                    </span>
+                </a>
+                <div class="workspace">
+                    @await Html.PartialAsync("_AdminIcon", "building")
+                    <span><strong>Phòng Kế toán - Viện phí</strong><small>Thu ngân / BHYT</small></span>
+                </div>
+            </div>
+            <nav class="staff-nav" aria-label="Chức năng thu ngân">
+                <div class="nav-group">
+                    <span>CÔNG VIỆC HÔM NAY</span>
+                    <a href="@Url.Content("~/Workspace/staff/dashboard")">
+                        @await Html.PartialAsync("_AdminIcon", "grid")<span>Bàn làm việc</span>
+                    </a>
+                    <a asp-area="Staff" asp-controller="Reception" asp-action="Index">
+                        @await Html.PartialAsync("_AdminIcon", "users")<span>Tiếp nhận &amp; gọi số</span>
+                    </a>
+                    <a href="@Url.Content("~/Workspace/staff/vitals")">
+                        @await Html.PartialAsync("_AdminIcon", "pulse")<span>Sinh hiệu</span>
+                    </a>
+                    <a class="active" asp-area="Staff" asp-controller="Cashier" asp-action="Index" aria-current="page">
+                        @await Html.PartialAsync("_AdminIcon", "wallet")<span>Thu phí &amp; BHYT</span>
+                    </a>
+                </div>
+                <div class="nav-group">
+                    <span>HỒ SƠ &amp; LỊCH</span>
+                    <a href="@Url.Content("~/Workspace/staff/patients")">
+                        @await Html.PartialAsync("_AdminIcon", "clipboard")<span>Người khám</span>
+                    </a>
+                    <a asp-area="Staff" asp-controller="Schedule" asp-action="Index">
+                        @await Html.PartialAsync("_AdminIcon", "calendar")<span>Lịch làm việc</span>
+                    </a>
+                </div>
+            </nav>
+            <div class="sidebar-bottom">
+                <a class="portal-link" asp-area="" asp-controller="Home" asp-action="Index">
+                    @await Html.PartialAsync("_AdminIcon", "external") Cổng bệnh nhân
+                </a>
+                <div class="user-card">
+                    <div class="user-avatar" aria-hidden="true">@initials</div>
+                    <div class="user-meta">
+                        <span class="user-name">@displayName</span>
+                        <span class="user-role">Thu ngân / Viện phí</span>
+                    </div>
+                    <form asp-area="" asp-controller="Account" asp-action="Logout" method="post">
+                        <button type="submit" class="logout-btn" title="Đăng xuất">
+                            @await Html.PartialAsync("_AdminIcon", "logout")
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-content" id="main-content">
+            @RenderBody()
+        </main>
+    </div>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

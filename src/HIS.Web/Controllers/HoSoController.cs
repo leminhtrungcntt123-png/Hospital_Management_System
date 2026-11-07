@@ -28,6 +28,7 @@ public class HoSoController : PatientPageController
     private readonly IPatientProfileService _profileService;
     private readonly IBookingService _bookingService;
     private readonly IOtpService _otpService;
+    private readonly IHealthRecordService _healthRecordService;
     private readonly OtpOptions _otpOptions;
     private readonly QueueChangeNotifier _realtime;
 
@@ -35,12 +36,14 @@ public class HoSoController : PatientPageController
         IPatientProfileService profileService,
         IBookingService bookingService,
         IOtpService otpService,
+        IHealthRecordService healthRecordService,
         IOptions<OtpOptions> otpOptions,
         QueueChangeNotifier realtime)
     {
         _profileService = profileService;
         _bookingService = bookingService;
         _otpService = otpService;
+        _healthRecordService = healthRecordService;
         _otpOptions = otpOptions.Value;
         _realtime = realtime;
     }
@@ -306,6 +309,21 @@ public class HoSoController : PatientPageController
         }
 
         return View(new HoSoChiTietViewModel { Profile = profile, History = history });
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> HealthRecord(int id, CancellationToken ct = default)
+    {
+        if (RequireAccount() is { } signIn) return signIn;
+
+        var result = await _healthRecordService.GetHealthRecordDetailAsync(id, AccountId, ct);
+        if (!result.IsSuccess)
+        {
+            TempData["Error"] = result.Error.Message;
+            return RedirectToAction(nameof(Index));
+        }
+
+        return View(result.Value);
     }
 
     // ------------------------------------------------------------------ Helpers

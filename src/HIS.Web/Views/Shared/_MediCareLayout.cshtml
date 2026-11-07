@@ -1,0 +1,62 @@
+@using System.Security.Claims
+@using System.Text.Json
+
+@{
+    var isAuthenticated = User.Identity?.IsAuthenticated == true;
+    var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "PATIENT";
+    var defaultRoute = (role?.ToUpperInvariant()) switch
+    {
+        "ADMIN" => "admin/accounts",
+        "DEPARTMENT_HEAD" or "DEPT_HEAD" => "staff/schedule",
+        "DOCTOR" => "staff/consultation",
+        "NURSE" => "staff/reception",
+        "CASHIER" => "staff/cashier",
+        "PATIENT" => "patient/booking",
+        _ => "public/home"
+    };
+    var home = (role?.ToUpperInvariant()) switch
+    {
+        "ADMIN" => "/Admin/Management",
+        "DEPARTMENT_HEAD" or "DEPT_HEAD" => "/Staff/Schedule",
+        "DOCTOR" => "/Staff/Consultation",
+        "NURSE" => "/Staff/Reception",
+        "CASHIER" => "/Staff/Cashier",
+        "PATIENT" => "/Patient/Booking",
+        _ => "/Admin/Accounts"
+    };
+    var isPreview = ViewData["UiPreview"] is true;
+    var config = new
+    {
+        preview = isPreview,
+        live = !isPreview,
+        role,
+        authenticated = isAuthenticated,
+        displayName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? (isAuthenticated ? "Thành viên" : "Khách"),
+        initialRoute = ViewData["MediCareRoute"]?.ToString() ?? (isAuthenticated ? defaultRoute : "public/home"),
+        pathBase = Context.Request.PathBase.ToString(),
+        assetBase = Url.Content("~/ui/assets/"),
+        catalogUrl = Url.Action("Catalog", "Home", new { area = "" }),
+        home = Url.Content("~" + home),
+        login = Url.Action("Login", "Account", new { area = "" }),
+        changePassword = Url.Action("ChangePassword", "Account", new { area = "" })
+    };
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#079bc9" />
+    <title>@ViewData["Title"] — MediCare HIS</title>
+    <partial name="MediCare/_Styles" />
+</head>
+<body>
+    @RenderBody()
+    <partial name="MediCare/_Overlays" />
+    <partial name="MediCare/_SessionControls" />
+
+    <script id="his-ui-config" type="application/json">@Html.Raw(JsonSerializer.Serialize(config))</script>
+    <partial name="MediCare/_Scripts" />
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

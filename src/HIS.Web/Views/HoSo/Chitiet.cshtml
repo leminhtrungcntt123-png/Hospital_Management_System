@@ -96,6 +96,11 @@
                             <label><span>Bảo hiểm đã khai</span><strong>@a.InsuranceSummary</strong></label>
                         }
                     </div>
+                    <div style="margin: 10px 0 16px; display: flex; justify-content: flex-end;">
+                        <a class="btn btn-outline" asp-controller="HoSo" asp-action="HealthRecord" asp-route-id="@a.Id" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: #0077a3; border-color: #b3e5fc; font-size: 13px;">
+                            <i data-lucide="file-text"></i> Xem Hồ sơ sức khỏe &amp; Kết quả khám
+                        </a>
+                    </div>
                     <div class="summary-divider"></div>
                 }
             }

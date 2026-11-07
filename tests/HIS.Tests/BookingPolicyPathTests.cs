@@ -581,6 +581,9 @@ UPDATE appointment_slots s SET
 WHERE s.id IN (SELECT slot_id FROM appointments WHERE id = ANY ({0}) AND slot_id IS NOT NULL)", [ids]);
 
             await ctx.Database.ExecuteSqlRawAsync("DELETE FROM appointment_status_history WHERE appointment_id = ANY ({0})", [ids]);
+            await ctx.Database.ExecuteSqlRawAsync("DELETE FROM invoice_items WHERE invoice_id IN (SELECT id FROM invoices WHERE appointment_id = ANY ({0}))", [ids]);
+            await ctx.Database.ExecuteSqlRawAsync("DELETE FROM payments WHERE invoice_id IN (SELECT id FROM invoices WHERE appointment_id = ANY ({0}))", [ids]);
+            await ctx.Database.ExecuteSqlRawAsync("DELETE FROM invoices WHERE appointment_id = ANY ({0})", [ids]);
             await ctx.Database.ExecuteSqlRawAsync("DELETE FROM appointments WHERE id = ANY ({0})", [ids]);
         }
 

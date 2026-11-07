@@ -1,0 +1,169 @@
+/* staff / schedule */
+.schedule-week-nav {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    align-items: center;
+    margin: 0 0 17px;
+}
+.schedule-week-nav > div {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.schedule-week-nav strong {
+    font-size: 12px;
+    font-weight: 550;
+    color: #4f6d85;
+}
+.calendar-scroll {
+    overflow-x: auto;
+}
+.calendar-grid {
+    display: flex;
+    min-width: 750px;
+    padding: 0 18px 18px;
+    gap: 9px;
+}
+.calendar-col {
+    flex: 1;
+    min-width: 0;
+    border: 1px solid #e1eaf3;
+    border-radius: 7px;
+    overflow: hidden;
+}
+.calendar-col.label-col {
+    flex: 1.3;
+    border: 0;
+}
+.calendar-col > header {
+    height: 73px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-bottom: 1px solid #dfeaf3;
+    background: #f7fafd;
+    font-size: 10px;
+    color: #5b6978;
+    gap: 2px;
+}
+.calendar-col > header > strong {
+    font-size: 16px;
+    color: #526b80;
+    font-weight: 550;
+}
+.calendar-col > header > small {
+    font-size: 9px;
+}
+.calendar-col > header > b {
+    font-size: 7px;
+    font-weight: 500;
+    color: #426e81;
+}
+.calendar-col.today {
+    border-color: #a6d0e5;
+}
+.calendar-col.today > header {
+    background: #eaf7fd;
+}
+.calendar-doctor {
+    height: 114px;
+    padding: 15px 9px;
+    border-bottom: 1px solid #e2eaf3;
+    color: #526a7f;
+}
+.calendar-doctor > .avatar {
+    width: 25px;
+    height: 25px;
+    font-size: 8px;
+    float: left;
+    margin-right: 7px;
+}
+.calendar-doctor > strong {
+    font-size: 9px;
+    display: block;
+    font-weight: 550;
+    margin-top: 4px;
+}
+.calendar-doctor small {
+    font-size: 8px;
+    display: block;
+    clear: both;
+    padding-top: 8px;
+    color: #596876;
+}
+.calendar-cell {
+    height: 114px;
+    padding: 9px;
+    border-bottom: 1px solid #e4ecf5;
+}
+.calendar-cell:last-child {
+    border: 0;
+}
+.shift-chip {
+    background: #e9f7fd;
+    border-left: 2px solid #7abed7;
+    border-radius: 4px;
+    padding: 6px 6px;
+    margin-bottom: 7px;
+    line-height: 1.5;
+}
+.shift-chip strong {
+    font-size: 9px;
+    color: #4c6c7e;
+    display: block;
+    font-weight: 550;
+}
+.shift-chip small {
+    font-size: 7px;
+    display: block;
+    color: #596976;
+    margin-top: 2px;
+}
+.shift-chip.blue {
+    background: #eef2fd;
+    border-color: #a9b7e6;
+}
+.shift-chip.blue strong {
+    color: #5b6882;
+}
+.shift-chip.blocked {
+    background: #fff5e5;
+    border-color: #ddbc7f;
+}
+.shift-chip.blocked strong {
+    color: #7f6840;
+}
+.quota-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 0 19px 18px;
+    gap: 15px;
+}
+.quota-grid article {
+    padding: 15px;
+    background: #f8fbfe;
+    border: 1px solid #e1ebf4;
+    border-radius: 7px;
+}
+.quota-grid h3 {
+    font-size: 11px;
+    margin-bottom: 12px;
+    color: #4f6a80;
+}
+.quota-grid article > div {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: #5e6d7b;
+    margin: 7px 0;
+}
+.quota-grid strong {
+    font-weight: 600;
+    color: #4a6a7d;
+}
+.quota-grid .text-link {
+    font-size: 9px;
+    margin-top: 10px;
+}

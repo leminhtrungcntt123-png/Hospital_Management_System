@@ -1,0 +1,607 @@
+/* Consistent, readable internal workspace: reception, doctors, heads and admin. */
+@media screen {
+    .staff-app {
+        background: #e9eff6;
+        color: #152f49;
+    }
+    .staff-app .staff-main {
+        font-size: 13px;
+        font-weight: 500;
+    }
+    .staff-main .page-heading h1 {
+        color: #102a44;
+        font-weight: 800;
+    }
+    .staff-main .page-heading p {
+        font-size: 12px;
+        color: #3c536c;
+        font-weight: 500;
+    }
+    .staff-app .staff-breadcrumb,
+    .staff-app .staff-breadcrumb strong {
+        font-size: 12px;
+        color: #35506b;
+        font-weight: 600;
+    }
+    .staff-app .staff-profile strong {
+        font-size: 12px;
+        color: #203c57;
+    }
+    .staff-app .staff-profile small,
+    .staff-app .demo-clock {
+        font-size: 11px;
+        color: #405b74;
+    }
+    .staff-app .sidebar .workspace strong {
+        font-size: 12px;
+        color: #fff;
+        font-weight: 650;
+    }
+    .staff-app .sidebar .workspace small,
+    .staff-app .sidebar .workspace > .icon {
+        color: #b8cee2;
+        font-size: 11px;
+    }
+    .staff-app .nav-group > span {
+        font-size: 10px;
+        color: #b8cee2;
+        font-weight: 650;
+    }
+    .staff-app .nav-group a {
+        font-size: 12px;
+        color: #e0ebf5;
+        font-weight: 600;
+    }
+    .staff-app .nav-group a.active {
+        background: #087fa9;
+        color: #fff;
+        font-weight: 750;
+    }
+    .staff-main .card {
+        border-color: #aebfd0;
+        box-shadow: 0 3px 12px #1739550c;
+    }
+    .staff-main .card-header {
+        background: #f3f7fb;
+        border-bottom: 1px solid #c5d3e0;
+    }
+    .staff-main .card-header h2 {
+        font-size: 15px;
+        color: #173650;
+        font-weight: 750;
+    }
+    .staff-main .card-header p {
+        font-size: 11px;
+        color: #465d74;
+    }
+    .staff-main .btn {
+        font-size: 12px;
+        font-weight: 650;
+        min-height: 40px;
+    }
+    .staff-main .btn.sm {
+        font-size: 11px;
+        min-height: 34px;
+    }
+    .staff-main .text-link,
+    .staff-main .link-button {
+        font-size: 12px;
+        color: #00658a;
+        font-weight: 700;
+    }
+    .staff-main th {
+        font-size: 11px;
+        color: #213f5c;
+        font-weight: 750;
+        background: #e2ecf5;
+        border-color: #afc3d5;
+    }
+    .staff-main td {
+        font-size: 12px;
+        color: #29465f;
+        border-color: #ccd9e5;
+    }
+    .staff-main td strong,
+    .staff-main .person-cell strong {
+        font-size: 12px;
+        font-weight: 700;
+        color: #18344e;
+    }
+    .staff-main td small,
+    .staff-main .person-cell small {
+        font-size: 11px;
+        color: #455d76;
+    }
+    .staff-main .badge {
+        font-size: 10px;
+        font-weight: 650;
+    }
+    .staff-main .toolbar,
+    .staff-main .tabs {
+        background: #f0f5fa;
+        border-color: #bbcedf;
+    }
+    .staff-main .tab {
+        font-size: 12px;
+        min-height: 37px;
+    }
+    .staff-main .tab.active {
+        color: #fff;
+        background: #006f98;
+        border-color: #005d80;
+    }
+    .staff-main .search-input input {
+        font-size: 12px;
+    }
+    .staff-main .stat-label {
+        font-size: 12px;
+        color: #304c68;
+        font-weight: 650;
+    }
+    .staff-main .stat-card > strong {
+        font-size: 30px;
+        font-weight: 800;
+    }
+    .staff-main .stat-card.cyan > strong {
+        color: #006b8e;
+    }
+    .staff-main .stat-card.blue > strong {
+        color: #304ba4;
+    }
+    .staff-main .stat-card.amber > strong {
+        color: #886015;
+    }
+    .staff-main .stat-card > small {
+        font-size: 11px;
+        color: #405a73;
+    }
+    .staff-main .doctor-strip strong {
+        font-size: 11px;
+        color: #234762;
+        font-weight: 650;
+        white-space: normal;
+    }
+    .staff-main .doctor-strip small,
+    .staff-main .doctor-strip b {
+        font-size: 10px;
+        color: #435f79;
+    }
+    .staff-main .queue-panel {
+        background: #e6f2fa;
+        border-color: #adc9dc;
+    }
+    .staff-main .queue-panel-head h2 {
+        font-size: 15px;
+        color: #163e59;
+    }
+    .staff-main .queue-panel-head select {
+        font-size: 12px;
+        border-color: #a1bdd0;
+        color: #284d68;
+        min-height: 36px;
+    }
+    .staff-main .ticket {
+        border-color: #b5ccdd;
+    }
+    .staff-main .ticket > .flex-between > span,
+    .staff-main .mini-heading {
+        font-size: 10px;
+        color: #3f5a72;
+        font-weight: 650;
+    }
+    .staff-main .ticket h3 {
+        font-size: 14px;
+        color: #153c57;
+        font-weight: 700;
+    }
+    .staff-main .ticket p {
+        font-size: 12px;
+        color: #415e77;
+    }
+    .staff-main .ticket > strong {
+        color: #00678b;
+        font-weight: 800;
+    }
+    .staff-main .queue-row strong {
+        font-size: 12px;
+        font-weight: 650;
+        color: #254863;
+    }
+    .staff-main .queue-row small,
+    .staff-main .queue-row > b {
+        font-size: 10px;
+        color: #415e77;
+    }
+    .staff-main .operation-summary {
+        font-size: 12px;
+        background: #dfedf7;
+        border-color: #acc9dd;
+        color: #345570;
+    }
+    .staff-main .consultation-person {
+        border-color: #c7d7e4;
+    }
+    .staff-main .consultation-person strong {
+        font-size: 12px;
+        color: #234761;
+        font-weight: 700;
+    }
+    .staff-main .consultation-person small {
+        font-size: 11px;
+        color: #435d76;
+    }
+    .staff-main .consultation-person.active {
+        background: #d9eff9;
+        border-left-color: #00749c;
+    }
+    .staff-main .consultation-person .badge {
+        font-size: 9px;
+    }
+    .staff-main .consultation-workspace .card-header h2 {
+        font-size: 18px;
+        color: #173851;
+    }
+    .staff-main .clinical-inner > .notice {
+        font-size: 12px;
+        color: #73511b;
+        background: #fff2d7;
+        border-color: #d7b978;
+    }
+    .staff-main .vitals-strip {
+        background: #eaf3fa;
+        border-color: #acc5d8;
+    }
+    .staff-main .vitals-strip > div + div {
+        border-color: #b8cedf;
+    }
+    .staff-main .vitals-strip small {
+        font-size: 11px;
+        color: #3c5872;
+    }
+    .staff-main .vitals-strip strong {
+        font-size: 15px;
+        color: #153e5a;
+        font-weight: 750;
+    }
+    .staff-main .vitals-strip strong > span {
+        font-size: 10px;
+        color: #435f79;
+        font-weight: 500;
+    }
+    .staff-main .begin-exam {
+        background: #e0f1fa;
+        border-color: #9ec6dc;
+    }
+    .staff-main .begin-exam h3 {
+        font-size: 14px;
+        color: #1d4a65;
+        font-weight: 750;
+    }
+    .staff-main .begin-exam p {
+        font-size: 12px;
+        color: #405c74;
+    }
+    .staff-main .form-section-title {
+        padding: 11px 12px;
+        border: 1px solid #b9ccdc;
+        border-left: 4px solid #00789e;
+        background: #e9f2f9;
+        border-radius: 5px;
+    }
+    .staff-main .form-section-title > h3 {
+        font-size: 14px;
+        font-weight: 750;
+        color: #173c58;
+    }
+    .staff-main .form-section-title > span {
+        font-size: 11px;
+        color: #00688c;
+        font-weight: 700;
+    }
+    .staff-main .field label,
+    .modal .field label {
+        font-size: 12px;
+        font-weight: 650;
+        color: #27455e;
+    }
+    .staff-main .field input,
+    .staff-main .field select,
+    .staff-main .field textarea,
+    .modal .field input,
+    .modal .field select,
+    .modal .field textarea {
+        font-size: 13px;
+        color: #183c56;
+        border-color: #98b3c9;
+        line-height: 1.65;
+    }
+    .staff-main .field input:disabled,
+    .staff-main .field textarea:disabled {
+        opacity: 0.8;
+        background: #f0f4f8;
+    }
+    .staff-main .rx-row {
+        background: #f7fafc;
+        border-color: #b5cbdc;
+    }
+    .staff-main .rx-row .field label {
+        font-size: 11px;
+    }
+    .staff-main .rx-row .field input,
+    .staff-main .rx-row .field select {
+        font-size: 12px;
+    }
+    .staff-main .inline-labs {
+        border-color: #acc5d8;
+    }
+    .staff-main .inline-labs > div {
+        font-size: 12px;
+        color: #345771;
+    }
+    .staff-main .clinical-actions {
+        border-color: #a8c0d4;
+    }
+    .staff-main .clinical-actions > span {
+        font-size: 11px;
+        color: #435d75;
+    }
+    .staff-main .schedule-week-nav strong {
+        font-size: 14px;
+        font-weight: 700;
+        color: #234864;
+    }
+    .staff-main .calendar-grid {
+        min-width: 900px;
+    }
+    .staff-main .calendar-col {
+        border-color: #b0c4d6;
+    }
+    .staff-main .calendar-col > header {
+        font-size: 12px;
+        color: #314f6a;
+        background: #e7eff7;
+        border-color: #b9cddd;
+        height: 82px;
+    }
+    .staff-main .calendar-col > header > strong {
+        font-weight: 750;
+        color: #1d415d;
+    }
+    .staff-main .calendar-col > header > small,
+    .staff-main .calendar-col > header > b {
+        font-size: 10px;
+    }
+    .staff-main .calendar-col.today {
+        border: 2px solid #007a9f;
+    }
+    .staff-main .calendar-col.today > header {
+        background: #cfeaf7;
+    }
+    .staff-main .calendar-doctor,
+    .staff-main .calendar-cell {
+        height: 136px;
+        border-color: #c3d3e1;
+    }
+    .staff-main .calendar-doctor > strong {
+        font-size: 11px;
+        font-weight: 700;
+        color: #254c68;
+    }
+    .staff-main .calendar-doctor small {
+        font-size: 10px;
+        color: #425f77;
+    }
+    .staff-main .shift-chip {
+        background: #dceff8;
+        border-left: 3px solid #007aa1;
+    }
+    .staff-main .shift-chip strong {
+        font-size: 11px;
+        font-weight: 700;
+        color: #20516d;
+    }
+    .staff-main .shift-chip small {
+        font-size: 10px;
+        color: #3a5972;
+    }
+    .staff-main .shift-chip.blue {
+        background: #e4eafa;
+        border-color: #4b66b2;
+    }
+    .staff-main .shift-chip.blue strong {
+        color: #344f91;
+    }
+    .staff-main .shift-chip.blocked {
+        background: #fff0cf;
+        border-color: #ac781e;
+    }
+    .staff-main .quota-grid article {
+        background: #edf4fa;
+        border-color: #aec5d8;
+    }
+    .staff-main .quota-grid h3 {
+        font-size: 13px;
+        font-weight: 700;
+        color: #244962;
+    }
+    .staff-main .quota-grid article > div {
+        font-size: 12px;
+        color: #415d75;
+    }
+    .staff-main .quota-grid strong {
+        font-weight: 750;
+        color: #183f5c;
+    }
+    .staff-main .collection-rate > span,
+    .staff-main .collection-lines > div {
+        font-size: 12px;
+        color: #3e5c75;
+    }
+    .staff-main .collection-lines strong {
+        font-size: 14px;
+        color: #1c4965;
+        font-weight: 700;
+    }
+    .staff-main .shortcut-row,
+    .staff-main .collection-link {
+        font-size: 12px;
+        color: #265470;
+        font-weight: 600;
+    }
+    .staff-main .amount-summary,
+    .modal .amount-summary {
+        background: #deeff9;
+        border-color: #9fbed4;
+    }
+    .staff-main .amount-summary span,
+    .modal .amount-summary span {
+        font-size: 12px;
+        color: #2d536e;
+        font-weight: 650;
+    }
+    .modal-header {
+        background: #edf4fa;
+        border-color: #b2c9db;
+    }
+    .modal-header h2 {
+        font-weight: 750;
+        color: #183c58;
+    }
+    .modal-header p {
+        font-size: 12px;
+        color: #415c74;
+    }
+    .modal .btn {
+        font-size: 12px;
+        min-height: 40px;
+        font-weight: 650;
+    }
+    .modal .check-line,
+    .modal .notice {
+        font-size: 12px;
+        color: #3c5871;
+    }
+    .modal .notice.amber {
+        color: #79531a;
+        border-color: #d6b778;
+        background: #fff3db;
+    }
+    .modal th {
+        font-size: 12px;
+        color: #284d68;
+        font-weight: 700;
+        background: #e5eef7;
+    }
+    .modal td {
+        font-size: 12px;
+        color: #34546f;
+    }
+    .modal .info-grid small,
+    .modal .review-grid small {
+        font-size: 11px;
+        color: #48627b;
+    }
+    .modal .info-grid strong,
+    .modal .review-grid strong {
+        font-size: 13px;
+        color: #20445f;
+        font-weight: 650;
+    }
+    .modal .record-detail-section h3 {
+        font-size: 14px;
+        font-weight: 700;
+        color: #214c69;
+    }
+    .modal .record-detail-section dl,
+    .modal .record-detail-section > p {
+        font-size: 13px;
+        color: #314f69;
+    }
+    .modal .record-detail-section dt {
+        font-size: 12px;
+        color: #435e77;
+        font-weight: 600;
+    }
+    .insurance-box {
+        background: #eaf3fa;
+        border-color: #acc5d8;
+    }
+    .insurance-box select,
+    .insurance-box > .btn {
+        font-size: 12px;
+    }
+    .insurance-box > small {
+        font-size: 11px;
+        color: #435f77;
+    }
+    .billing-totals {
+        background: #eaf3fa;
+        border-color: #aec7da;
+    }
+    .billing-totals > div {
+        font-size: 12px;
+        color: #3a5873;
+    }
+    .billing-totals strong {
+        font-size: 14px;
+        color: #234963;
+        font-weight: 700;
+    }
+    .billing-totals .grand-total {
+        border-color: #acc6d9;
+        color: #204c68;
+        font-weight: 700;
+    }
+    .billing-totals .grand-total strong {
+        font-size: 26px;
+        color: #006b90;
+        font-weight: 800;
+    }
+    @media (max-width: 640px) {
+        .staff-main .page-heading p {
+            font-size: 11px;
+        }
+        .staff-main .heading-actions > .btn,
+        .staff-main .btn {
+            font-size: 11px;
+        }
+        .staff-main .stat-label,
+        .staff-main .stat-card > small {
+            font-size: 11px;
+        }
+        .staff-main .stat-card > strong {
+            font-size: 26px;
+        }
+        .staff-main .tab {
+            font-size: 11px;
+        }
+        .staff-main .card-header h2 {
+            font-size: 14px;
+        }
+        .staff-main .vitals-strip small {
+            font-size: 10px;
+        }
+        .staff-main .vitals-strip strong {
+            font-size: 13px;
+        }
+        .staff-main .vitals-strip strong > span {
+            font-size: 9px;
+        }
+        .staff-main .form-section-title > h3 {
+            font-size: 12px;
+        }
+        .staff-main .form-section-title > .text-link {
+            font-size: 11px;
+        }
+        .staff-main .consultation-workspace .card-header .text-link {
+            font-size: 11px;
+        }
+        .staff-main .queue-panel-head select {
+            font-size: 11px;
+            width: 135px;
+        }
+        .modal-header p {
+            font-size: 11px;
+        }
+    }
+}
