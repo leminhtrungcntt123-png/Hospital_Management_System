@@ -1,0 +1,11 @@
+@model string
+
+<main class="mvc-data-error">
+    <h1>Chưa tải được dữ liệu</h1>
+    <p>@Model</p>
+
+    <a class="btn primary" href="@Context.Request.Path">Thử lại</a>
+    <a class="btn outline" asp-area="" asp-controller="Account" asp-action="Login">
+        Đăng nhập lại
+    </a>
+</main>
