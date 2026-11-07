@@ -706,19 +706,28 @@ public class BookingController : PatientPageController
     };
 
     /// <summary>
-    /// Chặn nhảy bước: đưa về bước sớm nhất còn thiếu, đồng thời nạp nhãn stepper và nút Quay lại
-    /// của bước hiện tại theo đúng luồng đang đi.
+    /// Chặn nhảy bước: chỉ ngăn người dùng nhảy cóc về các bước phía sau khi các bước trước đó chưa hoàn thành.
+    /// Luôn cho phép người dùng quay lại (Back) hoặc đổi thông tin ở bất kỳ bước nào phía trước.
     /// </summary>
     private IActionResult? Guard(BookingState state, string action)
     {
         if (RequireAccount() is { } signIn) return signIn;
         if (state.Mode is not string mode) return RedirectToAction(nameof(Index));
 
-        if (FirstUnfinishedStep(state) is { } missing && missing.Action != action)
-            return RedirectToAction(missing.Action);
-
         var steps = StepsOf(mode);
         int index = Array.FindIndex(steps, s => s.Action == action);
+        if (index < 0) return RedirectToAction(nameof(Index));
+
+        if (FirstUnfinishedStep(state) is { } missing)
+        {
+            int missingIndex = Array.FindIndex(steps, s => s.Action == missing.Action);
+            if (missingIndex >= 0 && index > missingIndex)
+            {
+                // Chỉ chặn khi nhảy cóc về bước sau vượt qua bước chưa hoàn thành.
+                return RedirectToAction(missing.Action);
+            }
+        }
+
         ViewData["Steps"] = steps.Select(s => s.Label).ToArray();
         ViewData["Step"] = index + 1;
         ViewData["StepLabel"] = $"BƯỚC {index + 1} / {steps.Length}";
