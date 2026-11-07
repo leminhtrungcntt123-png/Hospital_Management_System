@@ -37,7 +37,7 @@ builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("AdminOnly", policy => policy.RequireClaim(ClaimTypes.Role, "ADMIN"));
     options.AddPolicy("DepartmentHeadOnly", policy => policy.RequireClaim(ClaimTypes.Role, "DEPARTMENT_HEAD"));
-    options.AddPolicy("DoctorOnly", policy => policy.RequireClaim(ClaimTypes.Role, "DOCTOR"));
+    options.AddPolicy("DoctorOnly", policy => policy.RequireClaim(ClaimTypes.Role, "DOCTOR", "DEPARTMENT_HEAD"));
     options.AddPolicy("NurseOnly", policy => policy.RequireClaim(ClaimTypes.Role, "NURSE"));
     options.AddPolicy("PatientOnly", policy => policy.RequireClaim(ClaimTypes.Role, "PATIENT"));
     options.AddPolicy("StaffAny", policy => policy.RequireClaim(ClaimTypes.Role, "ADMIN", "DEPARTMENT_HEAD", "DOCTOR", "NURSE"));

@@ -1,158 +1,368 @@
+@using System.Security.Claims
+
+@{
+    string GetInitials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "NV";
+        var parts = name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 1) return parts[0].Length >= 2 ? parts[0][..2].ToUpperInvariant() : parts[0].ToUpperInvariant();
+        return string.Concat(parts.TakeLast(2).Select(p => char.ToUpperInvariant(p[0])));
+    }
+
+    var isAuthenticated = User.Identity?.IsAuthenticated == true;
+    var isStaff = User.IsInRole("ADMIN") || User.IsInRole("DOCTOR") || User.IsInRole("NURSE") || User.IsInRole("DEPARTMENT_HEAD");
+    var role = User.FindFirst(ClaimTypes.Role)?.Value ?? (isAuthenticated ? "ADMIN" : "PATIENT");
+    var fullName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? (isAuthenticated ? "Nhân viên" : "Khách");
+    var departmentName = User.FindFirst("DepartmentName")?.Value;
+    var currentPath = Context.Request.Path.Value ?? "";
+    var currentTab = Context.Request.Query["tab"].ToString().ToLowerInvariant();
+
+    var currentTitle = (currentPath.StartsWith("/Staff/Schedule", StringComparison.OrdinalIgnoreCase)) ? (currentTab switch
+    {
+        "exceptions" => "Nghỉ / đổi ca",
+        "overview" => "Bàn làm việc",
+        "records" => "Bệnh án trong khoa",
+        "patients" => "Thông tin người khám",
+        _ => "Lịch khám & lịch trực"
+    }) : (currentPath.StartsWith("/Staff/Consultation", StringComparison.OrdinalIgnoreCase)) ? (currentTab switch
+    {
+        "labs" => "Chỉ định & kết quả",
+        "records" => "Bệnh án trong khoa",
+        "schedule" => "Lịch khám & trực",
+        "exceptions" => "Nghỉ / đổi ca",
+        _ => "Khám & kê đơn"
+    }) : (ViewData["Title"]?.ToString() ?? "MediCare HIS");
+}
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - HIS Bệnh viện</title>
-    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/HIS.Web.styles.css" asp-append-version="true" />
+    <meta name="theme-color" content="#079bc9" />
+    <title>@currentTitle — MediCare HIS</title>
+    <partial name="MediCare/_Styles" />
+    <!-- Hỗ trợ Bootstrap JS cho Modals và Alerts -->
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" asp-append-version="true" />
+    <style>
+        body { font-family: 'Be Vietnam Pro', -apple-system, sans-serif !important; }
+        .staff-app a { text-decoration: none; }
+        .staff-app button { font-family: inherit; }
+    </style>
 </head>
-<body class="bg-light d-flex flex-column min-vh-100">
-    <header>
-        <nav class="navbar navbar-expand-lg navbar-dark bg-dark border-bottom shadow-sm">
-            <div class="container-fluid px-3">
-                <a class="navbar-brand fw-bold text-white d-flex align-items-center" asp-area="" asp-controller="Home" asp-action="Index">
-                    <span class="badge bg-primary me-2">HIS</span> Bệnh viện Đa khoa
+<body>
+@if (isStaff)
+{
+    <!-- GIAO DIỆN KHU VỰC NHÂN VIÊN & QUẢN TRỊ (MEDICARE STAFF SHELL) -->
+    <div class="staff-app">
+        <aside class="sidebar">
+            <div>
+                <a href="/" class="brand-link" style="text-decoration:none;">
+                    <span class="brand">
+                        <span class="brand-mark">+</span>
+                        <span>MediCare<sup>+</sup></span>
+                    </span>
                 </a>
-
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain" aria-controls="navbarMain"
-                        aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-
-                <div class="collapse navbar-collapse" id="navbarMain">
-                    <!-- Left: Role-based Navigation Links (HIS-22) -->
-                    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                        <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-controller="Home" asp-action="Index">Trang chủ</a>
-                        </li>
-
-                        @if (User.Identity?.IsAuthenticated == true)
-                        {
-                            @if (User.IsInRole("ADMIN"))
-                            {
-                                <li class="nav-item dropdown">
-                                    <a class="nav-link dropdown-toggle text-warning" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                        Quản trị hệ thống
-                                    </a>
-                                    <ul class="dropdown-menu">
-                                        <li><a class="dropdown-item" asp-area="Admin" asp-controller="Accounts" asp-action="Index">Quản lý Tài khoản & Phân quyền</a></li>
-                                        <li><a class="dropdown-item" asp-area="Admin" asp-controller="Catalog" asp-action="Index">Danh mục Y tế (Khoa, Phòng, Thuốc, BHYT)</a></li>
-                                    </ul>
-                                </li>
-                            }
-
-                            @if (User.IsInRole("DEPARTMENT_HEAD"))
-                            {
-                                <li class="nav-item">
-                                    <a class="nav-link text-info" asp-area="Staff" asp-controller="Schedule" asp-action="Index">Lịch trực & Duyệt ca</a>
-                                </li>
-                            }
-
-                            @if (User.IsInRole("DOCTOR"))
-                            {
-                                <li class="nav-item">
-                                    <a class="nav-link text-info" asp-area="Staff" asp-controller="Consultation" asp-action="Index">Bàn khám Ngoại trú</a>
-                                </li>
-                            }
-
-                            @if (User.IsInRole("NURSE"))
-                            {
-                                <li class="nav-item">
-                                    <a class="nav-link text-info" asp-area="Staff" asp-controller="Reception" asp-action="Index">Tiếp đón & Cấp số</a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" asp-area="Staff" asp-controller="Cashier" asp-action="Index">Thu ngân viện phí</a>
-                                </li>
-                            }
-
-                            @if (User.IsInRole("PATIENT"))
-                            {
-                                <li class="nav-item">
-                                    <a class="nav-link text-success" asp-area="Patient" asp-controller="Booking" asp-action="Index">Đặt lịch khám</a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" asp-area="Patient" asp-controller="MyAppointments" asp-action="Index">Lịch hẹn của tôi</a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" asp-area="Patient" asp-controller="FamilyProfiles" asp-action="Index">Hồ sơ người thân</a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" asp-area="Patient" asp-controller="MedicalRecords" asp-action="Index">Hồ sơ bệnh án</a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" asp-area="Patient" asp-controller="Notifications" asp-action="Index">Thông báo</a>
-                                </li>
-                            }
-                        }
-                    </ul>
-
-                    <!-- Right: User Session Information / Auth Controls (HIS-22) -->
-                    <ul class="navbar-nav ms-auto align-items-lg-center">
-                        @if (User.Identity?.IsAuthenticated == true)
-                        {
-                            <li class="nav-item me-3 mb-2 mb-lg-0 text-white-50 small">
-                                <span class="d-none d-lg-inline">Xin chào: </span>
-                                <strong class="text-white">@(User.FindFirst("FullName")?.Value ?? User.Identity.Name)</strong>
-                                @if (User.IsInRole("ADMIN"))
-                                {
-                                    <span class="badge bg-danger ms-1">Quản trị viên</span>
-                                }
-                                else if (User.IsInRole("DEPARTMENT_HEAD"))
-                                {
-                                    <span class="badge bg-warning text-dark ms-1">Trưởng khoa</span>
-                                }
-                                else if (User.IsInRole("DOCTOR"))
-                                {
-                                    <span class="badge bg-primary ms-1">Bác sĩ</span>
-                                }
-                                else if (User.IsInRole("NURSE"))
-                                {
-                                    <span class="badge bg-info text-dark ms-1">Điều dưỡng / Tiếp đón</span>
-                                }
-                                else if (User.IsInRole("PATIENT"))
-                                {
-                                    <span class="badge bg-success ms-1">Bệnh nhân</span>
-                                }
-                            </li>
-                            <li class="nav-item">
-                                <form asp-area="" asp-controller="Account" asp-action="Logout" method="post">
-                                    <button class="btn btn-outline-light btn-sm" type="submit">Đăng xuất</button>
-                                </form>
-                            </li>
-                        }
-                        else
-                        {
-                            <li class="nav-item">
-                                <a class="nav-link text-white fw-semibold" asp-area="" asp-controller="Account" asp-action="Login">Đăng nhập</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="btn btn-primary btn-sm ms-lg-2" asp-area="" asp-controller="Account" asp-action="Register">Đăng ký</a>
-                            </li>
-                        }
-                    </ul>
+                <div class="workspace">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 21h18 M9 8h1 M9 12h1 M9 16h1 M14 8h1 M14 12h1 M14 16h1 M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"></path>
+                    </svg>
+                    <span>
+                        <strong>@(User.IsInRole("ADMIN") ? "Bệnh viện MediCare" : (!string.IsNullOrEmpty(departmentName) ? departmentName : "Khoa chuyên môn"))</strong>
+                        <small>
+                            @(User.IsInRole("ADMIN") ? "Quản trị viên" :
+                              User.IsInRole("DOCTOR") ? "Bác sĩ" :
+                              User.IsInRole("NURSE") ? "Điều dưỡng / Tiếp đón" : "Trưởng khoa")
+                        </small>
+                    </span>
                 </div>
             </div>
-        </nav>
-    </header>
 
-    <div class="container-fluid flex-grow-1 px-4 py-3">
-        <main role="main" class="pb-3">
+            <nav class="staff-nav" aria-label="Menu chức năng">
+                @if (User.IsInRole("ADMIN"))
+                {
+                    <div class="nav-group">
+                        <span>QUẢN TRỊ HỆ THỐNG</span>
+                        <a href="/Admin/Accounts" class="@(currentPath.StartsWith("/Admin/Accounts") ? "active" : "")">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                            </svg>
+                            <span>Tài khoản & Phân quyền</span>
+                        </a>
+                        <a href="/Admin/Catalog" class="@(currentPath.StartsWith("/Admin/Catalog") ? "active" : "")">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect>
+                            </svg>
+                            <span>Danh mục Khoa phòng</span>
+                        </a>
+                    </div>
+                }
+                @if (User.IsInRole("DOCTOR"))
+                {
+                    <div class="nav-group">
+                        <span>CHUYÊN MÔN</span>
+                        <a href="/Staff/Consultation" class="@(currentPath.StartsWith("/Staff/Consultation") && (string.IsNullOrEmpty(currentTab) || currentTab == "consultation") ? "active" : "")">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M5 3v5a5 5 0 0 0 10 0V3 M3 3h4 M13 3h4 M10 13v3a5 5 0 0 0 10 0v-2 M22 11a2 2 0 1 1-4 0 2 2 0 0 1 4 0"></path>
+                            </svg>
+                            <span>Khám & kê đơn</span>
+                            <b>2</b>
+                        </a>
+                        <a href="/Staff/Consultation?tab=labs" class="@(currentTab == "labs" ? "active" : "")">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M2 12h5l3-8 4 16 3-8h5"></path>
+                            </svg>
+                            <span>Chỉ định & kết quả</span>
+                        </a>
+                        <a href="/Staff/Consultation?tab=records" class="@(currentTab == "records" ? "active" : "")">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M8 13h8 M8 17h5"></path>
+                            </svg>
+                            <span>Bệnh án trong khoa</span>
+                        </a>
+                    </div>
+                    <div class="nav-group">
+                        <span>CÁ NHÂN</span>
+                        <a href="/Staff/Consultation?tab=schedule" class="@(currentTab == "schedule" ? "active" : "")">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line>
+                            </svg>
+                            <span>Lịch khám & trực</span>
+                        </a>
+                        <a href="/Staff/Consultation?tab=exceptions" class="@(currentTab == "exceptions" ? "active" : "")">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>
+                            </svg>
+                            <span>Nghỉ / đổi ca</span>
+                            <b>1</b>
+                        </a>
+                    </div>
+                }
+                @if (User.IsInRole("NURSE"))
+                {
+                    <div class="nav-group">
+                        <span>TIẾP ĐÓN</span>
+                        <a href="/Staff/Reception" class="@(currentPath.StartsWith("/Staff/Reception") ? "active" : "")">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                            <span>Tiếp nhận & Cấp số</span>
+                        </a>
+                        <a href="/Staff/Cashier" class="@(currentPath.StartsWith("/Staff/Cashier") ? "active" : "")">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line>
+                            </svg>
+                            <span>Thu ngân viện phí</span>
+                        </a>
+                    </div>
+                }
+                @if (User.IsInRole("DEPARTMENT_HEAD"))
+                {
+                    <div class="nav-group">
+                        <span>ĐIỀU PHỐI KHOA</span>
+                        <a href="/Staff/Schedule?tab=schedule" class="@(currentPath.StartsWith("/Staff/Schedule") && (currentTab == "schedule" || string.IsNullOrEmpty(currentTab)) ? "active" : "")">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line>
+                            </svg>
+                            <span>Lịch khám & trực</span>
+                        </a>
+                        <a href="/Staff/Schedule?tab=exceptions" class="@(currentPath.StartsWith("/Staff/Schedule") && currentTab == "exceptions" ? "active" : "")">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>
+                            </svg>
+                            <span>Duyệt nghỉ / đổi ca</span>
+                            <b>1</b>
+                        </a>
+                        <a href="/Staff/Schedule?tab=overview" class="@(currentPath.StartsWith("/Staff/Schedule") && currentTab == "overview" ? "active" : "")">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect>
+                            </svg>
+                            <span>Tổng quan khoa</span>
+                        </a>
+                    </div>
+                    <div class="nav-group">
+                        <span>CHUYÊN MÔN</span>
+                        <a href="/Staff/Consultation" class="@(currentPath.StartsWith("/Staff/Consultation") && (currentTab == "consultation" || string.IsNullOrEmpty(currentTab)) ? "active" : "")">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M5 3v5a5 5 0 0 0 10 0V3 M3 3h4 M13 3h4 M10 13v3a5 5 0 0 0 10 0v-2 M22 11a2 2 0 1 1-4 0 2 2 0 0 1 4 0"></path>
+                            </svg>
+                            <span>Khám & kê đơn</span>
+                        </a>
+                        <a href="/Staff/Consultation?tab=labs" class="@(currentPath.StartsWith("/Staff/Consultation") && currentTab == "labs" ? "active" : "")">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M2 12h5l3-8 4 16 3-8h5"></path>
+                            </svg>
+                            <span>Chỉ định & kết quả</span>
+                        </a>
+                    </div>
+                    <div class="nav-group">
+                        <span>THEO DÕI</span>
+                        <a href="/Staff/Schedule?tab=records" class="@(currentPath.StartsWith("/Staff/Schedule") && currentTab == "records" ? "active" : "")">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M8 13h8 M8 17h5"></path>
+                            </svg>
+                            <span>Bệnh án trong khoa</span>
+                        </a>
+                    </div>
+                }
+            </nav>
+
+            <div class="sidebar-bottom">
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:9px; color:#7491ad; padding:4px;">
+                    <span><i style="display:inline-block; width:4px; height:4px; border-radius:50%; background:#41b9d3; margin-right:4px;"></i>Dữ liệu mẫu HIS</span>
+                    <a href="/Account/Login" style="color:#7491ad; text-decoration:none;">Đổi vai trò</a>
+                </div>
+            </div>
+        </aside>
+
+        <div class="staff-shell">
+            <header class="staff-topbar">
+                <div class="staff-breadcrumb">
+                    <span>@(User.IsInRole("DEPARTMENT_HEAD") ? "Trưởng khoa" : User.IsInRole("DOCTOR") ? "Bác sĩ" : User.IsInRole("ADMIN") ? "Quản trị" : role)</span><i>/</i>
+                    <strong>@currentTitle</strong>
+                </div>
+                <div class="topbar-right">
+                    <div class="demo-clock">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        <span>@DateTime.Now.ToString("dd/MM/yyyy · HH:mm")</span>
+                        <small>giờ hệ thống</small>
+                    </div>
+                    <button type="button" class="btn icon-btn" style="background:none; border:none; padding:6px; cursor:pointer;" aria-label="Tìm kiếm">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;color:#596a7c;">
+                            <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                    </button>
+                    <button type="button" class="btn icon-btn" style="background:none; border:none; padding:6px; cursor:pointer;" aria-label="Thông báo">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;color:#596a7c;">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                        </svg>
+                    </button>
+                    <div class="staff-profile">
+                        @{
+                            var displayName = !string.IsNullOrWhiteSpace(fullName) && fullName != "Nhân viên"
+                                ? fullName
+                                : (User.Identity?.Name ?? "Nhân viên");
+                            var displayInitials = GetInitials(displayName);
+                            var displayRole = User.IsInRole("DEPARTMENT_HEAD") ? "Trưởng khoa" :
+                                              User.IsInRole("DOCTOR") ? "Bác sĩ" :
+                                              User.IsInRole("NURSE") ? "Điều dưỡng" :
+                                              User.IsInRole("ADMIN") ? "Quản trị viên" : role;
+                        }
+                        <div class="avatar" style="background:#e0f2fe; color:#0369a1; font-weight:700; font-size:11px; width:30px; height:30px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center;">
+                            @displayInitials
+                        </div>
+                        <div>
+                            <strong>@displayName</strong>
+                            <small>@displayRole</small>
+                        </div>
+                        <form asp-area="" asp-controller="Account" asp-action="Logout" method="post" style="display:inline; margin-left:8px;">
+                            <button type="submit" title="Đăng xuất khỏi hệ thống" style="background:#fee2e2; border:1px solid #fca5a5; color:#b91c1c; border-radius:6px; padding:3px 8px; font-size:11px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;">
+                                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line>
+                                </svg>
+                                <span>Đăng xuất</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </header>
+
+            <main class="staff-main">
+                @if (TempData["SuccessMessage"] != null)
+                {
+                    <div class="notice" style="background:#dcfce7; border-color:#86efac; color:#15803d; margin-bottom:16px; font-size:12px; padding:10px 14px; border-radius:8px;">
+                        <strong>Thành công!</strong> @TempData["SuccessMessage"]
+                    </div>
+                }
+                @if (TempData["ErrorMessage"] != null)
+                {
+                    <div class="notice" style="background:#fee2e2; border-color:#fca5a5; color:#b91c1c; margin-bottom:16px; font-size:12px; padding:10px 14px; border-radius:8px;">
+                        <strong>Lỗi:</strong> @TempData["ErrorMessage"]
+                    </div>
+                }
+                @RenderBody()
+            </main>
+        </div>
+    </div>
+}
+else
+{
+    <!-- GIAO DIỆN BỆNH NHÂN & CÔNG KHAI (MEDICARE PUBLIC SHELL) -->
+    <div class="public-app">
+        <div class="utility-bar">
+            <div>
+                <span>🏥 Bệnh viện Đa khoa MediCare</span>
+                <span class="utility-demo"><i></i>Cổng đặt khám & Thông tin y tế trực tuyến</span>
+                <a href="/Account/Login" style="margin-left:auto; color:inherit; text-decoration:none; font-weight:500;">
+                    🛡️ Khu vực nhân viên &rarr;
+                </a>
+            </div>
+        </div>
+
+        <header class="public-header">
+            <div class="header-inner">
+                <a href="/" class="brand-link" style="text-decoration:none;">
+                    <span class="brand">
+                        <span class="brand-mark">+</span>
+                        <span>MediCare<sup>+</sup></span>
+                    </span>
+                </a>
+                <nav class="public-nav">
+                    <a href="/" class="@(currentPath == "/" ? "active" : "")">Trang chủ</a>
+                    <a href="/#specialties">Chuyên khoa</a>
+                    @if (isAuthenticated)
+                    {
+                        <a href="/Patient/MyAppointments">Lịch hẹn</a>
+                        <a href="/Patient/MedicalRecords">Hồ sơ sức khỏe</a>
+                    }
+                </nav>
+                <div class="public-header-actions">
+                    @if (isAuthenticated)
+                    {
+                        <span style="font-size:12px; font-weight:600; color:#0b7189;">
+                            Xin chào, @fullName
+                        </span>
+                        <form asp-area="" asp-controller="Account" asp-action="Logout" method="post" style="display:inline;">
+                            <button type="submit" class="btn outline sm" style="font-size:11px; padding:4px 10px;">
+                                Đăng xuất
+                            </button>
+                        </form>
+                    }
+                    else
+                    {
+                        <a href="/Account/Login" class="btn outline sm">Đăng nhập</a>
+                        <a href="/Account/Register" class="btn primary sm">Đăng ký</a>
+                    }
+                </div>
+            </div>
+        </header>
+
+        <main class="public-main">
             @RenderBody()
         </main>
+
+        <footer class="public-footer">
+            <div class="public-footer-inner">
+                <div class="footer-brand">
+                    <span class="brand">
+                        <span class="brand-mark">+</span>
+                        <span>MediCare<sup>+</sup></span>
+                    </span>
+                    <p>Hệ thống Đặt lịch & Quản lý Khám bệnh Thông minh</p>
+                </div>
+                <div class="footer-bottom">
+                    <p>&copy; @DateTime.Now.Year MediCare Hospital System. Tất cả các quyền được bảo lưu.</p>
+                </div>
+            </div>
+        </footer>
     </div>
+}
 
-    <footer class="border-top footer text-muted bg-white py-3 mt-auto">
-        <div class="container-fluid px-4 text-center text-md-start d-flex justify-content-between align-items-center">
-            <span>&copy; 2026 - Hệ thống thông tin bệnh viện (HIS) - Đồ án Lập trình Web</span>
-            <span class="text-secondary small">Phiên bản: 1.0.0-web</span>
-        </div>
-    </footer>
+<partial name="MediCare/_SessionControls" />
 
-    <script src="~/lib/jquery/dist/jquery.min.js"></script>
-    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="~/js/site.js" asp-append-version="true"></script>
-    @await RenderSectionAsync("Scripts", required: false)
+<script src="~/lib/jquery/dist/jquery.min.js"></script>
+<script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+@await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

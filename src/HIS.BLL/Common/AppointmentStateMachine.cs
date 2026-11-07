@@ -6,7 +6,7 @@ public static class AppointmentStateMachine
 {
     private static readonly Dictionary<AppointmentStatusId, HashSet<AppointmentStatusId>> AllowedTransitions = new()
     {
-        [AppointmentStatusId.Pending] = [AppointmentStatusId.Confirmed, AppointmentStatusId.Expired, AppointmentStatusId.Cancelled],
+        [AppointmentStatusId.Pending] = [AppointmentStatusId.Confirmed, AppointmentStatusId.Expired, AppointmentStatusId.Cancelled, AppointmentStatusId.RescheduleRequired],
         [AppointmentStatusId.Confirmed] = [AppointmentStatusId.CheckedIn, AppointmentStatusId.Cancelled, AppointmentStatusId.NoShow, AppointmentStatusId.RescheduleRequired],
         [AppointmentStatusId.CheckedIn] = [AppointmentStatusId.ReadyForDoctor, AppointmentStatusId.Cancelled],
         [AppointmentStatusId.ReadyForDoctor] = [AppointmentStatusId.InProgress],

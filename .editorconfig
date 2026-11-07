@@ -10,4 +10,3 @@ insert_final_newline = true
 
 [src/HIS.DAL/Migrations/**]
 generated_code = true
-

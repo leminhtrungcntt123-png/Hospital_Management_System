@@ -15,7 +15,7 @@ public record RegisterPatientRequest(
 
 public record LoginRequest(string Username, string Password);
 
-public record AuthResponse(int AccountId, string Username, string Role, string? FullName = null);
+public record AuthResponse(int AccountId, string Username, string Role, string? FullName = null, string? DepartmentName = null);
 
 public record ForgotPasswordRequest([Required, StringLength(100)] string EmailOrUsername);
 

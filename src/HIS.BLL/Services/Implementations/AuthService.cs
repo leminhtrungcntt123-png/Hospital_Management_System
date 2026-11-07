@@ -66,9 +66,9 @@ public class AuthService : IAuthService
                 SELECT * FROM accounts WHERE lower(username) = {username} OR lower(email) = {username} FOR UPDATE
                 """)
                 .Include(account => account.Role)
-                .Include(account => account.Doctor)
-                .Include(account => account.Nurse)
-                .Include(account => account.DepartmentHead)
+                .Include(account => account.Doctor).ThenInclude(d => d!.Department)
+                .Include(account => account.Nurse).ThenInclude(n => n!.Department)
+                .Include(account => account.DepartmentHead).ThenInclude(dh => dh!.Department)
                 .Include(account => account.PatientLinks).ThenInclude(link => link.Patient)
                 .ToListAsync(ct);
             var account = matches.Count == 1 ? matches[0] : null;
@@ -125,7 +125,10 @@ public class AuthService : IAuthService
                 ?? account.DepartmentHead?.FullName
                 ?? account.PatientLinks.FirstOrDefault(link => link.Relationship == PatientRelationship.Self)?.Patient.FullName
                 ?? account.Username;
-            return Result.Success(new AuthResponse(account.Id, account.Username, account.Role.Code, fullName));
+            var departmentName = account.Doctor?.Department?.Name
+                ?? account.Nurse?.Department?.Name
+                ?? account.DepartmentHead?.Department?.Name;
+            return Result.Success(new AuthResponse(account.Id, account.Username, account.Role.Code, fullName, departmentName));
         });
     }
 
