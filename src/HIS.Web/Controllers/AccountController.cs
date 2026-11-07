@@ -173,9 +173,9 @@ public class AccountController : Controller
             return View(model);
         }
 
-        // Đăng nhập ở cổng PatientPortal: AuthService tự chặn vai trò không phải bệnh nhân ở cổng này.
+        // Đăng nhập ở cổng Web chung: chấp nhận cả Bệnh nhân lẫn Nhân sự (Bác sĩ, Admin, Lễ tân, Thu ngân...)
         LoginResult result = await _authService.LoginAsync(
-            model.Username!, model.Password!, LoginSurface.PatientPortal);
+            model.Username!, model.Password!, LoginSurface.Web);
 
         if (!result.Succeeded || result.User is null)
         {
