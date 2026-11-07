@@ -327,11 +327,20 @@ public class BillingAndHealthRecordTests
     [Fact]
     public async Task HealthRecordDetail_EnforcesAccessControl_ForbidsUnrelatedAccount()
     {
-        var (_, _, _, healthRecord, _, _, otherAccId, _, _, appId) = CreateFixture();
+        var (_, _, _, healthRecord, _, _, otherAccId, doctorAccId, cashierAccId, appId) = CreateFixture();
 
-        var result = await healthRecord.GetHealthRecordDetailAsync(appId, otherAccId);
+        // 1. Tài khoản bệnh nhân lạ -> FORBIDDEN
+        var patientResult = await healthRecord.GetHealthRecordDetailAsync(appId, otherAccId);
+        Assert.False(patientResult.IsSuccess);
+        Assert.Equal("FORBIDDEN", patientResult.Error.Code);
 
-        Assert.False(result.IsSuccess);
-        Assert.Equal("FORBIDDEN", result.Error.Code);
+        // 2. Nhân viên không thuộc lâm sàng (Thu ngân) truy cập hồ sơ bệnh án -> FORBIDDEN
+        var cashierResult = await healthRecord.GetHealthRecordDetailAsync(appId, cashierAccId);
+        Assert.False(cashierResult.IsSuccess);
+        Assert.Equal("FORBIDDEN", cashierResult.Error.Code);
+
+        // 3. Bác sĩ điều trị lượt khám -> SUCCESS
+        var doctorResult = await healthRecord.GetHealthRecordDetailAsync(appId, doctorAccId);
+        Assert.True(doctorResult.IsSuccess);
     }
 }

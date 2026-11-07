@@ -40,14 +40,20 @@ public class HealthRecordService : IHealthRecordService
             return Result.Failure<HealthRecordDetailDto>("NOT_FOUND", "Không tìm thấy hồ sơ lượt khám.");
         }
 
-        // Kiểm tra quyền truy cập nếu là tài khoản bệnh nhân
+        // Kiểm tra quyền truy cập hồ sơ bệnh án (Bảo mật theo CWE-285 - Improper Authorization)
         if (currentAccountId > 0)
         {
-            var isStaff = await _context.Accounts
+            var account = await _context.Accounts
                 .Include(a => a.Role)
-                .AnyAsync(a => a.Id == currentAccountId && a.Role.Code != "PATIENT", ct);
+                .FirstOrDefaultAsync(a => a.Id == currentAccountId, ct);
 
-            if (!isStaff)
+            if (account == null)
+            {
+                return Result.Failure<HealthRecordDetailDto>("FORBIDDEN", "Tài khoản không tồn tại.");
+            }
+
+            string roleCode = account.Role.Code.ToUpperInvariant();
+            if (roleCode == "PATIENT")
             {
                 bool hasAccess = await _context.AccountPatientProfiles
                     .AnyAsync(p => p.AccountId == currentAccountId && p.PatientId == app.PatientId && p.Status == LinkStatus.Active, ct);
@@ -56,6 +62,42 @@ public class HealthRecordService : IHealthRecordService
                 {
                     return Result.Failure<HealthRecordDetailDto>("FORBIDDEN", "Bạn không có quyền truy cập hồ sơ sức khỏe này.");
                 }
+            }
+            else if (roleCode == "ADMIN")
+            {
+                // Quản trị viên hệ thống có quyền giám sát
+            }
+            else if (roleCode == "DOCTOR")
+            {
+                // Bác sĩ chỉ được xem bệnh án của lượt khám do mình phụ trách hoặc trong cùng chuyên khoa
+                var doc = await _context.Doctors.FirstOrDefaultAsync(d => d.AccountId == currentAccountId, ct);
+                if (doc == null || (app.DoctorId != doc.Id && app.DepartmentId != doc.DepartmentId))
+                {
+                    return Result.Failure<HealthRecordDetailDto>("FORBIDDEN", "Bác sĩ chỉ có quyền xem hồ sơ bệnh án thuộc phạm vi chuyên môn hoặc lượt khám do mình phụ trách.");
+                }
+            }
+            else if (roleCode == "DEPARTMENT_HEAD" || roleCode == "DEPT_HEAD")
+            {
+                // Trưởng khoa chỉ xem các lượt khám thuộc khoa mình
+                var head = await _context.DepartmentHeads.FirstOrDefaultAsync(h => h.AccountId == currentAccountId, ct);
+                if (head == null || app.DepartmentId != head.DepartmentId)
+                {
+                    return Result.Failure<HealthRecordDetailDto>("FORBIDDEN", "Trưởng khoa chỉ có quyền xem hồ sơ bệnh án thuộc khoa phụ trách.");
+                }
+            }
+            else if (roleCode == "NURSE")
+            {
+                // Điều dưỡng chỉ xem các ca bệnh trong khoa mình phụ trách
+                var nurse = await _context.Nurses.FirstOrDefaultAsync(n => n.AccountId == currentAccountId, ct);
+                if (nurse == null || app.DepartmentId != nurse.DepartmentId)
+                {
+                    return Result.Failure<HealthRecordDetailDto>("FORBIDDEN", "Điều dưỡng chỉ có quyền xem hồ sơ bệnh án thuộc khoa phụ trách.");
+                }
+            }
+            else
+            {
+                // Các nhân viên phi lâm sàng (Thu ngân, Tiếp tân...) không được phép truy cập xem chi tiết chẩn đoán và đơn thuốc qua cổng này
+                return Result.Failure<HealthRecordDetailDto>("FORBIDDEN", "Tài khoản của bạn không có quyền xem chi tiết hồ sơ bệnh án này.");
             }
         }
 
