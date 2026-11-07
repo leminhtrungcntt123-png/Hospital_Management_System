@@ -25,6 +25,13 @@
      data-confirm-reset-url="@Url.Action("ConfirmPasswordReset", "Account")">
     <!-- 1. CỘT FORM ĐĂNG NHẬP (Bên phải mặc định) -->
     <div class="his-form-box his-login-box">
+        <div class="his-mobile-brand">
+            <img src="~/images/medicare-logo.jpg" alt="MediCare Logo" class="his-mobile-logo" />
+            <div class="his-mobile-brand-info">
+                <span class="his-mobile-brand-name">MediCare</span>
+                <span class="his-mobile-brand-badge">Bệnh Viện Thông Minh</span>
+            </div>
+        </div>
         <h2 class="his-form-title">Đăng Nhập</h2>
         <p class="his-form-subtitle">Hệ thống thông tin bệnh viện MediCare</p>
 
@@ -111,39 +118,53 @@
 
     <!-- 2. CỘT FORM ĐĂNG KÝ (Bên trái khi active) -->
     <div class="his-form-box his-register-box">
+        <div class="his-mobile-brand">
+            <img src="~/images/medicare-logo.jpg" alt="MediCare Logo" class="his-mobile-logo" />
+            <div class="his-mobile-brand-info">
+                <span class="his-mobile-brand-name">MediCare</span>
+                <span class="his-mobile-brand-badge">Bệnh Viện Thông Minh</span>
+            </div>
+        </div>
         <h2 class="his-form-title">Đăng Ký Người Khám</h2>
         <p class="his-form-subtitle">Hồ sơ khám chữa bệnh thông minh MediCare</p>
 
         <form id="registerForm">
             <div id="regAlert" class="auth-register-alert his-alert-error"></div>
+
             <div class="his-input-group">
                 <span class="his-input-icon">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                         <circle cx="12" cy="7" r="4"></circle>
                     </svg>
                 </span>
-                <input id="reg-fullname" class="his-input-field" aria-label="Họ và tên bệnh nhân" placeholder="Họ và tên bệnh nhân" required />
-            </div>
-            <div class="his-registration-details">
-                <label for="regDateOfBirth">
-                    Ngày sinh
-                    <input id="regDateOfBirth" type="date" class="his-input-field" required />
-                </label>
+                <input id="reg-fullname" class="his-input-field" aria-label="Họ và tên bệnh nhân" placeholder="Họ và tên bệnh nhân *" required />
             </div>
 
             <div class="his-input-group">
                 <span class="his-input-icon">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
                     </svg>
                 </span>
-                <input id="reg-phone" type="tel" class="his-input-field" aria-label="Số điện thoại liên hệ" placeholder="Số điện thoại liên hệ" required />
+                <input id="regDateOfBirth" type="text" onfocus="(this.type='date')" onblur="if(!this.value)this.type='text'" class="his-input-field" aria-label="Ngày sinh" placeholder="Ngày sinh (Chọn ngày) *" required />
             </div>
 
             <div class="his-input-group">
                 <span class="his-input-icon">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                    </svg>
+                </span>
+                <input id="reg-phone" type="tel" class="his-input-field" aria-label="Số điện thoại liên hệ" placeholder="Số điện thoại liên hệ *" required />
+            </div>
+
+            <div class="his-input-group">
+                <span class="his-input-icon">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <rect width="20" height="16" x="2" y="4" rx="2"></rect>
                         <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path>
                     </svg>
@@ -153,24 +174,24 @@
 
             <div class="his-input-group">
                 <span class="his-input-icon">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="4"></circle>
                         <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"></path>
                     </svg>
                 </span>
-                <input id="reg-username" class="his-input-field" aria-label="Tên tài khoản mong muốn" placeholder="Tên tài khoản mong muốn" autocomplete="username" required />
+                <input id="reg-username" class="his-input-field" aria-label="Tên tài khoản" placeholder="Tên đăng nhập *" autocomplete="username" required />
             </div>
 
             <div class="his-input-group">
                 <span class="his-input-icon">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                         <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                     </svg>
                 </span>
-                <input id="reg-password" type="password" class="his-input-field" aria-label="Mật khẩu (tối thiểu 6 ký tự)" placeholder="Mật khẩu (tối thiểu 6 ký tự)" autocomplete="new-password" required />
+                <input id="reg-password" type="password" class="his-input-field" aria-label="Mật khẩu" placeholder="Mật khẩu *" autocomplete="new-password" required />
                 <button type="button" class="his-pass-toggle" data-auth-action="password-toggle" data-input="reg-password" data-icon="eye-icon-reg" title="Hiện/ẩn mật khẩu">
-                    <svg id="eye-icon-reg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg id="eye-icon-reg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                         <circle cx="12" cy="12" r="3"></circle>
                     </svg>
@@ -211,3 +232,5 @@
     <partial name="_ValidationScriptsPartial" />
     <script src="~/js/auth/login.js" asp-append-version="true" defer></script>
 }
+
+

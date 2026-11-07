@@ -1,9 +1,15 @@
 /* Nền bệnh viện sắc nét, trong trẻo */
-.his-auth-bg {
+body.his-auth-bg {
     background: url('../../images/login-bg.jpg') no-repeat center center fixed !important;
     background-size: cover !important;
     position: relative;
+    height: 100vh;
     min-height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    margin: 0;
 }
 
 .his-auth-bg::before {
@@ -24,18 +30,19 @@
     display: flex;
     align-items: center !important;
     justify-content: center !important;
-    padding: 20px 16px;
-    min-height: calc(100vh - 40px);
+    padding: 8px 16px !important;
+    flex: 1 1 auto;
+    min-height: 0 !important;
 }
 
 /* KHỐI CHỨA SLIDER 2 CỘT (CARD TRUNG TÂM) */
 .his-slider-container {
     position: relative;
-    width: min(780px, 94vw);
-    height: 540px;
+    width: min(760px, 92vw);
+    height: 490px;
     background: #ffffff;
-    border-radius: 28px;
-    box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.4);
+    border-radius: 26px;
+    box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.35);
     overflow: hidden;
     display: flex;
 }
@@ -49,7 +56,7 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
-    padding: 36px 42px;
+    padding: 24px 34px;
     background: #ffffff;
     box-sizing: border-box;
     transition:
@@ -72,6 +79,7 @@
     transform: translateX(-100%);
     opacity: 0;
     pointer-events: none;
+    padding: 18px 30px;
 }
 
 /* Khi active (chế độ đăng ký) */
@@ -90,64 +98,81 @@
 
 /* Typography cho form */
 .his-form-title {
-    font-size: 26px;
+    font-size: 24px;
     font-weight: 800;
     color: #0f172a;
-    margin: 0 0 6px;
+    margin: 0 0 4px;
     text-align: center;
     letter-spacing: -0.4px;
 }
 
 .his-form-subtitle {
-    font-size: 13px;
+    font-size: 12.5px;
     color: #64748b;
-    margin: 0 0 22px;
+    margin: 0 0 18px;
     text-align: center;
 }
 
+.his-register-box .his-form-title {
+    font-size: 22px;
+    margin: 0 0 2px;
+}
+
 .his-register-box .his-form-subtitle {
-    margin: 0 0 16px;
+    font-size: 11.5px;
+    margin: 0 0 10px;
 }
 
 /* Input Groups */
 .his-input-group {
     position: relative;
-    margin-bottom: 16px;
+    margin-bottom: 13px;
     display: flex;
     align-items: center;
+    width: 100%;
 }
 
 .his-register-box .his-input-group {
-    margin-bottom: 11px;
-}
-
-.his-register-box .his-input-field {
-    height: 42px;
-    font-size: 13px;
+    margin-bottom: 7px;
 }
 
 .his-input-icon {
     position: absolute;
     left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
     color: #64748b;
     display: flex;
     align-items: center;
+    justify-content: center;
     pointer-events: none;
     transition: color 0.2s;
+    z-index: 2;
+}
+
+.his-register-box .his-input-icon {
+    left: 12px;
 }
 
 .his-input-field {
     width: 100%;
-    height: 46px;
+    height: 42px;
     padding: 0 14px 0 42px;
     background: #f8fafc;
     border: 1.5px solid #e2e8f0;
     border-radius: 12px;
-    font-size: 13.5px;
+    font-size: 13px;
     color: #0f172a;
     outline: none;
     transition: all 0.2s ease;
     box-sizing: border-box;
+}
+
+.his-register-box .his-input-field {
+    height: 36px;
+    font-size: 12px;
+    padding: 0 12px 0 36px;
+    border-radius: 10px;
 }
 
 .his-input-field::placeholder {
@@ -167,15 +192,18 @@
 .his-pass-toggle {
     position: absolute;
     right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
     background: transparent;
     border: none;
     color: #94a3b8;
     cursor: pointer;
-    padding: 6px;
+    padding: 5px;
     display: flex;
     align-items: center;
     border-radius: 6px;
     transition: color 0.2s;
+    z-index: 2;
 }
 
 .his-pass-toggle:hover {
@@ -198,8 +226,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin: 6px 0 24px;
-    font-size: 12.5px;
+    margin: 6px 0 20px;
+    font-size: 12px;
     color: #475569;
 }
 
@@ -234,18 +262,18 @@
 /* Nút Submit chính */
 .his-btn-solid {
     width: 100%;
-    height: 46px;
+    height: 42px;
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
     color: #ffffff;
     border: none;
     border-radius: 12px;
-    font-size: 15px;
+    font-size: 14.5px;
     font-weight: 700;
     letter-spacing: 0.3px;
     cursor: pointer;
     box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
     transition: all 0.2s ease;
-    margin-top: 4px;
+    margin-top: 2px;
 }
 
 .his-btn-solid:hover {
@@ -256,6 +284,13 @@
 
 .his-btn-solid:active {
     transform: translateY(0);
+}
+
+.his-register-box .his-btn-solid {
+    height: 38px;
+    font-size: 13px;
+    margin-top: 4px;
+    border-radius: 10px;
 }
 
 /* Lỗi tổng thể ModelState */
@@ -328,7 +363,7 @@
         var(--primary-hover) 100%
     );
     /* Đường cong uốn lượn đặc trưng: mặc định cong lồi sang phải */
-    border-radius: 0 150px 150px 0;
+    border-radius: 0 135px 135px 0;
     z-index: 10;
     overflow: hidden;
     transition:
@@ -340,7 +375,7 @@
 /* Khi active: trượt mượt sang phải và đảo chiều đường cong sang trái */
 .his-slider-container.active .his-toggle-box {
     transform: translateX(100%);
-    border-radius: 150px 0 0 150px;
+    border-radius: 135px 0 0 135px;
 }
 
 /* Nội dung bên trong Toggle Box */
@@ -354,7 +389,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 32px;
+    padding: 24px 28px;
     text-align: center;
     color: #ffffff;
     box-sizing: border-box;
@@ -392,30 +427,30 @@
 
 /* Chi tiết đồ họa trong panel màu xanh */
 .his-toggle-logo {
-    width: 72px;
-    height: 72px;
+    width: 62px;
+    height: 62px;
     object-fit: contain;
     background: #ffffff;
-    border-radius: 18px;
-    padding: 6px;
+    border-radius: 16px;
+    padding: 5px;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.22);
-    margin-bottom: 16px;
+    margin-bottom: 14px;
 }
 
 .his-toggle-title {
-    font-size: 26px;
+    font-size: 24px;
     font-weight: 800;
     color: #ffffff;
-    margin: 0 0 8px;
+    margin: 0 0 6px;
     letter-spacing: 0.3px;
 }
 
 .his-toggle-desc {
-    font-size: 13px;
+    font-size: 12.5px;
     color: rgba(255, 255, 255, 0.9);
-    margin: 0 0 24px;
-    max-width: 260px;
-    line-height: 1.5;
+    margin: 0 0 20px;
+    max-width: 250px;
+    line-height: 1.45;
 }
 
 /* Nút viền trắng bo tròn (Pill Outline Button) */
@@ -423,9 +458,9 @@
     background: transparent;
     border: 2px solid #ffffff;
     color: #ffffff;
-    border-radius: 24px;
-    padding: 10px 36px;
-    font-size: 14px;
+    border-radius: 22px;
+    padding: 9px 32px;
+    font-size: 13.5px;
     font-weight: 700;
     letter-spacing: 0.3px;
     cursor: pointer;
@@ -442,6 +477,11 @@
 
 .his-btn-outline:active {
     transform: translateY(0);
+}
+
+/* Logo thương hiệu dành riêng cho Mobile / Tablet (mặc định ẩn trên desktop) */
+.his-mobile-brand {
+    display: none;
 }
 
 /* Chuyển đổi trên màn hình nhỏ / điện thoại */
@@ -533,6 +573,4 @@
     padding: 10px;
 }
 
-.his-slider-container.active {
-    height: 690px;
-}
+
