@@ -217,7 +217,8 @@ public class AuthService : IAuthService
 
         string lowerRegUsername = username.ToLowerInvariant();
         bool usernameTaken = await _context.Accounts
-            .AnyAsync(a => a.Username.ToLower() == lowerRegUsername, cancellationToken);
+            .AnyAsync(a => a.Username.ToLower() == lowerRegUsername
+                        || (a.Email != null && a.Email.ToLower() == lowerRegUsername), cancellationToken);
         if (usernameTaken)
         {
             return RegisterResult.Fail($"Tên đăng nhập '{username}' đã được sử dụng. Vui lòng chọn tên khác.");
@@ -314,7 +315,7 @@ public class AuthService : IAuthService
         string maskedEmail = ProfileEmail.Mask(recipient);
         string? demoOtp = _otpOptions.RevealCodeOnScreen ? code : null;
 
-        var challenge = new PasswordResetChallenge(code, expiresAt, maskedEmail, demoOtp);
+        var challenge = new PasswordResetChallenge(account.Id, code, expiresAt, maskedEmail, demoOtp);
 
         string usernameKey = account.Username.ToLowerInvariant();
         ResetOtps[usernameKey] = challenge;
@@ -411,11 +412,20 @@ public class AuthService : IAuthService
                 $"Mã xác thực OTP không chính xác. Bạn còn {remainingAttempts} lần thử.");
         }
 
-        Account? account = await _context.Accounts
-            .FirstOrDefaultAsync(
-                a => a.Username.ToLower() == key
-                     || (a.Email != null && a.Email.ToLower() == key),
-                cancellationToken);
+        // CWE-640 Fix: Luôn tải tài khoản theo AccountId gắn với challenge lúc sinh OTP để chống chiếm quyền tài khoản (Account Hijacking)
+        Account? account;
+        if (challenge.AccountId > 0)
+        {
+            account = await _context.Accounts.FirstOrDefaultAsync(a => a.Id == challenge.AccountId, cancellationToken);
+        }
+        else
+        {
+            account = await _context.Accounts
+                .FirstOrDefaultAsync(
+                    a => a.Username.ToLower() == key
+                         || (a.Email != null && a.Email.ToLower() == key),
+                    cancellationToken);
+        }
 
         if (account == null)
         {

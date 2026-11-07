@@ -14,17 +14,24 @@ public sealed class PasswordResetChallenge
     private readonly DateTime _expiresAt;
     private bool _consumed;
 
+    public int AccountId { get; }
     public int Attempts { get; private set; }
     public DateTime ExpiresAt => _expiresAt;
     public string MaskedEmail { get; }
     public string? DemoOtp { get; }
 
-    public PasswordResetChallenge(string otp, DateTime expiresAt, string maskedEmail, string? demoOtp = null)
+    public PasswordResetChallenge(int accountId, string otp, DateTime expiresAt, string maskedEmail, string? demoOtp = null)
     {
+        AccountId = accountId;
         _code = Encoding.UTF8.GetBytes(otp);
         _expiresAt = expiresAt;
         MaskedEmail = maskedEmail;
         DemoOtp = demoOtp;
+    }
+
+    public PasswordResetChallenge(string otp, DateTime expiresAt, string maskedEmail, string? demoOtp = null)
+        : this(0, otp, expiresAt, maskedEmail, demoOtp)
+    {
     }
 
     public enum VerifyOutcome

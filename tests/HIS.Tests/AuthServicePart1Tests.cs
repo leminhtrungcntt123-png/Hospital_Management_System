@@ -237,6 +237,36 @@ public class AuthServicePart1Tests
     }
 
     [Fact]
+    public async Task PasswordReset_BindsToAccountId_PreventsAttackerHijackingVictimAccount()
+    {
+        var (context, _, delivery, service) = CreateHarness();
+
+        // Victim account: username = victim_user, email = victim@example.com
+        var regVictim = await service.RegisterPatientAsync(new RegisterPatientRequest("victim_user", "VictimPass123", "victim@example.com"));
+        Assert.True(regVictim.Succeeded);
+
+        // Attacker attempts to register a username that collides with victim's email -> Rejected!
+        var collideReg = await service.RegisterPatientAsync(new RegisterPatientRequest("victim@example.com", "AttackerPass123", "attacker@example.com"));
+        Assert.False(collideReg.Succeeded);
+
+        // Attacker account: username = attacker_user, email = attacker@example.com
+        var regAttacker = await service.RegisterPatientAsync(new RegisterPatientRequest("attacker_user", "AttackerPass123", "attacker@example.com"));
+        Assert.True(regAttacker.Succeeded);
+
+        // Attacker requests OTP for their own account
+        await service.SendPasswordResetOtpAsync("attacker_user");
+        var attackerOtp = delivery.Sent.Last().Code;
+
+        // Attacker resets their own password
+        var resetRes = await service.ResetPasswordWithOtpAsync("attacker_user", attackerOtp, "NewAttackerPass123");
+        Assert.True(resetRes.Succeeded);
+
+        // Victim's password remains intact
+        var victimLogin = await service.LoginAsync("victim_user", "VictimPass123", LoginSurface.PatientPortal);
+        Assert.True(victimLogin.Succeeded);
+    }
+
+    [Fact]
     public async Task PasswordResetChallenge_ConcurrentAttempts_EnforcesMaxAttemptsUnderLock()
     {
         var (_, _, delivery, service) = CreateHarness();
