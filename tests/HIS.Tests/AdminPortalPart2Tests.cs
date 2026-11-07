@@ -281,6 +281,48 @@ public class AdminPortalPart2Tests
     }
 
     [Fact]
+    public async Task ScheduleChangeService_Review_ApproveWithOnlineBooked_ResetsOnlineCountAndBlocksSlot()
+    {
+        var (context, _, _, _, _, scheduleService, adminId, _, doctorId, _) = CreateHarness();
+
+        var slot = new AppointmentSlot
+        {
+            DoctorId = doctorId,
+            RoomId = 1,
+            StartTime = new DateTime(2026, 11, 15, 8, 0, 0),
+            EndTime = new DateTime(2026, 11, 15, 8, 30, 0),
+            Capacity = 5,
+            BookedCount = 1,
+            OnlineQuota = 3,
+            OnlineBooked = 1,
+            Status = SlotStatus.Available
+        };
+        context.AppointmentSlots.Add(slot);
+
+        var ex = new ScheduleException
+        {
+            DoctorId = doctorId,
+            Date = new DateOnly(2026, 11, 15),
+            Shift = ExamShift.Morning,
+            Type = ScheduleExceptionType.Leave,
+            Status = ScheduleExceptionStatus.Pending,
+            Reason = "Việc cá nhân",
+            CreatedAt = new DateTime(2026, 11, 7, 7, 0, 0)
+        };
+        context.ScheduleExceptions.Add(ex);
+        await context.SaveChangesAsync();
+
+        var decisionReq = new ScheduleDecisionRequest(ex.Id, true, null);
+        await scheduleService.ReviewAsync(adminId, decisionReq);
+
+        var updatedSlot = await context.AppointmentSlots.FindAsync(slot.Id);
+        Assert.NotNull(updatedSlot);
+        Assert.Equal(SlotStatus.Blocked, updatedSlot.Status);
+        Assert.Equal(0, updatedSlot.BookedCount);
+        Assert.Equal(0, updatedSlot.OnlineBooked);
+    }
+
+    [Fact]
     public async Task CookieValidation_RejectsInactiveAccount()
     {
         var authMock = new Mock<IAuthService>();

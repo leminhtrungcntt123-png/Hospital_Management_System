@@ -223,6 +223,7 @@ public class ScheduleChangeService(AppDbContext db, TimeProvider clock) : ISched
 
             // Keep referenced slots for historical dates; prevent further bookings into the changed shift.
             source.BookedCount = 0;
+            source.OnlineBooked = 0;
             source.Status = SlotStatus.Blocked;
             source.Version++;
         }
