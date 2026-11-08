@@ -27,6 +27,9 @@ public class AccountController : Controller
         _authService = authService;
     }
 
+    /// <summary>
+    /// Điều hướng người dùng tới bảng điều khiển (Dashboard) tương ứng với vai trò đã đăng nhập.
+    /// </summary>
     [HttpGet]
     public IActionResult Dashboard()
     {
@@ -38,6 +41,11 @@ public class AccountController : Controller
         return RedirectToDashboard(User.FindFirstValue(ClaimTypes.Role));
     }
 
+    /// <summary>
+    /// Hiển thị giao diện đăng nhập cho người dùng.
+    /// </summary>
+    /// <param name="returnUrl">Đường dẫn quay về sau khi đăng nhập.</param>
+    /// <param name="loggedOut">Cờ trạng thái vừa đăng xuất.</param>
     [HttpGet]
     public IActionResult Login(string? returnUrl = null, int? loggedOut = null)
     {
@@ -51,8 +59,12 @@ public class AccountController : Controller
         return View(new LoginViewModel { ReturnUrl = returnUrl });
     }
 
-    // Đăng nhập nhanh cho Dev / Test (Bỏ qua mật khẩu)
-    // Ví dụ truy cập: /Account/DevLogin?role=ADMIN hoặc /Account/DevLogin?role=DOCTOR hoặc /Account/DevLogin?role=PATIENT
+    /// <summary>
+    /// Đăng nhập nhanh cho môi trường phát triển (Development) bỏ qua mật khẩu theo vai trò.
+    /// </summary>
+    /// <param name="db">DbContext.</param>
+    /// <param name="env">Môi trường máy chủ web.</param>
+    /// <param name="role">Tên vai trò (ADMIN, DOCTOR, NURSE, DEPT_HEAD, PATIENT).</param>
     [HttpGet]
     [AllowAnonymous]
     public async Task<IActionResult> DevLogin(
@@ -164,6 +176,11 @@ public class AccountController : Controller
         return RedirectToDashboard(targetRole);
     }
 
+    /// <summary>
+    /// Tiếp nhận thông tin đăng nhập, xác thực qua AuthService và tạo Cookie xác thực an toàn.
+    /// </summary>
+    /// <param name="model">Dữ liệu đăng nhập.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost]
     [EnableRateLimiting("login")]
     [ValidateAntiForgeryToken]
@@ -223,6 +240,9 @@ public class AccountController : Controller
             : RedirectToDashboard(user.RoleCode);
     }
 
+    /// <summary>
+    /// Đăng xuất người dùng khỏi hệ thống, hủy cookie và thu hồi phiên làm việc.
+    /// </summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Logout()
@@ -266,6 +286,11 @@ public class AccountController : Controller
         return View(new ChangePasswordViewModel());
     }
 
+    /// <summary>
+    /// Xử lý yêu cầu đổi mật khẩu tài khoản người dùng, sau khi thành công sẽ hủy toàn bộ cookie cũ (CWE-613).
+    /// </summary>
+    /// <param name="model">Mô hình đổi mật khẩu.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost]
     [Authorize]
     [ValidateAntiForgeryToken]
@@ -293,7 +318,10 @@ public class AccountController : Controller
         return RedirectToAction(nameof(Login));
     }
 
-    // API cho tab Đăng ký trên màn hình Login (fetch JSON).
+    /// <summary>
+    /// API tiếp nhận đăng ký tài khoản mới cho bệnh nhân từ form giao diện.
+    /// </summary>
+    /// <param name="request">Yêu cầu đăng ký.</param>
     [HttpPost]
     [EnableRateLimiting("register")]
     [ValidateAntiForgeryToken]
@@ -319,7 +347,10 @@ public class AccountController : Controller
         });
     }
 
-    // Bước 1 của Quên mật khẩu: gửi OTP tới email đã đăng ký.
+    /// <summary>
+    /// Bước 1: Gửi mã OTP xác thực tới email đã đăng ký của người dùng khi quên mật khẩu.
+    /// </summary>
+    /// <param name="request">Yêu cầu chứa email hoặc username.</param>
     [HttpPost]
     [EnableRateLimiting("password-reset-request")]
     [ValidateAntiForgeryToken]
@@ -346,7 +377,10 @@ public class AccountController : Controller
         });
     }
 
-    // Bước 2: đối chiếu OTP và đặt mật khẩu mới.
+    /// <summary>
+    /// Bước 2: Đối chiếu mã OTP và đặt mật khẩu mới cho tài khoản (CWE-640).
+    /// </summary>
+    /// <param name="request">Yêu cầu chứa OTP và mật khẩu mới.</param>
     [HttpPost]
     [EnableRateLimiting("password-reset-confirm")]
     [ValidateAntiForgeryToken]

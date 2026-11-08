@@ -31,7 +31,15 @@ public class ConsultationController : Controller
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
-    // 1. Màn hình Bác sĩ & Trưởng khoa: Phân luồng dữ liệu chuẩn theo phân quyền
+    /// <summary>
+    /// Hiển thị màn hình phòng khám của bác sĩ (danh sách bệnh nhân chờ khám, ca trực, hồ sơ bệnh án).
+    /// </summary>
+    /// <param name="date">Ngày khám.</param>
+    /// <param name="shift">Ca khám (Sáng/Chiều).</param>
+    /// <param name="tab">Tab hiển thị.</param>
+    /// <param name="doctorId">Mã bác sĩ lọc.</param>
+    /// <param name="weekOffset">Độ lệch tuần.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpGet]
     public async Task<IActionResult> Index(DateOnly? date, ExamShift? shift, string? tab, int? doctorId, int weekOffset = 0, CancellationToken ct = default)
     {
@@ -343,7 +351,11 @@ public class ConsultationController : Controller
         }
     }
 
-    // 2. Bác sĩ gọi bệnh nhân tiếp theo vào phòng khám
+    /// <summary>
+    /// Bác sĩ gọi bệnh nhân tiếp theo vào phòng khám theo số thứ tự và mức ưu tiên.
+    /// </summary>
+    /// <param name="roomId">Mã phòng khám.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CallNext(int roomId, CancellationToken ct)
@@ -361,7 +373,11 @@ public class ConsultationController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    // 3. Hoàn tất lượt khám và tạo hồ sơ bệnh án
+    /// <summary>
+    /// Bác sĩ hoàn tất lượt khám và tạo hồ sơ bệnh án điện tử cho bệnh nhân.
+    /// </summary>
+    /// <param name="request">Yêu cầu tạo hồ sơ bệnh án.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateRecord([FromForm] CreateMedicalRecordRequest request, CancellationToken ct)
@@ -387,7 +403,15 @@ public class ConsultationController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    // 4. Bác sĩ gửi đề nghị nghỉ / đổi ca
+    /// <summary>
+    /// Bác sĩ gửi đề nghị xin nghỉ phép hoặc đổi ca trực chờ trưởng khoa duyệt.
+    /// </summary>
+    /// <param name="date">Ngày xin nghỉ / đổi ca.</param>
+    /// <param name="shift">Ca trực.</param>
+    /// <param name="type">Loại ngoại lệ (Nghỉ phép / Đổi ca).</param>
+    /// <param name="reason">Lý do.</param>
+    /// <param name="replacementDoctorId">Mã bác sĩ thay thế nếu có.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateException(

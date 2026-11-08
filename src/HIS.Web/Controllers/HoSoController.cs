@@ -311,6 +311,12 @@ public class HoSoController : PatientPageController
         return View(new HoSoChiTietViewModel { Profile = profile, History = history });
     }
 
+    /// <summary>
+    /// Hiển thị chi tiết hồ sơ bệnh án điện tử của một lượt khám (kèm chẩn đoán, xét nghiệm, chẩn đoán hình ảnh, đơn thuốc và BHYT).
+    /// </summary>
+    /// <param name="id">Mã lượt khám (AppointmentId).</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Trang chi tiết bệnh án điện tử.</returns>
     [HttpGet]
     public async Task<IActionResult> HealthRecord(int id, CancellationToken ct = default)
     {

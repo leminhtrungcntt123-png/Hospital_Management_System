@@ -25,9 +25,20 @@ public class ReceptionController : Controller
 
     private int AccountId => int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : 0;
 
+    /// <summary>
+    /// Hiển thị màn hình bàn tiếp đón bệnh nhân và danh sách lượt khám trong ngày.
+    /// </summary>
+    /// <param name="search">Từ khóa tìm kiếm.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpGet]
     public async Task<IActionResult> Index(string? search, CancellationToken ct = default) => await DeskAsync(search, new(), ct);
 
+    /// <summary>
+    /// Tiếp nhận (check-in) cho lượt khám đặt trước sau khi đối chiếu danh tính.
+    /// </summary>
+    /// <param name="appointmentId">Mã lượt khám.</param>
+    /// <param name="identityVerified">Cờ xác nhận danh tính.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CheckIn(
@@ -51,6 +62,12 @@ public class ReceptionController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    /// <summary>
+    /// Đăng ký và tiếp nhận người bệnh vãng lai trực tiếp tại quầy và cấp STT khám ngay.
+    /// </summary>
+    /// <param name="request">Thông tin đăng ký vãng lai.</param>
+    /// <param name="search">Từ khóa tìm kiếm hiện tại.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> WalkIn(

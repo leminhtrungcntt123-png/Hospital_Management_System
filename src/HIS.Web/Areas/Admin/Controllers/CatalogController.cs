@@ -15,7 +15,10 @@ public class CatalogController : Controller
         _departmentService = departmentService;
     }
 
-    // 1. Danh sách chuyên khoa phòng
+    /// <summary>
+    /// Hiển thị danh sách các chuyên khoa phòng trong bệnh viện.
+    /// </summary>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpGet]
     public async Task<IActionResult> Index(CancellationToken ct)
     {
@@ -23,7 +26,11 @@ public class CatalogController : Controller
         return View(departments);
     }
 
-    // 2. Lấy danh sách phòng khám theo chuyên khoa (trả về JSON phục vụ dropdown/modal)
+    /// <summary>
+    /// API lấy danh sách phòng khám theo chuyên khoa dạng JSON.
+    /// </summary>
+    /// <param name="departmentId">Mã khoa phòng.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpGet]
     public async Task<IActionResult> Rooms(int departmentId, CancellationToken ct)
     {
@@ -31,7 +38,12 @@ public class CatalogController : Controller
         return Json(rooms);
     }
 
-    // 3. Thêm mới chuyên khoa
+    /// <summary>
+    /// Thêm mới chuyên khoa phòng trong bệnh viện.
+    /// </summary>
+    /// <param name="name">Tên khoa phòng.</param>
+    /// <param name="description">Mô tả chức năng nhiệm vụ.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateDepartment(string name, string? description, CancellationToken ct)
@@ -49,7 +61,13 @@ public class CatalogController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    // 4. Cập nhật thông tin chuyên khoa
+    /// <summary>
+    /// Cập nhật thông tin (tên, mô tả) của chuyên khoa phòng.
+    /// </summary>
+    /// <param name="id">Mã khoa phòng.</param>
+    /// <param name="name">Tên khoa phòng mới.</param>
+    /// <param name="description">Mô tả mới.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateDepartment(int id, string name, string? description, CancellationToken ct)
@@ -67,7 +85,11 @@ public class CatalogController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    // 5. Xóa chuyên khoa phòng (kiểm tra ràng buộc an toàn)
+    /// <summary>
+    /// Xóa chuyên khoa phòng (ngăn xóa nếu đang có bác sĩ hoặc phòng khám liên kết).
+    /// </summary>
+    /// <param name="id">Mã khoa phòng.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteDepartment(int id, CancellationToken ct)

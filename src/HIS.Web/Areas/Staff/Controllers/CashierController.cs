@@ -21,6 +21,12 @@ public class CashierController : Controller
         _context = context;
     }
 
+    /// <summary>
+    /// Hiển thị màn hình quầy thu ngân và danh sách hóa đơn chờ xử lý viện phí.
+    /// </summary>
+    /// <param name="search">Từ khóa tìm kiếm bệnh nhân hoặc mã hẹn.</param>
+    /// <param name="selectedId">Mã lượt khám đang chọn xem chi tiết.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpGet]
     public async Task<IActionResult> Index(string? search = null, int? selectedId = null, CancellationToken ct = default)
     {
@@ -44,6 +50,11 @@ public class CashierController : Controller
         return View(invoices);
     }
 
+    /// <summary>
+    /// API trả về dữ liệu JSON chi tiết viện phí của lượt khám cho giao diện.
+    /// </summary>
+    /// <param name="appointmentId">Mã lượt khám.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpGet]
     public async Task<IActionResult> GetDetailJson(int appointmentId, CancellationToken ct = default)
     {
@@ -56,6 +67,11 @@ public class CashierController : Controller
         return Json(result.Value);
     }
 
+    /// <summary>
+    /// Tiếp nhận thanh toán viện phí (tiền mặt / chuyển khoản) từ giao diện thu ngân.
+    /// </summary>
+    /// <param name="request">Yêu cầu thanh toán viện phí.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost]
     public async Task<IActionResult> Checkout([FromBody] CheckoutInvoiceRequest request, CancellationToken ct = default)
     {
@@ -76,6 +92,11 @@ public class CashierController : Controller
         });
     }
 
+    /// <summary>
+    /// Hiển thị biên lai / hóa đơn thu tiền viện phí để in ấn hoặc đối chiếu.
+    /// </summary>
+    /// <param name="appointmentId">Mã lượt khám.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpGet]
     public async Task<IActionResult> Receipt(int appointmentId, CancellationToken ct = default)
     {
