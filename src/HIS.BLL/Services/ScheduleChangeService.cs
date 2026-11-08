@@ -12,9 +12,24 @@ public class ScheduleChangeService(AppDbContext db, TimeProvider clock) : ISched
 {
     private DateTime Now => DateTime.SpecifyKind(clock.GetLocalNow().DateTime, DateTimeKind.Unspecified);
 
+    /// <summary>
+    /// Xử lý đơn xin nghỉ của bác sĩ và thực hiện phân bổ lại lịch khám.
+    /// </summary>
+    /// <param name="doctorId">Mã bác sĩ.</param>
+    /// <param name="date">Ngày nghỉ.</param>
+    /// <param name="shift">Ca khám (Sáng/Chiều).</param>
+    /// <param name="replacementDoctorId">Mã bác sĩ thay thế nếu có.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Kết quả xử lý.</returns>
     public Task<Result> ProcessDoctorLeaveAsync(int doctorId, DateOnly date, string? shift, int? replacementDoctorId, CancellationToken ct = default)
         => throw new NotImplementedException();
 
+    /// <summary>
+    /// Lấy danh sách các yêu cầu nghỉ hoặc đổi ca chờ quản trị viên phê duyệt.
+    /// </summary>
+    /// <param name="actorId">Mã tài khoản quản trị viên.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Danh sách đề xuất thay đổi lịch trực.</returns>
     public async Task<IReadOnlyList<ScheduleRequestRow>> GetRequestsAsync(int actorId, CancellationToken ct = default)
     {
         await AdminRules.RequireAdminAsync(db, actorId, ct);
@@ -39,6 +54,13 @@ public class ScheduleChangeService(AppDbContext db, TimeProvider clock) : ISched
                 .Select(doctor => new AdminOption(doctor.Id, doctor.FullName)).ToList())).ToList();
     }
 
+    /// <summary>
+    /// Quản trị viên duyệt hoặc từ chối đề xuất đổi ca, điều phối lại các lịch hẹn sang bác sĩ khác và giải phóng slot cũ.
+    /// </summary>
+    /// <param name="actorId">Mã tài khoản quản trị viên thực hiện duyệt.</param>
+    /// <param name="request">Quyết định phê duyệt (mã ngoại lệ, cờ đồng ý/từ chối, bác sĩ thay thế).</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Kết quả chuyển đổi lượt hẹn (chuyển thành công, cần đặt lại, hoặc đã hết hạn).</returns>
     public async Task<ScheduleDecisionResult> ReviewAsync(
         int actorId, ScheduleDecisionRequest request, CancellationToken ct = default)
     {

@@ -1144,6 +1144,13 @@ public class ReceptionService : IReceptionService
     // Web Quầy Tiếp Nhận (Reception Desk API)
     // ==========================================
 
+    /// <summary>
+    /// Lấy dữ liệu bàn tiếp nhận cho nhân viên điều dưỡng/tiếp đón bao gồm danh sách ca khám trong ngày và tìm kiếm bệnh nhân.
+    /// </summary>
+    /// <param name="staffAccountId">Mã tài khoản nhân viên tiếp đón.</param>
+    /// <param name="search">Từ khóa tìm kiếm (họ tên, CCCD, SĐT, số thứ tự).</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Dữ liệu bàn tiếp đón (ReceptionDesk).</returns>
     public async Task<Result<ReceptionDesk>> GetDeskAsync(int staffAccountId, string? search, CancellationToken ct = default)
     {
         var nurse = await _context.Nurses
@@ -1251,6 +1258,14 @@ public class ReceptionService : IReceptionService
             patients));
     }
 
+    /// <summary>
+    /// Tiếp nhận (check-in) cho lượt khám đặt trước sau khi nhân viên đã xác minh danh tính giấy tờ.
+    /// </summary>
+    /// <param name="staffAccountId">Mã tài khoản nhân viên tiếp nhận.</param>
+    /// <param name="appointmentId">Mã lượt khám.</param>
+    /// <param name="identityVerified">Cờ xác nhận đã đối chiếu giấy tờ tùy thân.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Số thứ tự khám (STT) vừa được cấp phát.</returns>
     public async Task<Result<string>> CheckInAsync(int staffAccountId, int appointmentId, bool identityVerified, CancellationToken ct = default)
     {
         if (!identityVerified)
@@ -1267,6 +1282,13 @@ public class ReceptionService : IReceptionService
         return Result.Success(res.QueueNumber);
     }
 
+    /// <summary>
+    /// Đăng ký tiếp nhận lượt khám vãng lai (walk-in) trực tiếp tại quầy và cấp số thứ tự khám ngay.
+    /// </summary>
+    /// <param name="staffAccountId">Mã tài khoản nhân viên tiếp nhận.</param>
+    /// <param name="request">Thông tin đăng ký vãng lai (bệnh nhân, lịch trực, BHYT, mức ưu tiên).</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Số thứ tự khám (STT) vừa được cấp phát.</returns>
     public async Task<Result<string>> RegisterWalkInAsync(int staffAccountId, WalkInReceptionRequest request, CancellationToken ct = default)
     {
         if (!request.IdentityVerified)

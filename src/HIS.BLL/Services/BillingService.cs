@@ -21,6 +21,12 @@ public class BillingService : IBillingService
     private DateTime Now => DateTime.SpecifyKind(_timeProvider.GetLocalNow().DateTime, DateTimeKind.Unspecified);
     private DateOnly Today => DateOnly.FromDateTime(Now);
 
+    /// <summary>
+    /// Lấy danh sách các lượt khám cần xử lý viện phí/hóa đơn tại quầy thu ngân.
+    /// </summary>
+    /// <param name="search">Từ khóa tìm kiếm (họ tên, SĐT, CCCD, số thứ tự, mã lịch khám).</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Danh sách hóa đơn chờ xử lý.</returns>
     public async Task<IReadOnlyList<PendingInvoiceItemDto>> GetPendingInvoicesAsync(string? search = null, CancellationToken ct = default)
     {
         var query = _context.Appointments
@@ -84,6 +90,12 @@ public class BillingService : IBillingService
         return list;
     }
 
+    /// <summary>
+    /// Lấy chi tiết viện phí của một lượt khám, bao gồm tiền khám, dịch vụ cận lâm sàng, thuốc và tỷ lệ miễn giảm BHYT.
+    /// </summary>
+    /// <param name="appointmentId">Mã lượt khám.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Chi tiết viện phí và số tiền bệnh nhân phải trả sau BHYT.</returns>
     public async Task<Result<InvoiceDetailDto>> GetInvoiceDetailAsync(int appointmentId, CancellationToken ct = default)
     {
         var app = await _context.Appointments
@@ -209,6 +221,12 @@ public class BillingService : IBillingService
         return Result.Success(detail);
     }
 
+    /// <summary>
+    /// Thực hiện thanh toán viện phí (thu tiền mặt hoặc chuyển khoản) và ghi nhận thanh toán hoàn tất.
+    /// </summary>
+    /// <param name="request">Yêu cầu thanh toán chứa mã lượt khám, phương thức thanh toán, ghi chú và tài khoản thu ngân.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Mã hóa đơn vừa thanh toán thành công.</returns>
     public async Task<Result<int>> CheckoutInvoiceAsync(CheckoutInvoiceRequest request, CancellationToken ct = default)
     {
         var app = await _context.Appointments

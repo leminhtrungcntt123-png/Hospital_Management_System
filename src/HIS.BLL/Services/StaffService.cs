@@ -23,13 +23,32 @@ public class StaffService : IStaffService
         _clock = timeProvider ?? TimeProvider.System;
     }
 
+    /// <summary>
+    /// Kiểm tra phiên làm việc của tài khoản có đang hoạt động và đúng vai trò hay không.
+    /// </summary>
+    /// <param name="accountId">Mã tài khoản.</param>
+    /// <param name="role">Mã vai trò (Role Code).</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>True nếu tài khoản đang hoạt động hợp lệ.</returns>
     public Task<bool> IsSessionActiveAsync(int accountId, string role, CancellationToken ct = default) =>
         _context.Accounts.AnyAsync(account => account.Id == accountId && account.IsActive && account.Role.Code == role, ct);
 
+    /// <summary>
+    /// Lấy danh sách tài khoản nhân viên y tế (Bác sĩ, Điều dưỡng, Trưởng khoa) dành cho trang quản trị.
+    /// </summary>
+    /// <param name="actorId">Mã tài khoản quản trị viên yêu cầu.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Danh sách tài khoản nhân viên y tế.</returns>
     public async Task<IReadOnlyList<AdminAccountRow>> GetAdminStaffAsync(int actorId, CancellationToken ct = default) =>
         (await GetAdminAccountsAsync(actorId, ct))
             .Where(account => account.Role is "DOCTOR" or "NURSE" or "DEPARTMENT_HEAD" or "DEPT_HEAD").ToList();
 
+    /// <summary>
+    /// Lấy danh sách vai trò khả dụng để quản trị viên gán quyền khi tạo hoặc phân quyền tài khoản.
+    /// </summary>
+    /// <param name="actorId">Mã tài khoản quản trị viên.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Danh sách vai trò quyền hạn.</returns>
     public async Task<IReadOnlyList<AdminRoleOption>> GetAdminRolesAsync(int actorId, CancellationToken ct = default)
     {
         await AdminRules.RequireAdminAsync(_context, actorId, ct);
@@ -42,10 +61,22 @@ public class StaffService : IStaffService
             role.Code == "PATIENT")).ToList();
     }
 
+    /// <summary>
+    /// Kiểm tra tài khoản có phải là quản trị viên hệ thống đang hoạt động hay không.
+    /// </summary>
+    /// <param name="actorId">Mã tài khoản.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>True nếu là quản trị viên.</returns>
     public Task<bool> IsActiveAdminAsync(int actorId, CancellationToken ct = default) =>
         _context.Accounts.AnyAsync(account => account.Id == actorId
             && account.IsActive && account.Role.Code == "ADMIN", ct);
 
+    /// <summary>
+    /// Lấy danh sách toàn bộ tài khoản người dùng trong hệ thống dành cho trang quản trị Admin.
+    /// </summary>
+    /// <param name="actorId">Mã tài khoản quản trị viên.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Danh sách tài khoản.</returns>
     public async Task<IReadOnlyList<AdminAccountRow>> GetAdminAccountsAsync(int actorId, CancellationToken ct = default)
     {
         await AdminRules.RequireAdminAsync(_context, actorId, ct);
@@ -66,6 +97,13 @@ public class StaffService : IStaffService
             .ToListAsync(ct);
     }
 
+    /// <summary>
+    /// Quản trị viên tạo tài khoản mới cho bác sĩ, điều dưỡng, trưởng khoa hoặc nhân viên khác.
+    /// </summary>
+    /// <param name="actorId">Mã tài khoản quản trị viên.</param>
+    /// <param name="request">Thông tin tài khoản mới (username, password, họ tên, role, khoa phòng, chứng chỉ hành nghề).</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Mã tài khoản mới tạo.</returns>
     public async Task<int> CreateAdminAccountAsync(
         int actorId, CreateAdminAccountRequest request, CancellationToken ct = default)
     {
@@ -191,6 +229,13 @@ public class StaffService : IStaffService
         });
     }
 
+    /// <summary>
+    /// Kích hoạt hoặc vô hiệu hóa một tài khoản người dùng và ghi nhật ký truy cập (AccessLog).
+    /// </summary>
+    /// <param name="actorId">Mã tài khoản quản trị viên thực hiện.</param>
+    /// <param name="accountId">Mã tài khoản được thao tác.</param>
+    /// <param name="active">Trạng thái kích hoạt (true/false).</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     public async Task SetAccountActiveAsync(int actorId, int accountId, bool active, CancellationToken ct = default)
     {
         await _context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
@@ -225,7 +270,11 @@ public class StaffService : IStaffService
         });
     }
 
-    // Lấy danh sách tài khoản nhân sự và vai trò tương ứng trong hệ thống
+    /// <summary>
+    /// Lấy danh sách tài khoản nhân sự và vai trò tương ứng trong hệ thống.
+    /// </summary>
+    /// <param name="cancellationToken">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Danh sách nhân sự.</returns>
     public async Task<IReadOnlyList<StaffListItemDto>> GetStaffAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Accounts
@@ -248,7 +297,11 @@ public class StaffService : IStaffService
             .ToListAsync(cancellationToken);
     }
 
-    // Lấy danh sách các vai trò trong hệ thống
+    /// <summary>
+    /// Lấy danh sách các vai trò quyền hạn có sẵn trong hệ thống.
+    /// </summary>
+    /// <param name="cancellationToken">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Danh sách vai trò.</returns>
     public async Task<IReadOnlyList<RoleOptionDto>> GetRolesAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Roles
@@ -258,7 +311,16 @@ public class StaffService : IStaffService
             .ToListAsync(cancellationToken);
     }
 
-    // Thêm mới tài khoản nhân sự
+    /// <summary>
+    /// Thêm mới tài khoản nhân sự y tế (bác sĩ, điều dưỡng, trưởng khoa) và khởi tạo hồ sơ nhân sự liên kết.
+    /// </summary>
+    /// <param name="username">Tên đăng nhập.</param>
+    /// <param name="password">Mật khẩu ban đầu.</param>
+    /// <param name="fullName">Họ và tên nhân sự.</param>
+    /// <param name="roleId">Mã vai trò.</param>
+    /// <param name="isActive">Trạng thái kích hoạt.</param>
+    /// <param name="cancellationToken">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Thông tin nhân sự vừa tạo.</returns>
     public async Task<StaffListItemDto> CreateStaffAsync(string username, string password, string fullName, int roleId, bool isActive = true, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(username))
@@ -331,7 +393,16 @@ public class StaffService : IStaffService
         return new StaffListItemDto(account.Id, account.Username, trimmedFullName, role.Name, role.Code, account.IsActive);
     }
 
-    // Cập nhật thông tin tài khoản nhân sự
+    /// <summary>
+    /// Cập nhật thông tin tài khoản nhân sự (họ tên, vai trò, mật khẩu mới, trạng thái kích hoạt).
+    /// </summary>
+    /// <param name="id">Mã tài khoản.</param>
+    /// <param name="password">Mật khẩu mới (nếu đổi).</param>
+    /// <param name="fullName">Họ và tên mới.</param>
+    /// <param name="roleId">Mã vai trò mới.</param>
+    /// <param name="isActive">Trạng thái kích hoạt mới.</param>
+    /// <param name="cancellationToken">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Thông tin nhân sự sau khi cập nhật.</returns>
     public async Task<StaffListItemDto> UpdateStaffAsync(int id, string? password, string fullName, int roleId, bool isActive, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(fullName))
@@ -380,7 +451,12 @@ public class StaffService : IStaffService
         return new StaffListItemDto(account.Id, account.Username, trimmedFullName, role.Name, role.Code, account.IsActive);
     }
 
-    // Xóa tài khoản nhân sự
+    /// <summary>
+    /// Xóa tài khoản nhân sự khỏi hệ thống (ngăn chặn xóa tài khoản admin mặc định).
+    /// </summary>
+    /// <param name="id">Mã tài khoản.</param>
+    /// <param name="cancellationToken">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>True nếu xóa thành công.</returns>
     public async Task<bool> DeleteStaffAsync(int id, CancellationToken cancellationToken = default)
     {
         var account = await _context.Accounts
@@ -399,7 +475,11 @@ public class StaffService : IStaffService
         return true;
     }
 
-    // Lấy danh sách bác sĩ (ủy quyền cho DoctorService)
+    /// <summary>
+    /// Lấy danh sách bác sĩ (chuyển tiếp tới IDoctorService).
+    /// </summary>
+    /// <param name="cancellationToken">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Danh sách bác sĩ.</returns>
     public Task<IReadOnlyList<DoctorListItemDto>> GetDoctorsAsync(CancellationToken cancellationToken = default)
         => _doctorService.GetDoctorsAsync(cancellationToken);
 }

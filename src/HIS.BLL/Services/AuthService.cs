@@ -30,9 +30,18 @@ public class AuthService : IAuthService
     /// </summary>
     private static readonly ConcurrentDictionary<int, int> SessionVersions = new();
 
+    /// <summary>
+    /// Lấy phiên bản session hiện tại của tài khoản (dùng để đối soát cookie).
+    /// </summary>
+    /// <param name="accountId">Mã tài khoản.</param>
+    /// <returns>Phiên bản session.</returns>
     public int GetSessionVersion(int accountId) =>
         SessionVersions.GetOrAdd(accountId, 1);
 
+    /// <summary>
+    /// Thu hồi tất cả các phiên cookie đăng nhập đang tồn tại của tài khoản trên mọi thiết bị.
+    /// </summary>
+    /// <param name="accountId">Mã tài khoản.</param>
     public void InvalidateSessions(int accountId) =>
         SessionVersions.AddOrUpdate(accountId, 2, (_, v) => v + 1);
 
@@ -53,6 +62,14 @@ public class AuthService : IAuthService
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
+    /// <summary>
+    /// Xác thực đăng nhập tài khoản theo username và mật khẩu, kiểm tra trạng thái khóa tạm thời và số lần thử sai.
+    /// </summary>
+    /// <param name="username">Tên đăng nhập.</param>
+    /// <param name="password">Mật khẩu.</param>
+    /// <param name="surface">Môi trường đăng nhập (Staff / Patient).</param>
+    /// <param name="cancellationToken">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Kết quả đăng nhập (LoginResult) kèm thông tin phân quyền.</returns>
     public async Task<LoginResult> LoginAsync(
         string username,
         string password,
@@ -187,6 +204,12 @@ public class AuthService : IAuthService
             doctorId));
     }
 
+    /// <summary>
+    /// Đăng ký tài khoản mới cho bệnh nhân kèm xác thực định dạng email, username và mật khẩu an toàn.
+    /// </summary>
+    /// <param name="request">Thông tin đăng ký (username, password, email).</param>
+    /// <param name="cancellationToken">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Kết quả đăng ký tài khoản (RegisterResult).</returns>
     public async Task<RegisterResult> RegisterPatientAsync(
         RegisterPatientRequest request,
         CancellationToken cancellationToken = default)
@@ -282,6 +305,12 @@ public class AuthService : IAuthService
         return RegisterResult.Success(account.Id, account.Username);
     }
 
+    /// <summary>
+    /// Gửi mã xác thực OTP 6 số qua email để phục hồi mật khẩu và ghi nhận mã thử thách (challenge) ràng buộc với AccountId (CWE-640).
+    /// </summary>
+    /// <param name="emailOrUsername">Email hoặc tên đăng nhập của tài khoản.</param>
+    /// <param name="cancellationToken">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Kết quả gửi OTP (email masked, mã demo nếu bật).</returns>
     public async Task<ForgotPasswordResult> SendPasswordResetOtpAsync(
         string emailOrUsername,
         CancellationToken cancellationToken = default)
@@ -368,6 +397,14 @@ public class AuthService : IAuthService
         return ForgotPasswordResult.Success(maskedEmail, demoOtp);
     }
 
+    /// <summary>
+    /// Đặt lại mật khẩu mới bằng mã OTP hợp lệ, hủy toàn bộ phiên làm việc cũ trên mọi trình duyệt (CWE-613).
+    /// </summary>
+    /// <param name="emailOrUsername">Email hoặc username người yêu cầu.</param>
+    /// <param name="otp">Mã xác thực OTP gồm 6 chữ số.</param>
+    /// <param name="newPassword">Mật khẩu mới.</param>
+    /// <param name="cancellationToken">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Kết quả đặt lại mật khẩu.</returns>
     public async Task<PasswordResetResult> ResetPasswordWithOtpAsync(
         string emailOrUsername,
         string otp,
@@ -470,6 +507,14 @@ public class AuthService : IAuthService
         return PasswordResetResult.Success();
     }
 
+    /// <summary>
+    /// Đổi mật khẩu người dùng sau khi xác thực mật khẩu cũ và tự động hủy các phiên cookie cũ (CWE-613).
+    /// </summary>
+    /// <param name="accountId">Mã tài khoản.</param>
+    /// <param name="oldPassword">Mật khẩu hiện tại.</param>
+    /// <param name="newPassword">Mật khẩu mới.</param>
+    /// <param name="cancellationToken">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Kết quả đổi mật khẩu.</returns>
     public async Task<ChangePasswordResult> ChangePasswordAsync(
         int accountId,
         string oldPassword,
@@ -536,12 +581,27 @@ public class AuthService : IAuthService
         return ChangePasswordResult.Success();
     }
 
+    /// <summary>
+    /// Kiểm tra phiên làm việc của tài khoản còn hợp lệ hay không (không kiểm tra phiên bản session).
+    /// </summary>
+    /// <param name="accountId">Mã tài khoản.</param>
+    /// <param name="roleCode">Mã vai trò mong muốn.</param>
+    /// <param name="cancellationToken">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>True nếu phiên còn hiệu lực.</returns>
     public Task<bool> IsSessionActiveAsync(
         int accountId,
         string? roleCode = null,
         CancellationToken cancellationToken = default) =>
         IsSessionActiveAsync(accountId, roleCode, sessionVersion: null, cancellationToken);
 
+    /// <summary>
+    /// Kiểm tra phiên làm việc của tài khoản, đối soát phiên bản session phía server để kịp thời thu hồi phiên cũ (CWE-613, CWE-645).
+    /// </summary>
+    /// <param name="accountId">Mã tài khoản.</param>
+    /// <param name="roleCode">Mã vai trò mong muốn.</param>
+    /// <param name="sessionVersion">Phiên bản session ghi trong cookie người dùng.</param>
+    /// <param name="cancellationToken">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>True nếu phiên và vai trò hoàn toàn hợp lệ.</returns>
     public async Task<bool> IsSessionActiveAsync(
         int accountId,
         string? roleCode,
@@ -578,6 +638,11 @@ public class AuthService : IAuthService
         return true;
     }
 
+    /// <summary>
+    /// Đăng xuất tài khoản người dùng và ghi nhật ký truy cập (AccessLog).
+    /// </summary>
+    /// <param name="accountId">Mã tài khoản đăng xuất.</param>
+    /// <param name="cancellationToken">Token hủy tác vụ bất đồng bộ.</param>
     public async Task LogoutAsync(int accountId, CancellationToken cancellationToken = default)
     {
         DateTime now = _timeProvider.GetLocalNow().DateTime;

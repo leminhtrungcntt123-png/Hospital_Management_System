@@ -26,6 +26,13 @@ public class HealthRecordService : IHealthRecordService
     private DateTime Now => DateTime.SpecifyKind(_timeProvider.GetLocalNow().DateTime, DateTimeKind.Unspecified);
     private DateOnly Today => DateOnly.FromDateTime(Now);
 
+    /// <summary>
+    /// Lấy chi tiết hồ sơ bệnh án và kiểm tra phân quyền truy cập theo từng vai trò (CWE-285).
+    /// </summary>
+    /// <param name="appointmentId">Mã lượt khám.</param>
+    /// <param name="currentAccountId">Mã tài khoản đang đăng nhập.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Kết quả chứa chi tiết hồ sơ bệnh án hoặc lỗi phân quyền.</returns>
     public async Task<Result<HealthRecordDetailDto>> GetHealthRecordDetailAsync(int appointmentId, int currentAccountId, CancellationToken ct = default)
     {
         var app = await _context.Appointments
@@ -230,6 +237,13 @@ public class HealthRecordService : IHealthRecordService
         return Result.Success(detail);
     }
 
+    /// <summary>
+    /// Lấy danh sách lịch sử các lần khám bệnh của một bệnh nhân.
+    /// </summary>
+    /// <param name="patientId">Mã định danh bệnh nhân.</param>
+    /// <param name="currentAccountId">Mã tài khoản đang đăng nhập.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Danh sách tóm tắt lịch sử khám bệnh.</returns>
     public async Task<IReadOnlyList<HealthRecordHistoryItemDto>> GetPatientHealthHistoryAsync(int patientId, int currentAccountId, CancellationToken ct = default)
     {
         var appointments = await _context.Appointments

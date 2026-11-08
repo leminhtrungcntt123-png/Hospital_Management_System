@@ -18,6 +18,12 @@ public class DepartmentHeadService : IDepartmentHeadService
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
+    /// <summary>
+    /// Tra cứu mã khoa phòng tương ứng với tài khoản người dùng (Trưởng khoa, Bác sĩ hoặc Điều dưỡng).
+    /// </summary>
+    /// <param name="accountId">Mã tài khoản.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Mã khoa phòng trực thuộc hoặc 0 nếu không tìm thấy.</returns>
     public async Task<int> ResolveDepartmentIdByAccountIdAsync(int accountId, CancellationToken ct = default)
     {
         var head = await _context.DepartmentHeads
@@ -52,7 +58,13 @@ public class DepartmentHeadService : IDepartmentHeadService
         return 0;
     }
 
-    // 1. Quản lý đề nghị ngoại lệ (Nghỉ phép / Đổi ca)
+    /// <summary>
+    /// Lấy danh sách các đề xuất thay đổi lịch khám (nghỉ phép, đổi ca) trong khoa phòng.
+    /// </summary>
+    /// <param name="departmentId">Mã khoa phòng.</param>
+    /// <param name="status">Trạng thái phê duyệt lọc (Pending, Approved, Rejected).</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Danh sách đề xuất thay đổi lịch.</returns>
     public async Task<IReadOnlyList<DepartmentExceptionItemDto>> GetExceptionsAsync(int departmentId, ScheduleExceptionStatus? status = null, CancellationToken ct = default)
     {
         var query = _context.ScheduleExceptions
@@ -87,6 +99,12 @@ public class DepartmentHeadService : IDepartmentHeadService
             .ToListAsync(ct);
     }
 
+    /// <summary>
+    /// Phê duyệt đề xuất thay đổi lịch khám của bác sĩ và tự động điều phối lại ca khám/lịch hẹn cho bác sĩ thay thế.
+    /// </summary>
+    /// <param name="request">Yêu cầu phê duyệt ngoại lệ (mã ngoại lệ, bác sĩ thay thế, trưởng khoa duyệt).</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Kết quả phê duyệt.</returns>
     public async Task<Result> ApproveExceptionAsync(ApproveExceptionRequest request, CancellationToken ct = default)
     {
         var ex = await _context.ScheduleExceptions
@@ -221,6 +239,12 @@ public class DepartmentHeadService : IDepartmentHeadService
         return Result.Success();
     }
 
+    /// <summary>
+    /// Từ chối đề xuất thay đổi lịch khám của bác sĩ và ghi nhận lý do từ chối.
+    /// </summary>
+    /// <param name="request">Yêu cầu từ chối đề xuất.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Kết quả từ chối.</returns>
     public async Task<Result> RejectExceptionAsync(RejectExceptionRequest request, CancellationToken ct = default)
     {
         var ex = await _context.ScheduleExceptions
@@ -252,7 +276,12 @@ public class DepartmentHeadService : IDepartmentHeadService
         return Result.Success();
     }
 
-    // 2. Thiết lập lịch khám mẫu & hạn mức
+    /// <summary>
+    /// Lấy danh sách lịch trực / lịch khám tuần mẫu của các bác sĩ trong khoa phòng.
+    /// </summary>
+    /// <param name="departmentId">Mã khoa phòng.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Danh sách lịch khám định kỳ.</returns>
     public async Task<IReadOnlyList<DepartmentScheduleItemDto>> GetSchedulesAsync(int departmentId, CancellationToken ct = default)
     {
         return await _context.DoctorSchedules
@@ -281,6 +310,12 @@ public class DepartmentHeadService : IDepartmentHeadService
             .ToListAsync(ct);
     }
 
+    /// <summary>
+    /// Thêm mới hoặc cập nhật lịch khám định kỳ của bác sĩ kèm tỷ lệ phân bổ hạn mức đặt khám online.
+    /// </summary>
+    /// <param name="request">Thông tin lịch khám định kỳ.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Mã lịch khám vừa lưu thành công.</returns>
     public async Task<Result<int>> UpsertDoctorScheduleAsync(UpsertDoctorScheduleRequest request, CancellationToken ct = default)
     {
         var today = DateOnly.FromDateTime(_timeProvider.GetLocalNow().DateTime);
@@ -362,6 +397,13 @@ public class DepartmentHeadService : IDepartmentHeadService
         return Result<int>.Success(schedule.Id);
     }
 
+    /// <summary>
+    /// Xóa một lịch khám định kỳ thuộc khoa phòng quản lý.
+    /// </summary>
+    /// <param name="scheduleId">Mã lịch khám.</param>
+    /// <param name="departmentId">Mã khoa phòng.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Kết quả xóa lịch khám.</returns>
     public async Task<Result> DeleteDoctorScheduleAsync(int scheduleId, int departmentId, CancellationToken ct = default)
     {
         var schedule = await _context.DoctorSchedules
@@ -379,7 +421,12 @@ public class DepartmentHeadService : IDepartmentHeadService
         return Result.Success();
     }
 
-    // 3. Phân công ca trực đêm nhân sự
+    /// <summary>
+    /// Lấy danh sách các ca trực đêm của nhân sự trong khoa phòng.
+    /// </summary>
+    /// <param name="departmentId">Mã khoa phòng.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Danh sách ca trực đêm.</returns>
     public async Task<IReadOnlyList<DepartmentDutyShiftDto>> GetDutyShiftsAsync(int departmentId, CancellationToken ct = default)
     {
         return await _context.DutyShifts
@@ -405,6 +452,12 @@ public class DepartmentHeadService : IDepartmentHeadService
             .ToListAsync(ct);
     }
 
+    /// <summary>
+    /// Phân công ca trực đêm cho nhân sự y tế (bác sĩ/điều dưỡng) trong khoa, kiểm tra không bị trùng ca trực trong cùng ngày.
+    /// </summary>
+    /// <param name="request">Thông tin ca trực.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Mã ca trực mới tạo.</returns>
     public async Task<Result<int>> AssignDutyShiftAsync(AssignDutyShiftRequest request, CancellationToken ct = default)
     {
         var now = DateTime.SpecifyKind(_timeProvider.GetLocalNow().DateTime, DateTimeKind.Unspecified);
@@ -441,6 +494,13 @@ public class DepartmentHeadService : IDepartmentHeadService
         return Result<int>.Success(duty.Id);
     }
 
+    /// <summary>
+    /// Xóa một ca trực đêm đã phân công trong khoa phòng.
+    /// </summary>
+    /// <param name="dutyShiftId">Mã ca trực.</param>
+    /// <param name="departmentId">Mã khoa phòng.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Kết quả xóa ca trực.</returns>
     public async Task<Result> DeleteDutyShiftAsync(int dutyShiftId, int departmentId, CancellationToken ct = default)
     {
         var duty = await _context.DutyShifts.FirstOrDefaultAsync(d => d.Id == dutyShiftId, ct);
@@ -455,7 +515,14 @@ public class DepartmentHeadService : IDepartmentHeadService
         return Result.Success();
     }
 
-    // 4. Giám sát bệnh án trong khoa
+    /// <summary>
+    /// Giám sát danh sách hồ sơ bệnh án thuộc khoa phòng quản lý và ghi nhật ký truy cập bảo mật (AccessLog).
+    /// </summary>
+    /// <param name="departmentId">Mã khoa phòng.</param>
+    /// <param name="viewerAccountId">Mã tài khoản người xem.</param>
+    /// <param name="ipAddress">Địa chỉ IP của người truy cập.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Danh sách bệnh án của khoa.</returns>
     public async Task<IReadOnlyList<DepartmentMedicalRecordDto>> GetMedicalRecordsAsync(int departmentId, int viewerAccountId, string? ipAddress = null, CancellationToken ct = default)
     {
         var records = await _context.MedicalRecords
@@ -493,7 +560,12 @@ public class DepartmentHeadService : IDepartmentHeadService
         return records;
     }
 
-    // 5. Tổng quan vận hành khoa
+    /// <summary>
+    /// Lấy số liệu tổng quan tình hình vận hành của khoa phòng trong ngày (bác sĩ, phòng khám, lượt tiếp nhận, đang khám, hoàn thành, viện phí chưa đóng).
+    /// </summary>
+    /// <param name="departmentId">Mã khoa phòng.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Dữ liệu tổng quan vận hành khoa (DepartmentOverviewDto).</returns>
     public async Task<DepartmentOverviewDto> GetDepartmentOverviewAsync(int departmentId, CancellationToken ct = default)
     {
         var dept = await _context.Departments.AsNoTracking().FirstOrDefaultAsync(d => d.Id == departmentId, ct);
@@ -578,7 +650,12 @@ public class DepartmentHeadService : IDepartmentHeadService
         );
     }
 
-    // 6. Danh mục phụ trợ
+    /// <summary>
+    /// Lấy danh sách bác sĩ trực thuộc khoa phòng.
+    /// </summary>
+    /// <param name="departmentId">Mã khoa phòng.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Danh sách bác sĩ trong khoa.</returns>
     public async Task<IReadOnlyList<DoctorListItemDto>> GetDoctorsInDepartmentAsync(int departmentId, CancellationToken ct = default)
     {
         return await _context.Doctors
@@ -589,6 +666,12 @@ public class DepartmentHeadService : IDepartmentHeadService
             .ToListAsync(ct);
     }
 
+    /// <summary>
+    /// Lấy danh sách toàn bộ nhân sự (bác sĩ và điều dưỡng) trực thuộc khoa phòng.
+    /// </summary>
+    /// <param name="departmentId">Mã khoa phòng.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Danh sách nhân sự trong khoa.</returns>
     public async Task<IReadOnlyList<StaffListItemDto>> GetStaffInDepartmentAsync(int departmentId, CancellationToken ct = default)
     {
         var doctorAccountIds = await _context.Doctors
@@ -621,6 +704,12 @@ public class DepartmentHeadService : IDepartmentHeadService
             .ToListAsync(ct);
     }
 
+    /// <summary>
+    /// Lấy danh sách phòng khám thuộc khoa phòng.
+    /// </summary>
+    /// <param name="departmentId">Mã khoa phòng.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Danh sách phòng khám.</returns>
     public async Task<IReadOnlyList<ClinicRoomDto>> GetRoomsInDepartmentAsync(int departmentId, CancellationToken ct = default)
     {
         return await _context.ClinicRooms

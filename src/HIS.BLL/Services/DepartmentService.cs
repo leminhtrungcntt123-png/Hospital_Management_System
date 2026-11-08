@@ -15,7 +15,11 @@ public class DepartmentService : IDepartmentService
         _context = context;
     }
 
-    // Lấy danh sách chuyên khoa phòng sắp xếp theo tên
+    /// <summary>
+    /// Lấy danh sách chuyên khoa phòng sắp xếp theo tên.
+    /// </summary>
+    /// <param name="cancellationToken">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Danh sách chuyên khoa.</returns>
     public async Task<IReadOnlyList<DepartmentListItemDto>> GetDepartmentsAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Departments
@@ -28,7 +32,12 @@ public class DepartmentService : IDepartmentService
             .ToListAsync(cancellationToken);
     }
 
-    // Lấy danh sách phòng khám theo chuyên khoa
+    /// <summary>
+    /// Lấy danh sách các phòng khám trực thuộc một chuyên khoa.
+    /// </summary>
+    /// <param name="departmentId">Mã khoa phòng.</param>
+    /// <param name="cancellationToken">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Danh sách phòng khám.</returns>
     public async Task<IReadOnlyList<ClinicRoomDto>> GetRoomsByDepartmentAsync(int departmentId, CancellationToken cancellationToken = default)
     {
         return await _context.ClinicRooms
@@ -43,7 +52,13 @@ public class DepartmentService : IDepartmentService
             .ToListAsync(cancellationToken);
     }
 
-    // Thêm mới chuyên khoa phòng
+    /// <summary>
+    /// Thêm mới chuyên khoa phòng trong bệnh viện.
+    /// </summary>
+    /// <param name="name">Tên khoa phòng.</param>
+    /// <param name="description">Mô tả chức năng nhiệm vụ.</param>
+    /// <param name="cancellationToken">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Thông tin khoa phòng vừa tạo.</returns>
     public async Task<DepartmentListItemDto> CreateDepartmentAsync(string name, string? description, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -65,7 +80,14 @@ public class DepartmentService : IDepartmentService
         return new DepartmentListItemDto(dept.Id, dept.Name, dept.Description ?? "");
     }
 
-    // Cập nhật thông tin chuyên khoa phòng
+    /// <summary>
+    /// Cập nhật thông tin (tên, mô tả) của chuyên khoa phòng.
+    /// </summary>
+    /// <param name="id">Mã khoa phòng.</param>
+    /// <param name="name">Tên khoa phòng mới.</param>
+    /// <param name="description">Mô tả mới.</param>
+    /// <param name="cancellationToken">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Thông tin khoa phòng sau khi cập nhật.</returns>
     public async Task<DepartmentListItemDto> UpdateDepartmentAsync(int id, string name, string? description, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -86,7 +108,12 @@ public class DepartmentService : IDepartmentService
         return new DepartmentListItemDto(dept.Id, dept.Name, dept.Description ?? "");
     }
 
-    // Xóa chuyên khoa phòng
+    /// <summary>
+    /// Xóa chuyên khoa phòng (kiểm tra không cho phép xóa nếu đang có bác sĩ hoặc phòng khám liên kết).
+    /// </summary>
+    /// <param name="id">Mã khoa phòng.</param>
+    /// <param name="cancellationToken">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>True nếu xóa thành công.</returns>
     public async Task<bool> DeleteDepartmentAsync(int id, CancellationToken cancellationToken = default)
     {
         var dept = await _context.Departments

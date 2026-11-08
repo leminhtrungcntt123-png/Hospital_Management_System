@@ -17,6 +17,13 @@ public class QueueService : IQueueService
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
+    /// <summary>
+    /// Thực hiện tiếp nhận (check-in) và phát số thứ tự khám cho người bệnh theo thứ tự tiếp nhận trong ngày.
+    /// </summary>
+    /// <param name="appointmentId">Mã lượt khám.</param>
+    /// <param name="staffAccountId">Mã tài khoản nhân viên tiếp nhận.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Số thứ tự khám (STT).</returns>
     public async Task<Result<string>> CheckInAndIssueQueueNumberAsync(int appointmentId, int staffAccountId, CancellationToken ct = default)
     {
         var app = await _context.Appointments.FirstOrDefaultAsync(a => a.Id == appointmentId, ct);
@@ -50,6 +57,13 @@ public class QueueService : IQueueService
         return Result<string>.Success(app.QueueNumber);
     }
 
+    /// <summary>
+    /// Bác sĩ gọi bệnh nhân kế tiếp vào phòng khám theo độ ưu tiên và số thứ tự, chuyển trạng thái sang InProgress.
+    /// </summary>
+    /// <param name="roomId">Mã phòng khám.</param>
+    /// <param name="doctorAccountId">Mã tài khoản bác sĩ gọi khám.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Số thứ tự của bệnh nhân vừa được gọi vào khám.</returns>
     public async Task<Result<int>> CallNextPatientAsync(int roomId, int doctorAccountId, CancellationToken ct = default)
     {
         var doctor = await _context.Doctors.FirstOrDefaultAsync(d => d.AccountId == doctorAccountId, ct);

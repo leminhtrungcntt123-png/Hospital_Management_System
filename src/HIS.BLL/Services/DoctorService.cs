@@ -17,7 +17,11 @@ public class DoctorService : IDoctorService
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
-    // Lấy danh sách bác sĩ kèm chuyên khoa và khoa phòng
+    /// <summary>
+    /// Lấy danh sách toàn bộ bác sĩ kèm chuyên khoa và khoa phòng trực thuộc.
+    /// </summary>
+    /// <param name="cancellationToken">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Danh sách bác sĩ.</returns>
     public async Task<IReadOnlyList<DoctorListItemDto>> GetDoctorsAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Doctors
@@ -33,7 +37,14 @@ public class DoctorService : IDoctorService
             .ToListAsync(cancellationToken);
     }
 
-    // Lấy danh sách bệnh nhân chờ khám theo bác sĩ và ca khám
+    /// <summary>
+    /// Lấy danh sách bệnh nhân đang chờ khám hoặc đang trong ca khám của bác sĩ theo ngày và ca.
+    /// </summary>
+    /// <param name="doctorId">Mã bác sĩ.</param>
+    /// <param name="date">Ngày khám.</param>
+    /// <param name="shift">Ca khám (Sáng/Chiều).</param>
+    /// <param name="cancellationToken">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Danh sách bệnh nhân trong hàng chờ khám.</returns>
     public async Task<IReadOnlyList<QueuePatientDto>> GetQueuePatientsAsync(int doctorId, DateOnly date, ExamShift shift, CancellationToken cancellationToken = default)
     {
         var startDateTime = shift == ExamShift.Morning
@@ -65,7 +76,12 @@ public class DoctorService : IDoctorService
             .ToListAsync(cancellationToken);
     }
 
-    // Tạo hồ sơ bệnh án cho lượt khám
+    /// <summary>
+    /// Tạo hồ sơ bệnh án, ghi nhận triệu chứng, khám lâm sàng, chẩn đoán ICD và kết luận cho lượt khám.
+    /// </summary>
+    /// <param name="request">Dữ liệu hồ sơ bệnh án.</param>
+    /// <param name="cancellationToken">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Mã bệnh án mới tạo.</returns>
     public async Task<int> CreateMedicalRecordAsync(CreateMedicalRecordRequest request, CancellationToken cancellationToken = default)
     {
         var appointment = await _context.Appointments

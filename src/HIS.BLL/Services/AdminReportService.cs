@@ -11,6 +11,14 @@ namespace HIS.BLL.Services;
 
 public sealed class AdminReportService(AppDbContext db) : IAdminReportService
 {
+    /// <summary>
+    /// Tổng hợp báo cáo doanh thu tài chính (tạm ứng, thanh toán viện phí, hoàn tiền, doanh thu thuần và lượt khám) theo khoảng thời gian.
+    /// </summary>
+    /// <param name="actorId">Mã tài khoản quản trị viên yêu cầu.</param>
+    /// <param name="from">Ngày bắt đầu.</param>
+    /// <param name="to">Ngày kết thúc.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Báo cáo doanh thu chi tiết (RevenueReport).</returns>
     public async Task<RevenueReport> GetRevenueAsync(
         int actorId, DateOnly from, DateOnly to, CancellationToken ct = default)
     {
@@ -61,6 +69,14 @@ public sealed class AdminReportService(AppDbContext db) : IAdminReportService
             days.Sum(day => day.Revenue), days.Sum(day => day.Visits), days);
     }
 
+    /// <summary>
+    /// Xuất dữ liệu báo cáo doanh thu tài chính thành tệp CSV kèm BOM UTF-8 để mở chính xác trên Excel.
+    /// </summary>
+    /// <param name="actorId">Mã tài khoản quản trị viên yêu cầu.</param>
+    /// <param name="from">Ngày bắt đầu.</param>
+    /// <param name="to">Ngày kết thúc.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Mảng byte tệp CSV UTF-8.</returns>
     public async Task<byte[]> ExportRevenueAsync(
         int actorId, DateOnly from, DateOnly to, CancellationToken ct = default)
     {
