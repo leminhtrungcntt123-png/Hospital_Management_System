@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Data;
 using HIS.BLL.Common;
 using HIS.BLL.DTOs;
 using HIS.BLL.Interfaces;
@@ -9,6 +11,7 @@ namespace HIS.BLL.Services;
 
 public class BillingService : IBillingService
 {
+    private static readonly ConcurrentDictionary<int, SemaphoreSlim> _checkoutLocks = new();
     private readonly AppDbContext _context;
     private readonly TimeProvider _timeProvider;
 
@@ -222,109 +225,139 @@ public class BillingService : IBillingService
     }
 
     /// <summary>
-    /// Thực hiện thanh toán viện phí (thu tiền mặt hoặc chuyển khoản) và ghi nhận thanh toán hoàn tất.
+    /// Thực hiện thanh toán và chốt hóa đơn viện phí cho lượt khám.
+    /// Đảm bảo tính bất biến (idempotent) và an toàn đồng thời (concurrency safe).
     /// </summary>
     /// <param name="request">Yêu cầu thanh toán chứa mã lượt khám, phương thức thanh toán, ghi chú và tài khoản thu ngân.</param>
     /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     /// <returns>Mã hóa đơn vừa thanh toán thành công.</returns>
     public async Task<Result<int>> CheckoutInvoiceAsync(CheckoutInvoiceRequest request, CancellationToken ct = default)
     {
-        var app = await _context.Appointments
-            .Include(a => a.Patient)
-            .Include(a => a.Invoice)!.ThenInclude(i => i!.InvoiceItems)
-            .Include(a => a.Invoice)!.ThenInclude(i => i!.Payments)
-            .Include(a => a.MedicalRecord)!.ThenInclude(m => m!.LabOrders)!.ThenInclude(o => o.Service)!.ThenInclude(s => s!.ServiceType)
-            .Include(a => a.MedicalRecord)!.ThenInclude(m => m!.Prescriptions)!.ThenInclude(p => p.PrescriptionItems)!.ThenInclude(pi => pi.Medication)
-            .FirstOrDefaultAsync(a => a.Id == request.AppointmentId, ct);
-
-        if (app == null)
+        var appLock = _checkoutLocks.GetOrAdd(request.AppointmentId, _ => new SemaphoreSlim(1, 1));
+        await appLock.WaitAsync(ct);
+        try
         {
-            return Result.Failure<int>("NOT_FOUND", "Không tìm thấy thông tin lượt khám.");
-        }
+            await using var tx = _context.Database.IsRelational()
+                ? await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct)
+                : null;
 
-        var detailRes = await GetInvoiceDetailAsync(request.AppointmentId, ct);
-        if (!detailRes.IsSuccess)
-        {
-            return Result.Failure<int>(detailRes.Error.Code, detailRes.Error.Message);
-        }
+            // Kiểm tra trạng thái hóa đơn để đảm bảo tính bất biến (idempotent under concurrency)
+            var existingPaidInvoice = await _context.Invoices
+                .AsNoTracking()
+                .Include(i => i.Payments)
+                .FirstOrDefaultAsync(i => i.AppointmentId == request.AppointmentId && (i.Status == InvoiceStatus.Paid || i.Payments.Any(p => p.PaymentType == PaymentType.Payment)), ct);
 
-        var detail = detailRes.Value!;
-        var now = Now;
-
-        var insuranceCard = await _context.InsuranceCards
-            .FirstOrDefaultAsync(c => c.PatientId == app.PatientId && c.IsActive && c.ValidFrom <= Today && c.ValidTo >= Today, ct);
-
-        var invoice = app.Invoice;
-        if (invoice != null && invoice.Status == InvoiceStatus.Paid)
-        {
-            return Result.Failure<int>("ALREADY_PAID", "Hóa đơn này đã được thanh toán trước đó.");
-        }
-
-        if (invoice == null)
-        {
-            invoice = new Invoice
+            if (existingPaidInvoice != null)
             {
-                AppointmentId = app.Id,
-                PatientId = app.PatientId,
-                CoveragePctApplied = detail.CoveragePct,
-                TotalAmount = detail.TotalAmount,
-                InsuranceCoveredAmount = detail.InsuranceCoveredAmount,
-                PatientAmount = detail.PatientAmount,
-                InsuranceCardId = insuranceCard?.Id,
-                InsurancePlanId = insuranceCard?.InsurancePlanId,
-                Status = InvoiceStatus.Paid,
-                CreatedAt = now
+                return Result.Failure<int>("ALREADY_PAID", "Hóa đơn này đã được thanh toán trước đó.");
+            }
+
+            var app = await _context.Appointments
+                .Include(a => a.Patient)
+                .Include(a => a.Invoice)!.ThenInclude(i => i!.InvoiceItems)
+                .Include(a => a.Invoice)!.ThenInclude(i => i!.Payments)
+                .Include(a => a.MedicalRecord)!.ThenInclude(m => m!.LabOrders)!.ThenInclude(o => o.Service)!.ThenInclude(s => s!.ServiceType)
+                .Include(a => a.MedicalRecord)!.ThenInclude(m => m!.Prescriptions)!.ThenInclude(p => p.PrescriptionItems)!.ThenInclude(pi => pi.Medication)
+                .FirstOrDefaultAsync(a => a.Id == request.AppointmentId, ct);
+
+            if (app == null)
+            {
+                return Result.Failure<int>("NOT_FOUND", "Không tìm thấy thông tin lượt khám.");
+            }
+
+            var detailRes = await GetInvoiceDetailAsync(request.AppointmentId, ct);
+            if (!detailRes.IsSuccess)
+            {
+                return Result.Failure<int>(detailRes.Error.Code, detailRes.Error.Message);
+            }
+
+            var detail = detailRes.Value!;
+            var now = Now;
+
+            var insuranceCard = await _context.InsuranceCards
+                .FirstOrDefaultAsync(c => c.PatientId == app.PatientId && c.IsActive && c.ValidFrom <= Today && c.ValidTo >= Today, ct);
+
+            var invoice = app.Invoice;
+            if (invoice != null && (invoice.Status == InvoiceStatus.Paid || invoice.Payments.Any(p => p.PaymentType == PaymentType.Payment)))
+            {
+                return Result.Failure<int>("ALREADY_PAID", "Hóa đơn này đã được thanh toán trước đó.");
+            }
+
+            if (invoice == null)
+            {
+                invoice = new Invoice
+                {
+                    AppointmentId = app.Id,
+                    PatientId = app.PatientId,
+                    CoveragePctApplied = detail.CoveragePct,
+                    TotalAmount = detail.TotalAmount,
+                    InsuranceCoveredAmount = detail.InsuranceCoveredAmount,
+                    PatientAmount = detail.PatientAmount,
+                    InsuranceCardId = insuranceCard?.Id,
+                    InsurancePlanId = insuranceCard?.InsurancePlanId,
+                    Status = InvoiceStatus.Paid,
+                    CreatedAt = now
+                };
+
+                foreach (var item in detail.Items)
+                {
+                    invoice.InvoiceItems.Add(new InvoiceItem
+                    {
+                        Category = item.Category.Contains("Thuốc") ? InvoiceCategory.Medication : (item.Category.Contains("Khám") ? InvoiceCategory.Examination : InvoiceCategory.Service),
+                        Description = item.Description,
+                        Amount = item.Total
+                    });
+                }
+
+                _context.Invoices.Add(invoice);
+            }
+            else
+            {
+                invoice.CoveragePctApplied = detail.CoveragePct;
+                invoice.TotalAmount = detail.TotalAmount;
+                invoice.InsuranceCoveredAmount = detail.InsuranceCoveredAmount;
+                invoice.PatientAmount = detail.PatientAmount;
+                invoice.InsuranceCardId = insuranceCard?.Id;
+                invoice.InsurancePlanId = insuranceCard?.InsurancePlanId;
+                invoice.Status = InvoiceStatus.Paid;
+            }
+
+            var payment = new Payment
+            {
+                Invoice = invoice,
+                Amount = detail.PatientAmount,
+                PaymentType = PaymentType.Payment,
+                PaymentMethod = request.Method,
+                CashierId = request.CashierAccountId > 0 ? request.CashierAccountId : null,
+                Note = string.IsNullOrWhiteSpace(request.Note) ? "Thanh toán viện phí tại quầy thu ngân" : request.Note.Trim(),
+                PaidAt = now
             };
 
-            foreach (var item in detail.Items)
+            _context.Payments.Add(payment);
+
+            if (request.CashierAccountId > 0)
             {
-                invoice.InvoiceItems.Add(new InvoiceItem
+                _context.AccessLogs.Add(new AccessLog
                 {
-                    Category = item.Category.Contains("Thuốc") ? InvoiceCategory.Medication : (item.Category.Contains("Khám") ? InvoiceCategory.Examination : InvoiceCategory.Service),
-                    Description = item.Description,
-                    Amount = item.Total
+                    AccountId = request.CashierAccountId,
+                    PatientId = app.PatientId,
+                    Action = "CHECKOUT_INVOICE",
+                    OccurredAt = now
                 });
             }
 
-            _context.Invoices.Add(invoice);
-        }
-        else
-        {
-            invoice.CoveragePctApplied = detail.CoveragePct;
-            invoice.TotalAmount = detail.TotalAmount;
-            invoice.InsuranceCoveredAmount = detail.InsuranceCoveredAmount;
-            invoice.PatientAmount = detail.PatientAmount;
-            invoice.InsuranceCardId = insuranceCard?.Id;
-            invoice.InsurancePlanId = insuranceCard?.InsurancePlanId;
-            invoice.Status = InvoiceStatus.Paid;
-        }
-
-        var payment = new Payment
-        {
-            Invoice = invoice,
-            Amount = detail.PatientAmount,
-            PaymentType = PaymentType.Payment,
-            PaymentMethod = request.Method,
-            CashierId = request.CashierAccountId > 0 ? request.CashierAccountId : null,
-            Note = string.IsNullOrWhiteSpace(request.Note) ? "Thanh toán viện phí tại quầy thu ngân" : request.Note.Trim(),
-            PaidAt = now
-        };
-
-        _context.Payments.Add(payment);
-
-        if (request.CashierAccountId > 0)
-        {
-            _context.AccessLogs.Add(new AccessLog
+            await _context.SaveChangesAsync(ct);
+            if (tx != null)
             {
-                AccountId = request.CashierAccountId,
-                PatientId = app.PatientId,
-                Action = "CHECKOUT_INVOICE",
-                OccurredAt = now
-            });
-        }
+                await tx.CommitAsync(ct);
+            }
 
-        await _context.SaveChangesAsync(ct);
-        return Result.Success(invoice.Id);
+            return Result.Success(invoice.Id);
+        }
+        finally
+        {
+            appLock.Release();
+        }
     }
 }
 

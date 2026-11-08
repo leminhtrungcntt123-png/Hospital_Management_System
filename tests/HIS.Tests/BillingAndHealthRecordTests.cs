@@ -284,6 +284,30 @@ public class BillingAndHealthRecordTests
     }
 
     [Fact]
+    public async Task CheckoutInvoice_ConcurrentCalls_OnlyOneSucceeds_AndNoDuplicatePayments()
+    {
+        var (context, _, billing, _, _, _, _, _, cashierId, appId) = CreateFixture();
+
+        var request = new CheckoutInvoiceRequest(appId, PaymentMethod.Cash, "Thu tại quầy đồng thời", cashierId);
+
+        // Chạy 5 tác vụ thanh toán đồng thời cho cùng 1 lượt khám
+        var tasks = Enumerable.Range(0, 5).Select(_ => billing.CheckoutInvoiceAsync(request)).ToList();
+        var results = await Task.WhenAll(tasks);
+
+        int successCount = results.Count(r => r.IsSuccess);
+        int alreadyPaidCount = results.Count(r => !r.IsSuccess && r.Error.Code == "ALREADY_PAID");
+
+        Assert.Equal(1, successCount);
+        Assert.Equal(4, alreadyPaidCount);
+
+        var app = await context.Appointments
+            .Include(a => a.Invoice)!.ThenInclude(i => i!.Payments)
+            .FirstAsync(a => a.Id == appId);
+
+        Assert.Single(app.Invoice!.Payments);
+    }
+
+    [Fact]
     public async Task HealthRecordDetail_MatchesUploadedPhotoStructure()
     {
         var (_, _, _, healthRecord, _, patientAccId, _, _, _, appId) = CreateFixture();
