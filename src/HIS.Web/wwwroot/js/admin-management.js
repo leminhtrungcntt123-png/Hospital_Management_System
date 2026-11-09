@@ -443,7 +443,7 @@
             }
 
             const labels = report.days.map((d) => date(d.date).slice(0, 5));
-            let barData = report.days.map((d) => d.revenue);
+            let barData = report.days.map((d) => (d.deposits || 0) + (d.payments || 0));
             let barLabel = 'Doanh thu (VNĐ)';
             let barBg = 'rgba(0, 104, 255, 0.85)';
             let barBorder = '#0068ff';
@@ -454,7 +454,7 @@
                 barBg = 'rgba(245, 158, 11, 0.85)';
                 barBorder = '#f59e0b';
             } else if (activeChartFlow === 'balance') {
-                barData = report.days.map((d) => d.revenue - d.refunds);
+                barData = report.days.map((d) => d.revenue);
                 barLabel = 'Dòng tiền thuần (VNĐ)';
                 barBg = 'rgba(16, 185, 129, 0.85)';
                 barBorder = '#10b981';
