@@ -181,221 +181,6 @@
         return AVATAR_PALETTES[Math.abs(hash) % AVATAR_PALETTES.length];
     }
 
-    const sampleStaffProfiles = [
-        {
-            id: 101,
-            name: 'Nguyễn Thu Trang',
-            username: 'trang.nt',
-            roleName: 'Bác sĩ Trưởng khoa',
-            role: 'Doctor',
-            department: 'Khoa Nội Tổng Hợp',
-            isActive: true,
-            canChangeStatus: true,
-            phone: '0908 ··· 148',
-            meta: 'Lumi – Quận 1 · khách từ 2024',
-            badges: [{ label: 'VIP', class: 'badge-vip' }],
-            alertBadge: { label: 'Dị ứng Lidocaine', type: 'warning' },
-            timeline: [
-                { date: 'Hôm nay', title: 'Laser Toning · buổi 1/5', subtitle: 'BS. Minh Anh', status: 'Đang thực hiện', statusType: 'active' },
-                { date: '22/08', title: 'Tư vấn da · không đều màu', subtitle: 'BS. Minh Anh', status: 'Hoàn thành', statusType: 'done' },
-                { date: '30/07', title: 'Hydrafacial · buổi 3/3', subtitle: 'ĐD. Thu Hà', status: 'Hoàn thành', statusType: 'done' },
-                { date: '16/07', title: 'Hydrafacial · buổi 2/3', subtitle: 'ĐD. Thu Hà', status: 'Hoàn thành', statusType: 'done' },
-            ],
-            notes: {
-                warning: 'Dị ứng Lidocaine',
-                warningDesc: 'Cần lưu ý kiểm tra tiền sử dị ứng thuốc tê cục bộ trước khi chỉ định thủ thuật.',
-                advisorTitle: 'Ghi chú tư vấn viên',
-                advisorList: ['• Da không đều màu vùng má', '• Quan tâm: đều màu, sáng da'],
-                doctorTitle: 'Ghi chú bác sĩ',
-                doctorList: ['• Laser Toning × 5, cách 2 tuần', '• Năng lượng thấp ở buổi đầu'],
-            }
-        },
-        {
-            id: 102,
-            name: 'Trần Minh Khoa',
-            username: 'khoa.tm',
-            roleName: 'Bác sĩ CK2 Ngoại thần kinh',
-            role: 'Doctor',
-            department: 'Khoa Ngoại Thần Kinh',
-            isActive: true,
-            canChangeStatus: true,
-            phone: '0912 ··· 562',
-            meta: 'Khoa Ngoại Thần Kinh · BS từ 2023',
-            badges: [{ label: 'Chuyên gia', class: 'badge-vip' }],
-            alertBadge: { label: 'Trực cấp cứu tối T3 & T5', type: 'info' },
-            timeline: [
-                { date: 'Hôm nay', title: 'Phẫu thuật nội soi sọ não · Ca #42', subtitle: 'Kíp mổ số 02 - Phòng mổ 3', status: 'Đang thực hiện', statusType: 'active' },
-                { date: '25/08', title: 'Hội chẩn liên khoa Cấp cứu', subtitle: 'Chủ trì ca can thiệp ngoại', status: 'Hoàn thành', statusType: 'done' },
-                { date: '12/08', title: 'Đổi ca trực chuyên môn', subtitle: 'Thay ca cùng BS. Thu Trang', status: 'Hoàn thành', statusType: 'done' },
-            ],
-            notes: {
-                warning: 'Phụ trách ca mổ đặc biệt',
-                warningDesc: 'Yêu cầu có mặt trước 30 phút tại phòng tiền phẫu và kiểm tra thiết bị áp lực âm.',
-                advisorTitle: 'Ghi chú phân công',
-                advisorList: ['• Giờ trực ưu tiên: Thứ 3 & Thứ 5', '• Liên hệ nội bộ: Máy nhánh 204'],
-                doctorTitle: 'Hồ sơ chuyên môn',
-                doctorList: ['• Đã hoàn thành đào tạo an toàn phòng mổ chuẩn Bộ Y tế', '• Chứng chỉ vi phẫu thuật thần kinh'],
-            }
-        },
-        {
-            id: 103,
-            name: 'Lê Ngọc Hân',
-            username: 'han.ln',
-            roleName: 'Điều dưỡng trưởng',
-            role: 'Nurse',
-            department: 'Khoa Hồi sức tích cực (ICU)',
-            isActive: true,
-            canChangeStatus: true,
-            phone: '0934 ··· 789',
-            meta: 'Khoa Hồi sức ICU · ĐD từ 2022',
-            badges: [{ label: 'Điều dưỡng', class: 'badge-vip' }],
-            alertBadge: { label: 'Quản lý tủ thuốc hướng thần', type: 'warning' },
-            timeline: [
-                { date: 'Hôm nay', title: 'Giao ban điều dưỡng ca sáng', subtitle: 'Khoa Hồi sức cấp cứu ICU', status: 'Đang thực hiện', statusType: 'active' },
-                { date: '20/08', title: 'Kiểm kê cơ số tủ thuốc cấp cứu', subtitle: 'Hoàn tất biên bản kiểm tra', status: 'Hoàn thành', statusType: 'done' },
-                { date: '05/08', title: 'Tập huấn kỹ thuật chăm sóc thở máy', subtitle: 'Bộ Y tế chứng nhận', status: 'Hoàn thành', statusType: 'done' },
-            ],
-            notes: {
-                warning: 'Bảo quản thuốc đặc biệt',
-                warningDesc: 'Tủ thuốc hướng thần yêu cầu khóa 2 lớp và ký sổ bàn giao giữa các ca trực.',
-                advisorTitle: 'Ghi chú điều dưỡng',
-                advisorList: ['• Điều phối phân ca điều dưỡng 3 ca 4 kíp', '• Hướng dẫn quy trình tiêm an toàn'],
-                doctorTitle: 'Chứng chỉ hành nghề',
-                doctorList: ['• Chứng chỉ ACLS Hồi sức tim mạch cao cấp còn hiệu lực', '• Đào tạo phòng ngừa chuẩn'],
-            }
-        },
-        {
-            id: 104,
-            name: 'Phạm Quỳnh Anh',
-            username: 'anh.pq',
-            roleName: 'Dược sĩ lâm sàng',
-            role: 'Pharmacist',
-            department: 'Khoa Dược & Vật tư y tế',
-            isActive: true,
-            canChangeStatus: true,
-            phone: '0978 ··· 321',
-            meta: 'Khoa Dược Bệnh viện · DS từ 2024',
-            badges: [{ label: 'Dược sĩ', class: 'badge-vip' }],
-            alertBadge: { label: 'Kiểm soát tương tác thuốc', type: 'info' },
-            timeline: [
-                { date: 'Hôm nay', title: 'Duyệt đơn thuốc ngoại trú đợt 1', subtitle: 'Hệ thống HIS kê đơn điện tử', status: 'Đang thực hiện', statusType: 'active' },
-                { date: '18/08', title: 'Cập nhật danh mục tương tác thuốc', subtitle: 'Phiên bản cơ sở dữ liệu v2.4', status: 'Hoàn thành', statusType: 'done' },
-            ],
-            notes: {
-                warning: 'Cảnh báo tương tác thuốc tự động',
-                warningDesc: 'Hệ thống tự động kích hoạt chặn tương tác mức độ nặng (Black Box Warning).',
-                advisorTitle: 'Ghi chú dược lâm sàng',
-                advisorList: ['• Hỗ trợ bác sĩ tra cứu tương đương sinh học', '• Phụ trách kho lẻ và cấp phát thuốc BHYT'],
-                doctorTitle: 'Quyền hạn phần mềm',
-                doctorList: ['• Duyệt xuất kho thuốc tổng và xuất thuốc ngoại trú', '• Khóa cảnh báo tương tác'],
-            }
-        },
-        {
-            id: 105,
-            name: 'Võ Hoài Nam',
-            username: 'nam.vh',
-            roleName: 'Kỹ thuật viên CĐHA',
-            role: 'Staff',
-            department: 'Khoa Chẩn đoán hình ảnh',
-            isActive: true,
-            canChangeStatus: true,
-            phone: '0903 ··· 888',
-            meta: 'Khoa CĐHA & PACS · KTV từ 2023',
-            badges: [{ label: 'Kỹ thuật viên', class: 'badge-vip' }],
-            alertBadge: { label: 'An toàn bức xạ hạt nhân', type: 'warning' },
-            timeline: [
-                { date: 'Hôm nay', title: 'Chụp MRI sọ não 1.5 Tesla', subtitle: 'Phòng chụp cộng hưởng từ 01', status: 'Đang thực hiện', statusType: 'active' },
-                { date: '21/08', title: 'Hiệu chuẩn máy CT Scanner 128 dãy', subtitle: 'Biên bản kiểm định định kỳ', status: 'Hoàn thành', statusType: 'done' },
-            ],
-            notes: {
-                warning: 'Kiểm định an toàn bức xạ',
-                warningDesc: 'Đeo liều kế cá nhân bắt buộc khi vận hành phòng chụp X-Quang / CT Scanner.',
-                advisorTitle: 'Ghi chú vận hành',
-                advisorList: ['• Thời gian trả kết quả PACS trung bình: 30 phút', '• Kiểm tra máy hút ẩm phòng máy định kỳ'],
-                doctorTitle: 'Khai thác thiết bị',
-                doctorList: ['• Quản trị hệ thống PACS Cloud và máy in phim số', '• Chứng chỉ an toàn bức xạ Cục ATBXHN'],
-            }
-        },
-        {
-            id: 106,
-            name: 'Đặng Thùy Linh',
-            username: 'linh.dt',
-            roleName: 'Tiếp đón & Thu ngân',
-            role: 'Receptionist',
-            department: 'Phòng Tài chính kế toán',
-            isActive: true,
-            canChangeStatus: true,
-            phone: '0989 ··· 456',
-            meta: 'Quầy Tiếp đón 02 · Nhân viên từ 2025',
-            badges: [{ label: 'Thu ngân', class: 'badge-vip' }],
-            alertBadge: { label: 'Hóa đơn máy tính tiền', type: 'info' },
-            timeline: [
-                { date: 'Hôm nay', title: 'Tiếp nhận tạm ứng viện phí ca sáng', subtitle: 'Quầy thu ngân số 02', status: 'Đang thực hiện', statusType: 'active' },
-                { date: '24/08', title: 'Đối soát giao dịch chuyển khoản VietQR', subtitle: 'Khớp số liệu ngân hàng Vietcombank', status: 'Hoàn thành', statusType: 'done' },
-            ],
-            notes: {
-                warning: 'Quy định tài chính',
-                warningDesc: 'Chốt ca và in bảng kê cuối ngày lúc 17h00. Nộp tiền mặt vào két an toàn.',
-                advisorTitle: 'Ghi chú quầy tiếp đón',
-                advisorList: ['• Hỗ trợ thanh toán thẻ POS và quét mã VietQR', '• Tiếp nhận thẻ BHYT qua CCCD gắn chip VNeID'],
-                doctorTitle: 'Thẩm quyền giao dịch',
-                doctorList: ['• Thu tạm ứng, thanh toán ra viện và hoàn tiền thừa', '• Xuất hóa đơn điện tử VAT khởi tạo từ POS'],
-            }
-        },
-        {
-            id: 107,
-            name: 'Bùi Yến Nhi',
-            username: 'nhi.by',
-            roleName: 'Bác sĩ Nhi khoa',
-            role: 'Doctor',
-            department: 'Khoa Nhi & Tiêm chủng',
-            isActive: true,
-            canChangeStatus: true,
-            phone: '0918 ··· 654',
-            meta: 'Khoa Nhi Phòng 105 · BS từ 2024',
-            badges: [{ label: 'Bác sĩ', class: 'badge-vip' }],
-            alertBadge: { label: 'Khám sàng lọc trước tiêm', type: 'info' },
-            timeline: [
-                { date: 'Hôm nay', title: 'Khám sàng lọc tiêm chủng 6 trong 1', subtitle: 'Phòng khám Nhi số 105', status: 'Đang thực hiện', statusType: 'active' },
-                { date: '22/08', title: 'Tư vấn dinh dưỡng trẻ nhỏ', subtitle: 'Hồ sơ khám sức khỏe định kỳ', status: 'Hoàn thành', statusType: 'done' },
-            ],
-            notes: {
-                warning: 'An toàn tiêm chủng',
-                warningDesc: 'Theo dõi tại phòng lưu 30 phút sau tiêm chủng bắt buộc đối với tất cả trẻ nhỏ.',
-                advisorTitle: 'Ghi chú phụ trách',
-                advisorList: ['• Hướng dẫn phụ huynh xử trí sốt sau tiêm chủng', '• Hẹn lịch tiêm nhắc lại tự động qua SMS'],
-                doctorTitle: 'Chứng chỉ chuyên môn',
-                doctorList: ['• Chứng chỉ An toàn Tiêm chủng do Viện Pasteur cấp', '• Chuyên khoa I Nhi khoa Đại học Y Dược'],
-            }
-        },
-        {
-            id: 108,
-            name: 'Hoàng Phương Thảo',
-            username: 'thao.hp',
-            roleName: 'Kỹ sư CNTT & Dữ liệu',
-            role: 'Admin',
-            department: 'Phòng Công nghệ thông tin',
-            isActive: true,
-            canChangeStatus: true,
-            phone: '0945 ··· 999',
-            meta: 'Trung tâm Dữ liệu · Kỹ sư từ 2021',
-            badges: [{ label: 'Admin', class: 'badge-vip' }],
-            alertBadge: { label: 'Quản trị viên Super Admin', type: 'warning' },
-            timeline: [
-                { date: 'Hôm nay', title: 'Sao lưu cơ sở dữ liệu định kỳ', subtitle: 'Hệ thống máy chủ NAS dự phòng', status: 'Đang thực hiện', statusType: 'active' },
-                { date: '19/08', title: 'Bảo trì hạ tầng mạng cáp quang', subtitle: 'Tối ưu đường truyền phòng mổ & cấp cứu', status: 'Hoàn thành', statusType: 'done' },
-            ],
-            notes: {
-                warning: 'Quyền Quản trị viên Tối cao',
-                warningDesc: 'Tài khoản có quyền can thiệp cơ sở dữ liệu và cấu hình bảo mật phân quyền toàn viện.',
-                advisorTitle: 'Ghi chú vận hành hệ thống',
-                advisorList: ['• Trực hỗ trợ kỹ thuật phần mềm HIS 24/7', '• Kiểm tra log an ninh mạng và tường lửa mỗi ngày'],
-                doctorTitle: 'Quyền hạn kỹ thuật',
-                doctorList: ['• Toàn quyền quản trị cơ sở dữ liệu SQL Server', '• Cấp phát tài khoản và cấu hình máy trạm'],
-            }
-        }
-    ];
-
     const currentProfileMap = {
         staff: null,
         accounts: null,
@@ -411,54 +196,28 @@
         const detailPane = find(`#${sectionKey}-detail-pane`);
         if (!masterList || !detailPane) return;
 
-        // Xây dựng danh sách tổng hợp (Real từ Server + Sample Profile)
-        const items = [];
-        const realIds = new Set();
-        (rawItems || []).forEach((row, idx) => {
-            realIds.add(row.id);
-            items.push({
-                id: row.id,
-                name: row.name || row.username,
-                username: row.username,
-                roleName: row.roleName || (row.role === 'Admin' ? 'Quản trị viên' : row.role),
-                role: row.role,
-                department: row.department || 'Bệnh viện Đa khoa Medicare',
-                isActive: row.isActive,
-                canChangeStatus: row.canChangeStatus,
-                phone: '0908 ··· ' + String(100 + idx).slice(-3),
-                meta: `${row.department || 'Bệnh viện Medicare'} · Tài khoản từ 2026`,
-                badges: [{ label: row.roleName || 'Quản trị viên', class: 'badge-vip' }],
-                alertBadge: {
-                    label: row.isActive ? 'Đang hoạt động' : 'Tài khoản bị khóa',
-                    type: row.isActive ? 'active' : 'warning',
-                },
-                timeline: [
-                    { date: 'Hôm nay', title: 'Đăng nhập phiên làm việc hệ thống', subtitle: 'Thiết bị máy trạm IP: 192.168.1.' + (10 + idx), status: row.isActive ? 'Đang hoạt động' : 'Đã khóa', statusType: row.isActive ? 'active' : 'done' },
-                    { date: 'Gần đây', title: 'Cập nhật phân quyền truy cập hồ sơ', subtitle: 'Quản trị viên hệ thống phê duyệt', status: 'Hoàn thành', statusType: 'done' },
-                ],
-                notes: {
-                    warning: row.isActive ? 'Tài khoản hệ thống an toàn' : 'Tài khoản đang bị tạm khóa',
-                    warningDesc: row.isActive ? 'Xác thực hai bước (2FA) và giám sát đăng nhập đang bật.' : 'Mọi quyền truy cập chuyên môn đã bị tạm ngưng.',
-                    advisorTitle: 'Ghi chú phân quyền',
-                    advisorList: [`• Vai trò: ${row.roleName || row.role}`, `• Khoa phòng: ${row.department || 'Toàn viện'}`],
-                    doctorTitle: 'Thông tin hệ thống',
-                    doctorList: [`• Tên đăng nhập: ${row.username}`, `• Trạng thái: ${row.isActive ? 'Kích hoạt' : 'Tạm khóa'}`],
-                }
-            });
-        });
-
-        // Bổ sung các profile mẫu chuẩn giao diện tham khảo
-        sampleStaffProfiles.forEach((p) => {
-            if (!realIds.has(p.id)) {
-                items.push(p);
-            }
-        });
+        const items = (rawItems || []).map((row) => ({
+            id: row.id,
+            name: row.name || row.username,
+            username: row.username,
+            roleName: row.roleName || (row.role === 'Admin' ? 'Quản trị viên' : row.role),
+            role: row.role,
+            department: row.department || (row.role === 'Admin' ? 'Ban Giám Đốc / CNTT' : 'Chưa phân khoa'),
+            isActive: row.isActive,
+            canChangeStatus: row.canChangeStatus,
+            meta: `${row.department || 'Bệnh viện Medicare'} · Mã: MED-${row.id}`,
+        }));
 
         if (countBadge) {
             countBadge.textContent = items.length >= 1000 ? (items.length / 1000).toFixed(3) : String(items.length);
         }
 
-        // Chọn profile active hiện tại
+        if (items.length === 0) {
+            masterList.innerHTML = `<div class="profile-subtab-empty-box" style="padding: 24px 12px; text-align: center; color: #64748b; font-size: 13px;">Chưa có dữ liệu ${sectionKey === 'staff' ? 'nhân sự' : 'tài khoản'}.</div>`;
+            detailPane.innerHTML = `<div class="profile-subtab-empty-box" style="padding: 48px 16px; text-align: center; color: #64748b; font-size: 13px;">Chọn một bản ghi để xem chi tiết hoặc bấm thêm mới.</div>`;
+            return;
+        }
+
         if (!currentProfileMap[sectionKey] || !items.find(i => i.id === currentProfileMap[sectionKey]?.id)) {
             currentProfileMap[sectionKey] = items[0];
         } else {
@@ -467,7 +226,6 @@
 
         const activeItem = currentProfileMap[sectionKey];
 
-        // Render master list
         masterList.innerHTML = items.map((item, index) => {
             const initials = getInitials(item.name);
             const palette = getAvatarColors(item.name, index);
@@ -484,7 +242,6 @@
             `;
         }).join('');
 
-        // Gắn sự kiện click chọn item trong master list
         masterList.querySelectorAll('.misa-split-item').forEach((el) => {
             el.addEventListener('click', () => {
                 const itemId = Number(el.dataset.itemId);
@@ -518,43 +275,30 @@
                     <div class="profile-header-title-wrap">
                         <h2>${escape(item.name)}</h2>
                         <div class="profile-header-subline">
-                            <span>${escape(item.phone || '0908 ··· 148')}</span>
+                            <span><code class="username-tag">@${escape(item.username)}</code></span>
                             <span>·</span>
-                            <span>${escape(item.meta || `${item.department || 'Bệnh viện Medicare'} · Bắt đầu từ 2024`)}</span>
+                            <span>${escape(item.department)}</span>
                         </div>
                     </div>
                 </div>
                 <div class="profile-header-badges">
-                    <span class="badge-vip">${escape(item.badges?.[0]?.label || item.roleName || 'VIP')}</span>
-                    ${item.alertBadge ? /* HTML */ `
-                        <span class="${item.alertBadge.type === 'active' ? 'badge-active-soft' : 'badge-warning-soft'}">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                                <line x1="12" y1="9" x2="12" y2="13"></line>
-                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                            </svg>
-                            <span>${escape(item.alertBadge.label)}</span>
-                        </span>
-                    ` : ''}
+                    <span class="badge-vip">${escape(item.roleName)}</span>
+                    <span class="${item.isActive ? 'badge-active-soft' : 'badge-warning-soft'}">
+                        <span>${item.isActive ? '● Đang hoạt động' : '○ Bị tạm khóa'}</span>
+                    </span>
                 </div>
             </div>
 
-            <!-- Pill subtabs (Chuẩn phong cách giao diện ảnh: Tổng quan, Ảnh, Hồ sơ y tế, Gói & thanh toán, Lịch hẹn) -->
             <div class="profile-subtabs-bar" role="tablist">
-                <button type="button" class="profile-pill-tab ${subtab === 'overview' ? 'active' : ''}" data-subtab="overview">Tổng quan</button>
-                <button type="button" class="profile-pill-tab ${subtab === 'photos' ? 'active' : ''}" data-subtab="photos">Ảnh</button>
-                <button type="button" class="profile-pill-tab ${subtab === 'medical' ? 'active' : ''}" data-subtab="medical">Hồ sơ y tế</button>
-                <button type="button" class="profile-pill-tab ${subtab === 'billing' ? 'active' : ''}" data-subtab="billing">Gói &amp; thanh toán</button>
-                <button type="button" class="profile-pill-tab ${subtab === 'appointments' ? 'active' : ''}" data-subtab="appointments">Lịch hẹn</button>
+                <button type="button" class="profile-pill-tab ${subtab === 'overview' ? 'active' : ''}" data-subtab="overview">Tổng quan hồ sơ</button>
+                <button type="button" class="profile-pill-tab ${subtab === 'security' ? 'active' : ''}" data-subtab="security">Phân quyền &amp; Quyền hạn</button>
             </div>
 
-            <!-- Thân thẻ chi tiết theo subtab -->
             <div class="profile-tab-body">
-                ${subtab === 'overview' ? renderOverviewSubtab(item) : renderOtherSubtab(subtab, item)}
+                ${subtab === 'overview' ? renderOverviewSubtab(item) : renderSecuritySubtab(item)}
             </div>
         `;
 
-        // Gắn sự kiện chuyển subtab
         detailPane.querySelectorAll('.profile-pill-tab').forEach((tabBtn) => {
             tabBtn.addEventListener('click', () => {
                 const tabKey = tabBtn.dataset.subtab;
@@ -565,74 +309,61 @@
     }
 
     function renderOverviewSubtab(item) {
-        const timelineRows = (item.timeline || [
-            { date: 'Hôm nay', title: 'Laser Toning · buổi 1/5', subtitle: 'BS. Minh Anh', status: 'Đang thực hiện', statusType: 'active' },
-            { date: '22/08', title: 'Tư vấn da · không đều màu', subtitle: 'BS. Minh Anh', status: 'Hoàn thành', statusType: 'done' },
-            { date: '30/07', title: 'Hydrafacial · buổi 3/3', subtitle: 'ĐD. Thu Hà', status: 'Hoàn thành', statusType: 'done' },
-            { date: '16/07', title: 'Hydrafacial · buổi 2/3', subtitle: 'ĐD. Thu Hà', status: 'Hoàn thành', statusType: 'done' },
-        ]).map((row) => /* HTML */ `
-            <div class="timeline-item">
-                <div class="timeline-date ${row.date === 'Hôm nay' ? 'today' : ''}">${escape(row.date)}</div>
-                <div class="timeline-text">
-                    <div class="timeline-text-title">${escape(row.title)}</div>
-                    <div class="timeline-text-sub">${escape(row.subtitle)}</div>
-                </div>
-                <div class="timeline-badge-wrap">
-                    <span class="timeline-status-badge ${row.statusType || (row.status.includes('thực hiện') ? 'active' : 'done')}">
-                        ${escape(row.status)}
-                    </span>
-                </div>
-            </div>
-        `).join('');
-
-        const notes = item.notes || {
-            warning: 'Dị ứng Lidocaine',
-            warningDesc: 'Cần lưu ý kiểm tra tiền sử dị ứng thuốc tê cục bộ trước khi chỉ định thủ thuật.',
-            advisorTitle: 'Ghi chú tư vấn viên',
-            advisorList: ['• Da không đều màu vùng má', '• Quan tâm: đều màu, sáng da'],
-            doctorTitle: 'Ghi chú bác sĩ',
-            doctorList: ['• Laser Toning × 5, cách 2 tuần', '• Năng lượng thấp ở buổi đầu'],
-        };
-
         return /* HTML */ `
             <div class="profile-content-grid">
-                <!-- Cột trái: Lịch sử điều trị -->
+                <!-- Cột trái: Thông tin nhân sự / tài khoản -->
                 <div class="profile-timeline-block">
-                    <h3 class="timeline-block-title">Lịch sử điều trị</h3>
-                    <div class="timeline-list">
-                        ${timelineRows}
+                    <h3 class="timeline-block-title">Hồ sơ chuyên môn &amp; Đơn vị công tác</h3>
+                    <div class="profile-info-fields" style="display: flex; flex-direction: column; gap: 12px; padding: 12px 4px;">
+                        <div class="profile-info-row">
+                            <span style="font-size: 12px; color: #64748b; font-weight: 500;">Mã định danh hệ thống:</span>
+                            <div style="font-size: 13.5px; font-weight: 600; color: #0f172a; margin-top: 2px;"><code>MED-${item.id}</code></div>
+                        </div>
+                        <div class="profile-info-row">
+                            <span style="font-size: 12px; color: #64748b; font-weight: 500;">Họ và tên hiển thị:</span>
+                            <div style="font-size: 14px; font-weight: 600; color: #0f172a; margin-top: 2px;">${escape(item.name)}</div>
+                        </div>
+                        <div class="profile-info-row">
+                            <span style="font-size: 12px; color: #64748b; font-weight: 500;">Tên tài khoản:</span>
+                            <div style="font-size: 13.5px; font-weight: 600; color: #0068ff; margin-top: 2px;"><code class="username-tag">@${escape(item.username)}</code></div>
+                        </div>
+                        <div class="profile-info-row">
+                            <span style="font-size: 12px; color: #64748b; font-weight: 500;">Chức danh / Vai trò:</span>
+                            <div style="font-size: 13.5px; font-weight: 600; color: #334155; margin-top: 2px;">
+                                <span class="misa-badge-role role-${escape(item.roleName).toLowerCase()}">${escape(item.roleName)}</span>
+                            </div>
+                        </div>
+                        <div class="profile-info-row">
+                            <span style="font-size: 12px; color: #64748b; font-weight: 500;">Khoa / Phòng ban công tác:</span>
+                            <div style="font-size: 13.5px; font-weight: 600; color: #334155; margin-top: 2px;">${escape(item.department)}</div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Cột phải: Cần biết trước khi tư vấn -->
+                <!-- Cột phải: Trạng thái & Thao tác quản trị -->
                 <div class="profile-cards-block">
-                    <h3 class="profile-cards-title">Cần biết trước khi tư vấn</h3>
-                    
-                    ${notes.warning ? /* HTML */ `
-                        <div class="misa-detail-alert-card card-pink">
-                            <div class="alert-card-title">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                                    <line x1="12" y1="9" x2="12" y2="13"></line>
-                                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                                </svg>
-                                <span>${escape(notes.warning)}</span>
-                            </div>
-                            ${notes.warningDesc ? `<p class="alert-card-desc">${escape(notes.warningDesc)}</p>` : ''}
-                        </div>
-                    ` : ''}
+                    <h3 class="profile-cards-title">Trạng thái &amp; Thao tác quản trị</h3>
 
-                    <div class="misa-detail-alert-card card-yellow">
-                        <div class="alert-card-title">${escape(notes.advisorTitle || 'Ghi chú tư vấn viên')}</div>
-                        <ul class="alert-card-list">
-                            ${(notes.advisorList || []).map(li => `<li>${escape(li)}</li>`).join('')}
-                        </ul>
+                    <div class="misa-detail-alert-card ${item.isActive ? 'card-blue' : 'card-pink'}">
+                        <div class="alert-card-title">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polyline points="12 6 12 12 14 14"></polyline>
+                            </svg>
+                            <span>${item.isActive ? 'Tài khoản đang hoạt động' : 'Tài khoản đang bị tạm khóa'}</span>
+                        </div>
+                        <p class="alert-card-desc">
+                            ${item.isActive
+                                ? 'Người dùng có thể đăng nhập vào cổng thông tin bệnh viện Medicare và thực hiện chức năng theo đúng vai trò.'
+                                : 'Mọi phiên làm việc và quyền đăng nhập của người dùng tạm thời bị từ chối truy cập.'}
+                        </p>
                     </div>
 
-                    <div class="misa-detail-alert-card card-blue">
-                        <div class="alert-card-title">${escape(notes.doctorTitle || 'Ghi chú bác sĩ')}</div>
+                    <div class="misa-detail-alert-card card-yellow">
+                        <div class="alert-card-title">Chính sách an toàn hệ thống</div>
                         <ul class="alert-card-list">
-                            ${(notes.doctorList || []).map(li => `<li>${escape(li)}</li>`).join('')}
+                            <li>• Xác thực danh tính qua ASP.NET Core Identity &amp; Cookie bảo mật.</li>
+                            <li>• Chặn thao tác trái quyền với Middleware Authorize và Antiforgery Token.</li>
                         </ul>
                     </div>
 
@@ -646,55 +377,23 @@
                             >
                                 ${item.isActive ? 'Khóa tài khoản' : 'Kích hoạt tài khoản'}
                             </button>
-                        ` : '<span class="self-tag">Đang đăng nhập</span>'}
-                        <button type="button" class="btn misa-btn-outline-primary" onclick="alert('Đã đồng bộ hồ sơ và cập nhật thông tin!')">
-                            Đổi mật khẩu / 2FA
-                        </button>
+                        ` : '<span class="self-tag">Tài khoản đang đăng nhập (Không thể tự khóa)</span>'}
                     </div>
                 </div>
             </div>
         `;
     }
 
-    function renderOtherSubtab(subtab, item) {
-        if (subtab === 'photos') {
-            return /* HTML */ `
-                <div class="profile-subtab-empty-box">
-                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                        <polyline points="21 15 16 10 5 21"></polyline>
-                    </svg>
-                    <p>Hình ảnh hồ sơ &amp; lâm sàng của <strong>${escape(item.name)}</strong></p>
-                    <small class="text-muted">Chưa có hình ảnh siêu âm / X-Quang tải lên trong đợt điều trị này.</small>
-                </div>
-            `;
-        }
-        if (subtab === 'medical') {
-            return /* HTML */ `
-                <div class="profile-subtab-info-card">
-                    <h4>Hồ sơ bệnh án điện tử (EMR)</h4>
-                    <p>• Mã định danh nhân sự / hồ sơ: <code>MED-${item.id}</code></p>
-                    <p>• Chuyên khoa phụ trách: <strong>${escape(item.department || 'Đa khoa')}</strong></p>
-                    <p>• Trạng thái hành nghề: <strong>${item.isActive ? 'Hợp lệ & Hoạt động' : 'Tạm ngưng'}</strong></p>
-                </div>
-            `;
-        }
-        if (subtab === 'billing') {
-            return /* HTML */ `
-                <div class="profile-subtab-info-card">
-                    <h4>Gói dịch vụ &amp; Thanh toán viện phí</h4>
-                    <p>• Gói bảo trợ y tế: <strong>Medicare Care Standard 2026</strong></p>
-                    <p>• Hạn mức miễn giảm: <strong>Tối đa 15% theo chính sách nội bộ</strong></p>
-                    <p>• Lịch sử đối soát: <strong>Đã hoàn tất thanh toán kỳ gần nhất</strong></p>
-                </div>
-            `;
-        }
+    function renderSecuritySubtab(item) {
         return /* HTML */ `
             <div class="profile-subtab-info-card">
-                <h4>Lịch hẹn &amp; Lịch làm việc</h4>
-                <p>• Ca làm việc kế tiếp: <strong>07:30 - 11:30 ngày mai</strong></p>
-                <p>• Phòng khám / Vị trí: <strong>${escape(item.department || 'Khu khám bệnh ngoại trú')}</strong></p>
+                <h4>Chính sách phân quyền &amp; Giám sát truy cập</h4>
+                <p>• Mã định danh hồ sơ: <code>MED-${item.id}</code></p>
+                <p>• Tên đăng nhập: <strong>@${escape(item.username)}</strong></p>
+                <p>• Vai trò phân quyền: <strong>${escape(item.roleName)}</strong> (${escape(item.role)})</p>
+                <p>• Phòng ban trực thuộc: <strong>${escape(item.department)}</strong></p>
+                <p>• Trạng thái hoạt động: <strong>${item.isActive ? 'Đang hoạt động' : 'Tạm khóa'}</strong></p>
+                <p>• Quyền quản trị tài khoản: <strong>${item.canChangeStatus ? 'Quản trị viên được phép thao tác đổi trạng thái' : 'Tài khoản quản trị hiện tại của bạn'}</strong></p>
             </div>
         `;
     }
@@ -894,26 +593,29 @@
                 window._cashflowDonutInstance.destroy();
             }
 
-            const deposits = Math.max(0, report.deposits);
-            const payments = Math.max(0, report.payments);
-            const refunds = Math.max(0, report.refunds);
+            const deposits = Math.max(0, report.deposits || 0);
+            const payments = Math.max(0, report.payments || 0);
+            const refunds = Math.max(0, report.refunds || 0);
             const hasData = deposits > 0 || payments > 0 || refunds > 0;
 
-            const dData = hasData ? [deposits, payments, refunds] : [40, 45, 15];
+            const dData = hasData ? [deposits, payments, refunds] : [1];
             const dColors = hasData
                 ? ['#0068ff', '#10b981', '#f59e0b']
-                : ['#38bdf8', '#34d399', '#fbbf24'];
+                : ['#e2e8f0'];
+            const dLabels = hasData
+                ? ['Tạm ứng viện phí', 'Thanh toán viện phí', 'Hoàn tiền / Miễn giảm']
+                : ['Chưa có giao dịch'];
 
             const centerTotal = find('#donut-center-total');
             if (centerTotal) {
-                centerTotal.textContent = hasData ? money(deposits + payments + refunds) + ' ₫' : '100%';
+                centerTotal.textContent = hasData ? money(deposits + payments + refunds) + ' ₫' : '0 ₫';
             }
 
             const dCtx = donutCanvas.getContext('2d');
             window._cashflowDonutInstance = new window.Chart(dCtx, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Tạm ứng viện phí', 'Thanh toán viện phí', 'Hoàn tiền / Miễn giảm'],
+                    labels: dLabels,
                     datasets: [
                         {
                             data: dData,
@@ -938,7 +640,7 @@
                             cornerRadius: 6,
                             callbacks: {
                                 label: function (context) {
-                                    if (!hasData) return ' ' + context.label + ': Chưa có giao dịch';
+                                    if (!hasData) return ' Chưa có giao dịch trong kỳ';
                                     return ' ' + context.label + ': ' + money(context.raw) + ' ₫';
                                 },
                             },
@@ -949,99 +651,12 @@
         }
     }
 
-    let isDemoMode = true;
-
-    function generateSampleReport(fromDate, toDate) {
-        const today = new Date();
-        const to = toDate ? new Date(toDate) : today;
-        let from = fromDate ? new Date(fromDate) : new Date(today);
-        if (!fromDate) {
-            from.setDate(today.getDate() - 6);
-        }
-
-        const days = [];
-        const cur = new Date(from);
-        let totalDeposits = 0;
-        let totalPayments = 0;
-        let totalRefunds = 0;
-        let totalVisits = 0;
-
-        const sampleProfiles = [
-            { dep: 28500000, pay: 34200000, ref: 1800000, vis: 185 },
-            { dep: 31200000, pay: 38600000, ref: 2100000, vis: 210 },
-            { dep: 26800000, pay: 32100000, ref: 1500000, vis: 172 },
-            { dep: 35400000, pay: 42900000, ref: 3200000, vis: 230 },
-            { dep: 29800000, pay: 36400000, ref: 2400000, vis: 194 },
-            { dep: 21500000, pay: 25800000, ref: 1100000, vis: 138 },
-            { dep: 22000000, pay: 25500000, ref: 1100000, vis: 151 },
-        ];
-
-        let i = 0;
-        while (cur <= to && days.length < 31) {
-            const p = sampleProfiles[i % sampleProfiles.length];
-            const dateStr = cur.toISOString().slice(0, 10);
-            const dayRev = p.dep + p.pay - p.ref;
-            days.push({
-                date: dateStr,
-                deposits: p.dep,
-                payments: p.pay,
-                refunds: p.ref,
-                revenue: dayRev,
-                visits: p.vis,
-            });
-            totalDeposits += p.dep;
-            totalPayments += p.pay;
-            totalRefunds += p.ref;
-            totalVisits += p.vis;
-            cur.setDate(cur.getDate() + 1);
-            i++;
-        }
-
-        if (days.length === 0) {
-            const dateStr = today.toISOString().slice(0, 10);
-            days.push({
-                date: dateStr,
-                deposits: 28500000,
-                payments: 34200000,
-                refunds: 1800000,
-                revenue: 60900000,
-                visits: 185,
-            });
-            totalDeposits = 28500000;
-            totalPayments = 34200000;
-            totalRefunds = 1800000;
-            totalVisits = 185;
-        }
-
-        return {
-            from: days[0].date,
-            to: days[days.length - 1].date,
-            deposits: totalDeposits,
-            payments: totalPayments,
-            refunds: totalRefunds,
-            revenue: totalDeposits + totalPayments - totalRefunds,
-            visits: totalVisits,
-            days: days,
-            isSample: true,
-        };
-    }
-
     async function loadReport(withFilter = true) {
         const version = ++reportVersion;
         const filter = find('#report-filter');
         const query = withFilter && filter ? '?' + new URLSearchParams(new FormData(filter)) : '';
         let report = await request('Report' + query);
         if (version !== reportVersion) return;
-
-        const hasNoRealData =
-            !report ||
-            (report.revenue === 0 &&
-                report.visits === 0 &&
-                (!report.days || report.days.every((d) => d.revenue === 0 && d.visits === 0)));
-
-        if (isDemoMode || hasNoRealData) {
-            report = generateSampleReport(report?.from, report?.to);
-        }
 
         currentReport = report;
 
@@ -1327,14 +942,6 @@
     find('#account-form [name="roleId"]')?.addEventListener('change', updateRoleFields);
     find('#new-staff')?.addEventListener('click', () => openAccount(true));
     find('#new-account')?.addEventListener('click', () => openAccount(false));
-    find('#toggle-sample-data')?.addEventListener('click', (event) => {
-        isDemoMode = !isDemoMode;
-        const btn = event.currentTarget;
-        btn.classList.toggle('active', isDemoMode);
-        const txt = find('#demo-toggle-text');
-        if (txt) txt.textContent = isDemoMode ? 'Dữ liệu mẫu: BẬT' : 'Dữ liệu máy chủ: THẬT';
-        loadReport(true).catch((error) => notify(error.message, true));
-    });
     find('#refresh-data')?.addEventListener('click', () =>
         refresh().catch((error) => notify(error.message, true)),
     );
@@ -1360,27 +967,9 @@
         }
         const account = event.target.closest('[data-account]');
         if (account && confirm('Xác nhận thay đổi trạng thái truy cập của tài khoản này?')) {
-            const accId = Number(account.dataset.account);
-            const nextActive = account.dataset.active === 'true';
-            if (accId >= 100) {
-                const sample = sampleStaffProfiles.find((p) => p.id === accId);
-                if (sample) {
-                    sample.isActive = nextActive;
-                    if (sample.alertBadge) {
-                        sample.alertBadge.label = nextActive ? 'Đang hoạt động' : 'Tài khoản bị khóa';
-                        sample.alertBadge.type = nextActive ? 'active' : 'warning';
-                    }
-                    notify(
-                        `Đã cập nhật trạng thái của ${sample.name} sang: ${nextActive ? 'Đang hoạt động' : 'Tạm khóa'}`,
-                    );
-                    renderSplitView('accounts', directory?.accounts || []);
-                    renderSplitView('staff', directory?.staff || []);
-                    return;
-                }
-            }
             mutate('AccountStatus', {
-                accountId: accId,
-                isActive: nextActive,
+                accountId: Number(account.dataset.account),
+                isActive: account.dataset.active === 'true',
             });
         }
         const decision = event.target.closest('[data-decision]');
@@ -1440,21 +1029,6 @@
     });
 
     find('#export-revenue')?.addEventListener('click', async () => {
-        if (currentReport?.isSample && currentReport.days) {
-            let csv = '\uFEFFNgày,Tạm ứng,Thanh toán,Hoàn tiền,Doanh thu thực thu,Lượt đã tiếp nhận\r\n';
-            currentReport.days.forEach((d) => {
-                csv += `${d.date},${d.deposits},${d.payments},${d.refunds},${d.revenue},${d.visits}\r\n`;
-            });
-            csv += `Tổng,${currentReport.deposits},${currentReport.payments},${currentReport.refunds},${currentReport.revenue},${currentReport.visits}\r\n`;
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `doanh-thu-mau-${currentReport.from}-${currentReport.to}.csv`;
-            link.click();
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
-            return;
-        }
         const form = find('#report-filter');
         if (!form || !form.reportValidity()) return;
         const button = find('#export-revenue');
@@ -1496,7 +1070,7 @@
             if (!activePanel) return;
             const rows = activePanel.querySelectorAll('tbody tr');
             rows.forEach((row) => {
-                if (row.classList.contains('empty')) return;
+                if (row.querySelector('td.empty')) return;
                 const text = row.textContent.toLowerCase();
                 row.style.display = text.includes(query) ? '' : 'none';
             });
