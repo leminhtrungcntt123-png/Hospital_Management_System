@@ -49,14 +49,42 @@ public static class AppointmentStateMachine
             [AppointmentStatus.Codes.Expired] = []
         };
 
+    /// <summary>Danh sách tất cả mã trạng thái hợp lệ trong máy trạng thái.</summary>
     public static IReadOnlyCollection<string> Codes { get; } = [.. Transitions.Keys];
 
     /// <summary>Các trạng thái kế tiếp hợp lệ từ <paramref name="from"/> (rỗng nếu là trạng thái kết thúc).</summary>
     public static IReadOnlyList<string> AllowedNext(string from) => Next(from);
 
+    /// <summary>Kiểm tra mã trạng thái có phải là trạng thái kết thúc (terminal) hay không.</summary>
     public static bool IsTerminal(string code) => Next(code).Length == 0;
 
+    /// <summary>Kiểm tra việc chuyển đổi giữa 2 mã trạng thái có hợp lệ hay không.</summary>
     public static bool CanTransition(string from, string to) => Next(from).Contains(Status(to));
+
+    private static readonly Dictionary<AppointmentStatusId, HashSet<AppointmentStatusId>> AllowedTransitions = new()
+    {
+        [AppointmentStatusId.Pending] = [AppointmentStatusId.Confirmed, AppointmentStatusId.Expired, AppointmentStatusId.Cancelled, AppointmentStatusId.RescheduleRequired],
+        [AppointmentStatusId.Confirmed] = [AppointmentStatusId.CheckedIn, AppointmentStatusId.Cancelled, AppointmentStatusId.NoShow, AppointmentStatusId.RescheduleRequired],
+        [AppointmentStatusId.CheckedIn] = [AppointmentStatusId.ReadyForDoctor, AppointmentStatusId.Cancelled],
+        [AppointmentStatusId.ReadyForDoctor] = [AppointmentStatusId.InProgress],
+        [AppointmentStatusId.InProgress] = [AppointmentStatusId.Completed],
+        [AppointmentStatusId.RescheduleRequired] = [AppointmentStatusId.Cancelled],
+        [AppointmentStatusId.Completed] = [],
+        [AppointmentStatusId.Cancelled] = [],
+        [AppointmentStatusId.NoShow] = [],
+        [AppointmentStatusId.Expired] = []
+    };
+
+    /// <summary>Kiểm tra việc chuyển đổi giữa 2 enum AppointmentStatusId có hợp lệ hay không.</summary>
+    public static bool CanTransition(AppointmentStatusId current, AppointmentStatusId next) =>
+        AllowedTransitions.TryGetValue(current, out var targets) && targets.Contains(next);
+
+    /// <summary>Kiểm tra enum trạng thái có phải là trạng thái kết thúc (terminal) hay không.</summary>
+    public static bool IsTerminal(AppointmentStatusId status) =>
+        status is AppointmentStatusId.Completed
+            or AppointmentStatusId.Cancelled
+            or AppointmentStatusId.NoShow
+            or AppointmentStatusId.Expired;
 
     private static string[] Next(string from) =>
         Transitions.TryGetValue(Status(from), out string[]? next) ? next : [];

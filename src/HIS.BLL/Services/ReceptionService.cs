@@ -1,3 +1,4 @@
+using HIS.BLL.Common;
 using HIS.BLL.DTOs;
 using HIS.BLL.Interfaces;
 using HIS.BLL.Options;
@@ -1137,5 +1138,215 @@ public class ReceptionService : IReceptionService
     private static string Truncate(string? value, int maxLength)
     {
         return value == null || value.Length <= maxLength ? value ?? string.Empty : value[..maxLength];
+    }
+
+    // ==========================================
+    // Web Quầy Tiếp Nhận (Reception Desk API)
+    // ==========================================
+
+    /// <summary>
+    /// Lấy dữ liệu bàn tiếp nhận cho nhân viên điều dưỡng/tiếp đón bao gồm danh sách ca khám trong ngày và tìm kiếm bệnh nhân.
+    /// </summary>
+    /// <param name="staffAccountId">Mã tài khoản nhân viên tiếp đón.</param>
+    /// <param name="search">Từ khóa tìm kiếm (họ tên, CCCD, SĐT, số thứ tự).</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Dữ liệu bàn tiếp đón (ReceptionDesk).</returns>
+    public async Task<Result<ReceptionDesk>> GetDeskAsync(int staffAccountId, string? search, CancellationToken ct = default)
+    {
+        var nurse = await _context.Nurses
+            .Include(n => n.Department)
+            .FirstOrDefaultAsync(n => n.AccountId == staffAccountId, ct);
+
+        int departmentId = nurse?.DepartmentId ?? 0;
+        string departmentName = nurse?.Department?.Name ?? "";
+
+        if (departmentId <= 0)
+        {
+            var firstDept = await _context.Departments.OrderBy(d => d.Id).FirstOrDefaultAsync(ct);
+            if (firstDept != null)
+            {
+                departmentId = firstDept.Id;
+                departmentName = firstDept.Name;
+            }
+        }
+
+        var todayDate = DateOnly.FromDateTime(Now);
+        var start = todayDate.ToDateTime(TimeOnly.MinValue);
+        var end = start.AddDays(1);
+
+        var visitsQuery = _context.Appointments
+            .AsNoTracking()
+            .Include(a => a.Patient)
+            .Include(a => a.Doctor)
+            .Include(a => a.Room)
+            .Include(a => a.Slot)
+            .Where(a => (departmentId <= 0 || a.DepartmentId == departmentId)
+                && ((a.Slot != null && a.Slot.StartTime >= start && a.Slot.StartTime < end)
+                    || (a.Slot == null && a.CreatedAt >= start && a.CreatedAt < end)));
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            search = search.Trim();
+            visitsQuery = visitsQuery.Where(a =>
+                a.AppointmentCode.Contains(search)
+                || a.Patient.PhoneNumber.Contains(search)
+                || (a.Patient.NationalId != null && a.Patient.NationalId.Contains(search))
+                || (a.QueueNumber != null && a.QueueNumber.Contains(search))
+                || a.Patient.FullName.Contains(search));
+        }
+
+        var rows = await visitsQuery
+            .OrderByDescending(a => a.PriorityLevel)
+            .ThenBy(a => a.Slot != null ? a.Slot.StartTime : a.CreatedAt)
+            .Select(a => new ReceptionVisit(
+                a.Id,
+                a.AppointmentCode,
+                a.Patient.FullName,
+                a.Patient.DateOfBirth,
+                a.Patient.PhoneNumber,
+                a.Doctor != null ? a.Doctor.FullName : "Chưa phân công",
+                a.Room != null ? a.Room.RoomNumber : "",
+                a.Slot != null ? a.Slot.StartTime : a.CreatedAt,
+                a.BookingChannel,
+                a.StatusId,
+                a.QueueNumber,
+                a.PriorityLevel))
+            .Take(100)
+            .ToListAsync(ct);
+
+        var schedules = await _context.DoctorSchedules
+            .AsNoTracking()
+            .Include(s => s.Doctor)
+            .Include(s => s.Room)
+            .Where(s => (departmentId <= 0 || s.Doctor.DepartmentId == departmentId)
+                && s.Doctor.Account.IsActive
+                && s.IsActive
+                && s.DayOfWeek == todayDate.DayOfWeek
+                && s.EffectiveFrom <= todayDate
+                && (s.EffectiveTo == null || s.EffectiveTo >= todayDate))
+            .OrderBy(s => s.StartTime)
+            .ThenBy(s => s.Doctor.FullName)
+            .ToListAsync(ct);
+
+        var choices = schedules
+            .Select(s => new ReceptionSchedule(
+                s.Id,
+                $"{s.Doctor.FullName} · Phòng {s.Room.RoomNumber} · {s.StartTime:HH:mm}–{s.EndTime:HH:mm}"))
+            .ToList();
+
+        var patients = !string.IsNullOrWhiteSpace(search) && search.Trim().Length >= 3
+            ? await _context.Patients
+                .AsNoTracking()
+                .Where(p => p.PhoneNumber.Contains(search.Trim())
+                    || (p.NationalId != null && p.NationalId.Contains(search.Trim()))
+                    || p.FullName.Contains(search.Trim()))
+                .OrderBy(p => p.FullName)
+                .Select(p => new ReceptionPatient(
+                    p.Id,
+                    p.FullName,
+                    p.DateOfBirth,
+                    p.PhoneNumber))
+                .Take(20)
+                .ToListAsync(ct)
+            : (IReadOnlyList<ReceptionPatient>)[];
+
+        return Result.Success(new ReceptionDesk(
+            departmentName,
+            todayDate,
+            rows,
+            choices,
+            patients));
+    }
+
+    /// <summary>
+    /// Tiếp nhận (check-in) cho lượt khám đặt trước sau khi nhân viên đã xác minh danh tính giấy tờ.
+    /// </summary>
+    /// <param name="staffAccountId">Mã tài khoản nhân viên tiếp nhận.</param>
+    /// <param name="appointmentId">Mã lượt khám.</param>
+    /// <param name="identityVerified">Cờ xác nhận đã đối chiếu giấy tờ tùy thân.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Số thứ tự khám (STT) vừa được cấp phát.</returns>
+    public async Task<Result<string>> CheckInAsync(int staffAccountId, int appointmentId, bool identityVerified, CancellationToken ct = default)
+    {
+        if (!identityVerified)
+        {
+            return Result.Failure<string>("NOT_VERIFIED", "Cần đối chiếu danh tính người khám trước khi tiếp nhận.");
+        }
+
+        var res = await CheckInAsync(appointmentId, staffAccountId, ct);
+        if (!res.Success)
+        {
+            return Result.Failure<string>("CHECK_IN_FAILED", res.Message);
+        }
+
+        return Result.Success(res.QueueNumber);
+    }
+
+    /// <summary>
+    /// Đăng ký tiếp nhận lượt khám vãng lai (walk-in) trực tiếp tại quầy và cấp số thứ tự khám ngay.
+    /// </summary>
+    /// <param name="staffAccountId">Mã tài khoản nhân viên tiếp nhận.</param>
+    /// <param name="request">Thông tin đăng ký vãng lai (bệnh nhân, lịch trực, BHYT, mức ưu tiên).</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
+    /// <returns>Số thứ tự khám (STT) vừa được cấp phát.</returns>
+    public async Task<Result<string>> RegisterWalkInAsync(int staffAccountId, WalkInReceptionRequest request, CancellationToken ct = default)
+    {
+        if (!request.IdentityVerified)
+        {
+            return Result.Failure<string>("NOT_VERIFIED", "Cần đối chiếu danh tính người khám trước khi tiếp nhận.");
+        }
+
+        var schedule = await _context.DoctorSchedules
+            .Include(s => s.Doctor)
+            .Include(s => s.Room)
+            .FirstOrDefaultAsync(s => s.Id == request.ScheduleId && s.IsActive, ct);
+
+        if (schedule == null)
+        {
+            return Result.Failure<string>("NOT_FOUND", "Không tìm thấy lịch khám hoặc phòng khám được chọn.");
+        }
+
+        Patient? patient = null;
+        if (request.PatientId.HasValue && request.PatientId.Value > 0)
+        {
+            patient = await _context.Patients.FirstOrDefaultAsync(p => p.Id == request.PatientId.Value, ct);
+        }
+
+        var fullName = request.FullName?.Trim() ?? patient?.FullName ?? "";
+        if (string.IsNullOrWhiteSpace(fullName))
+        {
+            return Result.Failure<string>("INVALID_NAME", "Vui lòng nhập họ và tên người khám.");
+        }
+
+        var birthDate = request.DateOfBirth ?? patient?.DateOfBirth ?? DateOnly.FromDateTime(DateTime.Today);
+        var gender = (request.Gender ?? patient?.Gender ?? Gender.Male).ToString();
+        var phone = request.PhoneNumber?.Trim() ?? patient?.PhoneNumber ?? "";
+
+        var createReq = new CreateReceptionRequest
+        {
+            PatientId = request.PatientId,
+            FullName = fullName,
+            DateOfBirth = birthDate,
+            Gender = gender,
+            PhoneNumber = phone,
+            NationalId = request.NationalId?.Trim() ?? patient?.NationalId,
+            Address = request.Address?.Trim() ?? patient?.Address,
+            DepartmentId = schedule.Doctor.DepartmentId,
+            DoctorId = schedule.DoctorId,
+            PriorityLevel = request.PriorityLevel,
+            Reason = request.Reason?.Trim(),
+            IsEmergency = false,
+            OperatorAccountId = staffAccountId
+        };
+
+        try
+        {
+            var createRes = await CreateReceptionAsync(createReq, ct);
+            return Result.Success(createRes.QueueNumber);
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure<string>("REGISTER_WALKIN_FAILED", ex.Message);
+        }
     }
 }

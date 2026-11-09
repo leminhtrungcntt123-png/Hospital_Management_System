@@ -1,0 +1,238 @@
+.reception-desk {
+    min-width: 0;
+    margin: 0 auto;
+    color: #15334d;
+}
+
+.reception-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    margin: 0 0 24px;
+}
+
+.reception-heading h1 {
+    font-size: 28px;
+    font-weight: 750;
+    margin: 8px 0;
+}
+.reception-heading p,
+.reception-panel > p {
+    color: #435e73;
+    margin-bottom: 16px;
+}
+.reception-eyebrow {
+    color: #006b91;
+    font-size: 12px;
+    font-weight: 700;
+}
+.reception-shortcuts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+.reception-shortcuts a {
+    padding: 10px 16px;
+    background: #e2f2f8;
+    color: #005f83;
+    border: 1px solid #aacbdc;
+    border-radius: 8px;
+    font-weight: 650;
+    text-decoration: none;
+}
+.reception-search,
+.reception-panel {
+    padding: 22px;
+    margin-bottom: 22px;
+    background: white;
+    border: 1px solid #b7cbd8;
+    border-radius: 10px;
+}
+.reception-search label,
+.reception-field label {
+    display: block;
+    margin-bottom: 7px;
+    font-weight: 650;
+}
+.reception-search small,
+.reception-field small {
+    display: block;
+    margin-top: 7px;
+    color: #4c6478;
+}
+.reception-panel h2 {
+    font-size: 21px;
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+.reception-panel h2 span {
+    font-size: 14px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: #e2f2f8;
+    color: #00678b;
+}
+.reception-panel th {
+    background: #e9f1f7;
+    color: #15334d;
+    white-space: nowrap;
+}
+.reception-panel td {
+    font-size: 14px;
+    min-width: 100px;
+}
+.reception-panel table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+}
+.reception-panel th,
+.reception-panel td {
+    padding: 14px;
+    border-bottom: 1px solid #ccd9e5;
+    vertical-align: middle;
+}
+.reception-panel .table-responsive {
+    overflow-x: auto;
+}
+.reception-search-input {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+}
+.reception-search-input input {
+    flex: 1;
+    min-width: 0;
+}
+.reception-number {
+    color: #00678b;
+    font-size: 21px;
+    font-weight: 750;
+}
+.reception-verify {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    margin: 12px 0;
+}
+.reception-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+}
+.reception-wide {
+    grid-column: 1 / -1;
+}
+.reception-empty {
+    text-align: center;
+    padding: 24px !important;
+    color: #52697b;
+}
+
+.reception-field input,
+.reception-field select,
+.reception-field textarea {
+    width: 100%;
+    min-height: 42px;
+    padding: 10px 12px;
+    border: 1px solid #b7cbd8;
+    border-radius: 7px;
+    color: #15334d;
+    background: #fff;
+}
+.reception-field :is(input, select, textarea):focus-visible {
+    outline: 2px solid #51b5da;
+    outline-offset: 2px;
+}
+.reception-field textarea {
+    resize: vertical;
+}
+.reception-alert {
+    border: 1px solid;
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+}
+.reception-alert.success {
+    color: #176144;
+    background: #eaf5ef;
+    border-color: #9dcbb4;
+}
+.reception-alert.error {
+    color: #a12e35;
+    background: #fff1f1;
+    border-color: #e0b2b6;
+}
+.reception-account {
+    position: relative;
+}
+.reception-workspace .portal-link {
+    justify-content: center;
+    border: 1px solid #a9c6d9;
+    border-radius: 7px;
+}
+.reception-account summary {
+    cursor: pointer;
+    list-style: none;
+}
+.reception-account summary::-webkit-details-marker {
+    display: none;
+}
+.reception-account-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 12px);
+    min-width: 180px;
+    padding: 6px;
+    background: #fff;
+    border: 1px solid #b7cbd8;
+    border-radius: 9px;
+    box-shadow: 0 8px 24px #17395520;
+}
+.reception-account-menu a,
+.reception-account-menu button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 10px 12px;
+    border-radius: 5px;
+}
+.reception-account-menu a:hover,
+.reception-account-menu button:hover {
+    background: #e9f1f7;
+}
+
+@media (max-width: 700px) {
+    .reception-heading {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+    .reception-form-grid {
+        grid-template-columns: 1fr;
+    }
+    .reception-search,
+    .reception-panel {
+        padding: 16px;
+    }
+    .reception-workspace .staff-breadcrumb > span,
+    .reception-workspace .staff-breadcrumb > i,
+    .reception-workspace .demo-clock {
+        display: none;
+    }
+    .reception-heading h1 {
+        font-size: 24px;
+    }
+    .reception-shortcuts {
+        gap: 8px;
+    }
+    .reception-shortcuts a {
+        padding: 8px 10px;
+        font-size: 12px;
+    }
+    .reception-workspace .staff-profile > span:not(.avatar) {
+        display: none;
+    }
+}

@@ -1,0 +1,898 @@
+@media (max-width: 640px) {
+    body {
+        font-size: 12px;
+    }
+    h1 {
+        font-size: 24px;
+    }
+    .utility-bar > div {
+        padding: 6px 16px;
+        gap: 12px;
+    }
+    .utility-bar > div > span:first-child {
+        font-size: 8px;
+    }
+    .utility-demo {
+        font-size: 7px;
+    }
+    .utility-bar button {
+        font-size: 8px;
+        gap: 4px;
+    }
+    .utility-bar button .icon {
+        width: 11px;
+        height: 11px;
+    }
+    .header-inner {
+        padding: 14px 16px;
+        gap: 8px;
+    }
+    .public-header .brand {
+        font-size: 21px;
+        gap: 7px;
+    }
+    .public-header .brand-mark {
+        height: 29px;
+        width: 29px;
+        border-radius: 8px;
+        font-size: 26px;
+    }
+    .brand sup {
+        font-size: 14px;
+    }
+    .public-header-actions {
+        gap: 8px;
+    }
+    .public-header-actions > .icon-btn:not(.mobile-only) {
+        display: none;
+    }
+    .public-header-actions > .patient-account {
+        display: flex;
+    }
+    .public-header-actions > .patient-account > .icon {
+        display: none;
+    }
+    .public-header-actions > .header-book {
+        font-size: 9px;
+        min-height: 32px;
+        padding: 7px 9px;
+        gap: 4px;
+    }
+    .public-header-actions > .header-book > .icon {
+        height: 13px;
+        width: 13px;
+    }
+    .public-header-actions > .mobile-only {
+        height: 31px;
+        width: 31px;
+        min-height: 31px;
+    }
+    .public-nav {
+        padding: 12px 16px;
+    }
+    .public-nav a {
+        font-size: 11px;
+        padding: 10px;
+    }
+    .home-hero {
+        grid-template-columns: 1fr;
+        gap: 23px;
+        padding: 29px 19px 24px;
+    }
+    .hero-copy {
+        padding: 0;
+    }
+    .hero-copy > .eyebrow {
+        font-size: 7px;
+        letter-spacing: 1px;
+        margin-bottom: 13px;
+    }
+    .hero-copy h1 {
+        font-size: 34px;
+        letter-spacing: -1.2px;
+        line-height: 1.35;
+    }
+    .hero-copy > p {
+        font-size: 11px;
+        line-height: 1.95;
+        margin-top: 13px;
+        max-width: 100%;
+    }
+    .hero-actions {
+        gap: 9px;
+        margin-top: 20px;
+    }
+    .hero-actions > .btn {
+        font-size: 11px;
+        min-height: 41px;
+        padding: 10px 15px;
+        flex: 1;
+    }
+    .hero-photo {
+        aspect-ratio: 1.73;
+        border-radius: 11px;
+    }
+    .hero-photo img {
+        object-position: center 43%;
+    }
+    .photo-note {
+        font-size: 8px;
+        padding: 8px 10px;
+        bottom: 10px;
+        left: 10px;
+    }
+    .quick-access {
+        margin: 0 16px;
+        grid-template-columns: 1fr;
+        border-radius: 9px;
+    }
+    .quick-item {
+        padding: 14px 16px;
+        gap: 11px;
+    }
+    .quick-item + .quick-item {
+        border-left: 0;
+        border-top: 1px solid #dfeaf3;
+    }
+    .quick-icon {
+        height: 32px;
+        width: 32px;
+    }
+    .quick-icon .icon {
+        height: 18px;
+        width: 18px;
+    }
+    .quick-item strong {
+        font-size: 11px;
+    }
+    .quick-item small {
+        font-size: 9px;
+    }
+    .quick-item > .icon {
+        width: 14px;
+        height: 14px;
+    }
+    .upcoming-ribbon {
+        margin: 15px 16px 0;
+        padding: 13px;
+        gap: 9px;
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+    .upcoming-ribbon > div:nth-child(2) {
+        flex: 1;
+    }
+    .upcoming-ribbon strong {
+        font-size: 9px;
+    }
+    .upcoming-ribbon span {
+        font-size: 9px;
+        line-height: 1.9;
+    }
+    .upcoming-ribbon .ribbon-icon {
+        height: 27px;
+        width: 27px;
+    }
+    .upcoming-ribbon > .link-button {
+        margin-left: 36px;
+        font-size: 9px;
+    }
+    .home-section {
+        padding: 31px 17px;
+    }
+    .section-heading {
+        align-items: flex-start;
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    .section-heading h2 {
+        font-size: 21px;
+        line-height: 1.5;
+        letter-spacing: -0.6px;
+    }
+    .section-heading p {
+        font-size: 10px;
+        line-height: 1.9;
+        margin-top: 7px;
+    }
+    .section-heading > .text-link {
+        display: none;
+    }
+    .section-heading .eyebrow {
+        font-size: 7px;
+        letter-spacing: 1.1px;
+        margin-bottom: 5px;
+    }
+    .specialty-grid {
+        gap: 11px;
+    }
+    .specialty-card {
+        padding: 16px 13px;
+        min-height: 146px;
+    }
+    .specialty-card > .specialty-icon {
+        position: static;
+        height: 33px;
+        width: 33px;
+        margin-bottom: 12px;
+    }
+    .specialty-card strong {
+        font-size: 11px;
+        line-height: 1.5;
+        margin: 0 0 5px;
+    }
+    .specialty-card small {
+        font-size: 8px;
+        line-height: 1.8;
+    }
+    .specialty-card > .icon {
+        right: 12px;
+        top: 27px;
+        width: 11px;
+        height: 11px;
+    }
+    .doctor-grid {
+        gap: 13px;
+    }
+    .doctor-portrait {
+        height: 125px;
+    }
+    .doctor-avatar {
+        height: 59px;
+        width: 59px;
+        font-size: 18px;
+        border-width: 4px;
+    }
+    .portrait-icon {
+        height: 23px;
+        width: 23px;
+        top: 11px;
+        right: 10px;
+    }
+    .portrait-icon .icon {
+        height: 13px;
+        width: 13px;
+    }
+    .portrait-label {
+        font-size: 5px;
+        letter-spacing: 0.7px;
+        bottom: 9px;
+    }
+    .doctor-card-body {
+        padding: 13px 11px;
+    }
+    .doctor-card-body .mini-label {
+        font-size: 8px;
+        margin-bottom: 5px;
+    }
+    .doctor-card h3 {
+        font-size: 11px;
+        line-height: 1.6;
+        min-height: 35px;
+    }
+    .doctor-card-body > p {
+        font-size: 8px;
+        line-height: 1.8;
+        min-height: 29px;
+    }
+    .doctor-meta {
+        gap: 7px;
+        margin-top: 13px;
+        font-size: 8px;
+    }
+    .doctor-meta .icon {
+        width: 11px;
+        height: 11px;
+    }
+    .doctor-card-actions {
+        flex-direction: column;
+        gap: 5px;
+        padding-top: 11px;
+        margin-top: 12px;
+    }
+    .doctor-card-actions .btn {
+        font-size: 9px;
+        padding: 6px 8px;
+        min-height: 29px;
+        width: 100%;
+    }
+    .doctor-card-actions .btn.ghost {
+        padding: 6px;
+    }
+    .doctor-card-actions .btn > .icon {
+        width: 11px;
+        height: 11px;
+    }
+    .service-grid,
+    .service-grid.two {
+        grid-template-columns: 1fr;
+        gap: 17px;
+    }
+    .home-section > .service-grid > .service-card:last-child {
+        display: block;
+    }
+    .service-visual {
+        height: 122px;
+        padding: 23px;
+    }
+    .service-visual > span:first-child {
+        height: 49px;
+        width: 49px;
+        border-radius: 12px;
+    }
+    .service-visual .icon {
+        height: 27px;
+        width: 27px;
+    }
+    .service-type {
+        font-size: 9px;
+    }
+    .service-card-body {
+        padding: 19px;
+    }
+    .service-card h3 {
+        font-size: 16px;
+    }
+    .service-card-body > p {
+        font-size: 11px;
+        min-height: 0;
+    }
+    .service-card .mini-label {
+        font-size: 8px;
+    }
+    .service-price {
+        margin-top: 16px;
+        padding-top: 14px;
+        align-items: center;
+        flex-direction: row;
+        gap: 10px;
+    }
+    .service-price small {
+        font-size: 9px;
+    }
+    .service-price strong {
+        font-size: 20px;
+    }
+    .service-card-actions {
+        margin-top: 14px;
+        gap: 9px;
+    }
+    .service-card-actions .btn {
+        font-size: 10px;
+        min-height: 35px;
+    }
+    .journey-section {
+        padding: 30px 20px;
+        gap: 27px;
+    }
+    .journey-section h2 {
+        font-size: 28px;
+        margin: 7px 0 12px;
+    }
+    .journey-section > div:first-child > p {
+        font-size: 11px;
+        line-height: 1.95;
+        margin-bottom: 15px;
+    }
+    .journey-section > div:first-child > .eyebrow {
+        font-size: 7px;
+        letter-spacing: 1.2px;
+    }
+    .journey-steps {
+        grid-template-columns: 1fr;
+        gap: 22px;
+    }
+    .journey-steps article {
+        gap: 14px;
+    }
+    .journey-steps article > span {
+        font-size: 22px;
+    }
+    .journey-steps h3 {
+        font-size: 12px;
+    }
+    .journey-steps p {
+        font-size: 10px;
+        line-height: 1.95;
+        margin-top: 5px;
+    }
+    .family-banner {
+        margin: 27px 17px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 20px;
+        padding: 21px;
+    }
+    .family-banner > div {
+        padding-left: 0;
+    }
+    .family-banner > div > .icon {
+        position: static;
+        width: 29px;
+        height: 29px;
+        margin-bottom: 10px;
+    }
+    .family-banner h2 {
+        font-size: 20px;
+        line-height: 1.5;
+        letter-spacing: -0.6px;
+    }
+    .family-banner p {
+        font-size: 10px;
+        line-height: 2;
+        margin-top: 9px;
+    }
+    .family-banner .btn {
+        font-size: 10px;
+        min-height: 37px;
+    }
+    .footer-top {
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        padding: 26px 20px;
+    }
+    .footer-top > div:first-child {
+        grid-column: 1/-1;
+    }
+    .footer-top .brand {
+        font-size: 23px;
+    }
+    .footer-top p {
+        font-size: 10px;
+        line-height: 1.9;
+    }
+    .footer-top .demo-label {
+        font-size: 8px;
+    }
+    .footer-top h3 {
+        font-size: 11px;
+        margin-bottom: 13px;
+    }
+    .footer-top > div > a {
+        font-size: 10px;
+        margin: 10px 0;
+    }
+    .footer-top > div:last-child {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    .footer-top > div:last-child h3 {
+        font-size: 11px;
+    }
+    .footer-top > div:last-child p {
+        font-size: 10px;
+    }
+    .footer-staff {
+        margin-left: 0;
+        font-size: 10px;
+        margin-top: 2px;
+    }
+    .footer-bottom {
+        margin: 0 20px;
+        font-size: 8px;
+        flex-direction: column;
+        gap: 11px;
+        align-items: flex-start;
+        padding: 16px 0 20px;
+    }
+    .footer-bottom button {
+        font-size: 8px;
+    }
+    .footer-bottom > div {
+        gap: 20px;
+    }
+    .page-intro {
+        padding: 19px 19px 25px;
+    }
+    .breadcrumb {
+        font-size: 9px;
+        margin-bottom: 21px;
+        gap: 6px;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+    .breadcrumb > span {
+        text-overflow: ellipsis;
+        overflow: hidden;
+    }
+    .page-intro > .eyebrow {
+        font-size: 7px;
+        letter-spacing: 1.1px;
+        margin-bottom: 6px;
+    }
+    .page-intro h1 {
+        font-size: 25px;
+        line-height: 1.5;
+        letter-spacing: -0.7px;
+    }
+    .page-intro > p {
+        font-size: 11px;
+        line-height: 1.95;
+        margin-top: 9px;
+    }
+    .listing-section {
+        padding: 22px 17px 31px;
+    }
+    .listing-toolbar {
+        gap: 9px;
+        flex-wrap: wrap;
+        margin-bottom: 19px;
+    }
+    .listing-toolbar > .search-input {
+        width: 100%;
+    }
+    .listing-toolbar > select {
+        font-size: 10px;
+        width: 100%;
+        min-height: 37px;
+    }
+    .listing-toolbar > span {
+        font-size: 9px;
+        margin-left: 0;
+    }
+    .listing-toolbar .search-input input {
+        font-size: 11px;
+    }
+    .specialty-detail-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    .specialty-detail {
+        padding: 21px;
+        gap: 14px;
+    }
+    .specialty-detail .specialty-icon {
+        height: 35px;
+        width: 35px;
+        margin-top: 2px;
+    }
+    .specialty-detail .specialty-icon .icon {
+        height: 20px;
+        width: 20px;
+    }
+    .specialty-detail h2 {
+        font-size: 19px;
+        margin-bottom: 9px;
+    }
+    .specialty-detail p {
+        font-size: 10px;
+        line-height: 2;
+        min-height: 0;
+        margin-bottom: 17px;
+    }
+    .specialty-detail .mini-label {
+        font-size: 7px;
+        letter-spacing: 0.4px;
+    }
+    .specialty-detail .flex {
+        gap: 13px;
+    }
+    .specialty-detail .text-link {
+        font-size: 10px;
+    }
+    .specialty-detail .btn {
+        font-size: 9px;
+        min-height: 31px;
+    }
+    .help-callout {
+        align-items: flex-start;
+        flex-wrap: wrap;
+        padding: 17px;
+        gap: 10px;
+        margin-top: 20px;
+    }
+    .help-callout > .icon {
+        width: 20px;
+        height: 20px;
+    }
+    .help-callout h3 {
+        font-size: 11px;
+    }
+    .help-callout p {
+        font-size: 10px;
+        line-height: 1.9;
+    }
+    .help-callout > .btn {
+        margin-left: 30px;
+        font-size: 9px;
+    }
+    .catalog-layout {
+        grid-template-columns: 1fr;
+        gap: 18px;
+    }
+    .filter-panel {
+        position: static;
+        display: flex;
+        align-items: center;
+        overflow-x: auto;
+        padding: 9px;
+        gap: 7px;
+        white-space: nowrap;
+    }
+    .filter-panel h3,
+    .filter-note {
+        display: none;
+    }
+    .filter-option {
+        width: auto;
+        min-height: 35px;
+        white-space: nowrap;
+        padding: 8px 10px;
+        gap: 7px;
+        margin: 0;
+        font-size: 10px;
+        flex-shrink: 0;
+        border: 1px solid #e0ebf4;
+    }
+    .filter-option.active {
+        border-color: #b7dce9;
+    }
+    .filter-option .icon {
+        height: 13px;
+        width: 13px;
+    }
+    .filter-option b {
+        font-size: 8px;
+    }
+    .catalog-layout .service-grid {
+        grid-template-columns: 1fr;
+        gap: 17px;
+    }
+    .catalog-layout .service-card-body {
+        padding: 19px;
+    }
+    .catalog-layout .service-card h3 {
+        font-size: 16px;
+    }
+    .catalog-layout .service-card-body > p {
+        font-size: 11px;
+    }
+    .catalog-layout .service-visual {
+        height: 122px;
+        padding: 23px;
+    }
+    .catalog-layout .service-price {
+        flex-direction: row;
+        gap: 10px;
+        align-items: center;
+    }
+    .catalog-layout .service-card-actions {
+        flex-wrap: nowrap;
+        gap: 9px;
+    }
+    .catalog-layout .service-card-actions .btn {
+        font-size: 10px;
+    }
+    .catalog-layout .service-card-actions .text-link {
+        font-size: 10px;
+    }
+    .detail-layout {
+        grid-template-columns: 1fr;
+        gap: 20px;
+        padding: 22px 17px 30px;
+    }
+    .sticky-card {
+        position: static;
+        padding: 23px;
+        order: -1;
+    }
+    .sticky-card .mini-label {
+        font-size: 8px;
+    }
+    .sticky-card h2 {
+        font-size: 17px;
+        margin: 8px 0;
+    }
+    .sticky-card h3 {
+        font-size: 15px;
+    }
+    .sticky-card p {
+        font-size: 11px;
+    }
+    .detail-price {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-top: 15px;
+        margin: 18px 0;
+    }
+    .detail-price strong {
+        font-size: 26px;
+    }
+    .detail-price small {
+        font-size: 9px;
+        margin: 0;
+    }
+    .sticky-card .btn {
+        font-size: 11px;
+        min-height: 40px;
+    }
+    .mini-checks {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+        margin-top: 17px;
+        padding-top: 15px;
+        font-size: 10px;
+    }
+    .mini-checks .icon {
+        width: 13px;
+        height: 13px;
+    }
+    .doctor-bio {
+        padding: 22px;
+    }
+    .doctor-bio-top {
+        flex-direction: row;
+        gap: 15px;
+        padding-bottom: 20px;
+        margin-bottom: 21px;
+    }
+    .doctor-bio-top > .doctor-portrait {
+        width: 85px;
+        height: 108px;
+    }
+    .doctor-bio-top .doctor-avatar {
+        height: 53px;
+        width: 53px;
+        font-size: 16px;
+    }
+    .doctor-bio-top h1 {
+        font-size: 19px;
+        line-height: 1.5;
+    }
+    .doctor-bio-top p {
+        font-size: 10px;
+        line-height: 1.8;
+        margin: 4px 0 10px;
+    }
+    .doctor-bio-top .mini-label {
+        font-size: 8px;
+    }
+    .doctor-bio h2 {
+        font-size: 16px;
+        margin: 23px 0 11px;
+    }
+    .doctor-bio > p {
+        font-size: 11px;
+        line-height: 2;
+    }
+    .schedule-info {
+        font-size: 10px;
+        gap: 10px;
+    }
+    .content-list {
+        font-size: 11px;
+        line-height: 2;
+        padding-left: 17px;
+    }
+    .detail-banner {
+        padding: 20px;
+        gap: 14px;
+        min-height: 0;
+    }
+    .detail-banner > .icon {
+        height: 43px;
+        width: 43px;
+        padding: 10px;
+        border-radius: 11px;
+    }
+    .detail-banner .eyebrow {
+        font-size: 6px;
+        letter-spacing: 0.8px;
+    }
+    .detail-banner h2 {
+        font-size: 19px;
+        line-height: 1.5;
+    }
+    .detail-banner p {
+        font-size: 10px;
+        line-height: 1.9;
+        margin-top: 8px;
+    }
+    .anchor-tabs {
+        top: 61px;
+        gap: 5px;
+        justify-content: space-between;
+        margin: 13px 0 16px;
+        padding: 9px 0;
+    }
+    .anchor-tabs button {
+        font-size: 10px;
+        padding: 7px 8px;
+    }
+    .content-section {
+        padding: 22px;
+        margin-top: 17px;
+        scroll-margin-top: 125px;
+    }
+    .content-section .mini-label {
+        font-size: 8px;
+    }
+    .content-section h2 {
+        font-size: 19px;
+        line-height: 1.5;
+        margin: 7px 0 12px;
+    }
+    .content-section > p {
+        font-size: 11px;
+        line-height: 2;
+    }
+    .item-list > div {
+        padding: 13px 0;
+        gap: 10px;
+    }
+    .item-list strong {
+        font-size: 11px;
+        line-height: 1.8;
+    }
+    .item-list > div > span {
+        font-size: 9px;
+    }
+    .process-list {
+        gap: 19px;
+    }
+    .process-list article {
+        gap: 12px;
+    }
+    .process-list article > span {
+        width: 25px;
+        height: 25px;
+        font-size: 10px;
+    }
+    .process-list h3 {
+        font-size: 12px;
+    }
+    .process-list p {
+        font-size: 11px;
+        line-height: 1.95;
+    }
+    .guide-layout {
+        padding: 22px 17px 30px;
+        gap: 19px;
+    }
+    .guide-main {
+        padding: 2px 20px;
+    }
+    .guide-step {
+        gap: 13px;
+        padding: 22px 0;
+    }
+    .guide-step > span {
+        height: 29px;
+        width: 29px;
+        font-size: 11px;
+        border-radius: 7px;
+    }
+    .guide-step h2 {
+        font-size: 14px;
+        line-height: 1.7;
+        margin: 2px 0 9px;
+    }
+    .guide-step p {
+        font-size: 11px;
+        line-height: 2;
+    }
+    .guide-aside {
+        padding: 22px;
+    }
+    .guide-aside h2 {
+        font-size: 18px;
+    }
+    .guide-aside .check-list {
+        grid-template-columns: 1fr;
+        font-size: 11px;
+        line-height: 2.6;
+    }
+    .guide-aside > .btn {
+        width: 100%;
+        font-size: 11px;
+    }
+    .guide-aside summary {
+        font-size: 11px;
+    }
+    .guide-aside details p {
+        font-size: 10px;
+    }
+}

@@ -1,0 +1,847 @@
+@media (max-width: 640px) {
+    .staff-main {
+        padding: 20px 14px 28px;
+    }
+    .staff-main .page-heading {
+        gap: 14px;
+        margin-bottom: 19px;
+    }
+    .staff-main .page-heading h1 {
+        font-size: 22px;
+        line-height: 1.5;
+    }
+    .staff-main .page-heading p {
+        font-size: 10px;
+        line-height: 1.9;
+    }
+    .staff-main .page-heading .eyebrow {
+        font-size: 8px;
+    }
+    .staff-main .page-heading .heading-actions {
+        width: 100%;
+        gap: 9px;
+    }
+    .staff-main .heading-actions > .btn {
+        font-size: 10px;
+        flex: 1;
+        min-height: 37px;
+        padding: 8px 10px;
+    }
+    .stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 18px;
+    }
+    .stats-grid.three {
+        grid-template-columns: 1fr;
+    }
+    .stat-card {
+        padding: 13px 14px;
+        gap: 8px;
+    }
+    .stat-label {
+        font-size: 9px;
+        gap: 6px;
+        min-height: 23px;
+    }
+    .stat-icon {
+        display: grid;
+        height: 23px;
+        width: 23px;
+    }
+    .stat-icon > .icon {
+        height: 13px;
+        width: 13px;
+    }
+    .stat-card > strong {
+        font-size: 24px;
+        letter-spacing: -0.6px;
+    }
+    .stat-card > small {
+        font-size: 8px;
+    }
+    .stat-arrow {
+        height: 11px !important;
+        width: 11px !important;
+    }
+    .stats-grid.three .stat-card {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 3px 15px;
+        align-items: center;
+        padding: 15px;
+    }
+    .stats-grid.three .stat-card > small {
+        grid-column: 1/-1;
+        font-size: 9px;
+    }
+    .stats-grid.three .stat-label {
+        font-size: 10px;
+    }
+    .stats-grid.three .stat-card > strong {
+        font-size: 23px;
+    }
+    .staff-dashboard-grid,
+    .reception-layout,
+    .admin-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    .staff-dashboard-grid {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .dashboard-main {
+        display: contents;
+    }
+    .staff-dashboard-grid .dashboard-main > section:first-child {
+        order: 0;
+    }
+    .staff-dashboard-grid > .queue-panel {
+        order: 1;
+    }
+    .staff-dashboard-grid .dashboard-main > section:last-child {
+        order: 2;
+    }
+    .staff-dashboard-grid > .queue-panel,
+    .reception-layout > .queue-panel {
+        grid-template-columns: 1fr 1fr;
+        column-gap: 11px;
+        display: grid;
+    }
+    .reception-layout > .queue-panel {
+        order: 0;
+    }
+    .queue-panel-head {
+        padding: 13px;
+        gap: 9px;
+    }
+    .queue-panel-head h2 {
+        font-size: 12px;
+        gap: 6px;
+    }
+    .queue-panel-head h2 .icon {
+        width: 14px;
+        height: 14px;
+    }
+    .queue-panel-head select {
+        width: 118px;
+        font-size: 9px;
+        padding: 5px 6px;
+    }
+    .ticket {
+        padding: 12px;
+        margin: 0 0 13px 12px;
+        min-width: 0;
+    }
+    .ticket > .flex-between {
+        gap: 5px;
+    }
+    .ticket > .flex-between > span {
+        font-size: 6px;
+        letter-spacing: 0.6px;
+    }
+    .ticket > .flex-between > b {
+        font-size: 7px;
+        padding: 2px 3px;
+    }
+    .ticket > strong {
+        font-size: 32px;
+        margin: 8px 0 5px;
+    }
+    .ticket h3 {
+        font-size: 10px;
+        line-height: 1.8;
+    }
+    .ticket p {
+        font-size: 9px;
+        line-height: 1.8;
+        margin-top: 3px;
+    }
+    .ticket > .btn {
+        font-size: 8px;
+        padding: 7px 5px;
+        min-height: 31px;
+        margin-top: 11px;
+        gap: 4px;
+    }
+    .ticket > .btn .icon {
+        height: 12px;
+        width: 12px;
+    }
+    .queue-next {
+        padding: 1px 12px 11px 0;
+    }
+    .mini-heading {
+        font-size: 7px;
+        margin-bottom: 4px;
+        gap: 6px;
+    }
+    .queue-row {
+        padding: 10px 0;
+        gap: 7px;
+        flex-wrap: wrap;
+    }
+    .queue-row > b {
+        font-size: 8px;
+        line-height: 20px;
+        padding: 0 4px;
+        flex-shrink: 0;
+    }
+    .queue-row strong {
+        font-size: 9px;
+        line-height: 1.8;
+    }
+    .queue-row small {
+        font-size: 8px;
+        line-height: 1.8;
+    }
+    .queue-row > small {
+        display: none;
+    }
+    .queue-next > .small {
+        font-size: 9px;
+    }
+    .card-header {
+        padding: 14px;
+    }
+    .card-header h2 {
+        font-size: 13px;
+    }
+    .card-header p {
+        font-size: 9px;
+    }
+    .card-header > .text-link {
+        font-size: 9px;
+        white-space: nowrap;
+    }
+    .card-header > .text-link .icon {
+        display: none;
+    }
+    .section-title {
+        gap: 7px;
+    }
+    .section-icon {
+        width: 25px;
+        height: 25px;
+        border-radius: 6px;
+    }
+    .section-icon > .icon {
+        height: 14px;
+        width: 14px;
+    }
+    .tabs {
+        padding: 8px 10px;
+        gap: 4px;
+    }
+    .tab {
+        font-size: 9px;
+        padding: 6px 7px;
+        min-height: 31px;
+        gap: 4px;
+    }
+    .tab > span {
+        font-size: 7px;
+        line-height: 14px;
+        min-width: 14px;
+        padding: 0 4px;
+    }
+    .toolbar {
+        padding: 12px;
+        gap: 9px;
+        flex-wrap: wrap;
+    }
+    .toolbar .search-input {
+        width: 100%;
+    }
+    .toolbar > span {
+        font-size: 9px;
+        margin-left: 0;
+    }
+    .search-input {
+        font-size: 10px;
+        padding: 8px 10px;
+    }
+    .search-input input {
+        font-size: 10px;
+    }
+    .search-input > .icon {
+        height: 14px;
+        width: 14px;
+    }
+    .table-wrap table {
+        min-width: 600px;
+    }
+    .table-wrap table.appointments-table.compact {
+        min-width: 0;
+        width: 100%;
+    }
+    .appointments-table.compact th,
+    .appointments-table.compact td {
+        padding: 11px 8px;
+    }
+    .appointments-table.compact th:first-child,
+    .appointments-table.compact td:first-child {
+        padding-left: 12px;
+        width: 47px;
+    }
+    .appointments-table.compact th:last-child,
+    .appointments-table.compact td:last-child {
+        padding-right: 12px;
+    }
+    .appointments-table.compact th {
+        font-size: 8px;
+    }
+    .appointments-table.compact td {
+        font-size: 9px;
+    }
+    .appointments-table.compact td > strong {
+        font-size: 10px;
+    }
+    .appointments-table.compact .person-cell {
+        gap: 0;
+    }
+    .appointments-table.compact .person-cell strong {
+        font-size: 10px;
+        white-space: normal;
+        max-width: 112px;
+        line-height: 1.8;
+    }
+    .appointments-table.compact .person-cell small {
+        font-size: 8px;
+        line-height: 1.7;
+    }
+    .appointments-table.compact .badge {
+        font-size: 7px;
+        padding: 3px 4px;
+        gap: 3px;
+    }
+    .appointments-table.compact .badge i {
+        height: 3px;
+        width: 3px;
+    }
+    .appointments-table.compact .btn.sm {
+        font-size: 8px;
+        min-height: 29px;
+        padding: 5px 6px;
+        gap: 3px;
+    }
+    .appointments-table.compact .btn.sm .icon {
+        display: none;
+    }
+    .appointments-table.compact .priority-label {
+        font-size: 7px;
+        margin-left: 0;
+        padding: 2px 4px;
+    }
+    .doctor-strip {
+        grid-template-columns: 1fr;
+        gap: 0;
+        padding: 0 14px 13px;
+    }
+    .doctor-strip > div {
+        flex-wrap: nowrap;
+        padding: 9px 0;
+        gap: 9px;
+    }
+    .doctor-strip > div + div {
+        border-left: 0;
+        border-top: 1px solid #e5edf5;
+        padding: 9px 0;
+    }
+    .doctor-strip > div > span:not(.avatar) {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex: 1;
+    }
+    .doctor-strip strong {
+        font-size: 9px;
+    }
+    .doctor-strip small {
+        font-size: 8px;
+    }
+    .doctor-strip b {
+        font-size: 8px;
+        margin-left: auto;
+        padding: 2px 5px;
+    }
+    .operation-summary {
+        gap: 11px;
+        flex-wrap: wrap;
+        font-size: 9px;
+        padding: 11px 12px;
+        margin-bottom: 16px;
+    }
+    .operation-summary .icon {
+        height: 12px;
+        width: 12px;
+    }
+    .clinical-layout {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    .consultation-list {
+        position: static;
+    }
+    .consultation-list .card-header {
+        padding: 13px 14px;
+    }
+    .consultation-list .card-header h2 {
+        font-size: 12px;
+    }
+    .consultation-list .card-header p {
+        font-size: 9px;
+    }
+    .consultation-list > div {
+        display: flex;
+        overflow-x: auto;
+    }
+    .consultation-person {
+        min-width: 211px;
+        width: 211px;
+        padding: 12px;
+        border: 0;
+        border-top: 1px solid #e5edf5;
+        border-right: 1px solid #e5edf5;
+        gap: 9px;
+    }
+    .consultation-person.active {
+        border-left: 0;
+        border-bottom: 3px solid #2b9fc4;
+        padding-left: 12px;
+        padding-bottom: 9px;
+    }
+    .consultation-person .avatar {
+        width: 27px;
+        height: 27px;
+        font-size: 9px;
+    }
+    .consultation-person strong {
+        font-size: 10px;
+    }
+    .consultation-person small {
+        font-size: 9px;
+    }
+    .consultation-person .badge {
+        font-size: 7px;
+        margin-top: 6px;
+    }
+    .consultation-workspace .card-header {
+        padding: 14px;
+    }
+    .consultation-workspace .card-header h2 {
+        font-size: 15px;
+    }
+    .consultation-workspace .card-header p {
+        font-size: 9px;
+    }
+    .consultation-workspace .card-header .text-link {
+        font-size: 9px;
+    }
+    .clinical-inner {
+        padding: 0 14px;
+    }
+    .clinical-inner > .notice {
+        font-size: 9px;
+        padding: 10px;
+    }
+    .vitals-strip {
+        grid-template-columns: repeat(3, 1fr);
+        margin: 15px 0;
+    }
+    .vitals-strip > div {
+        padding: 9px 10px;
+    }
+    .vitals-strip > div + div {
+        border-left: 1px solid #e3edf5;
+    }
+    .vitals-strip > div:nth-child(4) {
+        border-left: 0;
+        border-top: 1px solid #e3edf5;
+    }
+    .vitals-strip > div:nth-child(5) {
+        border-top: 1px solid #e3edf5;
+    }
+    .vitals-strip small {
+        font-size: 8px;
+    }
+    .vitals-strip strong {
+        font-size: 11px;
+    }
+    .vitals-strip strong > span {
+        font-size: 7px;
+    }
+    .begin-exam {
+        padding: 13px;
+        gap: 11px;
+        flex-wrap: wrap;
+    }
+    .begin-exam h3 {
+        font-size: 11px;
+    }
+    .begin-exam p {
+        font-size: 9px;
+        line-height: 1.8;
+    }
+    .begin-exam > .btn {
+        font-size: 10px;
+        min-height: 35px;
+        flex: 1;
+    }
+    .form-section-title {
+        margin: 15px 0 14px;
+        padding: 10px 0 9px;
+        gap: 6px;
+    }
+    .form-section-title > span {
+        font-size: 8px;
+    }
+    .form-section-title > h3 {
+        font-size: 11px;
+    }
+    .form-section-title > .text-link {
+        font-size: 9px;
+    }
+    .form-grid {
+        gap: 12px;
+    }
+    .field label {
+        font-size: 10px;
+    }
+    .field input,
+    .field select,
+    .field textarea {
+        font-size: 12px;
+        min-height: 39px;
+        padding: 9px 10px;
+    }
+    .field textarea {
+        min-height: 78px;
+    }
+    .field small,
+    .field-help {
+        font-size: 9px;
+        line-height: 1.9;
+    }
+    .clinical-inner .field input,
+    .clinical-inner .field textarea {
+        font-size: 11px;
+    }
+    .clinical-inner .field label {
+        font-size: 9px;
+    }
+    .clinical-inner .field textarea {
+        min-height: 73px;
+    }
+    .clinical-actions {
+        gap: 8px;
+        padding: 13px 0;
+        margin-top: 18px;
+    }
+    .clinical-actions > .btn {
+        font-size: 10px;
+        flex: 1;
+        min-height: 37px;
+    }
+    .clinical-actions > .btn .icon {
+        height: 13px;
+        width: 13px;
+    }
+    .rx-row {
+        grid-template-columns: 1fr 1fr;
+        padding: 12px 32px 12px 12px;
+        gap: 10px;
+    }
+    .rx-row .field label {
+        font-size: 8px;
+    }
+    .rx-row .field select,
+    .rx-row .field input {
+        font-size: 10px;
+        min-height: 34px;
+        padding: 7px;
+    }
+    .rx-row > .small-field {
+        grid-column: auto;
+    }
+    .rx-row > .instructions {
+        grid-column: 1/-1;
+    }
+    .inline-labs > div {
+        font-size: 9px;
+        padding: 9px 10px;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .inline-labs .pill {
+        font-size: 7px;
+    }
+    .inline-labs .text-link {
+        font-size: 9px;
+    }
+    .empty-line {
+        font-size: 10px;
+        line-height: 1.9;
+    }
+    .record-detail-section {
+        padding-top: 15px;
+        margin-top: 15px;
+    }
+    .record-detail-section h3 {
+        font-size: 12px;
+    }
+    .record-detail-section dl {
+        grid-template-columns: 1fr;
+        gap: 7px;
+        font-size: 10px;
+    }
+    .record-detail-section dt {
+        font-size: 9px;
+        margin-top: 5px;
+    }
+    .record-detail-section dd {
+        font-size: 11px;
+        line-height: 1.95;
+    }
+    .record-detail-section > p {
+        font-size: 11px;
+        line-height: 2;
+    }
+    .result-box {
+        padding: 13px;
+        font-size: 10px;
+    }
+    .result-box strong {
+        font-size: 11px;
+    }
+    .result-box .pill {
+        font-size: 8px;
+        margin: 7px 0 0;
+        display: table;
+    }
+    .result-box p {
+        font-size: 11px;
+        line-height: 1.95;
+        margin-top: 8px;
+    }
+    .schedule-week-nav {
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+    .schedule-week-nav > div {
+        gap: 9px;
+    }
+    .schedule-week-nav strong {
+        font-size: 10px;
+    }
+    .schedule-week-nav .icon-btn {
+        height: 28px;
+        width: 28px;
+        min-height: 28px;
+    }
+    .schedule-week-nav .icon-btn .icon {
+        height: 13px;
+        width: 13px;
+    }
+    .schedule-week-nav > .btn {
+        font-size: 8px;
+        padding: 5px;
+        min-height: 28px;
+    }
+    .calendar-grid {
+        min-width: 740px;
+        padding: 0 13px 15px;
+        gap: 8px;
+    }
+    .calendar-col > header {
+        height: 68px;
+    }
+    .calendar-col > header > strong {
+        font-size: 15px;
+    }
+    .calendar-doctor {
+        height: 109px;
+        padding: 14px 7px;
+    }
+    .calendar-cell {
+        height: 109px;
+        padding: 8px;
+    }
+    .quota-grid {
+        padding: 0 14px 14px;
+        gap: 12px;
+    }
+    .quota-grid article {
+        padding: 14px;
+        gap: 13px;
+        align-items: center;
+    }
+    .quota-grid h3 {
+        font-size: 11px;
+        width: 100%;
+        flex: initial;
+        min-width: 0;
+    }
+    .quota-grid article > div {
+        font-size: 9px;
+        gap: 6px;
+    }
+    .quota-grid article > div strong {
+        font-size: 12px;
+    }
+    .quota-grid .text-link {
+        font-size: 9px;
+    }
+    .admin-shortcuts {
+        padding: 0 15px 9px;
+    }
+    .shortcut-row {
+        font-size: 10px;
+        padding: 12px 0;
+        gap: 8px;
+    }
+    .shortcut-row .icon {
+        height: 14px;
+        width: 14px;
+    }
+    .collection-card .card-header {
+        padding-bottom: 10px;
+    }
+    .collection-rate {
+        padding: 2px 18px 15px;
+        gap: 13px;
+    }
+    .collection-rate strong {
+        font-size: 35px;
+    }
+    .collection-rate > span {
+        font-size: 10px;
+    }
+    .collection-lines {
+        padding: 0 18px 14px;
+    }
+    .collection-lines > div {
+        font-size: 10px;
+    }
+    .collection-link {
+        font-size: 10px;
+        padding: 12px 18px;
+    }
+    .patient-strip {
+        gap: 10px;
+        padding-bottom: 15px;
+        margin-bottom: 17px;
+        flex-wrap: wrap;
+    }
+    .patient-strip h2 {
+        font-size: 17px;
+    }
+    .patient-strip h3 {
+        font-size: 14px;
+    }
+    .patient-strip p {
+        font-size: 10px;
+        line-height: 1.9;
+    }
+    .patient-strip > .badge {
+        font-size: 8px;
+        margin-left: 44px;
+    }
+    .info-grid {
+        gap: 14px;
+    }
+    .info-grid small {
+        font-size: 9px;
+    }
+    .info-grid strong {
+        font-size: 11px;
+        line-height: 1.9;
+    }
+    .patient-strip .avatar.large {
+        width: 43px;
+        height: 43px;
+        font-size: 14px;
+    }
+    .insurance-box {
+        grid-template-columns: 1fr;
+        padding: 13px;
+        gap: 10px;
+        margin-bottom: 17px;
+    }
+    .insurance-box .field label {
+        font-size: 10px;
+    }
+    .insurance-box select {
+        font-size: 10px;
+    }
+    .insurance-box > .btn {
+        font-size: 10px;
+        min-height: 35px;
+    }
+    .insurance-box > small {
+        font-size: 9px;
+        line-height: 1.9;
+    }
+    .invoice-items {
+        min-width: 480px !important;
+    }
+    .billing-totals {
+        padding: 15px 16px;
+        margin-top: 17px;
+    }
+    .billing-totals > div {
+        font-size: 10px;
+        padding: 6px 0;
+    }
+    .billing-totals strong {
+        font-size: 11px;
+    }
+    .billing-totals .grand-total {
+        padding-top: 13px;
+    }
+    .billing-totals .grand-total strong {
+        font-size: 23px;
+    }
+    .amount-summary {
+        padding: 14px;
+        margin-bottom: 19px;
+    }
+    .amount-summary span {
+        font-size: 10px;
+    }
+    .amount-summary strong {
+        font-size: 23px;
+    }
+    .receipt-paper {
+        padding: 8px 0 17px;
+    }
+    .receipt-brand {
+        margin-bottom: 23px;
+    }
+    .receipt-paper h2 {
+        font-size: 16px;
+        margin-bottom: 22px;
+    }
+    .receipt-paper > div:not(.receipt-brand) {
+        font-size: 10px;
+        padding: 13px 0;
+        align-items: flex-start;
+        gap: 15px;
+    }
+    .receipt-paper strong {
+        font-size: 10px;
+        word-break: break-word;
+        text-align: right;
+        max-width: 205px;
+    }
+    .receipt-paper .receipt-total strong {
+        font-size: 22px;
+    }
+    .receipt-paper > p {
+        font-size: 8px;
+        line-height: 1.9;
+        margin-top: 23px;
+    }
+}

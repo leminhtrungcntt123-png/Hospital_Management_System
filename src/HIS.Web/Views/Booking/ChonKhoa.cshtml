@@ -73,7 +73,7 @@
         <div class="booking-footer">
             <span>Đã chọn: <strong id="khoa-selected-name">@(selected?.Name ?? "chưa chọn")</strong></span>
             <div class="footer-actions">
-                <a class="btn btn-outline" asp-action="Index"><i data-lucide="chevron-left"></i> Thoát đặt lịch</a>
+                <a class="btn btn-outline" href="@ViewData["BackUrl"]"><i data-lucide="chevron-left"></i> @(ViewData["Step"]?.ToString() == "1" ? "Thoát đặt lịch" : "Quay lại")</a>
                 <button type="submit" class="btn btn-primary" id="khoa-next" disabled="@(selected is null)">
                     Tiếp tục <i data-lucide="chevron-right"></i>
                 </button>

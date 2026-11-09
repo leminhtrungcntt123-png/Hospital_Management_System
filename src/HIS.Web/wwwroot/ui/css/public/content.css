@@ -1,0 +1,200 @@
+/* public / content */
+.journey-section {
+    display: grid;
+    grid-template-columns: 0.85fr 1.15fr;
+    gap: 75px;
+    padding: 44px 48px 45px;
+    background: #f1f7fc;
+    border-top: 1px solid #e4edf5;
+    border-bottom: 1px solid #e4edf5;
+    align-items: center;
+}
+.journey-section > div:first-child > .eyebrow {
+    font-size: 9px;
+}
+.journey-section h2 {
+    font-size: 31px;
+    letter-spacing: -1px;
+    margin: 10px 0 13px;
+}
+.journey-section > div:first-child > p {
+    font-size: 12px;
+    line-height: 1.9;
+    color: #5a6c7e;
+    max-width: 330px;
+    margin-bottom: 21px;
+}
+.journey-steps {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 25px;
+}
+.journey-steps article {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+.journey-steps article > span {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -1px;
+    color: #497080;
+    line-height: 1.4;
+}
+.journey-steps h3 {
+    font-size: 12px;
+    font-weight: 600;
+    color: #365b79;
+}
+.journey-steps p {
+    font-size: 10px;
+    line-height: 1.9;
+    color: #5d6d7c;
+    margin-top: 6px;
+}
+.family-banner {
+    margin: 43px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 40px;
+    background: #f9fcfe;
+    border: 1px solid #e0ecf5;
+    padding: 25px 28px;
+    border-radius: 11px;
+}
+.family-banner > div {
+    position: relative;
+    padding-left: 52px;
+}
+.family-banner > div > .icon {
+    position: absolute;
+    left: 0;
+    top: 4px;
+    height: 33px;
+    width: 33px;
+    color: #336e84;
+}
+.family-banner h2 {
+    font-size: 20px;
+    letter-spacing: -0.5px;
+}
+.family-banner p {
+    font-size: 11px;
+    color: #5d6b7a;
+    margin-top: 6px;
+}
+.family-banner .btn {
+    font-size: 10px;
+}
+.public-footer {
+    background: #f4f8fc;
+    border-top: 1px solid #e2ebf4;
+    color: #576a7d;
+}
+.footer-top {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr 1fr 1.3fr;
+    gap: 42px;
+    max-width: 1280px;
+    margin: auto;
+    padding: 34px 32px;
+}
+.footer-top .brand {
+    font-size: 23px;
+}
+.footer-top .brand-mark {
+    height: 30px;
+    width: 30px;
+    font-size: 27px;
+}
+.footer-top p {
+    font-size: 10px;
+    line-height: 1.95;
+    margin: 13px 0;
+}
+.footer-top h3 {
+    font-size: 11px;
+    color: #395b79;
+    margin: 4px 0 14px;
+}
+.footer-top > div > a {
+    display: block;
+    font-size: 10px;
+    margin: 9px 0;
+}
+.footer-top > div > a:hover {
+    color: var(--primary);
+}
+.demo-label {
+    font-size: 8px;
+    color: #5e6876;
+}
+.footer-staff {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    color: var(--primary);
+    padding: 0;
+}
+.footer-staff .icon {
+    width: 13px;
+    height: 13px;
+}
+.footer-bottom {
+    max-width: 1216px;
+    margin: auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid #dde8f2;
+    padding: 15px 0;
+    font-size: 9px;
+    color: #5e6c7c;
+}
+.footer-bottom > div {
+    display: flex;
+    gap: 22px;
+}
+.footer-bottom button {
+    padding: 0;
+    font-size: 9px;
+    color: #586a7c;
+}
+.page-intro {
+    padding: 25px 32px 33px;
+    background: #f4f9fd;
+    border-bottom: 1px solid #e4edf5;
+}
+.breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 10px;
+    color: #5c6876;
+    margin-bottom: 27px;
+}
+.breadcrumb .icon {
+    width: 11px;
+    height: 11px;
+    color: #5e6a76;
+}
+.breadcrumb a {
+    color: #566d81;
+}
+.page-intro h1 {
+    font-size: 30px;
+    color: #1b3b5b;
+    font-weight: 700;
+    letter-spacing: -0.9px;
+}
+.page-intro > .eyebrow {
+    font-size: 9px;
+}
+.page-intro > p {
+    font-size: 12px;
+    color: #586a7c;
+    margin-top: 10px;
+    max-width: 670px;
+}

@@ -1,0 +1,547 @@
+/* responsive / laptop */
+@media (max-width: 1050px) {
+    .public-nav {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        margin: 0;
+        padding: 15px 26px;
+        background: #fff;
+        border-bottom: 1px solid #dce8f2;
+        box-shadow: 0 8px 15px #102c4407;
+        gap: 0;
+        z-index: 40;
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .public-nav.open {
+        display: flex;
+    }
+    .public-nav a {
+        font-size: 12px;
+        padding: 11px;
+    }
+    .public-nav a.active:after {
+        display: none;
+    }
+    .header-inner {
+        justify-content: space-between;
+        gap: 15px;
+    }
+    .public-header-actions {
+        margin-left: auto;
+        gap: 13px;
+    }
+    .public-header-actions .mobile-only {
+        display: inline-grid !important;
+    }
+    .public-header-actions > .icon-btn {
+        display: inline-grid;
+    }
+    .public-header-actions > .header-book {
+        font-size: 11px;
+    }
+    .patient-account > span:not(.avatar) {
+        display: inline;
+    }
+    .hero-copy h1 {
+        font-size: 33px;
+    }
+    .hero-copy > .eyebrow {
+        font-size: 7px;
+        letter-spacing: 1px;
+    }
+    .hero-copy > p {
+        font-size: 11px;
+    }
+    .home-hero {
+        gap: 23px;
+    }
+    .hero-trust {
+        font-size: 7px;
+        gap: 11px;
+    }
+    .hero-photo {
+        aspect-ratio: 1.08;
+    }
+    .photo-note {
+        font-size: 8px;
+        bottom: 12px;
+        left: 12px;
+        padding: 8px 10px;
+    }
+    .photo-note > .icon {
+        height: 13px;
+        width: 13px;
+    }
+    .quick-item {
+        padding: 17px 16px;
+        gap: 9px;
+    }
+    .quick-icon {
+        height: 33px;
+        width: 33px;
+    }
+    .quick-icon > .icon {
+        height: 18px;
+        width: 18px;
+    }
+    .quick-item strong {
+        font-size: 11px;
+    }
+    .quick-item small {
+        font-size: 8px;
+    }
+    .quick-item > .icon {
+        width: 13px;
+        height: 13px;
+    }
+    .doctor-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 20px;
+    }
+    .doctor-portrait {
+        height: 170px;
+    }
+    .doctor-card-body {
+        padding: 19px;
+    }
+    .doctor-card h3 {
+        font-size: 14px;
+    }
+    .doctor-card-body > p {
+        font-size: 11px;
+    }
+    .doctor-meta {
+        font-size: 10px;
+    }
+    .doctor-card-actions .btn {
+        font-size: 10px;
+        padding: 7px 12px;
+    }
+    .service-grid {
+        gap: 14px;
+    }
+    .service-card-body {
+        padding: 15px;
+    }
+    .service-card h3 {
+        font-size: 14px;
+    }
+    .service-price {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 5px;
+    }
+    .service-card-actions {
+        gap: 6px;
+    }
+    .service-card-actions .btn {
+        font-size: 9px;
+        padding: 7px;
+    }
+    .service-visual {
+        height: 111px;
+        padding: 19px;
+    }
+    .service-visual > span:first-child {
+        height: 45px;
+        width: 45px;
+        border-radius: 11px;
+    }
+    .service-visual .icon {
+        width: 25px;
+        height: 25px;
+    }
+    .service-type {
+        font-size: 8px;
+    }
+    .specialty-grid {
+        gap: 12px;
+    }
+    .specialty-card {
+        padding: 17px;
+    }
+    .specialty-card strong {
+        font-size: 11px;
+    }
+    .specialty-card small {
+        font-size: 8px;
+    }
+    .specialty-card > .icon {
+        right: 13px;
+        top: 25px;
+        width: 12px;
+        height: 12px;
+    }
+    .specialty-icon {
+        height: 36px;
+        width: 36px;
+        margin-bottom: 14px;
+    }
+    .specialty-icon > .icon {
+        height: 20px;
+        width: 20px;
+    }
+    .journey-section {
+        gap: 25px;
+        padding: 32px 28px;
+    }
+    .journey-section h2 {
+        font-size: 27px;
+    }
+    .journey-steps {
+        gap: 20px;
+    }
+    .journey-section > div:first-child > p {
+        font-size: 11px;
+    }
+    .journey-steps p {
+        font-size: 9px;
+    }
+    .family-banner {
+        padding: 22px;
+        gap: 25px;
+    }
+    .family-banner h2 {
+        font-size: 18px;
+    }
+    .family-banner p {
+        font-size: 10px;
+    }
+    .footer-top {
+        gap: 28px;
+        padding: 30px 28px;
+    }
+    .footer-top p,
+    .footer-top > div > a {
+        font-size: 9px;
+    }
+    .footer-top .brand {
+        font-size: 21px;
+    }
+    .detail-layout {
+        grid-template-columns: minmax(0, 1fr) 260px;
+        gap: 20px;
+        padding: 26px;
+    }
+    .sticky-card {
+        padding: 20px;
+    }
+    .sticky-card h2 {
+        font-size: 15px;
+    }
+    .detail-price strong {
+        font-size: 24px;
+    }
+    .doctor-bio {
+        padding: 22px;
+    }
+    .doctor-bio-top {
+        gap: 17px;
+    }
+    .doctor-bio-top > .doctor-portrait {
+        width: 100px;
+        height: 120px;
+    }
+    .doctor-bio-top h1 {
+        font-size: 21px;
+    }
+    .doctor-bio-top .doctor-avatar {
+        height: 61px;
+        width: 61px;
+        font-size: 19px;
+    }
+    .content-section {
+        padding: 22px;
+    }
+    .content-section h2 {
+        font-size: 18px;
+    }
+    .detail-banner {
+        padding: 21px;
+        gap: 17px;
+    }
+    .detail-banner h2 {
+        font-size: 21px;
+    }
+    .detail-banner > .icon {
+        width: 50px;
+        height: 50px;
+        padding: 12px;
+    }
+    .detail-banner .eyebrow {
+        font-size: 7px;
+        letter-spacing: 1px;
+    }
+    .guide-layout {
+        grid-template-columns: minmax(0, 1fr) 255px;
+        padding: 26px;
+        gap: 20px;
+    }
+    .guide-aside {
+        padding: 20px;
+    }
+    .booking-layout {
+        grid-template-columns: minmax(0, 1fr) 245px;
+        gap: 17px;
+    }
+    .booking-panel {
+        padding: 20px;
+    }
+    .booking-section-head h2 {
+        font-size: 17px;
+    }
+    .booking-section-head p {
+        font-size: 10px;
+    }
+    .booking-summary {
+        padding: 18px;
+    }
+    .profile-options {
+        grid-template-columns: 1fr;
+    }
+    .profile-option {
+        padding: 13px;
+    }
+    .profile-option > div > span:not(.badge) {
+        font-size: 10px;
+    }
+    .profile-option strong {
+        font-size: 12px;
+    }
+    .method-toggle {
+        gap: 8px;
+    }
+    .method-toggle button {
+        font-size: 10px;
+        gap: 6px;
+        padding: 10px;
+    }
+    .booking-doctor {
+        padding: 13px;
+        gap: 9px;
+    }
+    .booking-doctor > div > strong {
+        font-size: 11px;
+    }
+    .booking-doctor > div > small {
+        font-size: 8px;
+    }
+    .booking-doctor .doctor-fee {
+        font-size: 10px;
+        margin: 0 4px;
+    }
+    .booking-doctor .avatar {
+        width: 29px;
+        height: 29px;
+        font-size: 9px;
+    }
+    .time-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+    .shift-toggle {
+        gap: 8px;
+    }
+    .shift-toggle button {
+        font-size: 10px;
+        padding: 9px 10px;
+    }
+    .shift-toggle button > small {
+        font-size: 8px;
+    }
+    .patient-main {
+        padding: 27px;
+    }
+    .family-grid {
+        gap: 16px;
+    }
+    .family-card {
+        padding: 18px;
+    }
+    .family-card h2 {
+        font-size: 15px;
+    }
+    .family-summary {
+        font-size: 10px;
+        gap: 18px;
+    }
+    .family-summary strong {
+        font-size: 10px;
+    }
+    .patient-nav > div {
+        padding: 0 27px;
+        gap: 25px;
+    }
+    .patient-nav a {
+        font-size: 10px;
+    }
+    .family-actions .text-link {
+        margin-left: 0;
+    }
+    .staff-dashboard-grid,
+    .admin-grid,
+    .reception-layout {
+        grid-template-columns: 1fr;
+    }
+    .staff-dashboard-grid > .queue-panel,
+    .reception-layout > .queue-panel {
+        display: grid;
+        grid-template-columns: 0.9fr 1.3fr;
+        column-gap: 17px;
+        order: -1;
+    }
+    .queue-panel-head {
+        grid-column: 1/-1;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px;
+    }
+    .queue-panel-head select {
+        width: 150px;
+    }
+    .ticket {
+        margin: 0 0 15px 15px;
+        padding: 14px;
+    }
+    .ticket > strong {
+        font-size: 35px;
+        margin: 5px 0;
+    }
+    .queue-next {
+        padding: 0 16px 13px 0;
+    }
+    .queue-row {
+        padding: 10px 0;
+    }
+    .stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 13px;
+    }
+    .stats-grid.three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .stat-card {
+        padding: 14px 16px;
+        gap: 8px;
+    }
+    .stat-card > strong {
+        font-size: 27px;
+    }
+    .stat-card > small {
+        font-size: 9px;
+    }
+    .stat-label {
+        font-size: 10px;
+    }
+    .stat-icon {
+        width: 25px;
+        height: 25px;
+    }
+    .admin-grid > .collection-card {
+        order: 0;
+    }
+    .collection-rate {
+        padding-top: 8px;
+    }
+    .doctor-strip {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        padding-bottom: 16px;
+    }
+    .doctor-strip > div {
+        flex-wrap: wrap;
+    }
+    .doctor-strip > div > span:not(.avatar) {
+        display: block;
+        flex: initial;
+    }
+    .doctor-strip > div + div {
+        border-left: 1px solid #e3ecf5;
+        padding-left: 10px;
+    }
+    .doctor-strip strong {
+        font-size: 9px;
+    }
+    .doctor-strip small {
+        font-size: 8px;
+    }
+    .doctor-strip b {
+        margin-left: 32px;
+        font-size: 8px;
+    }
+    .staff-topbar {
+        gap: 11px;
+    }
+    .demo-clock {
+        display: none;
+    }
+    .clinical-layout {
+        grid-template-columns: 175px minmax(0, 1fr);
+        gap: 13px;
+    }
+    .consultation-person {
+        gap: 7px;
+        padding: 12px 10px;
+    }
+    .consultation-person.active {
+        padding-left: 7px;
+    }
+    .consultation-person .avatar {
+        width: 24px;
+        height: 24px;
+        font-size: 8px;
+    }
+    .consultation-person strong {
+        font-size: 10px;
+    }
+    .consultation-person small {
+        font-size: 8px;
+    }
+    .consultation-list .card-header {
+        padding: 14px 12px;
+    }
+    .consultation-list .card-header h2 {
+        font-size: 11px;
+    }
+    .rx-row {
+        grid-template-columns: 1fr 1fr 55px 55px;
+        padding: 11px 32px 11px 11px;
+        gap: 8px;
+    }
+    .vitals-strip > div {
+        padding: 9px 7px;
+    }
+    .vitals-strip strong {
+        font-size: 10px;
+    }
+    .quota-grid {
+        grid-template-columns: 1fr;
+        gap: 11px;
+    }
+    .quota-grid article {
+        display: flex;
+        align-items: center;
+        gap: 19px;
+        flex-wrap: wrap;
+        padding: 12px 14px;
+    }
+    .quota-grid h3 {
+        margin: 0;
+        flex: 1;
+        min-width: 150px;
+    }
+    .quota-grid article > div {
+        margin: 0;
+        gap: 7px;
+    }
+    .quota-grid article > div strong {
+        font-size: 12px;
+    }
+    .quota-grid .text-link {
+        margin: 0;
+        font-size: 9px;
+    }
+}

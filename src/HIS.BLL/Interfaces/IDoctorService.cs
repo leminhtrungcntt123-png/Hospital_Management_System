@@ -1,8 +1,16 @@
 using HIS.BLL.DTOs;
+using HIS.Domain;
 
 namespace HIS.BLL.Interfaces;
 
 public interface IDoctorService
 {
+    // Lấy danh sách bác sĩ
     Task<IReadOnlyList<DoctorListItemDto>> GetDoctorsAsync(CancellationToken cancellationToken = default);
+
+    // Lấy danh sách bệnh nhân chờ khám theo bác sĩ và ca khám
+    Task<IReadOnlyList<QueuePatientDto>> GetQueuePatientsAsync(int doctorId, DateOnly date, ExamShift shift, CancellationToken cancellationToken = default);
+
+    // Tạo hồ sơ bệnh án cho lượt khám
+    Task<int> CreateMedicalRecordAsync(CreateMedicalRecordRequest request, CancellationToken cancellationToken = default);
 }

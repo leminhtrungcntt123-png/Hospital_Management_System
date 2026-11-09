@@ -1,0 +1,137 @@
+.mvc-auth {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: #eaf1f8;
+    color: #17334d;
+}
+.mvc-auth-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24px max(24px, calc((100vw - 1180px) / 2));
+    background: #fff;
+    border-bottom: 1px solid #b6cddd;
+}
+.mvc-auth-main {
+    flex: 1;
+    padding: 44px 20px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+}
+.mvc-auth-card {
+    width: 460px;
+    padding: 32px;
+    border-color: #aac3d6;
+}
+.mvc-auth-card h1 {
+    font-size: 27px;
+    font-weight: 750;
+    margin-bottom: 10px;
+}
+.mvc-auth-intro {
+    font-size: 13px;
+    line-height: 1.8;
+    color: #445e77;
+    margin-bottom: 25px;
+}
+.mvc-auth-card .field {
+    margin: 16px 0;
+}
+.mvc-auth-card .field label {
+    font-size: 12px;
+    font-weight: 650;
+    color: #294b65;
+}
+.mvc-auth-card .field input {
+    min-height: 46px;
+    font-size: 14px;
+    border-color: #9ab8cd;
+}
+.mvc-auth-card .check-line {
+    font-size: 12px;
+}
+.mvc-auth-card form > .btn {
+    margin-top: 12px;
+}
+.mvc-auth-switch {
+    font-size: 12px;
+    color: #465f77;
+    margin-top: 24px;
+    text-align: center;
+}
+.mvc-auth-switch a {
+    color: #00698f;
+    font-weight: 650;
+}
+.mvc-auth-footer {
+    padding: 20px;
+    text-align: center;
+    font-size: 11px;
+    color: #4e667d;
+}
+.mvc-validation {
+    font-size: 12px;
+    color: #a53e3d;
+    line-height: 1.8;
+}
+.mvc-validation ul {
+    padding: 0;
+    list-style: none;
+}
+.validation-summary-valid,
+.field-validation-valid {
+    display: none;
+}
+.input-validation-error {
+    border-color: #b4423f !important;
+    background: #fff8f7 !important;
+}
+@media (max-width: 640px) {
+    .mvc-auth-header {
+        padding: 18px;
+    }
+    .mvc-auth-header .brand {
+        font-size: 22px;
+    }
+    .mvc-auth-header .text-link {
+        font-size: 10px;
+    }
+    .mvc-auth-main {
+        padding: 25px 16px;
+    }
+    .mvc-auth-card {
+        padding: 24px 20px;
+    }
+    .mvc-auth-card h1 {
+        font-size: 24px;
+    }
+}
+
+@media (max-width: 850px) {
+    .staff-main .stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+@media (max-width: 640px) {
+    .staff-main .stats-grid.three {
+        grid-template-columns: 1fr;
+    }
+}
+
+.mvc-data-error {
+    max-width: 700px;
+    margin: 10vh auto;
+    padding: 32px;
+    background: white;
+    border: 1px solid #adc5d8;
+    border-radius: 12px;
+}
+.mvc-data-error p {
+    margin: 16px 0;
+    color: #3b5670;
+}
+.mvc-data-error a {
+    margin-right: 10px;
+}

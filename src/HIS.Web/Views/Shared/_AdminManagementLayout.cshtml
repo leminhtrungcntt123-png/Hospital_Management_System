@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#006f98" />
+    <title>@ViewData["Title"] · MediCare</title>
+    <link rel="stylesheet" href="~/ui/css/base/tokens.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/ui/css/base/reset.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/ui/css/components/controls.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/ui/css/components/forms.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/ui/css/staff/layout.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/ui/css/responsive/desktop.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/ui/css/responsive/laptop.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/ui/css/responsive/tablet.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/ui/css/theme/contrast.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/ui/css/staff/readability.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/admin-management.css" asp-append-version="true" />
+</head>
+<body>
+    @RenderBody()
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>
+
