@@ -17,7 +17,7 @@ namespace HIS.DAL.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.4")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityAlwaysColumns(modelBuilder);
@@ -84,6 +84,10 @@ namespace HIS.DAL.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime?>("BookingBlockedUntil")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("booking_blocked_until");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp without time zone")
@@ -110,6 +114,10 @@ namespace HIS.DAL.Migrations
                     b.Property<DateTime?>("LockedUntil")
                         .HasColumnType("timestamp without time zone")
                         .HasColumnName("locked_until");
+
+                    b.Property<DateTime?>("NoShowResetAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("no_show_reset_at");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -286,9 +294,27 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("doctor_id");
 
+                    b.Property<bool>("HasHealthInsurance")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("has_health_insurance");
+
+                    b.Property<bool>("HasPrivateInsurance")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("has_private_insurance");
+
                     b.Property<DateTime?>("HoldUntil")
                         .HasColumnType("timestamp without time zone")
                         .HasColumnName("hold_until");
+
+                    b.Property<int>("OvertakenCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("overtaken_count");
 
                     b.Property<int?>("ParentAppointmentId")
                         .HasColumnType("integer")
@@ -321,6 +347,10 @@ namespace HIS.DAL.Migrations
                     b.Property<int?>("SlotId")
                         .HasColumnType("integer")
                         .HasColumnName("slot_id");
+
+                    b.Property<int?>("SlotPosition")
+                        .HasColumnType("integer")
+                        .HasColumnName("slot_position");
 
                     b.Property<int>("StatusId")
                         .HasColumnType("integer")
@@ -380,11 +410,20 @@ namespace HIS.DAL.Migrations
                         .HasDatabaseName("uq_patient_slot_active")
                         .HasFilter("slot_id IS NOT NULL AND status_id IN (1,2,3,4,5)");
 
+                    b.HasIndex("SlotId", "SlotPosition")
+                        .IsUnique()
+                        .HasDatabaseName("uq_slot_position")
+                        .HasFilter("slot_position IS NOT NULL AND status_id IN (1,2,3,4,5)");
+
                     b.ToTable("appointments", null, t =>
                         {
                             t.HasCheckConstraint("ck_appointments_booking_channel", "booking_channel IN ('WEB','ON_SITE')");
 
-                            t.HasCheckConstraint("ck_appointments_priority_level", "priority_level BETWEEN 0 AND 3");
+                            t.HasCheckConstraint("ck_appointments_overtaken_count", "overtaken_count BETWEEN 0 AND 3");
+
+                            t.HasCheckConstraint("ck_appointments_priority_level", "priority_level BETWEEN 0 AND 2");
+
+                            t.HasCheckConstraint("ck_appointments_slot_position", "slot_position >= 1");
 
                             t.HasCheckConstraint("ck_appointments_visit_type", "visit_type IN ('SCHEDULED','WALK_IN')");
                         });
@@ -419,6 +458,18 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("timestamp without time zone")
                         .HasColumnName("end_time");
 
+                    b.Property<int>("OnlineBooked")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("online_booked");
+
+                    b.Property<int>("OnlineQuota")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(3)
+                        .HasColumnName("online_quota");
+
                     b.Property<int>("RoomId")
                         .HasColumnType("integer")
                         .HasColumnName("room_id");
@@ -450,13 +501,17 @@ namespace HIS.DAL.Migrations
 
                     b.HasIndex("DoctorId", "StartTime")
                         .IsUnique()
-                        .HasDatabaseName("idx_slots_doctor_date");
+                        .HasDatabaseName("uq_slot");
 
                     b.ToTable("appointment_slots", null, t =>
                         {
+                            t.HasCheckConstraint("ck_appointment_slots_capacity", "booked_count <= capacity");
+
                             t.HasCheckConstraint("ck_appointment_slots_status", "status IN ('AVAILABLE','FULL','BLOCKED')");
 
-                            t.HasCheckConstraint("ck_capacity", "booked_count <= capacity");
+                            t.HasCheckConstraint("ck_online_booked", "online_booked <= online_quota AND online_booked <= booked_count");
+
+                            t.HasCheckConstraint("ck_online_quota", "online_quota <= capacity");
                         });
                 });
 
@@ -599,6 +654,12 @@ namespace HIS.DAL.Migrations
                         .HasColumnName("changed_at")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<bool>("IsLateCancel")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_late_cancel");
+
                     b.Property<int>("NewStatusId")
                         .HasColumnType("integer")
                         .HasColumnName("new_status_id");
@@ -623,8 +684,9 @@ namespace HIS.DAL.Migrations
                     b.HasIndex("OldStatusId")
                         .HasDatabaseName("ix_appointment_status_history_old_status_id");
 
-                    b.HasIndex("PerformedBy")
-                        .HasDatabaseName("ix_appointment_status_history_performed_by");
+                    b.HasIndex("PerformedBy", "ChangedAt")
+                        .HasDatabaseName("idx_history_cancel")
+                        .HasFilter("is_late_cancel");
 
                     b.ToTable("appointment_status_history", (string)null);
                 });
@@ -813,17 +875,11 @@ namespace HIS.DAL.Migrations
                         .HasDefaultValue(true)
                         .HasColumnName("is_active");
 
-                    b.Property<int>("MaxPatients")
+                    b.Property<int>("OnlineRatioPct")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
-                        .HasDefaultValue(40)
-                        .HasColumnName("max_patients");
-
-                    b.Property<int>("OnlineSlots")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(28)
-                        .HasColumnName("online_slots");
+                        .HasDefaultValue(60)
+                        .HasColumnName("online_ratio_pct");
 
                     b.Property<int>("RoomId")
                         .HasColumnType("integer")
@@ -838,7 +894,7 @@ namespace HIS.DAL.Migrations
                     b.Property<int>("SlotDurationMinutes")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
-                        .HasDefaultValue(15)
+                        .HasDefaultValue(60)
                         .HasColumnName("slot_duration_minutes");
 
                     b.Property<TimeOnly>("StartTime")
@@ -858,9 +914,9 @@ namespace HIS.DAL.Migrations
                         {
                             t.HasCheckConstraint("ck_doctor_schedules_day_of_week", "day_of_week BETWEEN 0 AND 6");
 
-                            t.HasCheckConstraint("ck_doctor_schedules_shift", "shift IN ('MORNING','AFTERNOON')");
+                            t.HasCheckConstraint("ck_doctor_schedules_online_ratio", "online_ratio_pct BETWEEN 0 AND 100");
 
-                            t.HasCheckConstraint("ck_online_slots", "online_slots BETWEEN 0 AND max_patients");
+                            t.HasCheckConstraint("ck_doctor_schedules_shift", "shift IN ('MORNING','AFTERNOON')");
                         });
                 });
 
@@ -1025,7 +1081,7 @@ namespace HIS.DAL.Migrations
 
                     b.ToTable("insurance_plans", null, t =>
                         {
-                            t.HasCheckConstraint("ck_insurance_plans_referral_type", "referral_type IN ('IN_NETWORK','OUT_OF_NETWORK')");
+                            t.HasCheckConstraint("ck_insurance_plans_referral_type", "referral_type IS NULL OR referral_type IN ('IN_NETWORK','OUT_OF_NETWORK')");
                         });
                 });
 
@@ -1112,7 +1168,7 @@ namespace HIS.DAL.Migrations
 
                     b.ToTable("invoices", null, t =>
                         {
-                            t.HasCheckConstraint("ck_invoices_coverage_pct_applied", "coverage_pct_applied BETWEEN 0 AND 100");
+                            t.HasCheckConstraint("ck_invoices_coverage_pct_applied", "coverage_pct_applied IS NULL OR coverage_pct_applied BETWEEN 0 AND 100");
 
                             t.HasCheckConstraint("ck_invoices_status", "status IN ('UNPAID','PARTIALLY_PAID','PAID')");
                         });
@@ -1480,6 +1536,11 @@ namespace HIS.DAL.Migrations
                         .HasColumnType("date")
                         .HasColumnName("date_of_birth");
 
+                    b.Property<string>("Email")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("email");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -1511,7 +1572,7 @@ namespace HIS.DAL.Migrations
 
                     b.ToTable("patients", null, t =>
                         {
-                            t.HasCheckConstraint("ck_patients_gender", "gender IN ('MALE','FEMALE','OTHER')");
+                            t.HasCheckConstraint("ck_patients_gender", "gender IS NULL OR gender IN ('MALE','FEMALE','OTHER')");
                         });
                 });
 
@@ -1550,8 +1611,10 @@ namespace HIS.DAL.Migrations
 
                     b.Property<string>("PaymentMethod")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
+                        .HasDefaultValue("CASH")
                         .HasColumnName("payment_method");
 
                     b.Property<string>("PaymentType")
@@ -1666,48 +1729,6 @@ namespace HIS.DAL.Migrations
                     b.ToTable("prescription_items", (string)null);
                 });
 
-            modelBuilder.Entity("HIS.Domain.QueueCounter", b =>
-                {
-                    b.Property<DateOnly>("QueueDate")
-                        .HasColumnType("date")
-                        .HasColumnName("queue_date");
-
-                    b.Property<int>("RoomId")
-                        .HasColumnType("integer")
-                        .HasColumnName("room_id");
-
-                    b.Property<string>("Shift")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)")
-                        .HasColumnName("shift");
-
-                    b.Property<string>("Channel")
-                        .HasMaxLength(15)
-                        .HasColumnType("character varying(15)")
-                        .HasColumnName("channel");
-
-                    b.Property<int>("LastNumber")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
-                        .HasColumnName("last_number");
-
-                    b.HasKey("QueueDate", "RoomId", "Shift", "Channel")
-                        .HasName("pk_queue_counters");
-
-                    b.HasIndex("RoomId")
-                        .HasDatabaseName("ix_queue_counters_room_id");
-
-                    b.ToTable("queue_counters", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_queue_counters_channel", "channel IN ('WEB','ON_SITE')");
-
-                            t.HasCheckConstraint("ck_queue_counters_last_number", "last_number >= 0");
-
-                            t.HasCheckConstraint("ck_queue_counters_shift", "shift IN ('MORNING','AFTERNOON')");
-                        });
-                });
-
             modelBuilder.Entity("HIS.Domain.Role", b =>
                 {
                     b.Property<int>("Id")
@@ -1745,29 +1766,41 @@ namespace HIS.DAL.Migrations
                         {
                             Id = 1,
                             Code = "ADMIN",
-                            Name = "Quản trị viên"
+                            Name = "Quản trị hệ thống"
                         },
                         new
                         {
                             Id = 2,
-                            Code = "DEPARTMENT_HEAD",
-                            Name = "Trưởng khoa"
-                        },
-                        new
-                        {
-                            Id = 3,
                             Code = "DOCTOR",
                             Name = "Bác sĩ"
                         },
                         new
                         {
-                            Id = 4,
+                            Id = 3,
                             Code = "NURSE",
-                            Name = "Y tá / Lễ tân"
+                            Name = "Y tá / Điều dưỡng"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Code = "RECEPTIONIST",
+                            Name = "Lễ tân / Tiếp đón"
                         },
                         new
                         {
                             Id = 5,
+                            Code = "CASHIER",
+                            Name = "Thu ngân"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Code = "DEPT_HEAD",
+                            Name = "Trưởng khoa"
+                        },
+                        new
+                        {
+                            Id = 7,
                             Code = "PATIENT",
                             Name = "Bệnh nhân"
                         });
@@ -1850,7 +1883,7 @@ namespace HIS.DAL.Migrations
 
                             t.HasCheckConstraint("ck_exception_replacement", "replacement_doctor_id IS NULL OR replacement_doctor_id <> doctor_id");
 
-                            t.HasCheckConstraint("ck_schedule_exceptions_shift", "shift IN ('MORNING','AFTERNOON')");
+                            t.HasCheckConstraint("ck_schedule_exceptions_shift", "shift IS NULL OR shift IN ('MORNING','AFTERNOON')");
 
                             t.HasCheckConstraint("ck_schedule_exceptions_status", "status IN ('PENDING','APPROVED','REJECTED')");
 
@@ -1944,6 +1977,12 @@ namespace HIS.DAL.Migrations
                             Id = 3,
                             Code = "IMAGING",
                             Name = "Chẩn đoán hình ảnh"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Code = "FUNCTIONAL",
+                            Name = "Thăm dò chức năng"
                         });
                 });
 
@@ -2067,8 +2106,8 @@ namespace HIS.DAL.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_account_patient_profiles_accounts_account_id");
 
-                    b.HasOne("HIS.Domain.Account", "CreatedByAccount")
-                        .WithMany("CreatedPatientLinks")
+                    b.HasOne("HIS.Domain.Account", "Creator")
+                        .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_account_patient_profiles_accounts_created_by");
@@ -2080,19 +2119,19 @@ namespace HIS.DAL.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_account_patient_profiles_patients_patient_id");
 
-                    b.HasOne("HIS.Domain.Account", "VerifiedByAccount")
-                        .WithMany("VerifiedPatientLinks")
+                    b.HasOne("HIS.Domain.Account", "Verifier")
+                        .WithMany()
                         .HasForeignKey("VerifiedBy")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_account_patient_profiles_accounts_verified_by");
 
                     b.Navigation("Account");
 
-                    b.Navigation("CreatedByAccount");
+                    b.Navigation("Creator");
 
                     b.Navigation("Patient");
 
-                    b.Navigation("VerifiedByAccount");
+                    b.Navigation("Verifier");
                 });
 
             modelBuilder.Entity("HIS.Domain.Appointment", b =>
@@ -2104,13 +2143,13 @@ namespace HIS.DAL.Migrations
                         .HasConstraintName("fk_appointments_accounts_booked_by");
 
                     b.HasOne("HIS.Domain.Department", "Department")
-                        .WithMany("Appointments")
+                        .WithMany()
                         .HasForeignKey("DepartmentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_appointments_departments_department_id");
 
                     b.HasOne("HIS.Domain.Doctor", "Doctor")
-                        .WithMany("Appointments")
+                        .WithMany()
                         .HasForeignKey("DoctorId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_appointments_doctors_doctor_id");
@@ -2188,7 +2227,7 @@ namespace HIS.DAL.Migrations
             modelBuilder.Entity("HIS.Domain.AppointmentStatusHistory", b =>
                 {
                     b.HasOne("HIS.Domain.Appointment", "Appointment")
-                        .WithMany("StatusHistory")
+                        .WithMany("StatusHistories")
                         .HasForeignKey("AppointmentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
@@ -2207,8 +2246,8 @@ namespace HIS.DAL.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_appointment_status_history_appointment_statuses_old_status_");
 
-                    b.HasOne("HIS.Domain.Account", "PerformedByAccount")
-                        .WithMany("PerformedStatusHistories")
+                    b.HasOne("HIS.Domain.Account", "Performer")
+                        .WithMany("PerformedAppointmentHistories")
                         .HasForeignKey("PerformedBy")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_appointment_status_history_accounts_performed_by");
@@ -2219,13 +2258,13 @@ namespace HIS.DAL.Migrations
 
                     b.Navigation("OldStatus");
 
-                    b.Navigation("PerformedByAccount");
+                    b.Navigation("Performer");
                 });
 
             modelBuilder.Entity("HIS.Domain.ClinicRoom", b =>
                 {
                     b.HasOne("HIS.Domain.Department", "Department")
-                        .WithMany("Rooms")
+                        .WithMany("ClinicRooms")
                         .HasForeignKey("DepartmentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
@@ -2279,14 +2318,14 @@ namespace HIS.DAL.Migrations
             modelBuilder.Entity("HIS.Domain.DoctorSchedule", b =>
                 {
                     b.HasOne("HIS.Domain.Doctor", "Doctor")
-                        .WithMany("Schedules")
+                        .WithMany("DoctorSchedules")
                         .HasForeignKey("DoctorId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_doctor_schedules_doctors_doctor_id");
 
                     b.HasOne("HIS.Domain.ClinicRoom", "Room")
-                        .WithMany("Schedules")
+                        .WithMany("DoctorSchedules")
                         .HasForeignKey("RoomId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
@@ -2420,13 +2459,13 @@ namespace HIS.DAL.Migrations
             modelBuilder.Entity("HIS.Domain.LabResult", b =>
                 {
                     b.HasOne("HIS.Domain.LabOrder", "Order")
-                        .WithOne("LabResult")
+                        .WithOne("Result")
                         .HasForeignKey("HIS.Domain.LabResult", "OrderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_lab_results_lab_orders_order_id");
 
-                    b.HasOne("HIS.Domain.Account", "PerformedByAccount")
+                    b.HasOne("HIS.Domain.Account", "Performer")
                         .WithMany("PerformedLabResults")
                         .HasForeignKey("PerformedBy")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2434,7 +2473,7 @@ namespace HIS.DAL.Migrations
 
                     b.Navigation("Order");
 
-                    b.Navigation("PerformedByAccount");
+                    b.Navigation("Performer");
                 });
 
             modelBuilder.Entity("HIS.Domain.MedicalRecord", b =>
@@ -2468,7 +2507,7 @@ namespace HIS.DAL.Migrations
                         .HasConstraintName("fk_notifications_accounts_account_id");
 
                     b.HasOne("HIS.Domain.Appointment", "Appointment")
-                        .WithMany("Notifications")
+                        .WithMany()
                         .HasForeignKey("AppointmentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_notifications_appointments_appointment_id");
@@ -2501,7 +2540,7 @@ namespace HIS.DAL.Migrations
             modelBuilder.Entity("HIS.Domain.Payment", b =>
                 {
                     b.HasOne("HIS.Domain.Account", "Cashier")
-                        .WithMany("CashierPayments")
+                        .WithMany("Payments")
                         .HasForeignKey("CashierId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_payments_accounts_cashier_id");
@@ -2551,21 +2590,9 @@ namespace HIS.DAL.Migrations
                     b.Navigation("Prescription");
                 });
 
-            modelBuilder.Entity("HIS.Domain.QueueCounter", b =>
-                {
-                    b.HasOne("HIS.Domain.ClinicRoom", "Room")
-                        .WithMany("QueueCounters")
-                        .HasForeignKey("RoomId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_queue_counters_clinic_rooms_room_id");
-
-                    b.Navigation("Room");
-                });
-
             modelBuilder.Entity("HIS.Domain.ScheduleException", b =>
                 {
-                    b.HasOne("HIS.Domain.Account", "ApprovedByAccount")
+                    b.HasOne("HIS.Domain.Account", "Approver")
                         .WithMany("ApprovedScheduleExceptions")
                         .HasForeignKey("ApprovedBy")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2584,7 +2611,7 @@ namespace HIS.DAL.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_schedule_exceptions_doctors_replacement_doctor_id");
 
-                    b.Navigation("ApprovedByAccount");
+                    b.Navigation("Approver");
 
                     b.Navigation("Doctor");
 
@@ -2612,7 +2639,7 @@ namespace HIS.DAL.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_vital_signs_appointments_appointment_id");
 
-                    b.HasOne("HIS.Domain.Nurse", "RecordedByNurse")
+                    b.HasOne("HIS.Domain.Nurse", "Recorder")
                         .WithMany("RecordedVitalSigns")
                         .HasForeignKey("RecordedBy")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2621,7 +2648,7 @@ namespace HIS.DAL.Migrations
 
                     b.Navigation("Appointment");
 
-                    b.Navigation("RecordedByNurse");
+                    b.Navigation("Recorder");
                 });
 
             modelBuilder.Entity("HIS.Domain.Account", b =>
@@ -2633,10 +2660,6 @@ namespace HIS.DAL.Migrations
                     b.Navigation("AssignedDutyShifts");
 
                     b.Navigation("BookedAppointments");
-
-                    b.Navigation("CashierPayments");
-
-                    b.Navigation("CreatedPatientLinks");
 
                     b.Navigation("DepartmentHead");
 
@@ -2650,11 +2673,11 @@ namespace HIS.DAL.Migrations
 
                     b.Navigation("PatientLinks");
 
+                    b.Navigation("Payments");
+
+                    b.Navigation("PerformedAppointmentHistories");
+
                     b.Navigation("PerformedLabResults");
-
-                    b.Navigation("PerformedStatusHistories");
-
-                    b.Navigation("VerifiedPatientLinks");
                 });
 
             modelBuilder.Entity("HIS.Domain.Appointment", b =>
@@ -2665,9 +2688,7 @@ namespace HIS.DAL.Migrations
 
                     b.Navigation("MedicalRecord");
 
-                    b.Navigation("Notifications");
-
-                    b.Navigation("StatusHistory");
+                    b.Navigation("StatusHistories");
 
                     b.Navigation("VitalSigns");
                 });
@@ -2692,14 +2713,12 @@ namespace HIS.DAL.Migrations
 
                     b.Navigation("Appointments");
 
-                    b.Navigation("QueueCounters");
-
-                    b.Navigation("Schedules");
+                    b.Navigation("DoctorSchedules");
                 });
 
             modelBuilder.Entity("HIS.Domain.Department", b =>
                 {
-                    b.Navigation("Appointments");
+                    b.Navigation("ClinicRooms");
 
                     b.Navigation("DepartmentHead");
 
@@ -2708,23 +2727,19 @@ namespace HIS.DAL.Migrations
                     b.Navigation("DutyShifts");
 
                     b.Navigation("Nurses");
-
-                    b.Navigation("Rooms");
                 });
 
             modelBuilder.Entity("HIS.Domain.Doctor", b =>
                 {
                     b.Navigation("AppointmentSlots");
 
-                    b.Navigation("Appointments");
+                    b.Navigation("DoctorSchedules");
 
                     b.Navigation("MedicalRecords");
 
                     b.Navigation("ReplacementScheduleExceptions");
 
                     b.Navigation("ScheduleExceptions");
-
-                    b.Navigation("Schedules");
                 });
 
             modelBuilder.Entity("HIS.Domain.InsuranceCard", b =>
@@ -2748,7 +2763,7 @@ namespace HIS.DAL.Migrations
 
             modelBuilder.Entity("HIS.Domain.LabOrder", b =>
                 {
-                    b.Navigation("LabResult");
+                    b.Navigation("Result");
                 });
 
             modelBuilder.Entity("HIS.Domain.MedicalRecord", b =>

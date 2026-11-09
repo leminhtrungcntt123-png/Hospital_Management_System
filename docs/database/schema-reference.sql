@@ -1,4 +1,15 @@
-- ─── LOOKUP TABLES ────────────────────────────────────
+-- Bản chép nguyên văn mục "5. DDL ĐẦY ĐỦ (nguồn sự thật)" của init.md (spec nhóm, bản 02/11).
+-- CHỈ ĐỂ THAM CHIẾU: nguồn sự thật thật của schema là migration trong src/HIS.DAL/Migrations
+-- (xem docs/DECISIONS.md). Khi file này và migration lệch nhau, migration đúng.
+--
+-- Khác biệt đã biết so với model EF (có chủ đích, không phải lỗi):
+--   * init.md đánh số id appointment_statuses 1..10 -> model seed HasData đúng theo số đó.
+--   * init.md khai báo queue_counters; mô hình số A/T theo vị trí (Mẻ 3b) không cần bảng này
+--     nên migration 20261104144910_QueuePositionNumbering đã DROP nó.
+--   * init.md có doctor_schedules.max_patients/online_slots; cũng migration trên thay bằng
+--     doctor_schedules.online_ratio_pct + appointment_slots.capacity/online_quota.
+
+-- ─── LOOKUP TABLES ────────────────────────────────────
 CREATE TABLE roles (
     id          INTEGER PRIMARY KEY,
     code        VARCHAR(20) NOT NULL UNIQUE,    -- 'ADMIN', 'DOCTOR'...
@@ -30,8 +41,11 @@ CREATE TABLE accounts (
     is_active           BOOLEAN NOT NULL DEFAULT TRUE,
     failed_login_count  INTEGER NOT NULL DEFAULT 0,
     locked_until        TIMESTAMP NULL,
+    booking_blocked_until TIMESTAMP NULL,       -- Chặn đặt lịch mới vì đủ số lần vắng mặt; NULL = không bị chặn
+    no_show_reset_at    TIMESTAMP NULL,         -- Mốc bắt đầu đếm lại vòng 90 ngày vắng mặt
     created_at          TIMESTAMP NOT NULL DEFAULT now(),
-    updated_at          TIMESTAMP NOT NULL DEFAULT now()
+    updated_at          TIMESTAMP NOT NULL DEFAULT now(),
+    CONSTRAINT ck_accounts_email_lower CHECK (email IS NULL OR email = lower(email))
 );
 
 CREATE TABLE departments (
@@ -69,6 +83,7 @@ CREATE TABLE patients (
     national_id     VARCHAR(20) UNIQUE,               -- NULL với trẻ chưa có CCCD
     phone_number    VARCHAR(15) NOT NULL,
     address         VARCHAR(255),
+    email           VARCHAR(200),                     -- nhận mã OTP lúc thêm hồ sơ
     created_at      TIMESTAMP NOT NULL DEFAULT now()
 );
 
@@ -168,13 +183,11 @@ CREATE TABLE doctor_schedules (
     shift                   VARCHAR(10) NOT NULL CHECK (shift IN ('MORNING','AFTERNOON')),
     start_time              TIME NOT NULL,
     end_time                TIME NOT NULL,
-    slot_duration_minutes   INTEGER NOT NULL DEFAULT 15,
-    max_patients            INTEGER NOT NULL DEFAULT 40,   -- tổng bệnh nhân / ca
-    online_slots            INTEGER NOT NULL DEFAULT 28,   -- số slot online; tại quầy tối đa = max_patients - online_slots
+    slot_duration_minutes   INTEGER NOT NULL DEFAULT 60,    -- độ dài một khung giờ, phút
+    online_ratio_pct        INTEGER NOT NULL DEFAULT 60 CHECK (online_ratio_pct BETWEEN 0 AND 100),
     effective_from          DATE NOT NULL,
     effective_to            DATE,
-    is_active               BOOLEAN NOT NULL DEFAULT TRUE,
-    CONSTRAINT ck_online_slots CHECK (online_slots BETWEEN 0 AND max_patients)
+    is_active               BOOLEAN NOT NULL DEFAULT TRUE
 );
 
 CREATE TABLE schedule_exceptions (
@@ -195,7 +208,10 @@ CREATE TABLE schedule_exceptions (
     CONSTRAINT ck_exception_approved CHECK (status <> 'APPROVED' OR (approved_by IS NOT NULL AND approved_at IS NOT NULL))
 );
 
--- Slot ONLINE. Khi bác sĩ hủy ca: chuyển lịch hẹn rồi XÓA dòng slot (không có trạng thái CLOSED/CANCELLED).
+-- Một khung giờ = slot_duration_minutes của ca, capacity = 60 / avg_consultation_minutes của bác sĩ.
+-- online_quota = round(capacity * online_ratio_pct / 100): số suất để dành cho web (A),
+-- phần còn lại bán tại quầy (T). Suất A chưa bán qua mốc cắt thì giải phóng thành suất T.
+-- Khi bác sĩ hủy ca: chuyển lịch hẹn rồi XÓA dòng slot (không có trạng thái CLOSED/CANCELLED).
 CREATE TABLE appointment_slots (
     id              INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     doctor_id       INTEGER NOT NULL REFERENCES doctors(id),
@@ -203,22 +219,16 @@ CREATE TABLE appointment_slots (
     start_time      TIMESTAMP NOT NULL,
     end_time        TIMESTAMP NOT NULL,
     capacity        INTEGER NOT NULL DEFAULT 1,
+    online_quota    INTEGER NOT NULL DEFAULT 3,
     booked_count    INTEGER NOT NULL DEFAULT 0,
+    online_booked   INTEGER NOT NULL DEFAULT 0,   -- số suất A đang bị giữ, chỉ đếm lượt WEB
     status          VARCHAR(15) NOT NULL DEFAULT 'AVAILABLE'
                     CHECK (status IN ('AVAILABLE','FULL','BLOCKED')),
     version         INTEGER NOT NULL DEFAULT 0,    -- Optimistic locking
     CONSTRAINT uq_slot UNIQUE (doctor_id, start_time),
-    CONSTRAINT ck_capacity CHECK (booked_count <= capacity)
-);
-
--- Bộ đếm số thứ tự (khóa dòng khi cấp số)
-CREATE TABLE queue_counters (
-    queue_date  DATE NOT NULL,
-    room_id     INTEGER NOT NULL REFERENCES clinic_rooms(id),
-    shift       VARCHAR(10) NOT NULL CHECK (shift IN ('MORNING','AFTERNOON')),
-    channel     VARCHAR(15) NOT NULL CHECK (channel IN ('WEB','ON_SITE')),
-    last_number INTEGER NOT NULL DEFAULT 0 CHECK (last_number >= 0),
-    PRIMARY KEY (queue_date, room_id, shift, channel)
+    CONSTRAINT ck_capacity CHECK (booked_count <= capacity),
+    CONSTRAINT ck_online_quota CHECK (online_quota <= capacity),
+    CONSTRAINT ck_online_booked CHECK (online_booked <= online_quota AND online_booked <= booked_count)
 );
 
 -- patient_id = NGƯỜI ĐƯỢC KHÁM; booked_by = TÀI KHOẢN ĐẶT LỊCH (bệnh nhân hoặc nhân viên quầy).
@@ -236,8 +246,12 @@ CREATE TABLE appointments (
                             CHECK (booking_channel IN ('WEB','ON_SITE')),
     visit_type              VARCHAR(15) NOT NULL DEFAULT 'SCHEDULED'
                             CHECK (visit_type IN ('SCHEDULED','WALK_IN')),
-    priority_level          INTEGER NOT NULL DEFAULT 0 CHECK (priority_level BETWEEN 0 AND 3),
-    queue_number            VARCHAR(10),          -- "O01" (WEB) / "W03" (ON_SITE)
+    priority_level          INTEGER NOT NULL DEFAULT 0 CHECK (priority_level BETWEEN 0 AND 2),  -- 0 thường, 1 trẻ <6/tuổi >=70, 2 nhân viên chỉ định
+    slot_position           INTEGER CHECK (slot_position >= 1),   -- vị trí trong khung giờ: 1..online_quota = suất A, sau đó = suất T
+    queue_number            VARCHAR(10),          -- "A06" (web) / "T09" (tại quầy) = tổng capacity các khung trước + slot_position
+    overtaken_count         INTEGER NOT NULL DEFAULT 0 CHECK (overtaken_count BETWEEN 0 AND 3), -- số lần bị chen
+    has_health_insurance    BOOLEAN NOT NULL DEFAULT false,  -- người bệnh khai khi đặt lịch: có BHYT (chỉ để quầy phân luồng)
+    has_private_insurance   BOOLEAN NOT NULL DEFAULT false,  -- người bệnh khai khi đặt lịch: có bảo hiểm tư nhân (không validate, không ảnh hưởng giá)
     reason                  VARCHAR(255),
     hold_until              TIMESTAMP,            -- Hạn giữ chỗ PENDING
     checked_in_at           TIMESTAMP,
@@ -253,6 +267,7 @@ CREATE TABLE appointment_status_history (
     old_status_id   INTEGER REFERENCES appointment_statuses(id),
     new_status_id   INTEGER NOT NULL REFERENCES appointment_statuses(id),
     performed_by    INTEGER REFERENCES accounts(id),
+    is_late_cancel  BOOLEAN NOT NULL DEFAULT false,   -- chỉ bật trên dòng chuyển sang CANCELLED/NO_SHOW sau FreeCancelHours
     changed_at      TIMESTAMP NOT NULL DEFAULT now()
 );
 
@@ -408,6 +423,14 @@ CREATE UNIQUE INDEX uq_link_self_patient ON account_patient_profiles (patient_id
 -- một bệnh nhân không đặt trùng 1 slot khi lịch còn hiệu lực (status 1..5 = PENDING..IN_PROGRESS)
 CREATE UNIQUE INDEX uq_patient_slot_active ON appointments (patient_id, slot_id)
     WHERE slot_id IS NOT NULL AND status_id IN (1,2,3,4,5);
+
+-- hai lượt còn hiệu lực không được giữ cùng một vị trí trong khung giờ (chống hai quầy bốc trùng suất)
+CREATE UNIQUE INDEX uq_slot_position ON appointments (slot_id, slot_position)
+    WHERE slot_position IS NOT NULL AND status_id IN (1,2,3,4,5);
+
+-- tra hạn mức "1 lần hủy muộn/tháng" theo người thực hiện
+CREATE INDEX idx_history_cancel ON appointment_status_history (performed_by, changed_at)
+    WHERE is_late_cancel;
 
 -- ─── SEED (cấu hình bằng HasData trong EF, id cố định) ─
 INSERT INTO roles (id, code, name) VALUES

@@ -1,0 +1,151 @@
+@* Trang kết thúc quy trình: chỉ tới được sau khi thanh toán thành công nên luôn có số thứ tự.
+   Không đặt ViewData["Step"] nên _BookingLayout ẩn thanh trên và stepper. *@
+@model ThanhCongViewModel
+@{
+    Layout = "_BookingLayout";
+    ViewData["Title"] = "Thanh toán thành công";
+
+    var confirmed = Model.Status == "CONFIRMED";
+}
+
+<main class="success-page">
+    <div class="success-card">
+        <div class="success-check"><i data-lucide="check"></i></div>
+
+        @if (confirmed)
+        {
+            <span class="badge badge-green">ĐÃ THANH TOÁN · ĐÃ XÁC NHẬN</span>
+        }
+        else
+        {
+            <span class="badge badge-yellow">ĐÃ TIẾP NHẬN · CHỜ XÁC NHẬN</span>
+        }
+
+        <div class="success-title">@(confirmed ? "Thanh toán thành công!" : "Đã tiếp nhận yêu cầu đặt lịch")</div>
+        <p>
+            @(confirmed
+                ? "Bệnh viện đã nhận được phí khám. Phiếu khám và số thứ tự của bạn đã được cấp."
+                : "Bệnh viện sẽ xác nhận lịch khám và thông báo cho bạn.")
+            Số điện thoại liên hệ: <b>@Model.Patient.Phone</b>
+        </p>
+
+        <div class="booking-code">
+            <span>MÃ LỊCH HẸN</span>
+            <strong>@Model.Code</strong>
+            <small>Vui lòng cung cấp mã này khi làm thủ tục</small>
+        </div>
+
+        @if (!string.IsNullOrEmpty(Model.QueueNumber))
+        {
+            <div class="booking-code">
+                <span>SỐ THỨ TỰ KHÁM</span>
+                <strong>@Model.QueueNumber</strong>
+                <small>Số A dành cho bệnh nhân đặt online; theo dõi màn gọi tại phòng @(Model.Room)</small>
+            </div>
+        }
+
+        @if (Model.PaidAmount > 0)
+        {
+            <div class="booking-code">
+                <span>PHÍ KHÁM ĐÃ THANH TOÁN</span>
+                <strong>@VietnameseFormat.Money(Model.PaidAmount)</strong>
+                <small>Chuyển khoản VietQR@(Model.PaidAt is { } paid ? $" lúc {paid:HH:mm} ngày {paid:dd/MM/yyyy}" : "")</small>
+            </div>
+        }
+
+        <div class="success-details">
+            <div><i data-lucide="user-round"></i><span>Người khám<strong>@Model.Patient.FullName</strong></span></div>
+            <div><i data-lucide="stethoscope"></i><span>Chuyên khoa<strong>@Model.DepartmentName</strong></span></div>
+            @if (Model.Doctor is null && !string.IsNullOrEmpty(Model.DoctorName))
+            {
+                <div><i data-lucide="user-round-check"></i><span>Bác sĩ<strong>@Model.DoctorName</strong></span></div>
+            }
+            <div><i data-lucide="calendar-days"></i><span>Thời gian<strong>@Model.ShiftLabel · @Model.TimeRange, @VietnameseFormat.ShortDate(Model.Date)</strong></span></div>
+            <div><i data-lucide="map-pin"></i><span>Địa điểm<strong>@Model.Room</strong></span></div>
+        </div>
+
+        @if (Model.Doctor is not null)
+        {
+            <div class="success-doctor">
+                <div class="doctor-avatar">@Model.Doctor.Initials</div>
+                <div>
+                    <span>Bác sĩ phụ trách</span>
+                    <strong>@Model.Doctor.FullName</strong>
+                    <small>@Model.Doctor.Specialty</small>
+                </div>
+                <button type="button" data-doctor-open="@Model.Doctor.ToModalJson(Model.TimeRange, Model.Room, Model.Date, Model.DepartmentName)">Xem thông tin</button>
+            </div>
+        }
+
+        <div class="alert warning">
+            <i data-lucide="circle-alert"></i>
+            <div>
+                <strong>Hướng dẫn trước khi đi khám</strong>
+                <p>
+                    Đến trước giờ hẹn 15 phút, mang theo CCCD@(Model.HasHealthInsurance ? ", thẻ BHYT" : "") và hồ sơ khám trước đây (nếu có).
+                    @(Model.HasHealthInsurance
+                        ? "Bạn đã khai báo BHYT: ghé quầy tiếp nhận để xác nhận bảo hiểm trước khi lên phòng khám."
+                        : "Bạn không dùng BHYT: có thể lên thẳng phòng khám theo giờ hẹn.")
+                </p>
+            </div>
+        </div>
+
+        <div class="success-actions">
+            <a class="btn btn-primary" asp-controller="LichKham" asp-action="Index">Xem lịch hẹn của tôi</a>
+            <button type="button" class="btn btn-outline" data-print><i data-lucide="download"></i> In phiếu khám</button>
+        </div>
+        <a class="text-button" asp-action="Index">Quay lại trang chủ</a>
+    </div>
+</main>
+
+<partial name="_DoctorModal" />
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="~/js/booking.js" asp-append-version="true"></script>
+    <script>
+        (function () {
+            if (!window.Swal) { return; }
+
+            var booking = @Json.Serialize(new
+            {
+                code = Model.Code,
+                date = VietnameseFormat.ShortDate(Model.Date),
+                shift = Model.ShiftLabel,
+                time = Model.TimeRange,
+                room = Model.Room,
+                doctor = Model.Doctor?.FullName ?? Model.DoctorName,
+                queue = Model.QueueNumber,
+                hasInsurance = Model.HasHealthInsurance
+            });
+
+            var rows = [
+                ['Mã lịch hẹn', booking.code],
+                ['Ngày giờ khám', booking.shift + ' · ' + booking.time + ', ' + booking.date],
+                ['Phòng khám', booking.room],
+                ['Bác sĩ', booking.doctor || 'Bác sĩ tiếp nhận tại phòng khám'],
+                ['Số khám', booking.queue]
+            ];
+
+            var html = '<div class="swal-booking">'
+                + rows.map(function (row) {
+                    return '<div class="swal-booking-row"><span>' + row[0] + '</span><strong>' + row[1] + '</strong></div>';
+                }).join('')
+                + '</div>'
+                + '<div class="swal-booking-note">'
+                + (booking.hasInsurance
+                    ? 'Bạn đã khai báo <b>BHYT</b>: vui lòng ghé <b>quầy tiếp nhận</b> để xác nhận bảo hiểm trước khi lên phòng khám.'
+                    : 'Bạn không dùng BHYT: sau khi thanh toán, đi thẳng đến <b>' + booking.room + '</b> theo giờ hẹn.')
+                + '</div>';
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Đặt lịch thành công!',
+                html: html,
+                confirmButtonText: 'Đã hiểu',
+                confirmButtonColor: '#0f766e',
+                customClass: { popup: 'swal-booking-popup' }
+            });
+        })();
+    </script>
+}

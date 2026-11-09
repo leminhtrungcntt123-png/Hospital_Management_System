@@ -1,0 +1,93 @@
+@* Bước "chọn người khám" của cả ba luồng. Tạo hồ sơ mới ở mục Hồ sơ (HoSoController), bước này chỉ chọn.
+   Khai báo bảo hiểm dời sang bước xác nhận vì người bệnh chỉ quyết định khi đã thấy đủ phiếu khám. *@
+@model ChonNguoiKhamViewModel
+@{
+    Layout = "_BookingLayout";
+    ViewData["Title"] = "Chọn người khám";
+
+    var selected = Model.Patients.FirstOrDefault(p => p.Id == Model.SelectedPatientId);
+}
+
+<form asp-action="ChonNguoiKham" method="post" id="nguoi-form">
+    <input type="hidden" name="patientId" id="field-patient" value="@Model.SelectedPatientId" />
+
+    <section class="booking-content">
+        <div class="content-head">
+            <div>
+                <div class="eyebrow">@ViewData["StepLabel"]</div>
+                <div class="page-title">Ai sẽ là người đến khám?</div>
+                <p>Chọn một hồ sơ đã lưu trong tài khoản của bạn. Mỗi lịch hẹn chỉ liên kết với một người khám.</p>
+            </div>
+            <div class="head-actions">
+                <a class="btn btn-outline" asp-controller="HoSo" asp-action="Index">
+                    <i data-lucide="folder-open"></i> Hồ sơ của tôi
+                </a>
+                <a class="btn btn-primary" asp-controller="HoSo" asp-action="Them">
+                    <i data-lucide="user-plus"></i> Thêm hồ sơ mới
+                </a>
+            </div>
+        </div>
+
+        <partial name="_ErrorAlert" />
+
+        <div class="profile-select-grid">
+            @foreach (var p in Model.Patients)
+            {
+                var isSelected = p.Id == Model.SelectedPatientId;
+                <button type="button" class="profile-select @(isSelected ? "selected" : "")"
+                        data-id="@p.Id" data-name="@p.DisplayName" data-bookable="@(p.IsBookable ? "true" : "false")">
+                    <div class="profile-avatar">@p.Initials</div>
+                    <div class="profile-body">
+                        <div>
+                            <strong>@p.DisplayName</strong>
+                            <span class="badge @(p.RelationshipCode == "SELF" ? "badge-blue" : "badge-gray")">@p.Relationship</span>
+                        </div>
+                        <p>Mã người bệnh: @p.Code</p>
+                        <p>Ngày sinh: @p.DisplayDateOfBirth</p>
+                        @if (p.IsVerified)
+                        {
+                            <span class="verified"><i data-lucide="shield-check"></i> Đã xác minh</span>
+                        }
+                        else if (p.NeedsApproval)
+                        {
+                            <span class="needs-verify"><i data-lucide="clock-3"></i> Chưa nhập mã xác thực nên chưa đặt lịch được</span>
+                        }
+                        else
+                        {
+                            <span class="needs-verify"><i data-lucide="circle-alert"></i> Không còn quyền đặt lịch</span>
+                        }
+                    </div>
+                    <div class="check-mark"><i data-lucide="check"></i></div>
+                </button>
+            }
+        </div>
+
+        @* TODO: nút "Cập nhật hồ sơ" thuộc nhóm B (Hồ sơ người khám), người phụ trách nhóm đó nối vào đây. *@
+        <div class="alert warning" id="unverified-alert" hidden>
+            <i data-lucide="circle-alert"></i>
+            <div>
+                <strong>Hồ sơ này không đặt lịch được</strong>
+                <p>Hồ sơ chưa nhập xong mã xác thực (hoặc liên kết đã bị thu hồi). Vào <a asp-controller="HoSo" asp-action="Index">Hồ sơ của tôi</a> để bấm "Nhập mã xác thực", hoặc chọn hồ sơ khác.</p>
+            </div>
+        </div>
+
+        <div class="privacy-note">
+            <i data-lucide="shield-check"></i>
+            <span>Thông tin cá nhân được mã hóa và chỉ sử dụng cho mục đích chăm sóc sức khỏe.</span>
+        </div>
+
+        <div class="booking-footer">
+            <span>Đã chọn: <strong id="nguoi-selected-name">@(selected?.DisplayName ?? "chưa chọn")</strong></span>
+            <div class="footer-actions">
+                <a class="btn btn-outline" href="@ViewData["BackUrl"]"><i data-lucide="chevron-left"></i> Quay lại</a>
+                <button type="submit" class="btn btn-primary" id="nguoi-next" disabled="@(selected is null)">
+                    Tiếp tục <i data-lucide="chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    </section>
+</form>
+
+@section Scripts {
+    <script src="~/js/booking.js" asp-append-version="true"></script>
+}

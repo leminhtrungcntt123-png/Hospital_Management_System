@@ -1,22 +1,58 @@
-## Ignore Visual Studio & .NET artifacts
-bin/
-obj/
-TestResults/
+## Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+## Visual Studio files
+.vs/
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+
+## User-specific files
+*.rsuser
 *.suo
 *.user
 *.userosscache
 *.sln.docstates
 
-## VS Code
-.vscode/
-
-## User Secrets & Local settings
-**/appsettings.Development.json
+## Secrets & Local Settings
+appsettings.json
 appsettings.Development.json
-.env
+*.local.json
+# Ngoại lệ: file dev của HIS.Web chỉ bật cờ demo RevealCodeOnScreen, không chứa mật khẩu/SMTP nào.
+!src/HIS.Web/appsettings.Development.json
+!src/HIS.WinForms/appsettings.json
+
+## Rider / JetBrains
+.idea/
+*.sln.iml
+
+## VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 
 ## OS generated
 .DS_Store
 Thumbs.db
-.init
-.vs/
+init.md
+
+## Local database dumps
+backup/
+
+## QR sinh lúc chạy (Utils.GenerateQRCodeImage)
+src/HIS.Web/wwwroot/images/qrcode/*.png

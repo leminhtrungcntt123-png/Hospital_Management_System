@@ -1,0 +1,664 @@
+@model HIS.BLL.DTOs.HealthRecordDetailDto
+@{
+    ViewData["Title"] = "Hồ sơ sức khỏe — " + Model.PatientName;
+}
+
+<style>
+    .mobile-screen-wrapper {
+        background: #f0f4f8;
+        min-height: calc(100vh - 120px);
+        padding: 24px 16px 60px;
+        display: flex;
+        justify-content: center;
+    }
+    .mobile-phone-container {
+        width: 100%;
+        max-width: 440px;
+        background: #0277bd;
+        border-radius: 28px;
+        box-shadow: 0 12px 36px rgba(2, 119, 189, 0.22);
+        padding: 20px 16px 28px;
+        color: #fff;
+        position: relative;
+    }
+    .hr-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+    }
+    .hr-header a.back-btn {
+        color: #fff;
+        text-decoration: none;
+        font-size: 22px;
+        line-height: 1;
+        padding: 6px 10px;
+        border-radius: 8px;
+        transition: background 0.2s;
+    }
+    .hr-header a.back-btn:hover {
+        background: rgba(255, 255, 255, 0.15);
+    }
+    .hr-header-title {
+        font-size: 17px;
+        font-weight: 700;
+        letter-spacing: -0.2px;
+        margin: 0;
+    }
+    .hr-refresh-btn {
+        background: rgba(255, 255, 255, 0.2);
+        color: #fff;
+        border: none;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 4px 12px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        text-decoration: none;
+    }
+    .hr-refresh-btn:hover {
+        background: rgba(255, 255, 255, 0.3);
+        color: #fff;
+    }
+
+    /* Patient ID Card */
+    .patient-id-card {
+        background: #fff;
+        border-radius: 16px;
+        padding: 14px 16px;
+        color: #212529;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 14px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+    .patient-avatar-box {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: #e1f5fe;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        margin-right: 12px;
+        flex-shrink: 0;
+    }
+    .patient-meta-info {
+        flex: 1;
+    }
+    .patient-meta-name {
+        font-size: 15px;
+        font-weight: 800;
+        color: #1a202c;
+        margin: 0 0 3px;
+        text-transform: uppercase;
+        letter-spacing: -0.2px;
+    }
+    .patient-meta-row {
+        font-size: 11px;
+        color: #4a5568;
+        line-height: 1.45;
+    }
+    .patient-meta-row span.label {
+        color: #718096;
+        display: inline-block;
+        width: 48px;
+    }
+    .patient-meta-row strong {
+        color: #2d3748;
+        font-weight: 600;
+    }
+    .patient-qr-box {
+        margin-left: 10px;
+        background: #f7fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 4px;
+        flex-shrink: 0;
+    }
+
+    /* Service list card (Blue Accordion) */
+    .services-accordion-card {
+        background: #fff;
+        border-radius: 14px;
+        overflow: hidden;
+        margin-bottom: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+        color: #2d3748;
+    }
+    .services-accordion-head {
+        background: #0288d1;
+        color: #fff;
+        padding: 11px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+    .services-accordion-head .left-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .services-accordion-body {
+        padding: 14px 16px;
+        font-size: 12px;
+    }
+    .facility-title {
+        color: #0277bd;
+        font-weight: 800;
+        font-size: 13px;
+        text-transform: uppercase;
+        margin-bottom: 3px;
+    }
+    .exam-time-label {
+        color: #4a5568;
+        font-size: 11px;
+        margin-bottom: 10px;
+    }
+    .services-list-subheading {
+        color: #718096;
+        font-style: italic;
+        font-size: 11px;
+        margin-bottom: 6px;
+    }
+    .service-row-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 5px 0;
+        border-bottom: 1px dashed #edf2f7;
+        font-size: 11px;
+    }
+    .service-row-item .item-title {
+        color: #2d3748;
+        font-weight: 500;
+        padding-right: 12px;
+        display: flex;
+        gap: 6px;
+    }
+    .service-row-item .item-title::before {
+        content: "•";
+        color: #0288d1;
+        font-weight: bold;
+    }
+    .service-row-item .item-price {
+        font-family: Consolas, monospace;
+        font-weight: 600;
+        color: #4a5568;
+        white-space: nowrap;
+    }
+    .service-total-section {
+        border-top: 1px solid #e2e8f0;
+        margin-top: 10px;
+        padding-top: 8px;
+    }
+    .service-total-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        padding: 3px 0;
+    }
+    .service-total-row.highlight {
+        color: #e53e3e;
+        font-weight: 700;
+    }
+    .service-total-row.highlight .price {
+        color: #e53e3e;
+        font-size: 13px;
+    }
+    .service-total-row.bhyt {
+        color: #00897b;
+        font-weight: 600;
+    }
+
+    /* Sub-Accordions (White with chevron right) */
+    .result-accordion-item {
+        background: #fff;
+        border-radius: 12px;
+        margin-bottom: 9px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        color: #2d3748;
+    }
+    .result-accordion-head {
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 600;
+        transition: background 0.15s;
+    }
+    .result-accordion-head:hover {
+        background: #f8fafc;
+    }
+    .result-accordion-head .left-content {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: #2d3748;
+    }
+    .result-accordion-head .left-content .icon-badge {
+        font-size: 16px;
+        width: 26px;
+        height: 26px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        background: #f0f7fb;
+    }
+    .result-accordion-head .chevron {
+        color: #a0aec0;
+        font-size: 16px;
+        transition: transform 0.2s;
+    }
+    .result-accordion-item.open .result-accordion-head .chevron {
+        transform: rotate(90deg);
+    }
+    .result-accordion-body {
+        display: none;
+        padding: 12px 16px 16px;
+        border-top: 1px solid #edf2f7;
+        background: #fafcfe;
+        font-size: 12px;
+    }
+    .result-accordion-item.open .result-accordion-body {
+        display: block;
+    }
+
+    /* Detail content stylings */
+    .clinical-field {
+        margin-bottom: 10px;
+    }
+    .clinical-field .field-label {
+        font-size: 11px;
+        font-weight: 700;
+        color: #0077a3;
+        text-transform: uppercase;
+        margin-bottom: 2px;
+    }
+    .clinical-field .field-val {
+        color: #2d3748;
+        line-height: 1.45;
+    }
+    .lab-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11px;
+        margin-top: 6px;
+    }
+    .lab-table th {
+        background: #edf2f7;
+        color: #4a5568;
+        padding: 6px 8px;
+        text-align: left;
+        font-weight: 700;
+    }
+    .lab-table td {
+        padding: 6px 8px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .med-item-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+    }
+    .med-item-name {
+        font-weight: 700;
+        color: #1a365d;
+        font-size: 12px;
+        margin-bottom: 2px;
+    }
+    .med-item-usage {
+        font-size: 11px;
+        color: #4a5568;
+    }
+</style>
+
+<div class="mobile-screen-wrapper">
+    <div class="mobile-phone-container">
+        <!-- Header -->
+        <header class="hr-header">
+            <a class="back-btn" asp-controller="HoSo" asp-action="Chitiet" asp-route-patientId="@Model.PatientId" title="Quay lại hồ sơ">
+                ←
+            </a>
+            <h1 class="hr-header-title">Hồ sơ sức khỏe</h1>
+            <a class="hr-refresh-btn" href="javascript:location.reload()">
+                ↓ Cập nhật kết quả
+            </a>
+        </header>
+
+        <!-- Thẻ người bệnh (Patient ID Card) -->
+        <div class="patient-id-card">
+            <div style="display: flex; align-items: center; flex: 1;">
+                <div class="patient-avatar-box">
+                    @(Model.Gender == "Nữ" ? "👧" : "👦")
+                </div>
+                <div class="patient-meta-info">
+                    <div class="patient-meta-name">@Model.PatientName</div>
+                    <div class="patient-meta-row">
+                        <span class="label">GT, tuổi</span>
+                        <strong>@Model.Gender, @Model.Age tuổi</strong>
+                    </div>
+                    <div class="patient-meta-row">
+                        <span class="label">Mã NB</span>
+                        <strong>@Model.PatientCode</strong>
+                    </div>
+                    <div class="patient-meta-row">
+                        <span class="label">Mã HS</span>
+                        <strong>@Model.AppointmentCode</strong>
+                    </div>
+                </div>
+            </div>
+            <div class="patient-qr-box" title="Mã QR định danh người bệnh">
+                <!-- SVG QR Code chuẩn y tế -->
+                <svg width="68" height="68" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="100" height="100" fill="#ffffff" />
+                    <!-- Top-Left Corner Box -->
+                    <rect x="10" y="10" width="26" height="26" fill="#1a202c" rx="4" />
+                    <rect x="15" y="15" width="16" height="16" fill="#ffffff" />
+                    <rect x="19" y="19" width="8" height="8" fill="#1a202c" />
+                    <!-- Top-Right Corner Box -->
+                    <rect x="64" y="10" width="26" height="26" fill="#1a202c" rx="4" />
+                    <rect x="69" y="15" width="16" height="16" fill="#ffffff" />
+                    <rect x="73" y="19" width="8" height="8" fill="#1a202c" />
+                    <!-- Bottom-Left Corner Box -->
+                    <rect x="10" y="64" width="26" height="26" fill="#1a202c" rx="4" />
+                    <rect x="15" y="69" width="16" height="16" fill="#ffffff" />
+                    <rect x="19" y="73" width="8" height="8" fill="#1a202c" />
+                    <!-- Matrix Patterns -->
+                    <rect x="42" y="12" width="6" height="6" fill="#1a202c" />
+                    <rect x="52" y="16" width="6" height="6" fill="#1a202c" />
+                    <rect x="44" y="24" width="6" height="6" fill="#1a202c" />
+                    <rect x="12" y="44" width="6" height="6" fill="#1a202c" />
+                    <rect x="22" y="48" width="6" height="6" fill="#1a202c" />
+                    <rect x="32" y="42" width="6" height="6" fill="#1a202c" />
+                    <rect x="42" y="44" width="8" height="8" fill="#1a202c" />
+                    <rect x="54" y="42" width="6" height="6" fill="#1a202c" />
+                    <rect x="66" y="46" width="6" height="6" fill="#1a202c" />
+                    <rect x="78" y="44" width="6" height="6" fill="#1a202c" />
+                    <rect x="44" y="58" width="6" height="6" fill="#1a202c" />
+                    <rect x="56" y="54" width="6" height="6" fill="#1a202c" />
+                    <rect x="44" y="70" width="6" height="6" fill="#1a202c" />
+                    <rect x="54" y="66" width="6" height="6" fill="#1a202c" />
+                    <rect x="64" y="74" width="6" height="6" fill="#1a202c" />
+                    <rect x="74" y="68" width="6" height="6" fill="#1a202c" />
+                    <rect x="82" y="78" width="6" height="6" fill="#1a202c" />
+                </svg>
+            </div>
+        </div>
+
+        <!-- 1. Danh sách dịch vụ (Khớp 100% hình mẫu) -->
+        <div class="services-accordion-card">
+            <div class="services-accordion-head" onclick="toggleCardBody(this)">
+                <div class="left-label">
+                    <span>🏥</span>
+                    <span>Danh sách dịch vụ</span>
+                </div>
+                <span>⌵</span>
+            </div>
+            <div class="services-accordion-body" style="display: block;">
+                <div class="facility-title">@Model.FacilityName</div>
+                <div class="exam-time-label">TG khám: @Model.ExaminationTime.ToString("HH:mm, dd/MM/yyyy")</div>
+                <div class="services-list-subheading">Dịch vụ đã thực hiện</div>
+
+                <div class="services-items-container">
+                    @foreach (var s in Model.Services)
+                    {
+                        <div class="service-row-item">
+                            <span class="item-title">@s.Name</span>
+                            <span class="item-price">@s.Price.ToString("N0")đ</span>
+                        </div>
+                    }
+                </div>
+
+                <div class="service-total-section">
+                    <div class="service-total-row">
+                        <span>Tổng chi phí</span>
+                        <strong class="font-monospace">@Model.TotalAmount.ToString("N0")đ</strong>
+                    </div>
+
+                    @if (Model.InsuranceCoveredAmount > 0)
+                    {
+                        <div class="service-total-row bhyt">
+                            <span>BHYT chi trả (@Model.CoveragePct.ToString("0.#")%)</span>
+                            <strong class="font-monospace">-@Model.InsuranceCoveredAmount.ToString("N0")đ</strong>
+                        </div>
+                    }
+
+                    <div class="service-total-row highlight">
+                        <span>Chi phí sau ưu đãi</span>
+                        <span class="price font-monospace">@Model.PatientAmount.ToString("N0")đ</span>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 11px;">
+                        <span class="text-muted">Trạng thái viện phí:</span>
+                        @if (Model.BillingStatus == HIS.Domain.InvoiceStatus.Paid)
+                        {
+                            <span style="background: #e8f5e9; color: #2e7d32; font-weight: 700; padding: 2px 8px; border-radius: 12px;">✓ Đã thanh toán</span>
+                        }
+                        else
+                        {
+                            <span style="background: #fff8e1; color: #f57f17; font-weight: 700; padding: 2px 8px; border-radius: 12px;">⏳ Chờ thanh toán</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Kết quả khám -->
+        <div class="result-accordion-item">
+            <div class="result-accordion-head" onclick="toggleResultSection(this)">
+                <div class="left-content">
+                    <span class="icon-badge">🩺</span>
+                    <span>Kết quả khám</span>
+                </div>
+                <span class="chevron">›</span>
+            </div>
+            <div class="result-accordion-body">
+                <div class="clinical-field">
+                    <div class="field-label">Bác sĩ khám</div>
+                    <div class="field-val"><strong>@Model.DoctorName</strong> (@Model.DepartmentName)</div>
+                </div>
+                @if (Model.Examination != null)
+                {
+                    <div class="clinical-field">
+                        <div class="field-label">Lý do khám / Triệu chứng</div>
+                        <div class="field-val">@Model.Examination.Symptoms</div>
+                    </div>
+                    <div class="clinical-field">
+                        <div class="field-label">Khám lâm sàng</div>
+                        <div class="field-val">@Model.Examination.ClinicalExam</div>
+                    </div>
+                    <div class="clinical-field">
+                        <div class="field-label">Chẩn đoán (ICD-10)</div>
+                        <div class="field-val">
+                            <span style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-family: monospace;">@Model.Examination.DiagnosisCode</span>
+                            <span>@Model.Examination.DiagnosisDesc</span>
+                        </div>
+                    </div>
+                    <div class="clinical-field">
+                        <div class="field-label">Kết luận &amp; Lời dặn của bác sĩ</div>
+                        <div class="field-val">@Model.Examination.Conclusion</div>
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted" style="margin: 0;">Đang cập nhật kết luận khám lâm sàng từ bác sĩ.</p>
+                }
+            </div>
+        </div>
+
+        <!-- 3. Kết quả xét nghiệm -->
+        <div class="result-accordion-item">
+            <div class="result-accordion-head" onclick="toggleResultSection(this)">
+                <div class="left-content">
+                    <span class="icon-badge">🧪</span>
+                    <span>Kết quả xét nghiệm</span>
+                </div>
+                <span class="chevron">›</span>
+            </div>
+            <div class="result-accordion-body">
+                @if (Model.LabResults.Count > 0)
+                {
+                    <table class="lab-table">
+                        <thead>
+                            <tr>
+                                <th>Chỉ số xét nghiệm</th>
+                                <th>Kết quả</th>
+                                <th>Khoảng tham chiếu</th>
+                                <th>Trạng thái</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var lab in Model.LabResults)
+                            {
+                                <tr>
+                                    <td><strong>@lab.TestName</strong></td>
+                                    <td class="font-monospace" style="color: #0277bd; font-weight: 600;">@lab.ResultValue</td>
+                                    <td class="text-muted">@lab.ReferenceRange</td>
+                                    <td>
+                                        <span style="color: #2e7d32; font-weight: 600;">@lab.Status</span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <p class="text-muted" style="margin: 0;">Không có chỉ định xét nghiệm hoặc đang chờ duyệt kết quả.</p>
+                }
+            </div>
+        </div>
+
+        <!-- 4. Kết quả CĐHA và thăm dò chức năng -->
+        <div class="result-accordion-item">
+            <div class="result-accordion-head" onclick="toggleResultSection(this)">
+                <div class="left-content">
+                    <span class="icon-badge">🩻</span>
+                    <span>Kết quả CĐHA và thăm dò chức năng</span>
+                </div>
+                <span class="chevron">›</span>
+            </div>
+            <div class="result-accordion-body">
+                @if (Model.ImagingResults.Count > 0)
+                {
+                    @foreach (var img in Model.ImagingResults)
+                    {
+                        <div style="margin-bottom: 12px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px;">
+                            <div style="font-weight: 700; color: #0277bd; margin-bottom: 4px;">• @img.ServiceName</div>
+                            <div class="clinical-field">
+                                <div class="field-label">Mô tả hình ảnh:</div>
+                                <div class="field-val">@img.Description</div>
+                            </div>
+                            <div class="clinical-field">
+                                <div class="field-label">Kết luận:</div>
+                                <div class="field-val" style="font-weight: 600; color: #2d3748;">@img.Conclusion</div>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <p class="text-muted" style="margin: 0;">Không có kết quả chẩn đoán hình ảnh cho lượt khám này.</p>
+                }
+            </div>
+        </div>
+
+        <!-- 5. Phẫu thuật thủ thuật -->
+        <div class="result-accordion-item">
+            <div class="result-accordion-head" onclick="toggleResultSection(this)">
+                <div class="left-content">
+                    <span class="icon-badge">💉</span>
+                    <span>Phẫu thuật thủ thuật</span>
+                </div>
+                <span class="chevron">›</span>
+            </div>
+            <div class="result-accordion-body">
+                @{
+                    var procedureServices = Model.Services.Where(s => s.Category.Contains("Phẫu thuật") || s.Category.Contains("Thủ thuật") || s.Name.Contains("Tế bào học")).ToList();
+                }
+                @if (procedureServices.Count > 0)
+                {
+                    @foreach (var proc in procedureServices)
+                    {
+                        <div style="margin-bottom: 10px;">
+                            <strong style="color: #0077a3;">• @proc.Name</strong>
+                            <p style="margin: 2px 0 0; color: #4a5568;">Thủ thuật lấy mẫu tế bào học đã được thực hiện an toàn. Kết quả tế bào học các tổn thương dạng nang trong giới hạn lành tính.</p>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <p class="text-muted" style="margin: 0;">Lượt khám không chỉ định phẫu thuật hay can thiệp thủ thuật.</p>
+                }
+            </div>
+        </div>
+
+        <!-- 6. Thuốc -->
+        <div class="result-accordion-item">
+            <div class="result-accordion-head" onclick="toggleResultSection(this)">
+                <div class="left-content">
+                    <span class="icon-badge">💊</span>
+                    <span>Thuốc</span>
+                </div>
+                <span class="chevron">›</span>
+            </div>
+            <div class="result-accordion-body">
+                @if (Model.Prescriptions.Count > 0)
+                {
+                    @foreach (var med in Model.Prescriptions)
+                    {
+                        <div class="med-item-card">
+                            <div class="med-item-name">@med.MedicineName (@med.Dosage)</div>
+                            <div style="font-size: 11px; color: #718096; margin-bottom: 4px;">
+                                Hoạt chất: @med.ActiveIngredient · Số lượng: <strong>@med.Quantity @med.Unit</strong>
+                            </div>
+                            <div class="med-item-usage">
+                                💊 <strong>Cách dùng:</strong> @med.UsageInstructions
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <p class="text-muted" style="margin: 0;">Không có đơn thuốc kèm theo cho lượt khám này.</p>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function toggleCardBody(headElem) {
+            var body = headElem.nextElementSibling;
+            if (body.style.display === 'none') {
+                body.style.display = 'block';
+                headElem.querySelector('span:last-child').textContent = '⌵';
+            } else {
+                body.style.display = 'none';
+                headElem.querySelector('span:last-child').textContent = '›';
+            }
+        }
+
+        function toggleResultSection(headElem) {
+            var item = headElem.closest('.result-accordion-item');
+            item.classList.toggle('open');
+        }
+    </script>
+}
+

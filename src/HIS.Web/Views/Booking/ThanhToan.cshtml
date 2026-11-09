@@ -1,0 +1,75 @@
+@* Bước thanh toán: VietQR động (đúng số tiền + mã lịch hẹn).
+   Bấm "Tôi đã chuyển khoản" mới chuyển PENDING -> CONFIRMED và cấp số thứ tự.
+   Không thanh toán thì bấm "Hủy đơn" để trả suất cho người khác. *@
+@model ThanhToanViewModel
+@{
+    Layout = "_BookingLayout";
+    ViewData["Title"] = "Thanh toán phí khám";
+
+    var a = Model.Appointment;
+}
+
+<main class="payment-page">
+    <div class="payment-card">
+        <div class="payment-head">
+            <span class="badge badge-yellow">CHỜ THANH TOÁN</span>
+            <div class="success-title">Thanh toán phí khám</div>
+            <p>
+                Quét mã VietQR bằng app ngân hàng để chuyển đúng số tiền.
+                Thanh toán thành công hệ thống mới cấp số thứ tự và phiếu khám.
+                Nếu chưa thanh toán, bạn có thể hủy đơn để nhường suất cho người khác.
+            </p>
+        </div>
+
+        <div class="payment-body">
+            <div class="payment-qr">
+                <img src="@Model.QrImagePath" alt="Mã VietQR thanh toán phí khám" width="240" height="240" />
+                <div class="payment-bank">
+                    <div><span>Ngân hàng</span><strong>@Model.BankName</strong></div>
+                    <div><span>Số tài khoản</span><strong>@Model.AccountNumber</strong></div>
+                    <div><span>Chủ tài khoản</span><strong>@Model.AccountName</strong></div>
+                    <div><span>Số tiền</span><strong class="payment-amount">@VietnameseFormat.Money(a.Amount)</strong></div>
+                    <div><span>Nội dung chuyển khoản</span><strong>@Model.TransferContent</strong></div>
+                </div>
+                <small>Nội dung chuyển khoản phải giữ nguyên mã lịch hẹn để bệnh viện đối soát.</small>
+            </div>
+
+            <aside class="payment-summary">
+                <div class="summary-title"><i data-lucide="receipt-text"></i> Thông tin lượt khám</div>
+                <div class="summary-row"><span>Mã lịch hẹn</span><strong>@a.Code</strong></div>
+                <div class="summary-row"><span>Người khám</span><strong>@a.PatientName</strong></div>
+                <div class="summary-row"><span>Chuyên khoa</span><strong>@a.DepartmentName</strong></div>
+                <div class="summary-row"><span>Thời gian</span><strong>@a.ShiftLabel · @a.TimeRange, @VietnameseFormat.ShortDate(a.Date)</strong></div>
+                @if (!string.IsNullOrEmpty(a.DoctorName))
+                {
+                    <div class="summary-row"><span>Bác sĩ</span><strong>@a.DoctorName</strong></div>
+                }
+                <div class="summary-row"><span>Địa điểm</span><strong>@a.RoomName</strong></div>
+                <div class="summary-divider"></div>
+                <div class="summary-row"><span>Phí khám</span><strong>@VietnameseFormat.Money(a.Amount)</strong></div>
+
+                <div class="alert warning payment-warning">
+                    <i data-lucide="circle-alert"></i>
+                    <div>
+                        <strong>Chưa thanh toán thì chưa có số thứ tự</strong>
+                        <p>Số khám chỉ được cấp sau khi thanh toán thành công. Nếu không thanh toán, hãy bấm <b>Hủy đơn</b> để nhường suất cho người khác.</p>
+                    </div>
+                </div>
+
+                <form asp-action="XacNhanThanhToan" asp-route-id="@a.AppointmentId" method="post" id="paid-form">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-primary payment-submit" id="paid-btn">
+                        <i data-lucide="check-check"></i> Tôi đã chuyển khoản
+                    </button>
+                </form>
+                <form asp-controller="LichKham" asp-action="HuyLich" method="post" class="payment-cancel"
+                      onsubmit="return confirm('Hủy đơn chưa thanh toán @a.Code? Suất khám sẽ được trả lại cho người khác.');">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="appointmentId" value="@a.AppointmentId" />
+                    <button type="submit" class="btn btn-outline"><i data-lucide="x"></i> Hủy đơn</button>
+                </form>
+                <a class="text-button" asp-controller="LichKham" asp-action="Index">Xem lịch khám của tôi</a>
+            </aside>
+        </div>
+    </div>
+</main>

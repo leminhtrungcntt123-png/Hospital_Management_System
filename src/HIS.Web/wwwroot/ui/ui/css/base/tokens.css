@@ -1,0 +1,18 @@
+/* base / tokens */
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;450;500;550;600;650;700;750;800&display=swap');
+:root {
+    --cyan: #079bc9;
+    --primary: #006f98;
+    --primary-hover: #005574;
+    --navy: #111f38;
+    --ink: #10243e;
+    --muted: #465d76;
+    --line: #bdcedd;
+    --bg: #eaf0f6;
+    --pale: #eaf6fc;
+    --blue: #244de1;
+    --amber: #a96f17;
+    --success: #2a7b60;
+    --danger: #b24e4b;
+    --shadow: 0 4px 20px #132a4505;
+}

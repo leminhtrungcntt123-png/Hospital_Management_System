@@ -1,0 +1,110 @@
+@* Chi tiết một hồ sơ: thông tin định danh + lịch sử khám riêng của hồ sơ đó. *@
+@model HoSoChiTietViewModel
+@{
+    ViewData["Title"] = "Hồ sơ " + Model.Profile.Code;
+    var p = Model.Profile;
+}
+
+<main>
+    <section class="booking-content">
+        <div class="content-head">
+            <div>
+                <div class="eyebrow">HỒ SƠ @p.Code</div>
+                <div class="page-title">@p.DisplayName</div>
+                <p>@p.Relationship · sinh ngày @p.DisplayDateOfBirth · @p.DisplayGender · @p.DisplayPhone</p>
+            </div>
+            <div class="head-actions">
+                <a class="btn btn-outline" asp-action="Index"><i data-lucide="chevron-left"></i> Danh sách hồ sơ</a>
+                @if (p.IsMasked)
+                {
+                    @* Chưa nhập xong mã OTP thì chưa đặt lịch được: nút duy nhất ở đây là nối lại việc xác thực. *@
+                    <a class="btn btn-primary" asp-action="Them" asp-route-branch="@ThemHoSoRequest.SeenBranch" asp-route-patientCode="@p.Code">
+                        <i data-lucide="shield-check"></i> Nhập mã xác thực
+                    </a>
+                }
+                else
+                {
+                    <a class="btn btn-primary" asp-controller="Booking" asp-action="Index"><i data-lucide="calendar-plus"></i> Đặt lịch khám</a>
+                }
+            </div>
+        </div>
+
+        @if (p.IsMasked)
+        {
+            <div class="alert warning">
+                <i data-lucide="clock-3"></i>
+                <div>
+                    <strong>Hồ sơ chưa xác thực xong nên chưa đặt lịch được</strong>
+                    <p>Mã xác thực gửi về email đã lưu trong hồ sơ này; chỉ khi nhập đúng mã, hệ thống mới mở quyền đặt lịch. Khi chưa xác thực, trang chỉ hiện mã bệnh nhân, quan hệ và trạng thái — không hiện họ tên, ngày sinh, liên hệ hay lịch sử khám. Không có email trong hồ sơ thì ra quầy đối chiếu giấy tờ, hotline 0808 0808.</p>
+                </div>
+            </div>
+        }
+        else if (!p.CanViewRecords)
+        {
+            <div class="alert warning">
+                <i data-lucide="circle-alert"></i>
+                <div>
+                    <strong>Chưa được xem hồ sơ bệnh án</strong>
+                    <p>Chỉ hiển thị lịch sử khám và trạng thái. Muốn xem bệnh án, người bệnh cần đồng ý và quầy sẽ ghi nhận sự đồng ý đó.</p>
+                </div>
+            </div>
+        }
+
+        <div class="card-section">
+            <div class="card-head"><strong>Thông tin định danh</strong></div>
+            <div class="detail-grid">
+                <label><span>Mã người bệnh</span><strong>@p.Code</strong></label>
+                <label><span>Họ và tên</span><strong>@p.DisplayName</strong></label>
+                <label><span>Quan hệ với bạn</span><strong>@p.Relationship</strong></label>
+                <label><span>Ngày sinh</span><strong>@p.DisplayDateOfBirth</strong></label>
+                <label><span>Giới tính</span><strong>@p.DisplayGender</strong></label>
+                <label><span>Điện thoại</span><strong>@p.DisplayPhone</strong></label>
+                <label><span>Trạng thái liên kết</span><strong>@p.StatusLabel</strong></label>
+                <label><span>Được xem bệnh án</span><strong>@(p.CanViewRecords ? "Có" : "Không")</strong></label>
+            </div>
+        </div>
+
+        @if (!p.IsMasked)
+        {
+        <div class="card-section">
+            <div class="card-head">
+                <strong>Lịch sử khám của hồ sơ này</strong>
+                <span class="badge badge-gray">@p.AppointmentCount lượt</span>
+            </div>
+
+            @if (Model.History.Count == 0)
+            {
+                <div class="empty-state">
+                    <i data-lucide="calendar-x"></i>
+                    <strong>Chưa có lượt khám nào</strong>
+                    <p>Lịch sử sẽ xuất hiện sau khi bạn đặt lịch cho hồ sơ này.</p>
+                </div>
+            }
+            else
+            {
+                @foreach (var a in Model.History)
+                {
+                    <div class="detail-grid">
+                        <label><span>Mã lịch hẹn</span><strong>@a.Code</strong></label>
+                        <label><span>Chuyên khoa</span><strong>@a.DepartmentName</strong></label>
+                        <label><span>Thời gian</span><strong>@a.DateLabel@(string.IsNullOrEmpty(a.TimeLabel) ? "" : $" · {a.TimeLabel}")</strong></label>
+                        <label><span>Trạng thái</span><strong>@a.StatusLabel</strong></label>
+                        <label><span>Bác sĩ</span><strong>@a.DoctorName</strong></label>
+                        <label><span>Số thứ tự</span><strong>@(string.IsNullOrEmpty(a.QueueNumber) ? "-" : a.QueueNumber)</strong></label>
+                        @if (!string.IsNullOrEmpty(a.InsuranceSummary))
+                        {
+                            <label><span>Bảo hiểm đã khai</span><strong>@a.InsuranceSummary</strong></label>
+                        }
+                    </div>
+                    <div style="margin: 10px 0 16px; display: flex; justify-content: flex-end;">
+                        <a class="btn btn-outline" asp-controller="HoSo" asp-action="HealthRecord" asp-route-id="@a.Id" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: #0077a3; border-color: #b3e5fc; font-size: 13px;">
+                            <i data-lucide="file-text"></i> Xem Hồ sơ sức khỏe &amp; Kết quả khám
+                        </a>
+                    </div>
+                    <div class="summary-divider"></div>
+                }
+            }
+        </div>
+        }
+    </section>
+</main>
