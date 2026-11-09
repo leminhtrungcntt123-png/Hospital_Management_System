@@ -1,0 +1,49 @@
+@* Khối chip khung giờ của MỘT ngày, nhóm theo Ca sáng / Ca chiều.
+   Dùng ở màn "Bác sĩ & khung giờ" (mỗi bác sĩ một khối) và màn "Ngày & khung giờ".
+   Chip đã kín vẫn hiển thị với nhãn "Đã đầy" để bệnh nhân thấy khung giờ tồn tại nhưng hết suất online. *@
+@model SlotListViewModel
+@{
+    var groups = Model.Slots
+        .GroupBy(s => s.ShiftLabel)
+        .OrderBy(g => g.Min(s => s.Label));
+}
+
+@foreach (var group in groups)
+{
+    <div class="slot-group">
+        <div class="slot-group-head">
+            <i data-lucide="@(group.Key.Contains("chiều") ? "sunset" : "sunrise")"></i>
+            <span>@group.Key</span>
+            <small>@group.Sum(s => s.SlotsLeft) suất còn lại</small>
+        </div>
+
+        <div class="slot-chips">
+            @foreach (var s in Model.Slots.Where(x => x.ShiftLabel == group.Key).OrderBy(x => x.Label))
+            {
+                var isSelected = s.Id == Model.SelectedSlotId;
+                <div class="slot-item @(isSelected ? "selected" : "") @(s.IsSelectable ? "" : "full")"
+                     data-slot="@s.Id" data-doctor="@s.Doctor?.Id" data-label="@s.Label"
+                     data-room="@s.Room" data-doctor-name="@(s.Doctor?.FullName ?? string.Empty)">
+                    <button type="button" class="slot-chip" disabled="@(!s.IsSelectable)">
+                        <strong>@s.Label</strong>
+                        @if (s.IsSelectable)
+                        {
+                            <span class="slot-left">Còn @s.SlotsLeft suất</span>
+                        }
+                        else
+                        {
+                            <span class="slot-full">Đã đầy</span>
+                        }
+                    </button>
+                    @if (Model.ShowDoctor && s.Doctor is not null)
+                    {
+                        <button type="button" class="chip-doctor"
+                                data-doctor-open="@s.Doctor.ToModalJson(s.Label, s.Room, Model.Date)">
+                            @s.Doctor.FullName
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+}

@@ -2,20 +2,18 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\HIS.BLL\HIS.BLL.csproj" />
-    <ProjectReference Include="..\HIS.DAL\HIS.DAL.csproj" />
-    <ProjectReference Include="..\HIS.Domain\HIS.Domain.csproj" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+    <PackageReference Include="QRCoder" Version="1.8.1" />
+    <PackageReference Include="SkiaSharp" Version="4.153.1" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" />
+    <ProjectReference Include="..\HIS.BLL\HIS.BLL.csproj" />
   </ItemGroup>
 
 </Project>

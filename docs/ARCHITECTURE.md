@@ -1,30 +1,180 @@
-# Kiến trúc hệ thống HIS
+# Kiến trúc HIS (Hệ thống hỗ trợ đặt lịch khám và quản lý hồ sơ bệnh án)
 
-## 1. Sơ đồ phụ thuộc giữa các dự án
+Tài liệu mô tả **code đang có trong repo**, không mô tả ước nguyện. Mọi chỗ lệch `init.md` mục 1 đều ghi rõ ở cuối và được giải thích trong [docs/DECISIONS.md](DECISIONS.md).
 
-```mermaid
-graph TD
-    Tests[HIS.Tests] --> Web[HIS.Web]
-    Tests --> BLL[HIS.BLL]
-    Tests --> DAL[HIS.DAL]
-    Tests --> Domain[HIS.Domain]
+Nguồn sự thật về cấu trúc dữ liệu: [docs/database/schema-reference.sql](database/schema-reference.sql) (DDL tham chiếu) và [docs/database/erd.md](database/erd.md) (ERD sinh từ DB thật `his_ci`).
 
-    Web --> BLL
-    Web --> DAL
-    Web --> Domain
+## 1. Sơ đồ project
 
-    BLL --> DAL
-    BLL --> Domain
-
-    DAL --> Domain
+```
+HIS.sln
+├─ src/HIS.Domain      (net10.0)   entity + enum, không tham chiếu gì
+├─ src/HIS.DAL         (net10.0)   → Domain
+├─ src/HIS.BLL         (net10.0)   → DAL, Domain
+├─ src/HIS.Web         (net10.0)   → BLL                 (portal bệnh nhân, MVC)
+├─ src/HIS.WebApi      (net10.0)   → BLL, DAL            (API nội bộ)
+├─ src/HIS.WinForms    (net10.0-windows) → BLL           (quầy tiếp nhận, admin)
+└─ tests/HIS.Tests     (net10.0)   → BLL, DAL, Domain
 ```
 
-## 2. Quy tắc bất biến
-1. **Phụ thuộc một chiều**:
-   - `HIS.Domain` không tham chiếu bất kỳ dự án nào.
-   - `HIS.DAL` chỉ tham chiếu `HIS.Domain`.
-   - `HIS.BLL` tham chiếu `HIS.DAL` và `HIS.Domain`. Không được dùng các thư viện `Microsoft.AspNetCore.*` hoặc `HttpContext` (giữ tính độc lập để có thể gắn WinForms/WPF sau này).
-   - `HIS.Web` tham chiếu `HIS.BLL`, `HIS.DAL`, `HIS.Domain`. `HIS.Web` tham chiếu `HIS.DAL` chỉ để đăng ký Dependency Injection (Composition Root).
-2. **Nguồn sự thật dữ liệu**:
-   - EF Core Migration là nguồn sự thật duy nhất của cơ sở dữ liệu trên PostgreSQL.
+Sinh ra từ file `.csproj` thật, kiểm tra bằng:
 
+```powershell
+Select-String -Path src/*/*.csproj,tests/*/*.csproj -Pattern "ProjectReference"
+```
+
+## 2. Quy tắc BẤT BIẾN (vi phạm là yêu cầu đổi, không phải gợi ý)
+
+Trích `init.md:33-34`, áp dụng cho toàn bộ code trong repo:
+
+1. `Domain` / `DAL` / `BLL` **không** được tham chiếu ngược lên `Web`, `WebApi`, `WinForms`.
+2. `BLL` **không** dùng `HttpContext` hay bất kỳ kiểu nào của `Microsoft.AspNetCore.*` — lý do: cùng service phải gắn được cho WinForms (xem `src/HIS.WinForms/Program.cs:34-56`).
+3. Project UI chỉ tham chiếu `DAL` ở composition root để đăng ký `AddDbContext`.
+
+## 3. Từng tầng một
+
+### HIS.Domain — 35 file, 18 enum
+
+- `Enums.cs`: 18 enum (`RoleId`, `AppointmentStatusId`, `Gender`, `ExamShift`, `SlotStatus`, `PatientRelationship`, `LinkStatus`, `PaymentMethod`, …).
+- `Entities/<Mục>/<Entity>.cs`: mỗi entity 1 file, tên class PascalCase tiếng Anh, property 1–1 với cột DDL.
+- `Entities/DomainExtensions.cs`: hàm thuần không phụ thuộc EF (`ToPatientCode()`, `ToVietnameseLabel()`, sinh mã hẹn `HIS-{yyyyMMdd}-{6 base32}`).
+- Không có annotation, không có attribute của EF/ASP.NET.
+
+### HIS.DAL — DbContext + 33 IEntityTypeConfiguration + 6 migration
+
+- `AppDbContext.cs:8-10` nhận `TimeProvider` trong constructor; `SaveChanges`/`SaveChangesAsync` gọi `TouchUpdatedAt()` (`:98-116`) để tự ghi `updated_at` cho `Account`, `Appointment`, `MedicalRecord` — vì vậy **code BLL không bao giờ tự gán** `updated_at`.
+- `AppDbContext.cs:80` `UseIdentityAlwaysColumns()`; 3 bảng lookup (`roles`, `service_types`, `appointment_statuses`) giữ `ValueGeneratedNever` để seed id cố định.
+- `AppDbContext.cs:87` vòng lặp `model.GetEntityTypes()` đặt `DeleteBehavior.Restrict` cho **mọi** FK. Ngoại lệ có chủ đích: 10 config giữ `Cascade` cho các bảng vệ tinh phụ thuộc một lịch hẹn/hóa đơn (`VitalSignsConfiguration.cs:21`, `InvoiceConfiguration.cs:28`, `PaymentConfiguration.cs:29`, `LabOrder/LabResult`, `Prescription/PrescriptionItem`, `AppointmentStatusHistory:36`, `MedicalRecord:25`).
+- `Configurations/<Mục>/*.cs`: đặt `ToTable`, CHECK constraints, index, `HasData` seed. Tên ràng buộc theo mẫu `ck_<bảng>_<cột>` / `uq_<nội dung>`.
+- `UpperSnakeCaseEnumConverter.cs`: chuyển enum PascalCase ↔ chuỗi `UPPER_SNAKE` trong cột CHECK, dùng cho mọi cột enum kiểu chuỗi.
+- Naming convention: `UseNpgsql(...).UseSnakeCaseNamingConvention()` — class `PatientAccount` → bảng `patient_account`, không đặt tên thủ công.
+
+### HIS.BLL — 15 interface + 18 service + DTO
+
+- `Interfaces/` + `Services/`: service trả **tuple/DTO**, không có `Result<T>` (xem DECISIONS #3).
+- `Services/AppointmentStateMachine.cs`: hàm thuần, không đụng DB — định nghĩa các bước chuyển trạng thái hợp lệ. Test unit trực tiếp, không cần Postgres.
+- `Services/QueuePositionAllocator.cs`: cấp vị trí trong khung giờ, tính số thứ tự hiển thị `A##`/`T##`. Là scoped service, **phải đăng ký trong mọi composition root** (`Web/Program.cs:33`, `WebApi/Program.cs:36`, `WinForms/Program.cs:43`).
+- `Services/QueueCallOrder.cs`: thứ tự gọi số, gồm ưu tiên/chen hàng.
+- `Services/OtpService.cs` + `Interfaces/IOtpService.cs`: cấp/xác thực mã OTP khi thêm hồ sơ (mục 5.4). Có hai cổng vào rõ ràng — `IssueProfileOtpAsync(accountId, patientId)` cho hồ sơ **đã có** (email lấy từ `patients.email`) và `IssueNewProfileOtpAsync(accountId, email, fullName)` cho hồ sơ **chưa lưu** (email do form truyền vào, BLL không tự đi tìm `accounts.email`). Phần chung nằm trong `IssueAndSendAsync`: kiểm tra hạn mức phát mã, sinh mã, ghi dấu vết `notifications` rồi gọi `IOtpDelivery` — không biết gì về SMTP/ASP.NET, nên WebApi và test dùng chung được. `OtpCodes.Matches` so mã trong Session, chịu khoảng trắng nhưng chặn sai độ dài.
+- `Services/ProfileEmail.cs`: chuẩn hóa email về chữ thường + `IsUsable`/`NormalizeUsable` (chuỗi rỗng/khoảng trắng/email vô nghĩa → `null`) để mọi chỗ cần email dùng chung một cách từ chối; `Mask` giữ chữ cái đầu + domain (`minhchi@gmail.com` → `m***@gmail.com`) cho dấu vết `notifications` và mọi màn hình hiện email lúc chưa xác thực.
+- `Services/PhoneNumbers.cs`: **một luật SĐT duy nhất cho hồ sơ** — 10–11 chữ số, bắt đầu bằng 0 (`^0\d{9,10}$`), kèm `Normalize` bỏ khoảng trắng/dấu chấm/gạch. `PatientProfileService` và `HoSoController` cùng dùng, không còn cảnh Web chặn 10–11 còn BLL cho 9–15. `ReceptionService`/WinForms **cố ý** giữ khoảng 9–15 vì quầy còn gõ số bàn.
+- `Services/PatientAccessService.cs`: cửa độc quyền cho hai câu hỏi "được đặt lịch" và "được xem hồ sơ". `CanBookAsync` **chỉ** chấp nhận liên kết `ACTIVE` — `PENDING` nghĩa là chưa nhập xong mã OTP nên chưa dùng được hồ sơ; `CanViewRecordsAsync` còn thêm `can_view_records=true`.
+- `Options/BookingOptions.cs`: các ngưỡng nghiệp vụ (`OnlineRatioPct=60`, `ReleaseCutoffMinutes=10`, ngưỡng chen hàng/tuổi ưu tiên, `MaxAdvanceDays=30`, `BookingCutoffHour=15`, `MaxProfilesPerAccount=5`, `MaxProfilesPerOwnerPhone=5`, `MaxRelativesPerDay=3`, `MaxBookingsPerDay=6`). Mặc định ghi thẳng trong code; muốn đổi thì thêm section `Booking` vào `appsettings.json` — `AddBookingOptions` bind và `ValidateOnStart()` sẽ chặn giá trị vô lý ngay lúc khởi động. **Đã bỏ** `FreeCancelHours`, `MaxLateCancelsPerMonth`, `BookingBlockDays`, `MaxNoShowsBeforeBlock`, `NoShowWindowDays`: không còn phạt hủy trễ và không còn chặn tài khoản vì vắng mặt (đến trễ thì bỏ lượt, quầy bắt số lại). Cột `accounts.booking_blocked_until`, `accounts.no_show_reset_at`, `appointment_status_history.is_late_cancel` vẫn còn trong DB cho khỏi ALTER nhưng code không đọc/ghi nữa.
+- `Security/RolePermissions.cs`: map role → trang được mở, dùng cho `MainForm` (WinForms) và guard của portal.
+- `DTOs/`: record trả về cho UI. UI không bao giờ nhận entity EF trừ `HIS.WebApi` (controller trả entity thô — cẩn thận khi đổi enum, nó đổi luôn payload JSON).
+
+### HIS.Web — portal bệnh nhân (MVC + Session)
+
+- `Controllers/PatientPageController.cs`: base class, `AccountId` đọc từ phiên đăng nhập, `RequireAccount()` redirect sang trang login.
+- `Controllers/AccountController.cs` + `Helpers/DemoSession.cs`: **trang login demo**, chủ đích dùng Session thay cookie (DECISIONS #8) vì module đăng nhập thật thuộc người khác.
+- `Controllers/BookingController.cs`: wizard **ba lối vào** hội tụ về một `slotId` — `khoa` = `ChonKhoa → ChonBacsi → ChonNgayGio → ChonNguoiKham → XacNhan`, `ngay` = `ChonNgay → ChonKhoa → ChonBacsi (Bác sĩ & khung giờ) → ChonNguoiKham → XacNhan`, `bacsi` = `ChonBacsi → ChonNgayGio → ChonNguoiKham → XacNhan`. Mode lưu trong `BookingState` (Session); `Wizard` + `ModeHasStep` sinh thứ tự bước cho stepper động và nút Back (`ViewData["Steps"]/["Step"]/["StepLabel"]/["BackUrl"]`), `Guard(state, action)` chặn đi tắt, `SlotStepOf(state)` đưa về đúng màn khung giờ của mode đang đi. Ca khám không còn là một bước: `ExamShifts` chỉ còn là nhãn nhóm chip "Ca sáng / Ca chiều" trong `_SlotChips`. Màn `ChonNgayGio` tải lại khung giờ bằng fetch `GET /Booking/KhungGio?date=` (partial `_SlotList`). Wizard **chỉ chọn** hồ sơ đã liên kết, không tạo hồ sơ ở đây. Hai khai báo bảo hiểm nằm ở bước `XacNhan` (mục 5.3).
+- `Controllers/HoSoController.cs`: màn Hồ sơ riêng — danh sách hồ sơ của tài khoản, một màn *Tạo hồ sơ* hai nhánh "đã từng khám / chưa từng khám" (mục 5.2), màn nhập mã xác thực `XacOtp` + `GuiLaiOtp` (mục 5.4), xem lịch sử khám theo từng hồ sơ.
+- `Services/OtpDeliveries.cs`: hai kênh gửi mã — `SmtpOtpDelivery` (mail thật) và `DemoOtpDelivery` (in mã ra log). `Program.cs:56-64` chỉ đăng ký SMTP khi `Otp:Smtp` có User/Password không còn placeholder; `Options/OtpSmtpOptions.cs` giữ cấu hình. Credential Gmail đặt ở `src/HIS.Web/appsettings.Otp.local.json` — **đã `.gitignore` qua mẫu `*.local.json`**, không bao giờ bỏ vào `appsettings.json` đang tracked.
+- `Controllers/LichKhamController.cs`: danh sách lịch theo tài khoản + hủy lịch.
+- `Realtime/QueueChangeNotifier.cs`: broadcaster WebSocket một chiều (server → client) + middleware `UseQueueChangeSocket()`; xem mục 6.
+
+### HIS.WebApi / HIS.WinForms
+
+- `WebApi`: REST nội bộ, cùng chain DI với Web, có Swagger.
+- `WinForms`: app quầy/admin; `Pages/` + `Controls/` + `Dialogs/`, `UserSession` giữ tài khoản đăng nhập, `Theme.cs` quy ước giao diện.
+- `WinForms/Services/QueueChangeClient.cs`: client WebSocket (`ClientWebSocket` trong BCL, không thêm package) nối vào `/ws/quay` của HIS.Web, tự kết nối lại sau 3s, báo `Received` cho `ReceptionPage` để nó tự reload lưới — xem mục 6.
+
+## 4. Database và migration
+
+DB phát triển: `hospital_his` (PostgreSQL 18.6, localhost:5432). DB phụ: `his_rehearsal` (tập dượt ALTER), `his_ci` (CI local).
+
+| Migration | Loại |
+|---|---|
+| `20261015010838_InitialCreate` | scaffold ban đầu, **không khớp model hiện tại**, giữ lại vì repo đồng nghiệp đã base vào nó |
+| `20261103165420_AlignToGroupSpec` | patch **chỉ chạy trên DB prod đã có dữ liệu** (remap id `appointment_statuses`, thêm cột, 3 bảng mới, di trú `patients.account_id` → link) |
+| `20261103173448_SanityCheck` | siết ràng buộc sau align |
+| `20261104144910_QueuePositionNumbering` | đổi sang cơ chế số A/T theo vị trí: `capacity`/`online_quota`/`slot_position`, bỏ `queue_counters` |
+| `20261105131631_AppointmentInsuranceDeclaration` | thêm 2 cột khai báo bảo hiểm trên `appointments`: `has_health_insurance`, `has_private_insurance` (BOOLEAN NOT NULL DEFAULT false, chỉ để quầy phân luồng) |
+| `20261105141229_PatientEmail` | thêm `patients.email character varying(200) NULL` — hộp thư của hồ sơ, dùng làm nơi nhận mã OTP (mục 5.4) |
+
+Vì `AlignToGroupSpec` là patch một chiều, CI **không** chạy migration để dựng DB. CI dựng DB từ snapshot sinh từ model:
+
+- `docs/database/ci/schema.sql` — DDL đầy đủ 32 bảng cho DB sạch
+- `docs/database/ci/demo_master.sql`, `demo_day.sql` — dữ liệu mồi
+- `docs/database/ci/schema_checks.sql` — 18 kiểm tra ràng buộc, phải trả 18/18 TRUE
+
+## 5. Chỗ trống và số thứ tự (bất biến nghiệp vụ quan trọng nhất)
+
+- `capacity = max(1, slot_duration / avg_consultation_minutes)`; `online_quota = round(capacity × OnlineRatioPct / 100)`.
+- Vị trí `1..online_quota` = ghế web (tiền tố `A`); vị trí còn lại = tại chỗ (tiền tố `T`).
+- Số hiển thị = (tổng `capacity` của các khung giờ đi trước trong cùng phòng + ca + ngày) + `slot_position`.
+- Trừ ghế phải **nguyên tử**: `UPDATE appointment_slots SET booked_count = booked_count + 1, online_booked = online_booked + 1 WHERE id = @id AND booked_count < capacity AND version = @version`, kiểm tra số dòng bị ảnh hưởng; hủy/chuyển walk-in phải nhả lại ghế trong cùng transaction.
+- `uq_patient_slot_active` (partial unique index) chặn một hồ sơ đặt trùng chính khung giờ đó khi lịch còn sống.
+
+### 5.1 Cửa sổ đặt lịch và hạn mức một ngày của portal
+
+Toàn bộ quy tắc nằm trong `BookingService` (BLL), UI chỉ hỏi `FirstBookableDate` / `LastBookableDate` / `BookableDayCount` / `IsBookableDate(date)` nên WinForms dùng lại được:
+
+- Ngày khám D chỉ **đặt** được trước `BookingCutoffHour` (15:00) của ngày D−1 ⇒ sau 15:00 hôm nay thì ngày mai tự đóng, `FirstBookableDate` nhảy sang ngày kia.
+- Chỉ đặt tối đa `MaxAdvanceDays` (30) ngày kể từ hôm nay; lịch web render đúng cửa sổ đó, ngày ngoài hạn/đã cutoff trả `state="closed"` (nút disabled, nhãn "Ngưng nhận").
+- Chỉ **hủy** được đến 23:59 ngày D−1 (`IsCancelAllowed`); qua mốc thì phải ra quầy.
+- Hạn mức theo `booked_by`, đếm trong 00:00–23:59 của ngày đặt và **chỉ tính lượt còn hiệu lực** (trạng thái ≠ CANCELLED): tối đa `MaxBookingsPerDay` (6) lượt và `MaxRelativesPerDay` (3) hồ sơ khác nhau ⇒ hủy một lượt là hoàn chỉ tiêu ngay trong ngày.
+- Hồ sơ: `PatientProfileService.ValidateProfileQuotaAsync` chặn quá `MaxProfilesPerAccount` (5) hồ sơ cho một tài khoản và quá `MaxProfilesPerOwnerPhone` (5) hồ sơ theo **SĐT chủ tài khoản** (SĐT của hồ sơ `SELF`, vì `accounts` không có cột phone); SĐT đã là chủ ở tài khoản khác → từ chối "Số điện thoại đã được đăng ký".
+- Không còn phạt: hủy trễ không bị tính hạn mức, `NO_SHOW/EXPIRED` không còn đặt `booking_blocked_until` (`ReceptionService` chỉ còn ghi trạng thái).
+
+### 5.2 Màn "Tạo hồ sơ": một màn, hai nhánh
+
+`HoSo/Them` là **màn hình duy nhất** cho cả hai tình trạng người bệnh (màn "Xin liên kết" riêng đã xóa), chọn nhánh bằng radio `Branch` = `seen` | `new`:
+
+- **`seen` — đã từng khám**: chỉ được nhập **mã bệnh nhân** `BN######` in trên phiếu khám (`Keyword`, `hoso.js` chặn format, `FindByPatientCodeAsync` chỉ parse mỗi mã) + quan hệ → `RequestLinkAsync` → link `PENDING`, `can_view_records=false` → màn nhập mã OTP (mục 5.4); mã không về được (hồ sơ chưa có email) thì link vẫn `PENDING` để quầy đối chiếu giấy tờ khi bệnh nhân tới. WinForms vẫn duyệt được. Broadcast `profile.link_requested`. **`PENDING` không đặt lịch được** (`CanBookAsync`/`IsBookable` chỉ nhận `ACTIVE`) và **bị che hết thông tin cá nhân** trên mọi màn Web.
+- **`new` — chưa từng khám**: khai họ tên, ngày sinh, giới tính, quan hệ, **email** (ô bắt buộc, nằm **cùng dòng** với SĐT trong `.form-grid`), SĐT, CCCD (hoặc CCCD người thân), địa chỉ, số thẻ BHYT → controller gọi `ValidateNewProfileAsync` (toàn bộ quy tắc, **không ghi DB**) rồi mới xin mã OTP (mục 5.4) → **chỉ khi nhập đúng mã** mới gọi `CreateProfileAsync` → link `ACTIVE` + `can_view_records=true`, email nhập được lưu vào `patients.email`, đặt lịch ngay. Thoát giữa màn nhập mã thì DB chưa có dòng nào. Phiếu còn hỏng khi nộp (`DbUpdateException` CCCD trùng) thì `RenderThemFormAsync` đưa về form **kèm dữ liệu đã điền**, mã vừa dùng bị vô hiệu. `InsuranceCardNumber` được lưu vào `insurance_cards` qua `TrackInsuranceCardAsync` (không cần ALTER).
+- **Quy tắc giấy tờ** `PatientProfileService.ValidateIdentityDocumentsAsync` (chạy sau hạn mức hồ sơ): CCCD đã tồn tại trong `patients` → từ chối và bảo chuyển sang nhánh `seen`; đủ `OwnIdFromAge` (14) tuổi → **bắt buộc** CCCD của chính mình; dưới 14 mà chưa có CCCD → **bắt buộc** `GuardianNationalId` và số đó phải khớp `national_id` của một hồ sơ `ACTIVE` thuộc đúng tài khoản (`uq` không đổi, chỉ là kiểm tra BLL — không thêm cột nào). `CreateProfileAsync` và `ValidateNewProfileAsync` dùng chung `ValidateNewProfileDraftAsync` nên hai đường **không thể lệch luật**.
+- `ThemHoSoRequest` **không** dùng `[Required]`/`[RegularExpression]` vì hai nhánh chung một form (trường của nhánh kia luôn rỗng; `Email` chỉ mang `[StringLength(200)]`); rỗng/format kiểm tra trong controller, nhân thân kiểm tra trong BLL. `hoso.js` disable toàn bộ input của panel không chọn để trình duyệt không gửi lẫn không chặn submit, và chỉ validate `Email` ở panel `new` (panel `seen` chỉ có ô mã BN).
+
+### 5.3 Hai khai báo bảo hiểm trên lượt khám
+
+`appointments.has_health_insurance` / `has_private_insurance` (BOOLEAN NOT NULL DEFAULT false) là **khai báo của người bệnh ở bước `XacNhan`** của wizard (trước đây nằm ở bước chọn người khám — xem `DECISIONS.md` mục 23), chỉ để quầy nhắc mang thẻ và làm thủ tục viện phí:
+
+- Không validate, không chặn đặt lịch, không ảnh hưởng viện phí. Thẻ bảo hiểm thật vẫn nằm ở `insurance_cards` (mục 5.2) — hai chỗ này không tra gì nhau.
+- Cờ đi qua `BookingState` (Session) nên bấm *Quay lại* rồi vào lại bước xác nhận vẫn còn khai báo; `CreateAppointmentAsync(..., hasHealthInsurance, hasPrivateInsurance)` ghi thẳng vào entity trong cùng lần ghi với cấp số A.
+- Nơi đọc: bước 5 ("Bảo hiểm đã khai"), hai màn lịch sử (nhãn gộp trong `InsuranceDeclarations.Summary`), và lưới quầy tiếp nhận qua `ReceptionItemDto.InsuranceDeclaration` ("BHYT" / "Tư nhân" / "BHYT + tư nhân"; BLL sinh nhãn vì quầy hiển thị tiếng Việt).
+- Quầy **chưa sửa** được khai báo khi bệnh nhân khai sai — chỉ bệnh nhân đổi được trên web trước cutoff.
+
+### 5.4 Mã OTP khi thêm hồ sơ
+
+Chỉ nghiệp vụ *thêm hồ sơ* cần xác thực (mục 5.2). Hai nhánh thu email khác nhau và **thứ tự ghi DB cũng khác nhau**:
+
+| Nhánh | Hồ sơ | Email nhận mã | Kết quả sau khi nhập đúng mã |
+|---|---|---|---|
+| `new` (chưa từng khám) | **chưa tồn tại** — form thu email, đặt cạnh ô Số điện thoại | email **người dùng nhập trên form** (chưa nhập/sai định dạng thì chặn tại form, báo "Hồ sơ chưa được lưu") | mới gọi `CreateProfileAsync` để tạo `patients` + link `ACTIVE`, email nhập được lưu vào `patients.email` |
+| `seen` (đã từng khám) | đã tồn tại, tìm bằng `BN######` | `patients.email` **đã lưu trong hồ sơ** (không cho form ghi đè) | `VerifyLinkAsync` chuyển link `PENDING` → `ACTIVE`, `verified_by` = tài khoản đang đăng nhập |
+
+- Vì nhánh `new` cấp mã **trước** khi ghi, thoát giữa màn nhập mã không để lại hồ sơ "ma" — hết 5 lần nhập hoặc quá hạn thì coi như chưa tạo gì.
+- Trạng thái chờ nằm trong `Session` (`HoSoController` key `PendingProfileOtp`: patientId, email nhận, mã, hạn, số lần đã nhập, `Draft` = bản khai nhánh `new` còn `null` ở nhánh `seen`); **không** có cột/bảng mới chứa mã nên không cần thêm ALTER. Hết hạn 5 phút, 5 lần nhập, cách 60 giây mới được gửi lại, xác nhận xong là xóa mã.
+- Email không hợp lệ/không có → `IssueNewProfileOtpAsync`/`IssueProfileOtpAsync` trả `Success=false`, **không** cấp mã, không ghi `notifications`, trả người dùng về đúng nhánh vừa khai kèm hotline 0808 0808. Nhánh `seen` vẫn để lại link `PENDING` vì quầy còn đường duyệt giấy tờ.
+- Mỗi lần cấp mã ghi một dòng `notifications` (`title = OtpService.TraceTitle = "Mã xác thực hồ sơ"`) làm dấu vết đối chiếu. Nội dung **không chứa mã và không chứa email thô**: "Đã gửi mã 6 số xác thực hồ sơ `BNxxxxxx` tới `m***@gmail.com` lúc HH:mm ngày dd/MM/yyyy". `RequestLinkAsync`/`OtpIssueResult` cũng chỉ nhắc **mã bệnh nhân**, không nhắc họ tên — người xin chưa được đọc hồ sơ.
+- **Hạn mức phát mã** (`OtpOptions.MaxIssuesPerWindow=5` trong `IssueWindowMinutes=15`): `IssueQuotaMessageAsync` đếm đúng các dòng `notifications` của tài khoản này mang `TraceTitle` rồi chặn, vì mọi lần cấp mã đều ghi một dòng. Không có bảng/column mới, và `GuiLaiOtp` vẫn giữ cửa 60 giây riêng của nó.
+- **Hệ quả của việc che PII**: màn *Hồ sơ của tôi* và *Chi tiết hồ sơ* hiển thị "Hồ sơ chờ xác thực", ngày sinh `••/••/••••`, avatar `?`, và **không truy vấn lịch sử khám** cho link không `ACTIVE`. Để không bị đường cụt, màn chi tiết có nút *Nhập mã xác thực* → `HoSo/Them?branch=seen&patientCode=BNxxxxxx`; `RequestLinkAsync` gặp link `PENDING` có sẵn thì cấp mã mới chứ không tạo liên kết trùng. Wizard đặt lịch cũng loại hồ sơ `PENDING` khỏi danh sách chọn người khám.
+- **Mã chỉ sống trong Session, không bao giờ hiện trên màn hình theo mặc định**: `OtpOptions.RevealCodeOnScreen` mặc định `false`; `Program.cs` chi đăng ký `DemoOtpDelivery` khi `IsDevelopment()` (thiếu SMTP ở môi trường khác = **không có kênh gửi**, `OtpService` báo "Chưa cấu hình kênh gửi mã OTP.") và **ném lỗi lúc khởi động** nếu ngoài Development mà cờ này vẫn bật. Bản dev bật cờ trong `src/HIS.Web/appsettings.Development.json` (file này được commit một cách có ý thức, có dòng `!` trong `.gitignore`, chỉ chứa mỗi cờ demo).
+- **Lời báo không lộ email thô ở cả hai lớp**: `OtpService` trả `message` đã qua `ProfileEmail.Mask`, còn `HoSoController.SavePendingAndAskCodeAsync` **không** đặt `TempData["Message"]` — chỉ `TempData["Error"]` khi cấp mã thất bại, để email không sống sang trang kế tiếp (`HoSo/Index`, `LichKham`).
+- **Dấu vết ghi theo đồng hồ ứng dụng**: `IssueAndSendAsync` lấy một `DateTime now = DateTime.Now` dùng chung cho `Notification.CreatedAt`, cho nội dung ("…tới `m***@x` lúc {giờ gửi} ngày dd/MM/yyyy; mã hết hạn lúc {giờ hết hạn}") và cho `IssueQuotaMessageAsync`. Lý do: cột là `timestamp without time zone` lấy từ `DEFAULT now()` của server, nên nếu DB UTC mà app UTC+7 thì hạn mức 5 mã/15 phút sẽ không bao giờ kích hoạt.
+- Chi tiết và lý do chốt: `docs/DECISIONS.md` #22, #24, #25 và #26; bằng chứng chạy thật: `Changed.md` §12, §14 và §16.
+
+## 6. Kênh realtime giữa portal bệnh nhân và quầy tiếp nhận
+
+Bệnh nhân đặt/hủy trên web → quầy phải thấy ngay, không cần bấm tải lại.
+
+- **Server** `src/HIS.Web/Realtime/QueueChangeNotifier.cs` (singleton): giữ danh sách socket đang mở; `Publish(kind)` gửi JSON `{ kind, at }` cho mọi client, fire-and-forget, client gửi lỗi thì gỡ khỏi danh sách. Middleware `UseQueueChangeSocket(path: "/ws/quay")` đăng ký trong `Program.cs` **trước** `UseHttpsRedirection` — quầy nối `ws://` trên cổng http, đặt sau thì request upgrade bị đá sang https và hỏng.
+- **Loại sự kiện** (`QueueChangeKinds`): `appointment.created` (BookingController đặt thành công), `appointment.cancelled` (LichKhamController hủy thành công), `profile.link_requested` (nhánh "đã từng khám" của `HoSo/Them` gửi yêu cầu liên kết).
+- **Client** `src/HIS.WinForms/Services/QueueChangeClient.cs`: `ReceptionPage` subscribe khi mở trang, unsubscribe khi đóng; callback tới từ thread nền nên bắt buộc marshalling về UI thread bằng `Control.BeginInvoke` (`OnRealtimeChanged`), rồi mới reload lưới.
+- **Config**: `Realtime:WebSocketUrl` (mặc định `ws://localhost:5044/ws/quay`) và `Realtime:Enabled` trong `src/HIS.WinForms/appsettings.json` (file gitignored). `Enabled=false` → quầy hoạt động y như trước, không mở kết nối.
+- Tin nhắn chỉ báo "có thay đổi", **không** mang dữ liệu; quầy vẫn đọc DB qua `IReceptionService`, nên tin nhắn có thất lạc cũng không làm hai UI lệch nhau.
+
+## 7. Test
+
+`tests/HIS.Tests`, 12 file:
+
+- Unit (không trait): `AppointmentStateMachineTests`, `QueueCallOrderTests`, `QueuePositionsTests`, `SchedulingServiceTests`, `BookingServiceTests` — dùng `FixedTimeProvider.cs`, không cần DB.
+- Integration (`[Trait("Category","Integration")]`): `SlotConstraintTests`, `BookingPolicyPathTests`, `BookingEntryPathTests`, `PatientProfileFlowTests`, `OtpProfileFlowTests`, `ReceptionCheckInPathTests`, `RehearsalReadPathsTests` — chạy trên Postgres thật qua biến môi trường `HIS_REHEARSAL_CONNECTION`, gộp chung `[Collection("RehearsalPostgres")]` để không phá nhau. `BookingEntryPathTests` không giả định lịch trực: cửa sổ không còn khung nào thì bỏ qua, nên `his_ci` (chỉ có fixture hôm nay/ngày mai) vẫn chạy xanh.
+- Ràng buộc CHECK/UNIQUE **không test được bằng InMemory**, nên các test ràng buộc bắt buộc đi qua Postgres.
+
+## 8. CI (`.github/workflows/ci.yml`)
+
+- job `build` (windows-latest): `dotnet build` + `dotnet test --filter "Category!=Integration"`.
+- job `integration` (ubuntu-latest, service `postgres:16`): dựng `schema.sql` → seed → `schema_checks.sql` → `dotnet test --filter "Category=Integration"` → `dotnet ef migrations has-pending-model-changes` (chặn model đổi mà quên migration).
+- Chạy y hệt bằng tay: `bash backup/ci_local.sh` (không commit `backup/`).

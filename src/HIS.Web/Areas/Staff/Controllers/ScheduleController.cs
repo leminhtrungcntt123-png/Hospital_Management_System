@@ -1,6 +1,6 @@
 using System.Security.Claims;
 using HIS.BLL.DTOs;
-using HIS.BLL.Services;
+using HIS.BLL.Interfaces;
 using HIS.Domain;
 using HIS.Web.Areas.Staff.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -13,12 +13,20 @@ namespace HIS.Web.Areas.Staff.Controllers;
 public class ScheduleController : Controller
 {
     private readonly IDepartmentHeadService _departmentHeadService;
+    private readonly TimeProvider _timeProvider;
 
-    public ScheduleController(IDepartmentHeadService departmentHeadService)
+    public ScheduleController(IDepartmentHeadService departmentHeadService, TimeProvider? timeProvider = null)
     {
         _departmentHeadService = departmentHeadService;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
+    /// <summary>
+    /// Hiển thị giao diện điều hành khoa phòng dành cho Trưởng khoa (lịch tuần, ca trực, đề xuất đổi ca, bệnh án).
+    /// </summary>
+    /// <param name="tab">Tab chức năng đang chọn.</param>
+    /// <param name="weekOffset">Độ lệch tuần so với tuần hiện tại.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpGet]
     public async Task<IActionResult> Index(string? tab, int weekOffset = 0, CancellationToken ct = default)
     {
@@ -27,7 +35,7 @@ public class ScheduleController : Controller
 
         var activeTab = string.IsNullOrWhiteSpace(tab) ? "schedule" : tab.ToLowerInvariant();
 
-        var today = DateOnly.FromDateTime(DateTime.Today);
+        var today = DateOnly.FromDateTime(_timeProvider.GetLocalNow().DateTime);
         int daysSinceMonday = ((int)today.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
         var mondayThisWeek = today.AddDays(-daysSinceMonday);
         var mondayTargetWeek = mondayThisWeek.AddDays(weekOffset * 7);
@@ -59,7 +67,7 @@ public class ScheduleController : Controller
         var dutyShifts = await _departmentHeadService.GetDutyShiftsAsync(departmentId, ct);
 
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
-        var isHead = User.IsInRole("DEPARTMENT_HEAD");
+        var isHead = User.IsInRole("DEPARTMENT_HEAD") || User.IsInRole("DEPT_HEAD");
         var medicalRecords = isHead
             ? await _departmentHeadService.GetMedicalRecordsAsync(departmentId, accountId, ipAddress, ct)
             : (IReadOnlyList<DepartmentMedicalRecordDto>)[];
@@ -90,7 +98,11 @@ public class ScheduleController : Controller
         return View(vm);
     }
 
-    // Duyệt đề nghị nghỉ / đổi ca
+    /// <summary>
+    /// Phê duyệt đề nghị nghỉ phép hoặc đổi ca trực của bác sĩ thuộc khoa phòng.
+    /// </summary>
+    /// <param name="id">Mã ngoại lệ.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost]
     [Authorize(Policy = "DepartmentHeadOnly")]
     [ValidateAntiForgeryToken]
@@ -118,7 +130,12 @@ public class ScheduleController : Controller
         return RedirectToAction(nameof(Index), new { tab = "exceptions" });
     }
 
-    // Từ chối đề nghị nghỉ / đổi ca
+    /// <summary>
+    /// Từ chối đề nghị nghỉ phép hoặc đổi ca trực của bác sĩ kèm lý do.
+    /// </summary>
+    /// <param name="id">Mã ngoại lệ.</param>
+    /// <param name="reason">Lý do từ chối.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost]
     [Authorize(Policy = "DepartmentHeadOnly")]
     [ValidateAntiForgeryToken]
@@ -146,7 +163,14 @@ public class ScheduleController : Controller
         return RedirectToAction(nameof(Index), new { tab = "exceptions" });
     }
 
-    // Phân công ca trực đêm nhân sự
+    /// <summary>
+    /// Phân công ca trực đêm cho nhân sự y tế trong khoa.
+    /// </summary>
+    /// <param name="accountId">Mã tài khoản nhân sự.</param>
+    /// <param name="startTime">Thời gian bắt đầu ca trực.</param>
+    /// <param name="endTime">Thời gian kết thúc ca trực.</param>
+    /// <param name="note">Ghi chú phân công.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost]
     [Authorize(Policy = "DepartmentHeadOnly")]
     [ActionName("AssignDuty")]
@@ -169,7 +193,8 @@ public class ScheduleController : Controller
             return RedirectToAction(nameof(Index), new { tab = "schedule" });
         }
 
-        if (startTime < DateTime.Now)
+        var now = _timeProvider.GetLocalNow().DateTime;
+        if (startTime < now)
         {
             TempData["ErrorMessage"] = "Không thể phân công ca trực trong quá khứ. Vui lòng chọn thời gian từ hiện tại hoặc tương lai.";
             return RedirectToAction(nameof(Index), new { tab = "schedule" });
@@ -198,7 +223,21 @@ public class ScheduleController : Controller
         return RedirectToAction(nameof(Index), new { tab = "schedule" });
     }
 
-    // Thiết lập / cập nhật lịch khám tuần & hạn mức
+    /// <summary>
+    /// Thiết lập hoặc cập nhật lịch khám định kỳ hàng tuần cho bác sĩ và cấu hình hạn mức online.
+    /// </summary>
+    /// <param name="scheduleId">Mã lịch khám nếu cập nhật.</param>
+    /// <param name="doctorId">Mã bác sĩ.</param>
+    /// <param name="roomId">Mã phòng khám.</param>
+    /// <param name="dayOfWeek">Thứ trong tuần.</param>
+    /// <param name="shift">Ca khám (Sáng/Chiều).</param>
+    /// <param name="startTime">Giờ bắt đầu.</param>
+    /// <param name="endTime">Giờ kết thúc.</param>
+    /// <param name="slotDurationMinutes">Thời lượng mỗi slot.</param>
+    /// <param name="maxPatients">Tổng công suất bệnh nhân.</param>
+    /// <param name="onlineSlots">Số lượng suất phân bổ online.</param>
+    /// <param name="effectiveFrom">Ngày bắt đầu áp dụng.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost]
     [Authorize(Policy = "DepartmentHeadOnly")]
     [ActionName("UpsertSchedule")]
@@ -225,7 +264,7 @@ public class ScheduleController : Controller
             return RedirectToAction(nameof(Index), new { tab = "schedule" });
         }
 
-        var today = DateOnly.FromDateTime(DateTime.Today);
+        var today = DateOnly.FromDateTime(_timeProvider.GetLocalNow().DateTime);
         var effectiveDate = effectiveFrom ?? today;
         if (effectiveDate < today)
         {
@@ -278,7 +317,11 @@ public class ScheduleController : Controller
         return RedirectToAction(nameof(Index), new { tab = "schedule" });
     }
 
-    // Xóa / hủy cấu hình lịch khám
+    /// <summary>
+    /// Xóa cấu hình lịch khám định kỳ của bác sĩ.
+    /// </summary>
+    /// <param name="scheduleId">Mã lịch khám.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost]
     [Authorize(Policy = "DepartmentHeadOnly")]
     [ValidateAntiForgeryToken]
@@ -305,7 +348,11 @@ public class ScheduleController : Controller
         return RedirectToAction(nameof(Index), new { tab = "schedule" });
     }
 
-    // Xóa / hủy ca trực đêm
+    /// <summary>
+    /// Xóa ca trực đêm đã phân công cho nhân sự.
+    /// </summary>
+    /// <param name="id">Mã ca trực.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost]
     [Authorize(Policy = "DepartmentHeadOnly")]
     [ValidateAntiForgeryToken]
@@ -338,3 +385,4 @@ public class ScheduleController : Controller
         return int.TryParse(claim, out var id) ? id : 0;
     }
 }
+

@@ -1,0 +1,119 @@
+@media (max-width: 640px) {
+    .modal-backdrop {
+        padding: 13px;
+    }
+    .modal {
+        max-height: calc(100dvh - 26px);
+        border-radius: 11px;
+    }
+    .modal-header {
+        padding: 18px 18px 15px;
+        gap: 11px;
+    }
+    .modal-header h2 {
+        font-size: 17px;
+        line-height: 1.5;
+    }
+    .modal-header p {
+        font-size: 9px;
+        line-height: 1.9;
+        margin-top: 5px;
+    }
+    .modal-body {
+        padding: 19px 18px;
+    }
+    .modal-body > p {
+        font-size: 11px;
+        line-height: 2;
+    }
+    .modal-footer {
+        padding: 13px 18px;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .modal-footer > .btn {
+        font-size: 10px;
+        min-height: 35px;
+        padding: 8px 11px;
+    }
+    .modal-footer > .btn.primary {
+        flex: 1;
+    }
+    .role-option {
+        padding: 12px;
+        gap: 10px;
+    }
+    .role-icon {
+        width: 31px;
+        height: 31px;
+        border-radius: 7px;
+    }
+    .role-icon .icon {
+        width: 17px;
+        height: 17px;
+    }
+    .role-option strong {
+        font-size: 11px;
+    }
+    .role-option small {
+        font-size: 9px;
+        line-height: 1.8;
+        margin-top: 3px;
+    }
+    .role-option > .icon {
+        width: 13px;
+        height: 13px;
+    }
+    .fine-print {
+        font-size: 9px;
+        line-height: 1.9;
+        margin-top: 15px;
+    }
+    .check-line {
+        font-size: 10px;
+        line-height: 1.9;
+        gap: 8px;
+        margin: 14px 0;
+    }
+    .modal-section-title {
+        font-size: 12px;
+        padding-top: 15px;
+        margin: 18px 0 12px;
+    }
+    .history-details {
+        font-size: 10px;
+    }
+    .history-details > div {
+        flex-direction: column;
+        gap: 4px;
+        padding: 9px 0;
+    }
+    .history-details small {
+        font-size: 8px;
+    }
+    .history-record {
+        padding: 12px;
+        gap: 10px;
+    }
+    .history-record strong {
+        font-size: 11px;
+    }
+    .history-record small {
+        font-size: 9px;
+        line-height: 1.9;
+    }
+    .history-record .text-link {
+        font-size: 10px;
+    }
+    .toast {
+        bottom: 18px;
+        font-size: 10px;
+        padding: 12px 15px;
+        gap: 8px;
+        max-width: calc(100vw - 28px);
+    }
+    .toast .icon {
+        height: 15px;
+        width: 15px;
+    }
+}

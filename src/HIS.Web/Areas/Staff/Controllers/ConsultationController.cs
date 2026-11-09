@@ -1,6 +1,6 @@
 using System.Security.Claims;
 using HIS.BLL.DTOs;
-using HIS.BLL.Services;
+using HIS.BLL.Interfaces;
 using HIS.DAL;
 using HIS.Domain;
 using HIS.Web.Areas.Staff.Models;
@@ -23,21 +23,29 @@ public class ConsultationController : Controller
         IDoctorService doctorService,
         IQueueService queueService,
         AppDbContext context,
-        TimeProvider timeProvider)
+        TimeProvider? timeProvider = null)
     {
         _doctorService = doctorService;
         _queueService = queueService;
         _context = context;
-        _timeProvider = timeProvider;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
-    // 1. Màn hình Bác sĩ & Trưởng khoa: Phân luồng dữ liệu chuẩn theo phân quyền
+    /// <summary>
+    /// Hiển thị màn hình phòng khám của bác sĩ (danh sách bệnh nhân chờ khám, ca trực, hồ sơ bệnh án).
+    /// </summary>
+    /// <param name="date">Ngày khám.</param>
+    /// <param name="shift">Ca khám (Sáng/Chiều).</param>
+    /// <param name="tab">Tab hiển thị.</param>
+    /// <param name="doctorId">Mã bác sĩ lọc.</param>
+    /// <param name="weekOffset">Độ lệch tuần.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpGet]
     public async Task<IActionResult> Index(DateOnly? date, ExamShift? shift, string? tab, int? doctorId, int weekOffset = 0, CancellationToken ct = default)
     {
         try
         {
-            var isDeptHead = User.IsInRole("DEPARTMENT_HEAD");
+            var isDeptHead = User.IsInRole("DEPARTMENT_HEAD") || User.IsInRole("DEPT_HEAD");
             var accountId = GetCurrentAccountId();
 
             int currentDoctorId = 0;
@@ -81,7 +89,7 @@ public class ConsultationController : Controller
                 // Bác sĩ thường: Chỉ phụ trách phòng và bệnh nhân của chính mình
                 var doc = await _context.Doctors
                     .Include(d => d.Department)
-                    .Include(d => d.Schedules).ThenInclude(s => s.Room)
+                    .Include(d => d.DoctorSchedules).ThenInclude(s => s.Room)
                     .FirstOrDefaultAsync(d => d.AccountId == accountId, ct);
 
                 if (doc != null)
@@ -90,7 +98,7 @@ public class ConsultationController : Controller
                     departmentId = doc.DepartmentId;
                     departmentName = doc.Department.Name;
                     currentDoctorName = doc.FullName;
-                    currentDoctorRoom = doc.Schedules.FirstOrDefault()?.Room?.RoomNumber ?? doc.LicenseNumber ?? "P.201";
+                    currentDoctorRoom = doc.DoctorSchedules.FirstOrDefault()?.Room?.RoomNumber ?? doc.LicenseNumber ?? "P.201";
                 }
                 else
                 {
@@ -169,7 +177,7 @@ public class ConsultationController : Controller
                 .Include(l => l.Service)
                 .Include(l => l.MedicalRecord).ThenInclude(r => r.Appointment).ThenInclude(a => a.Patient)
                 .Include(l => l.MedicalRecord).ThenInclude(r => r.Doctor)
-                .Include(l => l.LabResult)
+                .Include(l => l.Result)
                 .AsQueryable();
 
             if (isDeptHead)
@@ -196,7 +204,7 @@ public class ConsultationController : Controller
                     l.Note ?? "Chỉ định chuyên khoa",
                     l.CreatedAt,
                     l.Status == LabOrderStatus.Completed ? "Đã có kết quả" : "Chờ kết quả",
-                    l.LabResult != null ? l.LabResult.Result : null
+                    l.Result != null ? l.Result.Result : null
                 ))
                 .ToListAsync(ct);
 
@@ -339,12 +347,15 @@ public class ConsultationController : Controller
         }
         catch (OperationCanceledException)
         {
-            // Trình duyệt reload/chuyển trang làm hủy request - tránh Visual Studio debug exception popup
             return new EmptyResult();
         }
     }
 
-    // 2. Bác sĩ gọi bệnh nhân tiếp theo vào phòng khám
+    /// <summary>
+    /// Bác sĩ gọi bệnh nhân tiếp theo vào phòng khám theo số thứ tự và mức ưu tiên.
+    /// </summary>
+    /// <param name="roomId">Mã phòng khám.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CallNext(int roomId, CancellationToken ct)
@@ -362,7 +373,11 @@ public class ConsultationController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    // 3. Hoàn tất lượt khám và tạo hồ sơ bệnh án
+    /// <summary>
+    /// Bác sĩ hoàn tất lượt khám và tạo hồ sơ bệnh án điện tử cho bệnh nhân.
+    /// </summary>
+    /// <param name="request">Yêu cầu tạo hồ sơ bệnh án.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateRecord([FromForm] CreateMedicalRecordRequest request, CancellationToken ct)
@@ -388,7 +403,15 @@ public class ConsultationController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    // 4. Bác sĩ gửi đề nghị nghỉ / đổi ca
+    /// <summary>
+    /// Bác sĩ gửi đề nghị xin nghỉ phép hoặc đổi ca trực chờ trưởng khoa duyệt.
+    /// </summary>
+    /// <param name="date">Ngày xin nghỉ / đổi ca.</param>
+    /// <param name="shift">Ca trực.</param>
+    /// <param name="type">Loại ngoại lệ (Nghỉ phép / Đổi ca).</param>
+    /// <param name="reason">Lý do.</param>
+    /// <param name="replacementDoctorId">Mã bác sĩ thay thế nếu có.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateException(
@@ -408,7 +431,6 @@ public class ConsultationController : Controller
                 return RedirectToAction(nameof(Index), new { tab = "exceptions" });
             }
 
-            // Parse date hỗ trợ cả yyyy-MM-dd (chuẩn HTML5) và dd/MM/yyyy
             DateOnly targetDate;
             if (string.IsNullOrWhiteSpace(date) ||
                 (!DateOnly.TryParse(date, out targetDate) &&
@@ -432,7 +454,6 @@ public class ConsultationController : Controller
                     return RedirectToAction(nameof(Index), new { tab = "exceptions" });
                 }
 
-                // Kiểm tra bác sĩ nhận đổi ca phải thuộc cùng khoa chuyên môn
                 var currentDoctor = await _context.Doctors.FirstOrDefaultAsync(d => d.Id == doctorId, ct);
                 var repDoctor = await _context.Doctors.FirstOrDefaultAsync(d => d.Id == replacementDoctorId.Value, ct);
 
@@ -443,7 +464,7 @@ public class ConsultationController : Controller
                 }
             }
 
-            var now = _timeProvider.GetLocalNow().DateTime;
+            var now = DateTime.SpecifyKind(_timeProvider.GetLocalNow().DateTime, DateTimeKind.Unspecified);
 
             var exception = new ScheduleException
             {
@@ -495,3 +516,4 @@ public class ConsultationController : Controller
         return 0;
     }
 }
+

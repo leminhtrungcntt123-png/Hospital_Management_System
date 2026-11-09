@@ -30,3 +30,4 @@ internal static class AdminRules
             "Tài khoản không còn quyền quản trị đang hoạt động.");
     }
 }
+

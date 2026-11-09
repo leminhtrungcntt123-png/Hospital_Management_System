@@ -1,37 +1,91 @@
-using System.ComponentModel.DataAnnotations;
-using HIS.Domain;
-
 namespace HIS.BLL.DTOs;
 
+// --- DTOs Đếm & Thống kê ---
+public sealed record ReceptionCountsDto(
+    int Waiting,
+    int Received,
+    int Scheduled,
+    int Cancelled);
+
+// --- DTOs Hiển thị Danh sách & Tra cứu ---
+public sealed record ReceptionItemDto(
+    int AppointmentId,
+    string AppointmentCode,
+    int PatientId,
+    string PatientCode,
+    string PatientName,
+    string Gender,
+    DateOnly DateOfBirth,
+    string InsuranceCardNumber,
+    string DepartmentName,
+    string DoctorName,
+    string StatusCode,
+    string StatusName,
+    DateTime AppointmentTime,
+    string BookingChannel,
+    string VisitType,
+    int PriorityLevel,
+    string PriorityLabel,
+    string QueueNumber,
+    string Reason,
+    // "Đặt bởi": tài khoản web của bệnh nhân hoặc tài khoản quầy đã mở ca.
+    string BookedByLabel,
+    // Bệnh nhân có liên kết hồ sơ đang chờ quầy xác nhận (account_patient_profiles.status = PENDING).
+    bool HasPendingLink,
+    // Hai khai báo bảo hiểm người bệnh tick khi đặt lịch: "BHYT", "Tư nhân", "BHYT + tư nhân" hoặc rỗng.
+    string InsuranceDeclaration);
+
+public sealed record ReceptionPatientDto(
+    int PatientId,
+    string PatientCode,
+    string FullName,
+    DateOnly DateOfBirth,
+    string Gender,
+    string PhoneNumber,
+    string NationalId,
+    string Address,
+    string InsuranceCardNumber);
+
+// --- DTOs Thẻ chọn (Dropdown Options) ---
+public sealed record DepartmentOptionDto(
+    int Id, 
+    string Name);
+
+public sealed record DoctorOptionDto(
+    int Id, 
+    int DepartmentId, 
+    string Name, 
+    string Specialty);
+
+// --- DTOs Dành cho Web Quầy Tiếp Nhận (Reception Desk) ---
 public sealed class WalkInReceptionRequest
 {
     public int? PatientId { get; set; }
 
-    [StringLength(100)]
+    [System.ComponentModel.DataAnnotations.StringLength(100)]
     public string? FullName { get; set; }
     public DateOnly? DateOfBirth { get; set; }
-    public Gender? Gender { get; set; }
+    public HIS.Domain.Gender? Gender { get; set; }
 
-    [StringLength(20)]
+    [System.ComponentModel.DataAnnotations.StringLength(20)]
     public string? NationalId { get; set; }
 
-    [StringLength(15)]
+    [System.ComponentModel.DataAnnotations.StringLength(15)]
     public string? PhoneNumber { get; set; }
 
-    [StringLength(255)]
+    [System.ComponentModel.DataAnnotations.StringLength(255)]
     public string? Address { get; set; }
 
-    [Range(1, int.MaxValue)]
+    [System.ComponentModel.DataAnnotations.Range(1, int.MaxValue)]
     public int ScheduleId { get; set; }
 
-    [StringLength(255)]
+    [System.ComponentModel.DataAnnotations.StringLength(255)]
     public string? Reason { get; set; }
 
-    [Range(0, 3)]
+    [System.ComponentModel.DataAnnotations.Range(0, 3)]
     public int PriorityLevel { get; set; }
     public bool IdentityVerified { get; set; }
 }
-
 
 public record ReceptionVisit(
     int Id,
@@ -42,7 +96,7 @@ public record ReceptionVisit(
     string Doctor,
     string Room,
     DateTime ArrivalTime,
-    BookingChannel Channel,
+    HIS.Domain.BookingChannel Channel,
     int StatusId,
     string? QueueNumber,
     int PriorityLevel);

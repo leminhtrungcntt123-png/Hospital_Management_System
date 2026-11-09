@@ -1,0 +1,164 @@
+@* Bước "chọn bác sĩ". Hai dạng trên cùng một view:
+   - chưa chốt ngày (luồng theo chuyên khoa / theo bác sĩ): thẻ bác sĩ, bấm chọn rồi Tiếp tục;
+   - đã chốt ngày (luồng theo ngày): mỗi bác sĩ kèm trọn khung giờ trong ngày, bấm chip là chốt cả hai. *@
+@model ChonBacsiViewModel
+@{
+    Layout = "_BookingLayout";
+    ViewData["Title"] = "Chọn bác sĩ";
+
+    bool onDate = Model.Date is not null;
+    var selectedDoctor = Model.Doctors.FirstOrDefault(d => d.Id == Model.SelectedDoctorId);
+    var pickedSlot = onDate
+        ? Model.DoctorSlots.SelectMany(ds => ds.Slots).FirstOrDefault(s => s.Id == Model.SelectedSlotId)
+        : null;
+    var initialLabel = pickedSlot is not null
+        ? $"{pickedSlot.Doctor?.FullName} · {pickedSlot.Label}"
+        : selectedDoctor?.FullName;
+}
+
+<form asp-action="ChonBacsi" method="post" id="bacsi-form">
+    <input type="hidden" name="doctorId" id="field-doctor" value="@Model.SelectedDoctorId" />
+    <input type="hidden" name="slotId" id="field-slot" value="@Model.SelectedSlotId" />
+
+    <section class="booking-content">
+        <div class="content-head">
+            <div>
+                <div class="eyebrow">@ViewData["StepLabel"]</div>
+                <div class="page-title">
+                    @(onDate ? $"Bác sĩ trực và khung giờ ngày {VietnameseFormat.FullDate(Model.Date!.Value)}"
+                             : Model.Department is null ? "Bạn muốn khám với bác sĩ nào?" : "Chọn bác sĩ theo chuyên khoa")
+                </div>
+                <p>
+                    @if (Model.Department is not null)
+                    {
+                        <text>Chuyên khoa <b>@Model.Department.Name</b>.</text>
+                    }
+                    Học hàm, học vị lấy đúng hồ sơ bác sĩ trong hệ thống; số suất còn lại là suất đặt online (chữ A).
+                </p>
+            </div>
+            <div class="head-actions">
+                @if (onDate)
+                {
+                    <a class="btn btn-outline" asp-action="ChonNgay"><i data-lucide="calendar-days"></i> Đổi ngày</a>
+                }
+            </div>
+        </div>
+
+        <partial name="_ErrorAlert" />
+
+        @if (!onDate)
+        {
+            <label class="search-box">
+                <i data-lucide="search"></i>
+                <input type="search" id="bacsi-search"
+                       placeholder="@(Model.Department is null ? "Tìm theo tên bác sĩ hoặc chuyên môn..." : "Tìm bác sĩ trong khoa...")"
+                       autocomplete="off" />
+            </label>
+        }
+
+        @if (onDate)
+        {
+            <div class="doctor-list">
+                @foreach (var ds in Model.DoctorSlots)
+                {
+                    <div class="doctor-block @(ds.Doctor.Id == Model.SelectedDoctorId ? "selected" : "")" data-doctor="@ds.Doctor.Id">
+                        <div class="doctor-block-head">
+                            <div class="doctor-avatar">@ds.Doctor.Initials</div>
+                            <div class="doctor-block-info">
+                                <strong>@ds.Doctor.FullName</strong>
+                                <span>@ds.Doctor.Specialty</span>
+                                <small><i data-lucide="map-pin"></i> @ds.Room</small>
+                            </div>
+                            <button type="button" class="doctor-link"
+                                    data-doctor-open="@ds.Doctor.ToModalJson(room: ds.Room, department: Model.Department?.Name)">
+                                Xem thông tin bác sĩ <i data-lucide="chevron-right"></i>
+                            </button>
+                            @if (ds.SlotsLeft > 0)
+                            {
+                                <span class="badge badge-green">Còn @ds.SlotsLeft suất</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-red">Hết suất online</span>
+                            }
+                        </div>
+                        <partial name="_SlotChips" model="new SlotListViewModel { Date = Model.Date!.Value, Slots = ds.Slots, SelectedSlotId = Model.SelectedSlotId }" />
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="doctor-grid" id="bacsi-grid">
+                @if (Model.ShowAnyDoctor)
+                {
+                    <button type="button" class="doctor-card any-doctor @(Model.SelectedDoctorId == BookingModes.AnyDoctorId ? "selected" : "")"
+                            data-id="@BookingModes.AnyDoctorId" data-name="@DoctorVm.AnyDoctorName"
+                            data-tags="bac si bat ky bat ky phong kham">
+                        <div class="doctor-avatar any"><i data-lucide="user-round"></i></div>
+                        <div class="doctor-card-body">
+                            <strong>@DoctorVm.AnyDoctorName</strong>
+                            <span>Bệnh viện phân công theo lịch trực và chuyên môn của khoa.</span>
+                            <small><i data-lucide="sparkles"></i> Thường còn nhiều khung giờ nhất</small>
+                        </div>
+                        <div class="check-mark"><i data-lucide="check"></i></div>
+                    </button>
+                }
+
+                @foreach (var d in Model.Doctors)
+                {
+                    var isSelected = d.Id == Model.SelectedDoctorId;
+                    <button type="button" class="doctor-card @(isSelected ? "selected" : "")"
+                            data-id="@d.Id" data-name="@d.FullName"
+                            data-tags="@(d.FullName + " " + d.Specialty + " " + d.DepartmentName)"
+                            disabled="@(d.SlotsAvailable == 0)">
+                        <div class="doctor-avatar">@d.Initials</div>
+                        <div class="doctor-card-body">
+                            <strong>@d.FullName</strong>
+                            <span>@d.Specialty</span>
+                            @if (Model.Department is null)
+                            {
+                                <span class="badge badge-gray">@d.DepartmentName</span>
+                            }
+                            <small><i data-lucide="calendar-days"></i> Trực @d.DutyDays</small>
+                            <span class="@(d.SlotsAvailable > 0 ? "available" : "unavailable")">
+                                @if (d.SlotsAvailable > 0)
+                                {
+                                    <text>Còn @d.SlotsAvailable suất online · sớm nhất @(d.NextAvailableDate is { } next ? VietnameseFormat.ShortDate(next) : "—")</text>
+                                }
+                                else
+                                {
+                                    <text>Hết suất đặt online</text>
+                                }
+                            </span>
+                        </div>
+                        <div class="check-mark"><i data-lucide="check"></i></div>
+                    </button>
+                }
+            </div>
+
+            <div class="empty-state" id="bacsi-empty" hidden>
+                <i data-lucide="search"></i>
+                <strong>Không tìm thấy bác sĩ</strong>
+                <p>Thử từ khóa khác, hoặc chọn "Bác sĩ bất kỳ" để bệnh viện phân công theo lịch trực.</p>
+            </div>
+        }
+
+        <div class="booking-footer">
+            <span>Đã chọn: <strong id="bacsi-selected-label">@(initialLabel ?? "chưa chọn")</strong></span>
+            <div class="footer-actions">
+                <a class="btn btn-outline" href="@ViewData["BackUrl"]"><i data-lucide="chevron-left"></i> Quay lại</a>
+                <button type="submit" class="btn btn-primary" id="bacsi-next"
+                        disabled="@((onDate ? pickedSlot is null : selectedDoctor is null))">
+                    Tiếp tục <i data-lucide="chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    </section>
+</form>
+
+<partial name="_DoctorModal" />
+
+@section Scripts {
+    <script src="~/js/booking.js" asp-append-version="true"></script>
+}

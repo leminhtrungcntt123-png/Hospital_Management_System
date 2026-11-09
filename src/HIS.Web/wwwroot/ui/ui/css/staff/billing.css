@@ -1,0 +1,158 @@
+/* staff / billing */
+.amount-summary {
+    padding: 15px 17px;
+    border-radius: 8px;
+    background: #edf7fd;
+    border: 1px solid #d8eaf6;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 22px;
+}
+.amount-summary span {
+    font-size: 11px;
+    color: #4d6c7d;
+}
+.amount-summary strong {
+    font-size: 24px;
+    letter-spacing: -0.7px;
+    color: #1b6f8b;
+    font-weight: 650;
+}
+.insurance-box {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 11px;
+    align-items: end;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #dfeaf4;
+    background: #f6fafd;
+    margin-bottom: 20px;
+}
+.insurance-box > .field label {
+    font-size: 10px;
+}
+.insurance-box select {
+    font-size: 10px;
+    min-height: 38px;
+}
+.insurance-box > .btn {
+    font-size: 10px;
+    min-height: 38px;
+}
+.insurance-box > small {
+    grid-column: 1/-1;
+    font-size: 9px;
+    color: #576876;
+}
+.billing-totals {
+    background: #f7fbfe;
+    border: 1px solid #e1ebf4;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-top: 18px;
+}
+.billing-totals > div {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    font-size: 11px;
+    color: #5c6b7a;
+    padding: 6px 0;
+}
+.billing-totals strong {
+    font-size: 12px;
+    color: #4f6a80;
+    font-weight: 550;
+}
+.billing-totals .grand-total {
+    border-top: 1px solid #dfebf4;
+    margin-top: 8px;
+    padding-top: 14px;
+    color: #436b80;
+}
+.billing-totals .grand-total strong {
+    font-size: 24px;
+    color: #12718d;
+    font-weight: 650;
+    letter-spacing: -0.7px;
+}
+.receipt-paper {
+    padding: 10px 17px 23px;
+}
+.receipt-brand {
+    text-align: center;
+    margin-bottom: 23px;
+}
+.receipt-paper h2 {
+    font-size: 17px;
+    letter-spacing: 1.5px;
+    text-align: center;
+    margin: 0 0 25px;
+    color: #476e87;
+}
+.receipt-paper > div:not(.receipt-brand) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 13px 0;
+    border-bottom: 1px solid #e5edf4;
+    font-size: 11px;
+    color: #7e9ab2;
+}
+.receipt-paper strong {
+    font-weight: 550;
+    color: #466c84;
+    font-size: 11px;
+}
+.receipt-paper .receipt-total {
+    padding-top: 20px !important;
+}
+.receipt-paper .receipt-total strong {
+    font-size: 23px;
+    color: #25708b;
+    font-weight: 650;
+}
+.receipt-paper > p {
+    font-size: 9px;
+    color: #5f6c77;
+    text-align: center;
+    margin-top: 25px;
+}
+.switch {
+    width: 31px;
+    height: 18px;
+    border-radius: 15px;
+    background: #c6d6e3;
+    position: relative;
+    display: inline-block;
+}
+.switch:after {
+    content: '';
+    height: 12px;
+    width: 12px;
+    border-radius: 50%;
+    background: white;
+    position: absolute;
+    left: 3px;
+    top: 3px;
+    transition: left 0.15s;
+}
+.switch.on {
+    background: #33a0c4;
+}
+.switch.on:after {
+    left: 16px;
+}
+.code-tag {
+    font-family: Consolas, monospace;
+    font-size: 9px;
+    border: 1px solid #dce8f2;
+    border-radius: 4px;
+    padding: 3px 6px;
+    color: #556c80;
+    background: #f5f9fd;
+}

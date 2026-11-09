@@ -1,0 +1,249 @@
+/* components / controls */
+.text-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--primary);
+    padding: 3px 0;
+    border: 0;
+    background: none;
+    white-space: nowrap;
+}
+.text-link:hover {
+    color: #1454b1;
+}
+.text-link .icon {
+    width: 15px;
+    height: 15px;
+}
+.link-button {
+    background: none;
+    border: 0;
+    color: var(--primary);
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-weight: 600;
+    padding: 4px;
+}
+.link-button .icon {
+    width: 16px;
+    height: 16px;
+}
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    white-space: nowrap;
+    min-height: 39px;
+    padding: 9px 14px;
+    border-radius: 7px;
+    border: 1px solid var(--line);
+    background: white;
+    color: #405b78;
+    font-size: 11px;
+    font-weight: 550;
+    transition:
+        background 0.15s,
+        border-color 0.15s,
+        box-shadow 0.15s;
+}
+.btn:hover {
+    background: #f1f8fc;
+    border-color: #aacddd;
+}
+.btn .icon {
+    width: 16px;
+    height: 16px;
+}
+.btn.primary {
+    color: #fff;
+    background: var(--primary);
+    border-color: var(--primary);
+    box-shadow: 0 2px 4px #087fa910;
+}
+.btn.primary:hover {
+    background: var(--primary-hover);
+    border-color: var(--primary-hover);
+}
+.btn.outline {
+    color: var(--primary);
+    border-color: #c6ddea;
+    background: #fff;
+}
+.btn.ghost {
+    border-color: transparent;
+    background: transparent;
+    color: #576c81;
+}
+.btn.danger {
+    background: #fff1ee;
+    border-color: #efd6d1;
+    color: #a54f47;
+}
+.btn.large {
+    font-size: 12px;
+    min-height: 46px;
+    padding: 12px 20px;
+}
+.btn.sm {
+    min-height: 31px;
+    padding: 6px 10px;
+    font-size: 10px;
+    border-radius: 6px;
+}
+.btn.sm .icon {
+    width: 13px;
+    height: 13px;
+}
+.btn.text-link {
+    border: 0;
+    box-shadow: none;
+    padding: 3px 0;
+    min-height: 0;
+    background: none;
+    color: var(--primary);
+}
+.prev .icon {
+    transform: rotate(180deg);
+}
+.icon-btn {
+    height: 34px;
+    width: 34px;
+    border: 1px solid #dee7f1;
+    border-radius: 7px;
+    background: white;
+    display: inline-grid;
+    place-items: center;
+    padding: 0;
+    color: #556c85;
+    min-height: 34px;
+    flex-shrink: 0;
+}
+.icon-btn .icon {
+    width: 17px;
+    height: 17px;
+}
+.icon-btn:hover {
+    background: var(--pale);
+}
+.pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: #edf2f8;
+    color: #576d84;
+    font-size: 10px;
+    padding: 3px 7px;
+    border-radius: 5px;
+    white-space: nowrap;
+}
+.pill .icon {
+    width: 13px;
+    height: 13px;
+}
+.pill.cyan {
+    background: #e6f4fc;
+    color: #086f94;
+}
+.pill.amber {
+    background: #fff3dd;
+    color: #8e601b;
+}
+.pill.success {
+    background: #eaf5ef;
+    color: #32725a;
+}
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+    border-radius: 5px;
+    font-size: 9px;
+    font-weight: 500;
+    padding: 4px 7px;
+    color: #566980;
+    background: #f1f4f8;
+}
+.badge i {
+    display: block;
+    width: 4px;
+    height: 4px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: currentColor;
+}
+.s-confirmed,
+.s-active {
+    color: #086f8f;
+    background: #e6f5fc;
+}
+.s-pending,
+.s-pending_link,
+.s-checked_in,
+.s-partially_paid {
+    color: #8c5e18;
+    background: #fff5df;
+}
+.s-ready_for_doctor,
+.s-in_progress {
+    color: #3958bb;
+    background: #eaf0ff;
+}
+.s-completed,
+.s-paid,
+.s-approved {
+    color: #31765b;
+    background: #eaf5ef;
+}
+.s-cancelled,
+.s-revoked,
+.s-rejected {
+    color: #9d574f;
+    background: #fff0ed;
+}
+.s-reschedule_required,
+.s-unpaid {
+    color: #88611a;
+    background: #fff3db;
+}
+.s-expired,
+.s-no_show {
+    color: #636871;
+    background: #f0f2f5;
+}
+.avatar {
+    height: 34px;
+    width: 34px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #e3f4fb;
+    color: #1d6e8d;
+    font-size: 11px;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+.avatar.blue {
+    background: #eaf0ff;
+    color: #4364b4;
+}
+.avatar.orange {
+    background: #fff0e3;
+    color: #8a6236;
+}
+.avatar.purple {
+    background: #f0edfc;
+    color: #705e8d;
+}
+.avatar.large {
+    width: 53px;
+    height: 53px;
+    font-size: 17px;
+}

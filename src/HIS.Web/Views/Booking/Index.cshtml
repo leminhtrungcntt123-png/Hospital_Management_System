@@ -1,0 +1,108 @@
+@* A1. Trang bắt đầu đặt lịch (dùng _Layout mặc định: có Header + Footer).
+   Ba lối vào của Mẻ 3: theo chuyên khoa / theo ngày / theo bác sĩ. Mỗi thẻ bấm là vào thẳng
+   wizard của luồng đó (Booking/Start?mode=...), không còn một đường "Bắt đầu đặt lịch" duy nhất. *@
+@{
+    ViewData["Title"] = "Đặt lịch khám";
+
+    var entries = new[]
+    {
+        (
+            Mode: "khoa", Icon: "stethoscope", Title: "Khám theo chuyên khoa",
+            Text: "Chọn chuyên khoa trước, sau đó chọn bác sĩ và khung giờ phù hợp.",
+            Steps: "Chuyên khoa · Bác sĩ · Ngày & giờ · Người khám · Xác nhận"
+        ),
+        (
+            Mode: "ngay", Icon: "calendar-days", Title: "Khám theo ngày",
+            Text: "Bạn đã biết ngày rảnh? Chọn ngày, hệ thống liệt kê khoa và bác sĩ trực hôm đó.",
+            Steps: "Ngày khám · Chuyên khoa · Bác sĩ & giờ · Người khám · Xác nhận"
+        ),
+        (
+            Mode: "bacsi", Icon: "user-round-search", Title: "Khám theo bác sĩ",
+            Text: "Tìm bác sĩ theo tên hoặc chuyên môn, rồi chọn ngày trong lịch trực của người đó.",
+            Steps: "Bác sĩ · Ngày & giờ · Người khám · Xác nhận"
+        ),
+    };
+
+    var steps = new[]
+    {
+        (Icon: "search", No: "01", Title: "Chọn lối vào", Text: "Theo chuyên khoa, theo ngày hoặc theo bác sĩ."),
+        (Icon: "calendar-days", No: "02", Title: "Chọn ngày và giờ", Text: "Chỉ hiện các khung giờ còn suất đặt online."),
+        (Icon: "user-round", No: "03", Title: "Chọn người khám", Text: "Chọn hồ sơ đã có trong mục Hồ sơ của bạn."),
+        (Icon: "circle-check", No: "04", Title: "Xác nhận lịch", Text: "Kiểm tra thông tin và nhận mã lịch hẹn."),
+    };
+}
+
+<main>
+    <section class="start-hero">
+        <span class="badge badge-blue"><i data-lucide="shield-check"></i> Đặt lịch nhanh chóng và bảo mật</span>
+        <div class="display">Chủ động lịch khám,<br /><span>an tâm chăm sóc.</span></div>
+        <p class="hero-copy">
+            Đặt lịch khám tại Bệnh viện Đa khoa HIS chỉ trong vài phút. Không chờ đợi lâu,
+            thông tin minh bạch và luôn được hỗ trợ.
+        </p>
+        <div class="trust-row">
+            <div><i data-lucide="circle-check"></i><span>Miễn phí đặt lịch</span></div>
+            <div><i data-lucide="circle-check"></i><span>Bảo mật thông tin</span></div>
+            <div><i data-lucide="circle-check"></i><span>Hỗ trợ 24/7</span></div>
+        </div>
+    </section>
+
+    <section class="entries section" id="cach-dat">
+        <div class="section-intro">
+            <div>
+                <div class="eyebrow">BẮT ĐẦU TỪ ĐÂU?</div>
+                <div class="section-title">Bạn muốn đặt khám theo cách nào?</div>
+            </div>
+            <p>Chọn một cách bên dưới. Cả ba đều dẫn tới cùng một phiếu khám và không bắt buộc nhập lại thông tin đã lưu.</p>
+        </div>
+
+        <div class="entry-grid">
+            @foreach (var e in entries)
+            {
+                <a class="entry-card" asp-action="Start" asp-route-mode="@e.Mode">
+                    <div class="entry-icon"><i data-lucide="@e.Icon"></i></div>
+                    <strong>@e.Title</strong>
+                    <p>@e.Text</p>
+                    <span class="entry-steps">@e.Steps</span>
+                    <span class="entry-go">Chọn <i data-lucide="arrow-right"></i></span>
+                </a>
+            }
+        </div>
+    </section>
+
+    <section class="process section">
+        <div class="section-intro">
+            <div>
+                <div class="eyebrow">QUY TRÌNH ĐẶT LỊCH</div>
+                <div class="section-title">Dễ dàng trong 4 bước</div>
+            </div>
+            <p>Thông tin lịch khám được lưu giữ trong suốt quá trình. Bạn có thể quay lại chỉnh sửa bất cứ lúc nào.</p>
+        </div>
+        <div class="process-grid">
+            @for (int i = 0; i < steps.Length; i++)
+            {
+                var s = steps[i];
+                <div class="process-card">
+                    <div class="process-top">
+                        <div class="process-icon"><i data-lucide="@s.Icon"></i></div>
+                        <span>@s.No</span>
+                    </div>
+                    <strong>@s.Title</strong>
+                    <p>@s.Text</p>
+                    @if (i < steps.Length - 1)
+                    {
+                        <i data-lucide="chevron-right" class="process-arrow"></i>
+                    }
+                </div>
+            }
+        </div>
+    </section>
+
+    <section class="emergency section">
+        <div class="emergency-icon"><i data-lucide="circle-alert"></i></div>
+        <div>
+            <strong>Trường hợp cấp cứu?</strong>
+            <p>Không sử dụng chức năng đặt lịch. Vui lòng gọi <b>115</b> hoặc đến khoa Cấp cứu gần nhất.</p>
+        </div>
+    </section>
+</main>

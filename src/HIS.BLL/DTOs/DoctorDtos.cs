@@ -1,8 +1,12 @@
 namespace HIS.BLL.DTOs;
 
-public record DoctorListItemDto(int Id, string FullName, string Specialty, string DepartmentName, string LicenseNumber, int AccountId = 0);
-
-public record QueuePatientDto(int AppointmentId, string AppointmentCode, string PatientName, string? QueueNumber, int PriorityLevel, DateTime? CheckedInAt);
+public record QueuePatientDto(
+    int AppointmentId,
+    string AppointmentCode,
+    string PatientName,
+    string? QueueNumber,
+    int PriorityLevel,
+    DateTime? CheckedInAt);
 
 public record CreateMedicalRecordRequest(
     int AppointmentId,

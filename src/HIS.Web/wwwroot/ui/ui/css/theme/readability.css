@@ -1,0 +1,28 @@
+/* theme / readability */
+/* Deliberate contrast for practical daily use */
+td small,
+.person-cell small,
+.stat-card > small,
+.queue-row small,
+.doctor-meta,
+.doctor-card-body > p,
+.service-card-body > p,
+.hero-copy > p,
+.section-heading p,
+.page-intro > p,
+.fine-print,
+.field-help,
+.field small {
+    color: #596c80;
+}
+.doctor-strip small,
+.sidebar-bottom button,
+.demo-clock {
+    color: #7695b0;
+}
+.staff-main td {
+    font-size: 11px;
+}
+.staff-main th {
+    font-size: 10px;
+}

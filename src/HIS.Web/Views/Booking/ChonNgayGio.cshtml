@@ -1,0 +1,114 @@
+@* Bước "ngày & khung giờ" (luồng theo chuyên khoa và theo bác sĩ).
+   Ca khám không còn là một bước riêng: lịch ngày tô trạng thái, khung giờ hiển thị thành chip
+   nhóm theo Ca sáng / Ca chiều. Đổi ngày thì khối chip tải lại bằng fetch (Booking/KhungGio). *@
+@model ChonNgayGioViewModel
+@{
+    Layout = "_BookingLayout";
+    ViewData["Title"] = "Chọn ngày và khung giờ";
+
+    var firstDay = Model.Days.FirstOrDefault();
+    var lastDay = Model.Days.LastOrDefault();
+    var picked = Model.Slots.FirstOrDefault(s => s.Id == Model.SelectedSlotId);
+    string doctorName = Model.Doctor?.FullName ?? DoctorVm.AnyDoctorName;
+}
+
+<form asp-action="ChonNgayGio" method="post" id="ngaygio-form">
+    <input type="hidden" name="date" id="field-date" value="@Model.SelectedDate.ToString("yyyy-MM-dd")" />
+    <input type="hidden" name="slotId" id="field-slot" value="@Model.SelectedSlotId" />
+
+    <section class="booking-content">
+        <div class="content-head">
+            <div>
+                <div class="eyebrow">@ViewData["StepLabel"]</div>
+                <div class="page-title">Chọn ngày và khung giờ khám</div>
+                <p>
+                    Khung đặt được từ @(firstDay?.Date.ToString("dd/MM/yyyy")) đến @(lastDay?.Date.ToString("dd/MM/yyyy")).
+                    Mỗi lượt phải đặt trước 15:00 ngày liền trước; giới hạn trong ngày: 3 người thân / 6 lượt đăng ký.
+                </p>
+            </div>
+            <span class="badge badge-gray">@Model.MonthLabel</span>
+        </div>
+
+        <partial name="_ErrorAlert" />
+
+        <div class="picked-context">
+            @if (Model.Department is not null)
+            {
+                <div>
+                    <i data-lucide="stethoscope"></i>
+                    <span>@Model.Department.Name</span>
+                    @if (Model.CanChangeDepartment)
+                    {
+                        <a asp-action="ChonKhoa">Đổi</a>
+                    }
+                </div>
+            }
+            <div>
+                <i data-lucide="user-round"></i>
+                <span>@doctorName</span>
+                @if (Model.CanChangeDoctor)
+                {
+                    <a asp-action="ChonBacsi">Đổi</a>
+                }
+            </div>
+            @if (Model.Doctor is not null)
+            {
+                <button type="button" class="text-button" data-doctor-open="@Model.Doctor.ToModalJson()">
+                    Xem thông tin bác sĩ <i data-lucide="chevron-right"></i>
+                </button>
+            }
+        </div>
+
+        <div class="subhead">
+            <div>
+                <strong>Chọn ngày</strong>
+                <span>Lịch @(Model.Department is null ? "của bác sĩ" : $"{Model.Department.Name} · {doctorName}")</span>
+            </div>
+        </div>
+
+        <div class="date-strip" id="date-strip">
+            @foreach (var day in Model.Days)
+            {
+                var isSelected = day.Date == Model.SelectedDate;
+                var isBlocked = day.State is "off" or "closed";
+                <button type="button" class="@(isSelected ? "selected" : "") @(isBlocked ? "off" : day.State)"
+                        data-date="@day.Date.ToString("yyyy-MM-dd")" data-state="@day.State" disabled="@isBlocked">
+                    <span>@VietnameseFormat.WeekdayShort(day.Date)</span>
+                    <strong>@day.Date.Day</strong>
+                    <small>@(day.State switch { "closed" => "Ngưng nhận", "full" => "Hết chỗ", "off" => "Nghỉ", "few" => "Sắp hết", _ => "Còn lịch" })</small>
+                </button>
+            }
+        </div>
+        <div class="legend">
+            <span><i class="dot green"></i> Còn lịch</span>
+            <span><i class="dot yellow"></i> Sắp hết</span>
+            <span><i class="dot gray"></i> Nghỉ / hết chỗ</span>
+        </div>
+
+        <div class="slot-layout" id="slot-container" data-url="@Url.Action("KhungGio", "Booking")">
+            <partial name="_SlotList" model="new SlotListViewModel
+            {
+                Date = Model.SelectedDate,
+                Slots = Model.Slots,
+                SelectedSlotId = Model.SelectedSlotId,
+                ShowDoctor = Model.Doctor is null
+            }" />
+        </div>
+
+        <div class="booking-footer">
+            <span>Đã chọn: <strong id="ngaygio-selected-label">@(picked is null ? "chưa chọn khung giờ" : picked.Label)</strong></span>
+            <div class="footer-actions">
+                <a class="btn btn-outline" href="@ViewData["BackUrl"]"><i data-lucide="chevron-left"></i> Quay lại</a>
+                <button type="submit" class="btn btn-primary" id="ngaygio-next" disabled="@(picked is null)">
+                    Tiếp tục <i data-lucide="chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    </section>
+</form>
+
+<partial name="_DoctorModal" />
+
+@section Scripts {
+    <script src="~/js/booking.js" asp-append-version="true"></script>
+}
