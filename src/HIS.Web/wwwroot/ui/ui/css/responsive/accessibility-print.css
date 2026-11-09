@@ -1,0 +1,53 @@
+@media (prefers-reduced-motion: reduce) {
+    * {
+        scroll-behavior: auto !important;
+        animation: none !important;
+        transition: none !important;
+    }
+}
+@media print {
+    body {
+        background: white !important;
+    }
+    .public-app,
+    .staff-app,
+    #toast-root,
+    .modal-header,
+    .modal-footer,
+    .no-print {
+        display: none !important;
+    }
+    .modal-backdrop {
+        position: static;
+        inset: auto;
+        background: white;
+        padding: 0;
+        backdrop-filter: none;
+        display: block;
+    }
+    .modal {
+        width: 100% !important;
+        max-width: 100% !important;
+        max-height: none !important;
+        overflow: visible !important;
+        box-shadow: none !important;
+        border: 0;
+        border-radius: 0;
+    }
+    .modal-body {
+        padding: 0;
+    }
+    .receipt-paper {
+        padding: 20px;
+        color: #111;
+    }
+    .receipt-paper * {
+        color: #111 !important;
+    }
+    .receipt-paper > p {
+        margin-top: 35px;
+    }
+    .receipt-paper .receipt-total {
+        border-top: 2px solid #111;
+    }
+}

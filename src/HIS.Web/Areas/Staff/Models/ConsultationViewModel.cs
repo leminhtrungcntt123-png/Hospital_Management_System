@@ -112,3 +112,4 @@ public class ConsultationViewModel
     public IReadOnlyList<ScheduleExceptionItemDto> Exceptions { get; set; } = [];
     public IReadOnlyList<DoctorSelectItemDto> AvailableDoctors { get; set; } = [];
 }
+

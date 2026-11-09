@@ -1,0 +1,59 @@
+@* Màn xác thực email sau khi thêm hồ sơ. Mã chỉ sống trong Session; Otp:RevealCodeOnScreen = true
+   (host chưa cấu hình SMTP) thì in luôn mã ra màn hình để còn test được luồng. *@
+@model XacOtpViewModel
+@{
+    ViewData["Title"] = "Nhập mã xác thực";
+}
+
+<main>
+    <section class="booking-content">
+        <div class="content-head">
+            <div>
+                <div class="eyebrow">HỒ SƠ CỦA TÔI</div>
+                <div class="page-title">Nhập mã xác thực</div>
+                <p>Mã gồm 6 số đã gửi tới <strong>@Model.Email</strong>. Nhập mã để hoàn tất hồ sơ @(string.IsNullOrWhiteSpace(Model.PatientName) ? "" : $"của {Model.PatientName}"); chưa nhập mã thì hệ thống chưa lưu gì.</p>
+            </div>
+            <a class="back-link" asp-action="Index"><i data-lucide="chevron-left"></i> Về danh sách hồ sơ</a>
+        </div>
+
+        <partial name="_ErrorAlert" />
+
+        <div class="card-section">
+            <form asp-action="XacOtp" method="post" class="otp-form">
+                <div class="form-grid">
+                    <label class="wide">
+                        <span>Mã xác thực <b>*</b></span>
+                        <input name="code" type="text" maxlength="8" inputmode="numeric"
+                               autocomplete="one-time-code" placeholder="000000" autofocus />
+                    </label>
+                </div>
+
+                <p class="otp-meta">
+                    <i data-lucide="timer"></i>
+                    <span>Mã hết hạn lúc @Model.ExpiresAt.ToString("HH:mm") — còn @Model.AttemptsLeft lần nhập.</span>
+                    @if (Model.ResendWaitSeconds > 0)
+                    {
+                        <span>Cách lần gửi lại @Model.ResendWaitSeconds giây nữa.</span>
+                    }
+                </p>
+
+                @if (!string.IsNullOrEmpty(Model.RevealedCode))
+                {
+                    <p class="duplicate-note">
+                        <i data-lucide="info"></i>
+                        <span>Portal chưa cấu hình gửi mail thật nên mã demo hiện ở đây: <b>@Model.RevealedCode</b>.</span>
+                    </p>
+                }
+
+                <div class="modal-actions">
+                    <a class="btn btn-outline" asp-action="Index">Hủy</a>
+                    <button type="submit" class="btn btn-primary">Xác nhận</button>
+                </div>
+            </form>
+
+            <form asp-action="GuiLaiOtp" method="post" class="otp-resend">
+                <button type="submit" class="btn btn-ghost">Gửi lại mã</button>
+            </form>
+        </div>
+    </section>
+</main>

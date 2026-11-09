@@ -1,5 +1,5 @@
 using HIS.BLL.Common;
-using HIS.BLL.Services;
+using HIS.BLL.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -19,7 +19,10 @@ public class AccountsController : Controller
         _logger = logger;
     }
 
-    // 1. Danh sách tài khoản nhân sự và vai trò hệ thống
+    /// <summary>
+    /// Hiển thị danh sách tài khoản nhân sự và vai trò trong hệ thống.
+    /// </summary>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpGet]
     public async Task<IActionResult> Index(CancellationToken ct)
     {
@@ -28,7 +31,15 @@ public class AccountsController : Controller
         return View(staff);
     }
 
-    // 2. Thêm mới tài khoản nhân viên (bác sĩ, điều dưỡng, thu ngân, trưởng khoa)
+    /// <summary>
+    /// Thêm mới tài khoản nhân viên (bác sĩ, điều dưỡng, thu ngân, trưởng khoa).
+    /// </summary>
+    /// <param name="username">Tên đăng nhập.</param>
+    /// <param name="password">Mật khẩu ban đầu.</param>
+    /// <param name="fullName">Họ và tên nhân viên.</param>
+    /// <param name="roleId">Mã vai trò.</param>
+    /// <param name="isActive">Trạng thái kích hoạt.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(string username, string password, string fullName, int roleId, bool isActive, CancellationToken ct)
@@ -51,7 +62,15 @@ public class AccountsController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    // 3. Cập nhật thông tin nhân viên hoặc đổi mật khẩu/trạng thái hoạt động
+    /// <summary>
+    /// Cập nhật thông tin nhân viên hoặc đổi mật khẩu/trạng thái hoạt động.
+    /// </summary>
+    /// <param name="id">Mã tài khoản.</param>
+    /// <param name="password">Mật khẩu mới (nếu có).</param>
+    /// <param name="fullName">Họ và tên mới.</param>
+    /// <param name="roleId">Mã vai trò mới.</param>
+    /// <param name="isActive">Trạng thái kích hoạt mới.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(int id, string? password, string fullName, int roleId, bool isActive, CancellationToken ct)
@@ -74,7 +93,11 @@ public class AccountsController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    // 4. Xóa tài khoản nhân viên (bảo vệ tài khoản admin)
+    /// <summary>
+    /// Xóa tài khoản nhân viên khỏi hệ thống (ngăn xóa admin mặc định).
+    /// </summary>
+    /// <param name="id">Mã tài khoản.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(int id, CancellationToken ct)
@@ -100,7 +123,12 @@ public class AccountsController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    // 5. Đặt lại mật khẩu nhân viên tại quầy
+    /// <summary>
+    /// Đặt lại mật khẩu nhân viên trực tiếp từ quầy quản trị.
+    /// </summary>
+    /// <param name="accountId">Mã tài khoản.</param>
+    /// <param name="newPassword">Mật khẩu mới.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ResetPassword(int accountId, string newPassword, CancellationToken ct)
@@ -145,3 +173,4 @@ public class AccountsController : Controller
         return RedirectToAction(nameof(Index));
     }
 }
+

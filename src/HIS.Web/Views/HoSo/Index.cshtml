@@ -1,0 +1,71 @@
+@* Màn "Hồ sơ của tôi": danh sách hồ sơ đang liên kết với tài khoản. *@
+@model HIS.Web.ViewModels.HoSo.HoSoIndexViewModel
+@{
+    ViewData["Title"] = "Hồ sơ của tôi";
+}
+
+<main>
+    <section class="booking-content">
+        <div class="content-head">
+            <div>
+                <div class="eyebrow">TÀI KHOẢN CỦA TÔI</div>
+                <div class="page-title">Hồ sơ người khám</div>
+                <p>Mỗi hồ sơ là một người bệnh riêng. Bấm "Tạo hồ sơ" rồi chọn đã từng khám tại bệnh viện hay chưa — hai tình trạng này đi hai nhánh khác nhau trên cùng một màn.</p>
+            </div>
+            <div class="head-actions">
+                <a class="btn btn-primary" asp-action="Them"><i data-lucide="user-round-plus"></i> Tạo hồ sơ</a>
+            </div>
+        </div>
+
+        @if (TempData["Message"] is string ok && !string.IsNullOrWhiteSpace(ok))
+        {
+            <div class="alert info">
+                <i data-lucide="circle-check"></i>
+                <div><strong>Đã ghi nhận</strong><p>@ok</p></div>
+            </div>
+        }
+
+        <partial name="_ErrorAlert" />
+
+        @if (Model.Profiles.Count == 0)
+        {
+            <div class="empty-state">
+                <i data-lucide="folder-open"></i>
+                <strong>Chưa có hồ sơ nào</strong>
+                <p>Tạo hồ sơ cho người nhà — đã từng khám thì chỉ cần một thông tin định danh, chưa khám thì khai đầy đủ.</p>
+                <div class="modal-actions">
+                    <a class="btn btn-primary" asp-action="Them">Tạo hồ sơ</a>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="profile-select-grid">
+                @foreach (var p in Model.Profiles)
+                {
+                    <a class="profile-select" asp-action="Chitiet" asp-route-patientId="@p.PatientId">
+                        <div class="profile-avatar">@p.DisplayInitials</div>
+                        <div class="profile-body">
+                            <div>
+                                <strong>@p.DisplayName</strong>
+                                <span class="badge @(p.RelationshipCode == "SELF" ? "badge-blue" : "badge-gray")">@p.Relationship</span>
+                            </div>
+                            <p>Mã người bệnh: @p.Code</p>
+                            <p>Ngày sinh: @p.DisplayDateOfBirth · @p.DisplayGender</p>
+                            <p>@(p.IsMasked ? "Chưa thấy lịch sử khám" : $"{p.AppointmentCount} lịch sử khám")</p>
+                            @if (p.StatusCode == "ACTIVE")
+                            {
+                                <span class="verified"><i data-lucide="shield-check"></i> Đã xác minh</span>
+                            }
+                            else
+                            {
+                                <span class="needs-verify"><i data-lucide="clock-3"></i> Chờ bạn nhập mã xác thực — chưa đặt lịch được</span>
+                            }
+                        </div>
+                        <div class="check-mark"><i data-lucide="chevron-right"></i></div>
+                    </a>
+                }
+            </div>
+        }
+    </section>
+</main>

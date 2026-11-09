@@ -1,0 +1,87 @@
+@* Bước "chọn chuyên khoa" của hai luồng.
+   Model.OnDate khác null khi đi theo ngày: số chỗ chỉ tính trong đúng ngày đã chọn. *@
+@model ChonKhoaViewModel
+@{
+    Layout = "_BookingLayout";
+    ViewData["Title"] = "Chọn chuyên khoa";
+
+    var selected = Model.Departments.FirstOrDefault(d => d.Id == Model.SelectedDepartmentId);
+}
+
+<form asp-action="ChonKhoa" method="post" id="khoa-form">
+    <input type="hidden" name="departmentId" id="field-department" value="@Model.SelectedDepartmentId" />
+
+    <section class="booking-content">
+        <div class="content-head">
+            <div>
+                <div class="eyebrow">@ViewData["StepLabel"]</div>
+                <div class="page-title">Bạn cần khám chuyên khoa nào?</div>
+                @if (Model.OnDate is { } onDate)
+                {
+                    <p>
+                        Những chuyên khoa có ca trực ngày <b>@VietnameseFormat.FullDate(onDate)</b>.
+                        Khoa chưa có chỗ hôm đó hiển thị "Chưa có lịch".
+                    </p>
+                }
+                else
+                {
+                    <p>Chọn một chuyên khoa phù hợp. Bệnh viện sẽ phân công bác sĩ theo lịch trực.</p>
+                }
+            </div>
+            <div class="head-actions">
+                @if (Model.OnDate is not null)
+                {
+                    <a class="btn btn-outline" asp-action="ChonNgay"><i data-lucide="calendar-days"></i> Đổi ngày</a>
+                }
+            </div>
+        </div>
+
+        <partial name="_ErrorAlert" />
+
+        <label class="search-box">
+            <i data-lucide="search"></i>
+            <input type="search" id="khoa-search" placeholder="Tìm kiếm chuyên khoa..." autocomplete="off" />
+        </label>
+
+        <div class="specialty-grid" id="khoa-grid">
+            @foreach (var d in Model.Departments)
+            {
+                var isSelected = d.Id == Model.SelectedDepartmentId;
+                <button type="button" class="specialty-card @(isSelected ? "selected" : "")"
+                        data-id="@d.Id" data-name="@d.Name" disabled="@(d.SlotsAvailable == 0)">
+                    <div class="specialty-icon"><i data-lucide="@d.Icon"></i></div>
+                    <div class="specialty-info">
+                        <strong>@d.Name</strong>
+                        <p>@d.Description</p>
+                        <span class="@(d.SlotsAvailable > 0 ? "available" : "unavailable")">
+                            @(d.SlotsAvailable > 0
+                              ? Model.OnDate is null ? $"Còn {d.SlotsAvailable} suất đặt online" : $"Còn {d.SlotsAvailable} suất ngày {Model.OnDate:dd/MM}"
+                              : "Chưa có lịch khả dụng")
+                        </span>
+                    </div>
+                    <div class="check-mark"><i data-lucide="check"></i></div>
+                </button>
+            }
+        </div>
+
+        <div class="empty-state" id="khoa-empty" hidden>
+            <i data-lucide="search"></i>
+            <strong>Không tìm thấy chuyên khoa</strong>
+            <p>Thử tìm bằng từ khóa khác hoặc liên hệ 0808 0808 để được hỗ trợ.</p>
+        </div>
+
+        <div class="booking-footer">
+            <span>Đã chọn: <strong id="khoa-selected-name">@(selected?.Name ?? "chưa chọn")</strong></span>
+            <div class="footer-actions">
+                <a class="btn btn-outline" href="@ViewData["BackUrl"]"><i data-lucide="chevron-left"></i> @(ViewData["Step"]?.ToString() == "1" ? "Thoát đặt lịch" : "Quay lại")</a>
+                <button type="submit" class="btn btn-primary" id="khoa-next" disabled="@(selected is null)">
+                    Tiếp tục <i data-lucide="chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    </section>
+</form>
+
+@section Scripts {
+    <script src="~/js/booking.js" asp-append-version="true"></script>
+}

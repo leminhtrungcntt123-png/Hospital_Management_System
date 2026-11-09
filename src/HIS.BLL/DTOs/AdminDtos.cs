@@ -22,7 +22,7 @@ public sealed class CreateAdminAccountRequest
         set => _email = string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToLowerInvariant();
     }
 
-    [Range(1, 5)]
+    [Range(1, int.MaxValue)]
     public int RoleId { get; set; }
 
     public int? DepartmentId { get; set; }
@@ -39,6 +39,17 @@ public sealed class DepartmentCreateRequest
 
     [StringLength(255)]
     public string? Description { get; set; }
+}
+
+public sealed class RoomCreateRequest
+{
+    public int DepartmentId { get; set; }
+
+    [Required, StringLength(50)]
+    public string RoomNumber { get; set; } = "";
+
+    [Required, StringLength(100)]
+    public string RoomName { get; set; } = "";
 }
 
 public record AccountActivationRequest(
@@ -108,3 +119,4 @@ public record ScheduleDecisionResult(
     int Transferred,
     int NeedsRebooking,
     int ExpiredHolds);
+

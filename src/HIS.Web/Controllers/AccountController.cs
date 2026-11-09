@@ -1,12 +1,9 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
-using HIS.BLL.Common;
 using HIS.BLL.DTOs;
-using HIS.BLL.Services;
+using HIS.BLL.Interfaces;
 using HIS.DAL;
 using HIS.Domain;
-using HIS.Web.Models;
-using HIS.Web.Workers;
+using HIS.Web.ViewModels.Account;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
@@ -16,54 +13,64 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HIS.Web.Controllers;
 
+// Trang đăng nhập của cổng đặt lịch: xác thực qua IAuthService rồi phát cookie Claims
+// (Id, tên đăng nhập, vai trò, tên hiển thị) để các trang hồ sơ/đặt lịch biết đang làm việc với ai.
+// Cùng màn này có đăng ký tài khoản người khám, khôi phục mật khẩu bằng OTP và đổi mật khẩu.
 public class AccountController : Controller
 {
-    private const string RegistrationMessage = "Yêu cầu đăng ký đã được xử lý. Vui lòng đăng nhập hoặc khôi phục mật khẩu nếu bạn đã có tài khoản.";
+    private const string FullNameClaim = "FullName";
 
     private readonly IAuthService _authService;
-    private readonly ILogger<AccountController> _logger;
-    private readonly PasswordResetQueue _passwordResets;
 
-    public AccountController(IAuthService authService, ILogger<AccountController> logger, PasswordResetQueue passwordResets)
+    public AccountController(IAuthService authService)
     {
         _authService = authService;
-        _logger = logger;
-        _passwordResets = passwordResets;
     }
 
+    /// <summary>
+    /// Điều hướng người dùng tới bảng điều khiển (Dashboard) tương ứng với vai trò đã đăng nhập.
+    /// </summary>
     [HttpGet]
     public IActionResult Dashboard()
     {
         if (User.Identity?.IsAuthenticated != true)
         {
-            return RedirectToAction("Login", "Account");
+            return RedirectToAction(nameof(Login));
         }
-        return RedirectToDashboard(User.FindFirst(ClaimTypes.Role)?.Value);
+
+        return RedirectToDashboard(User.FindFirstValue(ClaimTypes.Role));
     }
 
+    /// <summary>
+    /// Hiển thị giao diện đăng nhập cho người dùng.
+    /// </summary>
+    /// <param name="returnUrl">Đường dẫn quay về sau khi đăng nhập.</param>
+    /// <param name="loggedOut">Cờ trạng thái vừa đăng xuất.</param>
     [HttpGet]
     public IActionResult Login(string? returnUrl = null, int? loggedOut = null)
     {
         if (loggedOut != 1 && User.Identity?.IsAuthenticated == true)
         {
-            if (IsAllowedReturnUrl(returnUrl))
-            {
-                return Redirect(returnUrl);
-            }
-            return RedirectToDashboard(User.FindFirst(ClaimTypes.Role)?.Value);
+            return IsSafeReturnUrl(returnUrl)
+                ? Redirect(returnUrl!)
+                : RedirectToAction("Index", "Booking");
         }
 
         return View(new LoginViewModel { ReturnUrl = returnUrl });
     }
 
-    // Đăng nhập nhanh cho Dev / Test (Bỏ qua mật khẩu)
-    // Ví dụ truy cập: /Account/DevLogin?role=ADMIN hoặc /Account/DevLogin?role=DOCTOR
+    /// <summary>
+    /// Đăng nhập nhanh cho môi trường phát triển (Development) bỏ qua mật khẩu theo vai trò.
+    /// </summary>
+    /// <param name="db">DbContext.</param>
+    /// <param name="env">Môi trường máy chủ web.</param>
+    /// <param name="role">Tên vai trò (ADMIN, DOCTOR, NURSE, DEPT_HEAD, PATIENT).</param>
     [HttpGet]
     [AllowAnonymous]
     public async Task<IActionResult> DevLogin(
         [FromServices] AppDbContext db,
         [FromServices] IWebHostEnvironment env,
-        string role = "ADMIN")
+        string role = "PATIENT")
     {
         if (!env.IsDevelopment())
         {
@@ -74,112 +81,64 @@ public class AccountController : Controller
         {
             "DOCTOR" or "DOC" => "DOCTOR",
             "NURSE" => "NURSE",
-            "DEPT_HEAD" or "DEPARTMENT_HEAD" => "DEPARTMENT_HEAD",
-            "PATIENT" => "PATIENT",
-            _ => "ADMIN"
+            "DEPT_HEAD" or "DEPARTMENT_HEAD" => "DEPT_HEAD",
+            "ADMIN" => "ADMIN",
+            _ => "PATIENT"
         };
 
         int accountId = 1;
-        string username = targetRole.ToLower() + "_dev";
+        string username = targetRole.ToLowerInvariant() + "_dev";
         string fullName = "Test " + targetRole;
         string? doctorId = null;
         string? departmentName = null;
 
-        if (targetRole == "ADMIN")
+        var acc = await db.Accounts
+            .Include(a => a.Role)
+            .FirstOrDefaultAsync(a => a.Role.Code == targetRole && a.IsActive);
+
+        if (acc != null)
         {
-            var acc = await db.Accounts.FirstOrDefaultAsync(a => a.Username == "admin");
-            if (acc != null)
+            accountId = acc.Id;
+            username = acc.Username;
+
+            if (targetRole == "DOCTOR")
             {
-                accountId = acc.Id;
-                username = acc.Username;
+                var doc = await db.Doctors.Include(d => d.Department).FirstOrDefaultAsync(d => d.AccountId == acc.Id);
+                if (doc != null)
+                {
+                    fullName = doc.FullName;
+                    doctorId = doc.Id.ToString();
+                    departmentName = doc.Department?.Name;
+                }
+            }
+            else if (targetRole == "NURSE")
+            {
+                var nurse = await db.Nurses.Include(n => n.Department).FirstOrDefaultAsync(n => n.AccountId == acc.Id);
+                if (nurse != null)
+                {
+                    fullName = nurse.FullName;
+                    departmentName = nurse.Department?.Name;
+                }
+            }
+            else if (targetRole == "DEPT_HEAD")
+            {
+                var head = await db.DepartmentHeads.Include(dh => dh.Department).FirstOrDefaultAsync(dh => dh.AccountId == acc.Id);
+                if (head != null)
+                {
+                    fullName = head.FullName;
+                    departmentName = head.Department?.Name;
+                }
+            }
+            else if (targetRole == "ADMIN")
+            {
                 fullName = "Quản trị viên";
             }
-        }
-        else if (targetRole == "DEPARTMENT_HEAD")
-        {
-            var head = await db.DepartmentHeads
-                .Include(dh => dh.Account)
-                .Include(dh => dh.Department)
-                .FirstOrDefaultAsync();
-
-            if (head != null)
-            {
-                accountId = head.AccountId;
-                username = head.Account?.Username ?? "head_noi";
-                fullName = head.FullName;
-                departmentName = head.Department?.Name;
-            }
             else
             {
-                var acc = await db.Accounts.FirstOrDefaultAsync(a => a.RoleId == (int)RoleId.DepartmentHead);
-                if (acc != null)
-                {
-                    accountId = acc.Id;
-                    username = acc.Username;
-                    fullName = "Trưởng khoa";
-                }
-            }
-        }
-        else if (targetRole == "DOCTOR")
-        {
-            var doc = await db.Doctors
-                .Include(d => d.Account)
-                .Include(d => d.Department)
-                .FirstOrDefaultAsync(d => d.AccountId > 0 && d.Account.RoleId == (int)RoleId.Doctor)
-                ?? await db.Doctors.Include(d => d.Account).Include(d => d.Department).FirstOrDefaultAsync();
-
-            if (doc != null)
-            {
-                accountId = doc.AccountId;
-                username = doc.Account?.Username ?? "bs_nam";
-                fullName = doc.FullName;
-                doctorId = doc.Id.ToString();
-                departmentName = doc.Department?.Name;
-            }
-            else
-            {
-                var acc = await db.Accounts.FirstOrDefaultAsync(a => a.RoleId == (int)RoleId.Doctor);
-                if (acc != null)
-                {
-                    accountId = acc.Id;
-                    username = acc.Username;
-                    fullName = "Bác sĩ";
-                }
-            }
-        }
-        else if (targetRole == "NURSE")
-        {
-            var nurse = await db.Nurses
-                .Include(n => n.Account)
-                .Include(n => n.Department)
-                .FirstOrDefaultAsync();
-
-            if (nurse != null)
-            {
-                accountId = nurse.AccountId;
-                username = nurse.Account?.Username ?? "nurse_lan";
-                fullName = nurse.FullName;
-                departmentName = nurse.Department?.Name;
-            }
-            else
-            {
-                var acc = await db.Accounts.FirstOrDefaultAsync(a => a.RoleId == (int)RoleId.Nurse);
-                if (acc != null)
-                {
-                    accountId = acc.Id;
-                    username = acc.Username;
-                    fullName = "Điều dưỡng";
-                }
-            }
-        }
-        else if (targetRole == "PATIENT")
-        {
-            var patientAcc = await db.Accounts.FirstOrDefaultAsync(a => a.RoleId == (int)RoleId.Patient);
-            if (patientAcc != null)
-            {
-                accountId = patientAcc.Id;
-                username = patientAcc.Username;
-                fullName = "Người bệnh";
+                fullName = await db.AccountPatientProfiles
+                    .Where(p => p.AccountId == acc.Id && p.Relationship == PatientRelationship.Self)
+                    .Select(p => p.Patient.FullName)
+                    .FirstOrDefaultAsync() ?? acc.Username;
             }
         }
 
@@ -188,7 +147,8 @@ public class AccountController : Controller
             new(ClaimTypes.NameIdentifier, accountId.ToString()),
             new(ClaimTypes.Name, username),
             new(ClaimTypes.Role, targetRole),
-            new("FullName", fullName)
+            new(FullNameClaim, fullName),
+            new("SessionVersion", _authService.GetSessionVersion(accountId).ToString())
         };
 
         if (!string.IsNullOrEmpty(doctorId))
@@ -201,8 +161,8 @@ public class AccountController : Controller
             claims.Add(new Claim("DepartmentName", departmentName));
         }
 
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        var principal = new ClaimsPrincipal(identity);
+        var principal = new ClaimsPrincipal(
+            new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
 
         await HttpContext.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,
@@ -216,6 +176,11 @@ public class AccountController : Controller
         return RedirectToDashboard(targetRole);
     }
 
+    /// <summary>
+    /// Tiếp nhận thông tin đăng nhập, xác thực qua AuthService và tạo Cookie xác thực an toàn.
+    /// </summary>
+    /// <param name="model">Dữ liệu đăng nhập.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost]
     [EnableRateLimiting("login")]
     [ValidateAntiForgeryToken]
@@ -226,40 +191,39 @@ public class AccountController : Controller
             return View(model);
         }
 
-        Result<AuthResponse> result;
-        try
+        // Đăng nhập ở cổng Web chung: chấp nhận cả Bệnh nhân lẫn Nhân sự (Bác sĩ, Admin, Lễ tân, Thu ngân...)
+        LoginResult result = await _authService.LoginAsync(
+            model.Username!, model.Password!, LoginSurface.Web);
+
+        if (!result.Succeeded || result.User is null)
         {
-            result = await _authService.LoginAsync(new LoginRequest(model.Username, model.Password), HttpContext.RequestAborted);
-        }
-        catch (Exception error) when (error is not OperationCanceledException)
-        {
-            _logger.LogError("Login failed: {Type}", error.GetType().Name);
-            Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-            ModelState.AddModelError(string.Empty, "Chưa kết nối được hệ thống đăng nhập. Vui lòng thử lại sau.");
-            return View(model);
-        }
-        if (!result.IsSuccess)
-        {
-            ModelState.AddModelError(string.Empty, result.Error.Message);
+            ModelState.AddModelError(string.Empty, result.ErrorMessage ?? "Đăng nhập không thành công.");
             return View(model);
         }
 
-        var auth = result.Value!;
+        AuthUserDto user = result.User;
+
         var claims = new List<Claim>
         {
-            new(ClaimTypes.NameIdentifier, auth.AccountId.ToString()),
-            new(ClaimTypes.Name, auth.Username),
-            new(ClaimTypes.Role, auth.Role),
-            new("FullName", string.IsNullOrWhiteSpace(auth.FullName) ? auth.Username : auth.FullName)
+            new(ClaimTypes.NameIdentifier, user.AccountId.ToString()),
+            new(ClaimTypes.Name, user.Username),
+            new(ClaimTypes.Role, user.RoleCode),
+            new(FullNameClaim, string.IsNullOrWhiteSpace(user.DisplayName) ? user.Username : user.DisplayName),
+            new("SessionVersion", _authService.GetSessionVersion(user.AccountId).ToString())
         };
 
-        if (!string.IsNullOrEmpty(auth.DepartmentName))
+        if (!string.IsNullOrEmpty(user.DepartmentName))
         {
-            claims.Add(new Claim("DepartmentName", auth.DepartmentName));
+            claims.Add(new Claim("DepartmentName", user.DepartmentName));
         }
 
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        var principal = new ClaimsPrincipal(identity);
+        if (!string.IsNullOrEmpty(user.DoctorId))
+        {
+            claims.Add(new Claim("DoctorId", user.DoctorId));
+        }
+
+        var principal = new ClaimsPrincipal(
+            new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
 
         var authProperties = new AuthenticationProperties
         {
@@ -267,123 +231,176 @@ public class AccountController : Controller
             ExpiresUtc = model.RememberMe ? DateTimeOffset.UtcNow.AddDays(7) : null
         };
 
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, authProperties);
+        await HttpContext.SignInAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme, principal, authProperties);
 
-        if (IsAllowedReturnUrl(model.ReturnUrl))
-        {
-            return Redirect(model.ReturnUrl);
-        }
-
-        return RedirectToDashboard(auth.Role);
+        // Chỉ quay về đường dẫn nội bộ an toàn để không biến trang đăng nhập thành cổng chuyển hướng ra ngoài.
+        return IsSafeReturnUrl(model.ReturnUrl)
+            ? Redirect(model.ReturnUrl!)
+            : RedirectToDashboard(user.RoleCode);
     }
 
+    /// <summary>
+    /// Đăng xuất người dùng khỏi hệ thống, hủy cookie và thu hồi phiên làm việc.
+    /// </summary>
     [HttpPost]
-    [Authorize]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Logout()
     {
+        if (int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out int accountId) && accountId > 0)
+        {
+            await _authService.LogoutAsync(accountId);
+        }
+
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
 
-        return RedirectToAction("Login", "Account", new { loggedOut = 1 });
+        // Xóa cả cookie cũ còn sót của phiên trước để lần sau mở web không bị đăng nhập nhầm tài khoản.
+        foreach (string cookie in Request.Cookies.Keys)
+        {
+            if (cookie.StartsWith(".AspNetCore", StringComparison.OrdinalIgnoreCase))
+            {
+                Response.Cookies.Delete(cookie);
+                Response.Cookies.Delete(cookie, new CookieOptions { Path = "/" });
+            }
+        }
+
+        return RedirectToAction(nameof(Login), new { loggedOut = 1 });
     }
 
     [HttpGet]
-    public IActionResult Register() => RedirectToAction("Login", "Account", new { mode = "register" });
+    public IActionResult Register() => RedirectToAction(nameof(Login), new { mode = "register" });
 
     [HttpGet]
-    public IActionResult ForgotPassword() => RedirectToAction("Login", "Account", new { mode = "forgot" });
+    public IActionResult ForgotPassword() => RedirectToAction(nameof(Login), new { mode = "forgot" });
 
     [HttpGet]
-    public IActionResult ResetPassword() => RedirectToAction("Login", "Account", new { mode = "forgot" });
+    public IActionResult ResetPassword() => RedirectToAction(nameof(Login), new { mode = "forgot" });
 
-    [HttpPost]
-    [EnableRateLimiting("register")]
-    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-    public async Task<IActionResult> RegisterApi([FromBody] RegisterPatientRequest request, CancellationToken ct)
+    [HttpGet]
+    public IActionResult AccessDenied() => View();
+
+    [HttpGet]
+    [Authorize]
+    public IActionResult ChangePassword()
     {
-        if (!ModelState.IsValid || request == null)
-        {
-            return Json(new { success = false, message = "Dữ liệu đăng ký không hợp lệ." });
-        }
-
-        var result = await _authService.RegisterPatientAsync(request, ct);
-        if (!result.IsSuccess && result.Error.Code != "AUTH_REGISTRATION_CONFLICT")
-        {
-            return Json(new { success = false, message = result.Error.Message });
-        }
-
-        return Json(new
-        {
-            success = true,
-            message = RegistrationMessage
-        });
+        return View(new ChangePasswordViewModel());
     }
 
+    /// <summary>
+    /// Xử lý yêu cầu đổi mật khẩu tài khoản người dùng, sau khi thành công sẽ hủy toàn bộ cookie cũ (CWE-613).
+    /// </summary>
+    /// <param name="model">Mô hình đổi mật khẩu.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost]
-    [EnableRateLimiting("register")]
+    [Authorize]
     [ValidateAntiForgeryToken]
-    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-    public async Task<IActionResult> Register(RegisterViewModel model, CancellationToken ct)
+    public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model, CancellationToken ct)
     {
         if (!ModelState.IsValid)
         {
             return View(model);
         }
 
-        var result = await _authService.RegisterPatientAsync(new RegisterPatientRequest(
-            model.Username,
-            model.Password,
-            model.FullName,
-            model.DateOfBirth,
-            model.PhoneNumber,
-            model.Email
-        ), ct);
-
-        if (!result.IsSuccess && result.Error.Code != "AUTH_REGISTRATION_CONFLICT")
+        if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out int accountId) || accountId <= 0)
         {
-            ModelState.AddModelError(string.Empty, result.Error.Message);
+            return RedirectToAction(nameof(Login));
+        }
+
+        var result = await _authService.ChangePasswordAsync(accountId, model.OldPassword, model.NewPassword, ct);
+        if (!result.Succeeded)
+        {
+            ModelState.AddModelError(string.Empty, result.ErrorMessage ?? "Đổi mật khẩu thất bại.");
             return View(model);
         }
 
-        TempData["SuccessMessage"] = RegistrationMessage;
-        return RedirectToAction("Login", "Account");
+        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        TempData["SuccessMessage"] = "Đổi mật khẩu thành công! Vui lòng đăng nhập lại với mật khẩu mới.";
+        return RedirectToAction(nameof(Login));
     }
 
+    /// <summary>
+    /// API tiếp nhận đăng ký tài khoản mới cho bệnh nhân từ form giao diện.
+    /// </summary>
+    /// <param name="request">Yêu cầu đăng ký.</param>
     [HttpPost]
-    [EnableRateLimiting("password-reset-request")]
+    [EnableRateLimiting("register")]
+    [ValidateAntiForgeryToken]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-    public IActionResult RequestPasswordReset([FromBody] ForgotPasswordRequest request)
+    public async Task<IActionResult> RegisterApi([FromBody] RegisterPatientRequest request)
     {
-        if (request == null || !ModelState.IsValid || string.IsNullOrWhiteSpace(request.EmailOrUsername)
-            || request.EmailOrUsername.Length > 100)
+        if (request == null)
         {
-            return Json(new { success = false, message = "Vui lòng nhập email hoặc tên đăng nhập." });
+            return Json(new { success = false, message = "Dữ liệu đăng ký không hợp lệ." });
         }
 
-        // Queue every valid identifier so account lookup and SMTP timing cannot identify an account.
-        _passwordResets.Enqueue(request.EmailOrUsername);
+        RegisterResult result = await _authService.RegisterPatientAsync(request);
+        if (!result.Succeeded)
+        {
+            return Json(new { success = false, message = result.ErrorMessage });
+        }
 
         return Json(new
         {
             success = true,
-            message = "Nếu thông tin tài khoản phù hợp, mã xác thực sẽ được gửi đến email đã đăng ký. Vui lòng kiểm tra hộp thư."
+            username = result.Username,
+            message = "Đăng ký tài khoản thành công! Vui lòng đăng nhập và tạo hồ sơ khám bệnh."
         });
     }
 
+    /// <summary>
+    /// Bước 1: Gửi mã OTP xác thực tới email đã đăng ký của người dùng khi quên mật khẩu.
+    /// </summary>
+    /// <param name="request">Yêu cầu chứa email hoặc username.</param>
+    [HttpPost]
+    [EnableRateLimiting("password-reset-request")]
+    [ValidateAntiForgeryToken]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> RequestPasswordReset([FromBody] ForgotPasswordRequest request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.EmailOrUsername))
+        {
+            return Json(new { success = false, message = "Vui lòng nhập email hoặc tên đăng nhập." });
+        }
+
+        ForgotPasswordResult result = await _authService.SendPasswordResetOtpAsync(request.EmailOrUsername);
+        if (!result.Succeeded)
+        {
+            return Json(new { success = false, message = result.ErrorMessage });
+        }
+
+        return Json(new
+        {
+            success = true,
+            message = "Mã xác thực OTP đã được gửi đến email của bạn.",
+            maskedEmail = result.MaskedEmail,
+            demoOtp = result.DemoOtp
+        });
+    }
+
+    /// <summary>
+    /// Bước 2: Đối chiếu mã OTP và đặt mật khẩu mới cho tài khoản (CWE-640).
+    /// </summary>
+    /// <param name="request">Yêu cầu chứa OTP và mật khẩu mới.</param>
     [HttpPost]
     [EnableRateLimiting("password-reset-confirm")]
+    [ValidateAntiForgeryToken]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-    public async Task<IActionResult> ConfirmPasswordReset([FromBody] ResetPasswordRequest request, CancellationToken ct)
+    public async Task<IActionResult> ConfirmPasswordReset([FromBody] ResetPasswordRequest request)
     {
-        if (request == null || !ModelState.IsValid || string.IsNullOrWhiteSpace(request.EmailOrUsername) ||
-            string.IsNullOrWhiteSpace(request.Otp) || string.IsNullOrWhiteSpace(request.NewPassword))
+        if (request == null
+            || string.IsNullOrWhiteSpace(request.EmailOrUsername)
+            || string.IsNullOrWhiteSpace(request.Otp)
+            || string.IsNullOrWhiteSpace(request.NewPassword))
         {
             return Json(new { success = false, message = "Vui lòng điền đầy đủ thông tin yêu cầu." });
         }
 
-        var result = await _authService.ResetPasswordWithOtpAsync(request.EmailOrUsername, request.Otp, request.NewPassword, ct);
-        if (!result.IsSuccess)
+        PasswordResetResult result = await _authService.ResetPasswordWithOtpAsync(
+            request.EmailOrUsername, request.Otp, request.NewPassword);
+
+        if (!result.Succeeded)
         {
-            return Json(new { success = false, message = result.Error.Message });
+            return Json(new { success = false, message = result.ErrorMessage });
         }
 
         return Json(new
@@ -393,53 +410,23 @@ public class AccountController : Controller
         });
     }
 
-    [HttpGet]
-    public IActionResult AccessDenied() => View();
-
-    [HttpGet]
-    [Authorize]
-    public IActionResult ChangePassword() => View(new ChangePasswordViewModel());
-
-    [HttpPost]
-    [Authorize]
-    public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model, CancellationToken ct)
-    {
-        if (!ModelState.IsValid)
-        {
-            return View(model);
-        }
-        var accountId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var result = await _authService.ChangePasswordAsync(accountId, model.OldPassword, model.NewPassword, ct);
-        if (!result.IsSuccess)
-        {
-            ModelState.AddModelError(string.Empty, result.Error.Message);
-            return View(model);
-        }
-        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-        TempData["SuccessMessage"] = "Đã đổi mật khẩu. Vui lòng đăng nhập lại.";
-        return RedirectToAction(nameof(Login));
-    }
-
-    private bool IsAllowedReturnUrl([NotNullWhen(true)] string? returnUrl)
-    {
-        if (string.IsNullOrEmpty(returnUrl) || !Url.IsLocalUrl(returnUrl)) return false;
-        var path = Url.Content(returnUrl);
-        return path != "/"
-            && !path.StartsWith(Url.Content("~/Account/Login"), StringComparison.OrdinalIgnoreCase)
-            && !path.StartsWith(Url.Content("~/Account/Logout"), StringComparison.OrdinalIgnoreCase);
-    }
+    private bool IsSafeReturnUrl(string? returnUrl)
+        => !string.IsNullOrEmpty(returnUrl)
+           && Url.IsLocalUrl(returnUrl)
+           && returnUrl != "/"
+           && !returnUrl.StartsWith("/Account/Login", StringComparison.OrdinalIgnoreCase)
+           && !returnUrl.StartsWith("/Account/Logout", StringComparison.OrdinalIgnoreCase);
 
     private IActionResult RedirectToDashboard(string? role)
     {
         return (role?.Trim().ToUpperInvariant()) switch
         {
             "ADMIN" => RedirectToAction("Index", "Management", new { area = "Admin" }),
-            "DEPARTMENT_HEAD" or "DEPT_HEAD" => RedirectToAction("Index", "Schedule", new { area = "Staff" }),
             "DOCTOR" => RedirectToAction("Index", "Consultation", new { area = "Staff" }),
-            "NURSE" => RedirectToAction("Index", "Reception", new { area = "Staff" }),
+            "DEPARTMENT_HEAD" or "DEPT_HEAD" => RedirectToAction("Index", "Schedule", new { area = "Staff" }),
+            "NURSE" or "RECEPTIONIST" => RedirectToAction("Index", "Reception", new { area = "Staff" }),
             "CASHIER" => RedirectToAction("Index", "Cashier", new { area = "Staff" }),
-            "PATIENT" => RedirectToAction("Index", "Booking", new { area = "Patient" }),
-            _ => RedirectToAction("Index", "Home")
+            _ => RedirectToAction("Index", "Booking")
         };
     }
 }

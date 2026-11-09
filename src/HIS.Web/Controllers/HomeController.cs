@@ -1,17 +1,28 @@
+using HIS.BLL.Interfaces;
 using Microsoft.AspNetCore.Mvc;
-using HIS.BLL.Services;
 
 namespace HIS.Web.Controllers;
 
-public class HomeController(
-    IDoctorService doctors,
-    IDepartmentService departments,
-    ILogger<HomeController> logger) : Controller
+public class HomeController : Controller
 {
-    [HttpGet]
-    public async Task<IActionResult> Index(CancellationToken ct = default)
+    private readonly IDoctorService _doctorService;
+    private readonly IDepartmentService _departmentService;
+    private readonly ILogger<HomeController> _logger;
+
+    public HomeController(
+        IDoctorService doctorService,
+        IDepartmentService departmentService,
+        ILogger<HomeController> logger)
     {
-        if (User.IsInRole("DEPARTMENT_HEAD"))
+        _doctorService = doctorService;
+        _departmentService = departmentService;
+        _logger = logger;
+    }
+
+    [HttpGet]
+    public IActionResult Index()
+    {
+        if (User.IsInRole("DEPARTMENT_HEAD") || User.IsInRole("DEPT_HEAD"))
         {
             return RedirectToAction("Index", "Schedule", new { area = "Staff" });
         }
@@ -21,7 +32,7 @@ public class HomeController(
             return RedirectToAction("Index", "Consultation", new { area = "Staff" });
         }
 
-        if (User.IsInRole("NURSE"))
+        if (User.IsInRole("NURSE") || User.IsInRole("RECEPTIONIST"))
         {
             return RedirectToAction("Index", "Reception", new { area = "Staff" });
         }
@@ -31,8 +42,7 @@ public class HomeController(
             return RedirectToAction("Index", "Management", new { area = "Admin" });
         }
 
-        var departmentList = await departments.GetDepartmentsAsync(ct);
-        return View(departmentList);
+        return RedirectToAction("Index", "Booking");
     }
 
     [HttpGet, HttpPost]
@@ -49,12 +59,12 @@ public class HomeController(
 
     [HttpGet]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-    public async Task<IActionResult> Catalog(CancellationToken ct)
+    public async Task<IActionResult> Catalog(CancellationToken ct = default)
     {
         try
         {
-            var doctorList = await doctors.GetDoctorsAsync(ct);
-            var departmentList = await departments.GetDepartmentsAsync(ct);
+            var doctorList = await _doctorService.GetDoctorsAsync(ct);
+            var departmentList = await _departmentService.GetDepartmentsAsync(ct);
             return Json(new
             {
                 doctors = doctorList.Select(doctor => new
@@ -74,9 +84,10 @@ public class HomeController(
         }
         catch (Exception error) when (error is not OperationCanceledException)
         {
-            logger.LogError("Public catalog could not be loaded: {Type}", error.GetType().Name);
+            _logger.LogError("Public catalog could not be loaded: {Type}", error.GetType().Name);
             return StatusCode(StatusCodes.Status503ServiceUnavailable,
                 new { message = "Chưa tải được thông tin bác sĩ và chuyên khoa. Vui lòng thử lại sau." });
         }
     }
 }
+

@@ -1,5 +1,5 @@
-using HIS.Domain;
 using Microsoft.EntityFrameworkCore;
+using HIS.Domain;
 
 namespace HIS.DAL;
 
@@ -32,7 +32,6 @@ public class AppDbContext : DbContext
     public DbSet<DoctorSchedule> DoctorSchedules => Set<DoctorSchedule>();
     public DbSet<ScheduleException> ScheduleExceptions => Set<ScheduleException>();
     public DbSet<AppointmentSlot> AppointmentSlots => Set<AppointmentSlot>();
-    public DbSet<QueueCounter> QueueCounters => Set<QueueCounter>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<AppointmentStatusHistory> AppointmentStatusHistories => Set<AppointmentStatusHistory>();
     public DbSet<Notification> Notifications => Set<Notification>();
@@ -47,14 +46,44 @@ public class AppDbContext : DbContext
     public DbSet<InvoiceItem> InvoiceItems => Set<InvoiceItem>();
     public DbSet<AccessLog> AccessLogs => Set<AccessLog>();
 
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        // CSDL thật dùng 'timestamp without time zone' cho mọi cột datetime
+        configurationBuilder.Properties<DateTime>()
+            .HaveColumnType("timestamp without time zone");
+
+        // Mọi cột CHECK dạng chuỗi trong init.md mục 5 lưu enum PascalCase dưới dạng UPPER_SNAKE
+        configurationBuilder.Properties<Gender>().HaveConversion<UpperSnakeCaseEnumConverter<Gender>>();
+        configurationBuilder.Properties<ExamShift>().HaveConversion<UpperSnakeCaseEnumConverter<ExamShift>>();
+        configurationBuilder.Properties<SlotStatus>().HaveConversion<UpperSnakeCaseEnumConverter<SlotStatus>>();
+        configurationBuilder.Properties<BookingChannel>().HaveConversion<UpperSnakeCaseEnumConverter<BookingChannel>>();
+        configurationBuilder.Properties<VisitType>().HaveConversion<UpperSnakeCaseEnumConverter<VisitType>>();
+        configurationBuilder.Properties<ScheduleExceptionType>().HaveConversion<UpperSnakeCaseEnumConverter<ScheduleExceptionType>>();
+        configurationBuilder.Properties<ScheduleExceptionStatus>().HaveConversion<UpperSnakeCaseEnumConverter<ScheduleExceptionStatus>>();
+        configurationBuilder.Properties<PatientRelationship>().HaveConversion<UpperSnakeCaseEnumConverter<PatientRelationship>>();
+        configurationBuilder.Properties<LinkStatus>().HaveConversion<UpperSnakeCaseEnumConverter<LinkStatus>>();
+        configurationBuilder.Properties<InvoiceCategory>().HaveConversion<UpperSnakeCaseEnumConverter<InvoiceCategory>>();
+        configurationBuilder.Properties<InvoiceStatus>().HaveConversion<UpperSnakeCaseEnumConverter<InvoiceStatus>>();
+        configurationBuilder.Properties<PaymentType>().HaveConversion<UpperSnakeCaseEnumConverter<PaymentType>>();
+        configurationBuilder.Properties<PaymentMethod>().HaveConversion<UpperSnakeCaseEnumConverter<PaymentMethod>>();
+        configurationBuilder.Properties<LabOrderStatus>().HaveConversion<UpperSnakeCaseEnumConverter<LabOrderStatus>>();
+        configurationBuilder.Properties<ReferralType>().HaveConversion<UpperSnakeCaseEnumConverter<ReferralType>>();
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
+        // PK INTEGER GENERATED ALWAYS AS IDENTITY — đúng với CSDL hiện tại.
+        // Gọi TRƯỚC khi nạp cấu hình để 3 bảng danh mục (roles/service_types/appointment_statuses)
+        // vẫn giữ ValueGeneratedNever() và cho phép seed id cố định.
         modelBuilder.UseIdentityAlwaysColumns();
 
+        // Nạp toàn bộ file IEntityTypeConfiguration<T> trong các thư mục con
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
 
+        // Dữ liệu bệnh viện không được xóa dây chuyền: mọi FK là Restrict (init.md mục 3).
+        // Vòng lặp này chạy cuối nên nó thắng mọi OnDelete() khai báo trong từng cấu hình.
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
             foreach (var foreignKey in entityType.GetForeignKeys())
@@ -64,30 +93,27 @@ public class AppDbContext : DbContext
         }
     }
 
-    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
-        var utcNow = _timeProvider.GetLocalNow().DateTime;
+        TouchUpdatedAt();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
 
-        foreach (var entry in ChangeTracker.Entries())
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        TouchUpdatedAt();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private void TouchUpdatedAt()
+    {
+        var now = _timeProvider.GetLocalNow().DateTime;
+
+        foreach (var entry in ChangeTracker.Entries()
+                    .Where(e => e.State == EntityState.Modified
+                                && e.Entity is Account or Appointment or MedicalRecord))
         {
-            if (entry.State == EntityState.Modified)
-            {
-                if (entry.Entity is Account account)
-                {
-                    account.UpdatedAt = utcNow;
-                }
-                else if (entry.Entity is Appointment appointment)
-                {
-                    appointment.UpdatedAt = utcNow;
-                }
-                else if (entry.Entity is MedicalRecord medicalRecord)
-                {
-                    medicalRecord.UpdatedAt = utcNow;
-                }
-            }
+            entry.Property(nameof(Account.UpdatedAt)).CurrentValue = now;
         }
-
-        return base.SaveChangesAsync(cancellationToken);
     }
 }
-

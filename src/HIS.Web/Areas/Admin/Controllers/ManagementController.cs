@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using HIS.BLL.Common;
 using HIS.BLL.DTOs;
-using HIS.BLL.Services;
+using HIS.BLL.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
@@ -36,9 +36,16 @@ public sealed class ManagementController(
         await next();
     }
 
+    /// <summary>
+    /// Hiển thị trang quản trị vận hành trung tâm cho Quản trị viên.
+    /// </summary>
     [HttpGet("")]
     public IActionResult Index() => View();
 
+    /// <summary>
+    /// API lấy danh bạ người dùng, nhân sự y tế, vai trò và chuyên khoa cho trang quản trị.
+    /// </summary>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpGet("Directory")]
     public Task<IActionResult> Directory(CancellationToken ct) => ExecuteAsync(async () => Ok(new
     {
@@ -49,6 +56,12 @@ public sealed class ManagementController(
         departments = await departments.GetDepartmentsAsync(ct)
     }));
 
+    /// <summary>
+    /// API tổng hợp báo cáo tài chính doanh thu cho trang quản trị.
+    /// </summary>
+    /// <param name="from">Ngày bắt đầu.</param>
+    /// <param name="to">Ngày kết thúc.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpGet("Report")]
     public Task<IActionResult> Report(DateOnly? from, DateOnly? to, CancellationToken ct) => ExecuteAsync(async () =>
     {
@@ -56,14 +69,29 @@ public sealed class ManagementController(
         return Ok(await reports.GetRevenueAsync(ActorId, from ?? new DateOnly(today.Year, today.Month, 1), to ?? today, ct));
     });
 
+    /// <summary>
+    /// Xuất tệp báo cáo doanh thu tài chính định dạng CSV.
+    /// </summary>
+    /// <param name="from">Ngày bắt đầu.</param>
+    /// <param name="to">Ngày kết thúc.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpGet("Revenue.csv")]
     public Task<IActionResult> Export(DateOnly from, DateOnly to, CancellationToken ct) => ExecuteAsync(async () =>
         File(await reports.ExportRevenueAsync(ActorId, from, to, ct), "text/csv; charset=utf-8", $"doanh-thu-{from:yyyyMMdd}-{to:yyyyMMdd}.csv"));
 
+    /// <summary>
+    /// API lấy danh sách yêu cầu nghỉ phép và đổi ca chờ duyệt.
+    /// </summary>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpGet("Requests")]
     public Task<IActionResult> Requests(CancellationToken ct) => ExecuteAsync(async () =>
         Ok(await schedules.GetRequestsAsync(ActorId, ct)));
 
+    /// <summary>
+    /// API tạo tài khoản người dùng và hồ sơ nhân sự mới.
+    /// </summary>
+    /// <param name="request">Yêu cầu tạo tài khoản.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost("Accounts")]
     public Task<IActionResult> CreateAccount([FromBody] CreateAdminAccountRequest request, CancellationToken ct) =>
         ExecuteAsync(async () => Ok(new
@@ -72,6 +100,11 @@ public sealed class ManagementController(
             message = "Đã tạo tài khoản và hồ sơ liên quan."
         }));
 
+    /// <summary>
+    /// API kích hoạt hoặc vô hiệu hóa tài khoản người dùng.
+    /// </summary>
+    /// <param name="request">Yêu cầu cập nhật trạng thái.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost("AccountStatus")]
     public Task<IActionResult> AccountStatus([FromBody] AccountActivationRequest request, CancellationToken ct) =>
         ExecuteAsync(async () =>
@@ -80,6 +113,11 @@ public sealed class ManagementController(
             return Ok(new { message = "Đã cập nhật trạng thái tài khoản." });
         });
 
+    /// <summary>
+    /// API thêm mới chuyên khoa phòng.
+    /// </summary>
+    /// <param name="request">Yêu cầu thêm khoa phòng.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost("Departments")]
     public Task<IActionResult> CreateDepartment([FromBody] DepartmentCreateRequest request, CancellationToken ct) =>
         ExecuteAsync(async () =>
@@ -101,6 +139,11 @@ public sealed class ManagementController(
             });
         });
 
+    /// <summary>
+    /// API phê duyệt hoặc từ chối đề xuất đổi ca của bác sĩ.
+    /// </summary>
+    /// <param name="request">Quyết định phê duyệt.</param>
+    /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
     [HttpPost("Decision")]
     public Task<IActionResult> Decision([FromBody] ScheduleDecisionRequest request, CancellationToken ct) =>
         ExecuteAsync(async () =>
@@ -158,3 +201,4 @@ public sealed class ManagementController(
         }
     }
 }
+

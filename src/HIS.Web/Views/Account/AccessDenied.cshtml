@@ -8,11 +8,14 @@
         "DEPARTMENT_HEAD" or "DEPT_HEAD" => "Trưởng khoa",
         "DOCTOR" => "Bác sĩ",
         "NURSE" => "Điều dưỡng / Tiếp đón",
-        "CASHIER" => "Thu ngân",
         "PATIENT" => "Bệnh nhân",
         _ => "Chưa xác định"
     };
     var displayName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? "Người dùng";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/auth/access-denied.css" asp-append-version="true" />
 }
 
 <div class="access-denied-card">
@@ -31,8 +34,8 @@
     </p>
 
     <div class="access-denied-actions">
-        <a asp-controller="Account" asp-action="Dashboard" class="access-denied-home">
-            Về trang làm việc của bạn →
+        <a asp-controller="Booking" asp-action="Index" class="access-denied-home">
+            Về trang chủ MediCare →
         </a>
 
         <form asp-controller="Account" asp-action="Logout" method="post">
@@ -43,6 +46,3 @@
     </div>
 </div>
 
-@section Styles {
-    <link rel="stylesheet" href="~/css/auth/access-denied.css" asp-append-version="true" />
-}

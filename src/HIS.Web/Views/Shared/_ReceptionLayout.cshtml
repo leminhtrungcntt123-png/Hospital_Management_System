@@ -1,4 +1,4 @@
-@model HIS.Web.Models.ReceptionViewModel
+@model HIS.Web.ViewModels.ReceptionViewModel
 @{
     var displayName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? "Nhân viên";
     var initials = string.Concat(displayName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
