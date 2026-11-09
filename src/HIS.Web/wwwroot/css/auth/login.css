@@ -161,7 +161,7 @@ body.his-auth-bg {
     background: #f8fafc;
     border: 1.5px solid #e2e8f0;
     border-radius: 12px;
-    font-size: 13px;
+    font-size: 16px;
     color: #0f172a;
     outline: none;
     transition: all 0.2s ease;
@@ -170,7 +170,7 @@ body.his-auth-bg {
 
 .his-register-box .his-input-field {
     height: 36px;
-    font-size: 12px;
+    font-size: 16px;
     padding: 0 12px 0 36px;
     border-radius: 10px;
 }

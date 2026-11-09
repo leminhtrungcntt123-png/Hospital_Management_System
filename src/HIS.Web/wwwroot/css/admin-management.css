@@ -7,6 +7,7 @@
 :root {
     --misa-primary: #0068ff;
     --misa-primary-hover: #0056cc;
+    --misa-primary-text: #0056cc;
     --misa-primary-light: #edf4ff;
     --misa-primary-border: #b3d4ff;
     --misa-primary-gradient: linear-gradient(135deg, #0068ff 0%, #0056cc 100%);
@@ -1015,6 +1016,9 @@ svg.icon, .icon {
     margin: 0 !important;
     letter-spacing: -0.3px !important;
     white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    min-width: 0 !important;
 }
 
 .misa-kpi-label {
@@ -1731,11 +1735,14 @@ svg.icon, .icon {
         top: calc(var(--misa-topbar-height) + var(--misa-subbar-height));
         bottom: 0;
         z-index: 100;
-        transition: left 0.25s ease;
+        visibility: hidden;
+        transition: left 0.25s ease, visibility 0s linear 0.25s;
         box-shadow: 10px 0 25px rgba(0, 0, 0, 0.15);
     }
     .misa-sidebar.open {
         left: 0;
+        visibility: visible;
+        transition: left 0.25s ease;
     }
     .sidebar-scrim {
         position: fixed;
@@ -1748,6 +1755,16 @@ svg.icon, .icon {
     }
     .misa-main-content {
         padding: 14px 14px 28px;
+    }
+    .misa-filter-left,
+    .misa-filter-right,
+    .misa-date-form {
+        flex-wrap: wrap;
+        white-space: normal;
+    }
+    .misa-filter-right,
+    .misa-date-form {
+        width: 100%;
     }
 }
 

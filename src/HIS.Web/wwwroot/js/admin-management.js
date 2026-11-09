@@ -807,6 +807,9 @@
 
         const pDesc = find('#page-description');
         if (pDesc && titles[section]) pDesc.textContent = titles[section][1];
+
+        const search = find('#misa-global-search');
+        if (search) search.value = '';
     }
 
     function openAccount(staffOnly) {
