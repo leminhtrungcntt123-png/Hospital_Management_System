@@ -13,6 +13,7 @@ public sealed class CreateReceptionRequest
     public string PhoneNumber { get; set; } = string.Empty;
     public string? NationalId { get; set; }
     public string? Address { get; set; }
+    public string? Email { get; set; }
     public string? InsuranceCardNumber { get; set; }
     public int DepartmentId { get; set; }
     public int? DoctorId { get; set; }
@@ -66,4 +67,8 @@ public interface IReceptionService
     Task<Result<ReceptionDesk>> GetDeskAsync(int staffAccountId, string? search, CancellationToken ct = default);
     Task<Result<string>> CheckInAsync(int staffAccountId, int appointmentId, bool identityVerified, CancellationToken ct = default);
     Task<Result<string>> RegisterWalkInAsync(int staffAccountId, WalkInReceptionRequest request, CancellationToken ct = default);
+    Task<Result<PatientSearchResultDto?>> FindPatientByNationalIdAsync(string nationalId, CancellationToken ct = default);
+    Task<Result<IReadOnlyList<PatientSearchResultDto>>> SearchPatientsAsync(string keyword, CancellationToken ct = default);
+    Task<Result<IReadOnlyList<DepartmentDoctorScheduleDto>>> GetDepartmentSchedulesWithLoadAsync(int departmentId, DateOnly? date = null, CancellationToken ct = default);
+    Task<Result<WalkInTicketDto?>> GetWalkInTicketAsync(string queueNumber, int? appointmentId = null, CancellationToken ct = default);
 }

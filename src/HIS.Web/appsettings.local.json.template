@@ -1,0 +1,7 @@
+{
+  "_comment": "File mẫu cấu hình cục bộ dành cho máy cá nhân. Hãy sao chép (copy) file này thành 'appsettings.local.json' và thay đổi mật khẩu PostgreSQL tương ứng với máy của bạn. File appsettings.local.json đã được cấu hình trong .gitignore nên sẽ KHÔNG BAO GIỜ bị đẩy lên Git hoặc bị ghi đè khi git pull.",
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Port=5432;Database=hospital_his;Username=postgres;Password=123456789"
+  }
+}
+

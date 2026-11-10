@@ -92,6 +92,25 @@ public class PatientProfileService : IPatientProfileService
     }
 
     /// <summary>
+    /// Hạn mức email: một địa chỉ email chỉ được dùng chung cho tối đa MaxProfilesPerEmail hồ sơ
+    /// (phục vụ mô hình gia đình: bản thân + con nhỏ / người thân). Vượt quá thì từ chối.
+    /// </summary>
+    private async Task<string?> ValidateEmailQuotaAsync(string email, CancellationToken cancellationToken)
+    {
+        string normalizedEmail = email.Trim().ToLowerInvariant();
+        int count = await _context.Patients.AsNoTracking()
+            .CountAsync(p => p.Email != null && p.Email.ToLower() == normalizedEmail, cancellationToken);
+
+        if (count >= _options.MaxProfilesPerEmail)
+        {
+            return $"Địa chỉ email \"{email}\" đã được đăng ký cho tối đa {_options.MaxProfilesPerEmail} hồ sơ trong hệ thống. " +
+                   $"Vui lòng sử dụng địa chỉ email khác hoặc liên hệ hotline 0808 0808.";
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Quy tắc giấy tờ khi tạo hồ sơ mới: CCCD đã có trong hệ thống thì phải dùng nhánh "Đã từng khám"
     /// để liên kết; người từ OwnIdFromAge tuổi bắt buộc có CCCD của chính mình; trẻ nhỏ chưa có CCCD
     /// thì bắt buộc CCCD của một người thân đang có hồ sơ ACTIVE thuộc chính tài khoản.
@@ -275,6 +294,15 @@ public class PatientProfileService : IPatientProfileService
         if (quotaError != null)
         {
             return (quotaError, null);
+        }
+
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            string? emailQuotaError = await ValidateEmailQuotaAsync(email, cancellationToken);
+            if (emailQuotaError != null)
+            {
+                return (emailQuotaError, null);
+            }
         }
 
         string? identityError = await ValidateIdentityDocumentsAsync(

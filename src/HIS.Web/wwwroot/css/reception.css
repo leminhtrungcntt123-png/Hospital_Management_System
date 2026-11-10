@@ -200,9 +200,432 @@
     padding: 10px 12px;
     border-radius: 5px;
 }
-.reception-account-menu a:hover,
-.reception-account-menu button:hover {
-    background: #e9f1f7;
+/* ========================================================
+   TABS NAVIGATION & WORKSPACE EXTENSIONS
+   ======================================================== */
+.reception-tabs-nav {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 22px;
+    border-bottom: 2px solid #ccdbe6;
+    padding-bottom: 0;
+}
+
+.reception-tab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 22px;
+    border: 1px solid #ccdbe6;
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    background: #eef5f9;
+    color: #4b667e;
+    font-size: 15px;
+    font-weight: 650;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.reception-tab-btn:hover {
+    background: #e2eff7;
+    color: #005f83;
+}
+
+.reception-tab-btn.active {
+    background: #ffffff;
+    color: #006b91;
+    border-color: #b7cbd8 #b7cbd8 #ffffff;
+    border-bottom: 2px solid #ffffff;
+    margin-bottom: -2px;
+    box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.reception-tab-btn .badge-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 11px;
+    font-size: 12px;
+    font-weight: 700;
+    background: #d4e8f3;
+    color: #00678b;
+}
+
+.reception-tab-btn.active .badge-pill {
+    background: #006b91;
+    color: #ffffff;
+}
+
+/* Patient Type Selection (Adult vs Child) */
+.patient-type-selector {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 22px;
+    padding: 6px;
+    background: #f2f7fb;
+    border: 1px solid #cce1ee;
+    border-radius: 10px;
+}
+
+.patient-type-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    background: #ffffff;
+    border: 2px solid #d5e5f0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.patient-type-card:hover {
+    border-color: #79bfdd;
+    background: #f9fdff;
+}
+
+.patient-type-card.selected {
+    border-color: #0087b7;
+    background: #eaf6fc;
+    color: #005677;
+    box-shadow: 0 2px 8px rgba(0, 107, 145, 0.12);
+}
+
+.patient-type-icon {
+    font-size: 26px;
+    line-height: 1;
+}
+
+.patient-type-card strong {
+    display: block;
+    font-size: 16px;
+    margin-bottom: 2px;
+}
+
+.patient-type-card small {
+    display: block;
+    color: #557288;
+    font-size: 13px;
+    font-weight: normal;
+}
+
+/* CCCD Search Box */
+.cccd-search-group {
+    display: flex;
+    gap: 8px;
+}
+
+.cccd-search-group input {
+    flex: 1;
+}
+
+.btn-lookup {
+    white-space: nowrap;
+    padding: 0 16px;
+    background: #006b91;
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    font-weight: 650;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-lookup:hover {
+    background: #005574;
+}
+
+.patient-found-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #a5d6a7;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    margin-top: 6px;
+}
+
+/* Guardian Sub-section */
+.guardian-box {
+    grid-column: 1 / -1;
+    padding: 18px;
+    background: #f7fafc;
+    border: 1px dashed #9bc4dc;
+    border-radius: 8px;
+    margin-bottom: 6px;
+}
+
+.guardian-box-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #005f83;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Doctor Selection Cards & Load Balancing */
+.doctor-cards-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+    max-height: 280px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.doctor-card-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    background: #ffffff;
+    border: 1.5px solid #d5e5f0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.doctor-card-item:hover:not(.disabled) {
+    border-color: #0087b7;
+    background: #f6fbfe;
+}
+
+.doctor-card-item.selected {
+    border-color: #0087b7;
+    background: #eaf6fc;
+    box-shadow: 0 2px 6px rgba(0, 107, 145, 0.08);
+}
+
+.doctor-card-item.disabled {
+    opacity: 0.55;
+    background: #f7f9fa;
+    border-color: #e2e8ed;
+    cursor: not-allowed;
+}
+
+.doctor-card-item.best-recommended {
+    border-color: #00937a;
+    background: #f2faf8;
+}
+
+.doctor-card-item.best-recommended.selected {
+    border-color: #007965;
+    background: #e2f5f1;
+}
+
+.doc-info strong {
+    display: block;
+    color: #15334d;
+    font-size: 15px;
+}
+
+.doc-info span {
+    font-size: 13px;
+    color: #557288;
+}
+
+.doc-status-badges {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.badge-tag {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.badge-tag.waiting {
+    background: #eef4f8;
+    color: #005677;
+    border: 1px solid #c9dfea;
+}
+
+.badge-tag.full {
+    background: #ffebee;
+    color: #c62828;
+    border: 1px solid #ffcdd2;
+}
+
+.badge-tag.best {
+    background: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #a5d6a7;
+}
+
+/* Modal Ticket Print */
+.ticket-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 35, 53, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 16px;
+}
+
+.ticket-modal-card {
+    background: #fff;
+    width: 100%;
+    max-width: 440px;
+    border-radius: 12px;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+    animation: ticketPop 0.25s ease-out;
+}
+
+@@keyframes ticketPop {
+    from { opacity: 0; transform: scale(0.92); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.ticket-modal-header {
+    background: #006b91;
+    color: #fff;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.ticket-modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.ticket-modal-body {
+    padding: 24px;
+    text-align: center;
+}
+
+.ticket-number-display {
+    display: inline-block;
+    padding: 8px 24px;
+    background: #e7f5fb;
+    border: 2px dashed #0087b7;
+    border-radius: 10px;
+    margin: 12px 0 18px;
+}
+
+.ticket-number-display strong {
+    font-size: 38px;
+    color: #005f83;
+    font-weight: 800;
+    letter-spacing: 1px;
+}
+
+.ticket-details-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    margin-bottom: 20px;
+    font-size: 14px;
+}
+
+.ticket-details-table td {
+    padding: 8px 6px;
+    border-bottom: 1px solid #eef2f5;
+}
+
+.ticket-details-table td:first-child {
+    color: #557288;
+    width: 40%;
+}
+
+.ticket-details-table td:last-child {
+    font-weight: 650;
+    color: #15334d;
+}
+
+.ticket-modal-actions {
+    display: flex;
+    gap: 10px;
+    padding: 0 24px 24px;
+}
+
+.ticket-modal-actions button {
+    flex: 1;
+    padding: 12px;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 15px;
+}
+
+/* Thermal Print Stylesheet (Khổ K80: 80mm) */
+@@media print {
+    body * {
+        visibility: hidden !important;
+    }
+    #thermal-ticket-print, #thermal-ticket-print * {
+        visibility: visible !important;
+    }
+    #thermal-ticket-print {
+        display: block !important;
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 72mm;
+        margin: 0;
+        padding: 5mm;
+        background: #fff;
+        color: #000;
+        font-family: 'Courier New', Courier, monospace, sans-serif;
+        text-align: center;
+    }
+    #thermal-ticket-print .print-title {
+        font-size: 16px;
+        font-weight: bold;
+        text-transform: uppercase;
+        margin-bottom: 4px;
+    }
+    #thermal-ticket-print .print-sub {
+        font-size: 12px;
+        margin-bottom: 8px;
+    }
+    #thermal-ticket-print .print-divider {
+        border-top: 1px dashed #000;
+        margin: 6px 0;
+    }
+    #thermal-ticket-print .print-num {
+        font-size: 32px;
+        font-weight: 900;
+        margin: 6px 0;
+    }
+    #thermal-ticket-print .print-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        margin: 4px 0;
+        text-align: left;
+    }
+    #thermal-ticket-print .print-footer {
+        font-size: 11px;
+        margin-top: 10px;
+    }
 }
 
 @media (max-width: 700px) {

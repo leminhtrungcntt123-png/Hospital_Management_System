@@ -300,6 +300,10 @@ public class ReceptionService : IReceptionService
 
                 patient.PhoneNumber = phoneNumber;
                 patient.Address = address;
+                if (!string.IsNullOrWhiteSpace(request.Email))
+                {
+                    patient.Email = request.Email.Trim();
+                }
             }
             else
             {
@@ -315,6 +319,10 @@ public class ReceptionService : IReceptionService
                     patient = duplicate;
                     patient.PhoneNumber = phoneNumber;
                     patient.Address = address;
+                    if (!string.IsNullOrWhiteSpace(request.Email))
+                    {
+                        patient.Email = request.Email.Trim();
+                    }
                 }
                 else
                 {
@@ -327,6 +335,7 @@ public class ReceptionService : IReceptionService
                         Gender = EnumCodes.ParseDatabaseCode<Gender>(request.Gender),
                         NationalId = nationalId,
                         PhoneNumber = phoneNumber,
+                        Email = NullIfWhiteSpace(request.Email),
                         Address = address,
                         CreatedAt = now
                     };
@@ -1250,12 +1259,19 @@ public class ReceptionService : IReceptionService
                 .ToListAsync(ct)
             : (IReadOnlyList<ReceptionPatient>)[];
 
+        var allDepts = await _context.Departments
+            .AsNoTracking()
+            .OrderBy(d => d.Id)
+            .Select(d => new DepartmentOptionDto(d.Id, d.Name))
+            .ToListAsync(ct);
+
         return Result.Success(new ReceptionDesk(
             departmentName,
             todayDate,
             rows,
             choices,
-            patients));
+            patients,
+            allDepts));
     }
 
     /// <summary>
@@ -1322,6 +1338,24 @@ public class ReceptionService : IReceptionService
         var gender = (request.Gender ?? patient?.Gender ?? Gender.Male).ToString();
         var phone = request.PhoneNumber?.Trim() ?? patient?.PhoneNumber ?? "";
 
+        var isChild = request.IsChild || birthDate > DateOnly.FromDateTime(DateTime.Today.AddYears(-15));
+
+        string? combinedReason = request.Reason?.Trim();
+        if (isChild && !string.IsNullOrWhiteSpace(request.GuardianName))
+        {
+            var guardianInfo = $"[Người giám hộ: {request.GuardianName.Trim()}" +
+                (!string.IsNullOrWhiteSpace(request.GuardianRelationship) ? $" ({request.GuardianRelationship.Trim()})" : "") +
+                (!string.IsNullOrWhiteSpace(request.GuardianPhone) ? $" - SĐT: {request.GuardianPhone.Trim()}" : "") +
+                (!string.IsNullOrWhiteSpace(request.GuardianNationalId) ? $" - CCCD: {request.GuardianNationalId.Trim()}" : "") +
+                "]";
+            combinedReason = string.IsNullOrWhiteSpace(combinedReason) ? guardianInfo : $"{guardianInfo} {combinedReason}";
+        }
+
+        if (string.IsNullOrWhiteSpace(phone) && !string.IsNullOrWhiteSpace(request.GuardianPhone))
+        {
+            phone = request.GuardianPhone.Trim();
+        }
+
         var createReq = new CreateReceptionRequest
         {
             PatientId = request.PatientId,
@@ -1329,12 +1363,14 @@ public class ReceptionService : IReceptionService
             DateOfBirth = birthDate,
             Gender = gender,
             PhoneNumber = phone,
-            NationalId = request.NationalId?.Trim() ?? patient?.NationalId,
+            NationalId = isChild && string.IsNullOrWhiteSpace(request.NationalId) ? null : (request.NationalId?.Trim() ?? patient?.NationalId),
+            Email = request.Email?.Trim() ?? patient?.Email,
             Address = request.Address?.Trim() ?? patient?.Address,
+            InsuranceCardNumber = request.InsuranceCardNumber?.Trim(),
             DepartmentId = schedule.Doctor.DepartmentId,
             DoctorId = schedule.DoctorId,
             PriorityLevel = request.PriorityLevel,
-            Reason = request.Reason?.Trim(),
+            Reason = combinedReason,
             IsEmergency = false,
             OperatorAccountId = staffAccountId
         };
@@ -1348,5 +1384,248 @@ public class ReceptionService : IReceptionService
         {
             return Result.Failure<string>("REGISTER_WALKIN_FAILED", ex.Message);
         }
+    }
+
+    /// <summary>
+    /// Tra cứu hồ sơ người khám theo số CCCD (định danh 12 số).
+    /// </summary>
+    public async Task<Result<PatientSearchResultDto?>> FindPatientByNationalIdAsync(string nationalId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(nationalId))
+        {
+            return Result.Success<PatientSearchResultDto?>(null);
+        }
+
+        nationalId = nationalId.Trim();
+        var patient = await _context.Patients
+            .AsNoTracking()
+            .Include(p => p.InsuranceCards)
+            .FirstOrDefaultAsync(p => p.NationalId == nationalId, ct);
+
+        if (patient == null)
+        {
+            return Result.Success<PatientSearchResultDto?>(null);
+        }
+
+        var activeCard = patient.InsuranceCards
+            .OrderByDescending(c => c.ValidTo)
+            .FirstOrDefault();
+
+        var isChild = patient.DateOfBirth > DateOnly.FromDateTime(DateTime.Today.AddYears(-15));
+        var dto = new PatientSearchResultDto(
+            patient.Id,
+            patient.FullName,
+            patient.DateOfBirth.ToString("yyyy-MM-dd"),
+            patient.Gender?.ToString() ?? "Male",
+            patient.PhoneNumber,
+            patient.NationalId,
+            patient.Email,
+            patient.Address,
+            activeCard?.CardNumber,
+            isChild
+        );
+
+        return Result.Success<PatientSearchResultDto?>(dto);
+    }
+
+    /// <summary>
+    /// Tìm kiếm bệnh nhân theo từ khóa (CCCD, SĐT, hoặc Họ tên).
+    /// </summary>
+    public async Task<Result<IReadOnlyList<PatientSearchResultDto>>> SearchPatientsAsync(string keyword, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(keyword) || keyword.Trim().Length < 2)
+        {
+            return Result.Success<IReadOnlyList<PatientSearchResultDto>>([]);
+        }
+
+        var term = keyword.Trim();
+        var patients = await _context.Patients
+            .AsNoTracking()
+            .Include(p => p.InsuranceCards)
+            .Where(p => (p.NationalId != null && p.NationalId.Contains(term))
+                || p.PhoneNumber.Contains(term)
+                || p.FullName.Contains(term))
+            .OrderBy(p => p.FullName)
+            .Take(10)
+            .ToListAsync(ct);
+
+        var list = patients.Select(p => new PatientSearchResultDto(
+            p.Id,
+            p.FullName,
+            p.DateOfBirth.ToString("yyyy-MM-dd"),
+            p.Gender?.ToString() ?? "Male",
+            p.PhoneNumber,
+            p.NationalId,
+            p.Email,
+            p.Address,
+            p.InsuranceCards.OrderByDescending(c => c.ValidTo).FirstOrDefault()?.CardNumber,
+            p.DateOfBirth > DateOnly.FromDateTime(DateTime.Today.AddYears(-15))
+        )).ToList();
+
+        return Result.Success<IReadOnlyList<PatientSearchResultDto>>(list);
+    }
+
+    /// <summary>
+    /// Lấy danh sách bác sĩ trực ca hôm nay thuộc chuyên khoa kèm số lượng ca đang chờ và trạng thái đầy slot.
+    /// </summary>
+    public async Task<Result<IReadOnlyList<DepartmentDoctorScheduleDto>>> GetDepartmentSchedulesWithLoadAsync(
+        int departmentId,
+        DateOnly? date = null,
+        CancellationToken ct = default)
+    {
+        var queryDate = date ?? DateOnly.FromDateTime(Now);
+        var start = queryDate.ToDateTime(TimeOnly.MinValue);
+        var end = start.AddDays(1);
+
+        var schedules = await _context.DoctorSchedules
+            .AsNoTracking()
+            .Include(s => s.Doctor)
+            .Include(s => s.Room)
+            .Where(s => s.Doctor.DepartmentId == departmentId
+                && s.Doctor.Account.IsActive
+                && s.IsActive
+                && s.DayOfWeek == queryDate.DayOfWeek
+                && s.EffectiveFrom <= queryDate
+                && (s.EffectiveTo == null || s.EffectiveTo >= queryDate))
+            .OrderBy(s => s.StartTime)
+            .ThenBy(s => s.Doctor.FullName)
+            .ToListAsync(ct);
+
+        if (schedules.Count == 0)
+        {
+            return Result.Success<IReadOnlyList<DepartmentDoctorScheduleDto>>([]);
+        }
+
+        var doctorIds = schedules.Select(s => s.DoctorId).Distinct().ToList();
+
+        // Đếm số lượng bệnh nhân đang chờ khám (StatusId = 3 CheckedIn hoặc 4 ReadyForDoctor)
+        var waitingCounts = await _context.Appointments
+            .AsNoTracking()
+            .Where(a => a.DoctorId.HasValue && doctorIds.Contains(a.DoctorId.Value)
+                && (a.StatusId == 3 || a.StatusId == 4)
+                && ((a.Slot != null && a.Slot.StartTime >= start && a.Slot.StartTime < end)
+                    || (a.Slot == null && a.CreatedAt >= start && a.CreatedAt < end)))
+            .GroupBy(a => a.DoctorId!.Value)
+            .Select(g => new { DoctorId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.DoctorId, x => x.Count, ct);
+
+        // Kiểm tra slot còn trống trong ngày
+        var roomIds = schedules.Select(s => s.RoomId).Distinct().ToList();
+        var totalSlotsByRoom = await _context.AppointmentSlots
+            .AsNoTracking()
+            .Where(sl => roomIds.Contains(sl.RoomId) && sl.StartTime >= start && sl.StartTime < end)
+            .GroupBy(sl => sl.RoomId)
+            .Select(g => new { RoomId = g.Key, TotalCapacity = g.Sum(x => x.Capacity) })
+            .ToDictionaryAsync(x => x.RoomId, x => x.TotalCapacity, ct);
+
+        var bookedCountsByRoom = await _context.Appointments
+            .AsNoTracking()
+            .Where(a => a.RoomId.HasValue && roomIds.Contains(a.RoomId.Value)
+                && (a.StatusId == 1 || a.StatusId == 2 || a.StatusId == 3 || a.StatusId == 4 || a.StatusId == 5)
+                && ((a.Slot != null && a.Slot.StartTime >= start && a.Slot.StartTime < end)
+                    || (a.Slot == null && a.CreatedAt >= start && a.CreatedAt < end)))
+            .GroupBy(a => a.RoomId!.Value)
+            .Select(g => new { RoomId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.RoomId, x => x.Count, ct);
+
+        var currentTime = TimeOnly.FromDateTime(Now);
+        var todayDate = DateOnly.FromDateTime(Now);
+        bool isToday = queryDate == todayDate;
+
+        var resultList = new List<DepartmentDoctorScheduleDto>();
+        foreach (var s in schedules)
+        {
+            int waiting = waitingCounts.GetValueOrDefault(s.DoctorId, 0);
+            int roomCap = totalSlotsByRoom.GetValueOrDefault(s.RoomId, 30);
+            int roomBooked = bookedCountsByRoom.GetValueOrDefault(s.RoomId, 0);
+            bool isFull = roomCap > 0 && roomBooked >= roomCap;
+
+            string shiftName = s.Shift == ExamShift.Morning ? "Ca sáng" : "Ca chiều";
+            string shiftTime = $"{s.StartTime:HH:mm} – {s.EndTime:HH:mm}";
+            bool isShiftEnded = isToday && (currentTime > s.EndTime);
+            bool isCurrentShift = isToday && (currentTime >= s.StartTime && currentTime <= s.EndTime);
+
+            resultList.Add(new DepartmentDoctorScheduleDto(
+                s.Id,
+                s.DoctorId,
+                s.Doctor.FullName,
+                s.Doctor.Specialty ?? "Chuyên khoa",
+                s.Room.RoomNumber,
+                waiting,
+                isFull,
+                $"{s.Doctor.FullName} · Phòng {s.Room.RoomNumber} · {shiftName} ({shiftTime})",
+                shiftName,
+                shiftTime,
+                isCurrentShift,
+                isShiftEnded
+            ));
+        }
+
+        return Result.Success<IReadOnlyList<DepartmentDoctorScheduleDto>>(resultList);
+    }
+
+    /// <summary>
+    /// Lấy thông tin phiếu khám vừa cấp phát cho lượt vãng lai để in hoặc hiển thị modal.
+    /// </summary>
+    public async Task<Result<WalkInTicketDto?>> GetWalkInTicketAsync(string queueNumber, int? appointmentId = null, CancellationToken ct = default)
+    {
+        var todayDate = DateOnly.FromDateTime(Now);
+        var start = todayDate.ToDateTime(TimeOnly.MinValue);
+        var end = start.AddDays(1);
+
+        var query = _context.Appointments
+            .AsNoTracking()
+            .Include(a => a.Patient)
+            .Include(a => a.Doctor)
+            .Include(a => a.Department)
+            .Include(a => a.Room)
+            .Include(a => a.Slot)
+            .Where(a => (a.Slot != null && a.Slot.StartTime >= start && a.Slot.StartTime < end)
+                || (a.Slot == null && a.CreatedAt >= start && a.CreatedAt < end));
+
+        if (appointmentId.HasValue && appointmentId.Value > 0)
+        {
+            query = query.Where(a => a.Id == appointmentId.Value);
+        }
+        else if (!string.IsNullOrWhiteSpace(queueNumber))
+        {
+            query = query.Where(a => a.QueueNumber == queueNumber.Trim());
+        }
+        else
+        {
+            return Result.Success<WalkInTicketDto?>(null);
+        }
+
+        var app = await query.OrderByDescending(a => a.Id).FirstOrDefaultAsync(ct);
+        if (app == null)
+        {
+            return Result.Success<WalkInTicketDto?>(null);
+        }
+
+        int waitingAhead = 0;
+        if (app.RoomId.HasValue)
+        {
+            waitingAhead = await _context.Appointments
+                .AsNoTracking()
+                .CountAsync(a => a.RoomId == app.RoomId
+                    && (a.StatusId == 3 || a.StatusId == 4)
+                    && a.Id < app.Id
+                    && ((a.Slot != null && a.Slot.StartTime >= start && a.Slot.StartTime < end)
+                        || (a.Slot == null && a.CreatedAt >= start && a.CreatedAt < end)), ct);
+        }
+
+        var ticket = new WalkInTicketDto(
+            app.Id,
+            app.AppointmentCode,
+            app.QueueNumber ?? "Chưa cấp",
+            app.Patient.FullName,
+            app.Department?.Name ?? "Khoa khám",
+            app.Room?.RoomNumber ?? "Đang xếp phòng",
+            app.Doctor?.FullName ?? "Bác sĩ phụ trách",
+            waitingAhead,
+            app.CreatedAt
+        );
+
+        return Result.Success<WalkInTicketDto?>(ticket);
     }
 }

@@ -73,8 +73,31 @@ public sealed class WalkInReceptionRequest
     [System.ComponentModel.DataAnnotations.StringLength(15)]
     public string? PhoneNumber { get; set; }
 
+    [System.ComponentModel.DataAnnotations.StringLength(100)]
+    [System.ComponentModel.DataAnnotations.EmailAddress]
+    public string? Email { get; set; }
+
     [System.ComponentModel.DataAnnotations.StringLength(255)]
     public string? Address { get; set; }
+
+    [System.ComponentModel.DataAnnotations.StringLength(30)]
+    public string? InsuranceCardNumber { get; set; }
+
+    public bool IsChild { get; set; }
+
+    [System.ComponentModel.DataAnnotations.StringLength(100)]
+    public string? GuardianName { get; set; }
+
+    [System.ComponentModel.DataAnnotations.StringLength(50)]
+    public string? GuardianRelationship { get; set; }
+
+    [System.ComponentModel.DataAnnotations.StringLength(15)]
+    public string? GuardianPhone { get; set; }
+
+    [System.ComponentModel.DataAnnotations.StringLength(20)]
+    public string? GuardianNationalId { get; set; }
+
+    public int? DepartmentId { get; set; }
 
     [System.ComponentModel.DataAnnotations.Range(1, int.MaxValue)]
     public int ScheduleId { get; set; }
@@ -86,6 +109,43 @@ public sealed class WalkInReceptionRequest
     public int PriorityLevel { get; set; }
     public bool IdentityVerified { get; set; }
 }
+
+public record DepartmentDoctorScheduleDto(
+    int ScheduleId,
+    int DoctorId,
+    string DoctorName,
+    string Specialty,
+    string RoomNumber,
+    int WaitingCount,
+    bool IsFull,
+    string ShiftLabel,
+    string ShiftName = "",
+    string ShiftTime = "",
+    bool IsCurrentShift = false,
+    bool IsShiftEnded = false);
+
+public record PatientSearchResultDto(
+    int Id,
+    string FullName,
+    string DateOfBirth,
+    string Gender,
+    string PhoneNumber,
+    string? NationalId,
+    string? Email,
+    string? Address,
+    string? InsuranceCardNumber,
+    bool IsChild);
+
+public record WalkInTicketDto(
+    int AppointmentId,
+    string AppointmentCode,
+    string QueueNumber,
+    string PatientName,
+    string DepartmentName,
+    string RoomNumber,
+    string DoctorName,
+    int WaitingCount,
+    DateTime CreatedAt);
 
 public record ReceptionVisit(
     int Id,
@@ -114,4 +174,5 @@ public record ReceptionDesk(
     DateOnly Date,
     IReadOnlyList<ReceptionVisit> Visits,
     IReadOnlyList<ReceptionSchedule> Schedules,
-    IReadOnlyList<ReceptionPatient> Patients);
+    IReadOnlyList<ReceptionPatient> Patients,
+    IReadOnlyList<DepartmentOptionDto>? Departments = null);

@@ -17,6 +17,8 @@ var builder = WebApplication.CreateBuilder(args);
 // App Password SMTP để gửi mail OTP thật: cất trong file này (đã .gitignore vì khớp *.local.json)
 // hoặc biến môi trường Otp:Smtp:User / Otp:Smtp:Password. Không để vào appsettings.json vì file đó đang được commit.
 builder.Configuration.AddJsonFile("appsettings.Otp.local.json", optional: true, reloadOnChange: false);
+// Cấu hình cục bộ máy cá nhân (chứa chuỗi kết nối riêng, không bao giờ bị push lên Git)
+builder.Configuration.AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true);
 
 // MVC (Controllers + Views) thay cho Razor Pages mặc định
 builder.Services.AddControllersWithViews();
@@ -217,6 +219,47 @@ app.UseAuthorization();
 app.MapControllerRoute(
     name: "areas",
     pattern: "{area:exists}/{controller=Home}/{action=Index}/{id?}");
+
+// Tự động kiểm tra và nạp dữ liệu mẫu chuẩn cho môi trường Development
+if (app.Environment.IsDevelopment())
+{
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var forceSeed = args.Contains("--seed-fresh") || args.Contains("--seed");
+        await HIS.BLL.Data.DbSeeder.SeedAsync(dbContext, forceFresh: forceSeed);
+    }
+    catch (Exception ex)
+    {
+        var logger = app.Services.GetService<ILogger<Program>>();
+        logger?.LogWarning(ex, "Không thể tự động nạp dữ liệu mẫu (DbSeeder): {Message}", ex.Message);
+    }
+
+    // Endpoint dev để làm mới dữ liệu test bất cứ lúc nào qua trình duyệt: /dev/seed-fresh
+    app.MapGet("/dev/seed-fresh", async (IServiceProvider sp) =>
+    {
+        using var scope = sp.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await HIS.BLL.Data.DbSeeder.SeedAsync(db, forceFresh: true);
+        return Results.Ok(new
+        {
+            success = true,
+            message = "Đã làm mới toàn bộ dữ liệu test chuẩn thành công!",
+            defaultPassword = HIS.BLL.Data.DbSeeder.DefaultPassword,
+            accounts = new[]
+            {
+                new { username = "admin", role = "ADMIN", name = "Quản trị viên" },
+                new { username = "receptionist", role = "RECEPTIONIST", name = "Tiếp đón (Trần Thị Vân)" },
+                new { username = "nurse", role = "NURSE", name = "Điều dưỡng (Nguyễn Thị Mai)" },
+                new { username = "bs.tranthutrang", role = "DOCTOR", name = "BS.CKI Trần Thu Trang (Khoa Tim mạch - P101)" },
+                new { username = "bs.phamthuyduong", role = "DOCTOR", name = "BS.CKI Phạm Thùy Dương (Khoa Nhi - P301)" },
+                new { username = "patient01", role = "PATIENT", name = "Bệnh nhân mẫu (Nguyễn Minh Anh - CCCD 001190012345)" },
+                new { username = "patient02", role = "PATIENT", name = "Bệnh nhân mẫu (Trần Thu Hà & Bé Trần Bảo Nam)" }
+            }
+        });
+    });
+}
 
 // Trang mặc định: trang bắt đầu đặt lịch
 app.MapControllerRoute(

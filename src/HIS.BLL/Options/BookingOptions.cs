@@ -36,6 +36,9 @@ public class BookingOptions
     /// <summary>Số hồ sơ tối đa tính theo SĐT chủ tài khoản (SĐT của hồ sơ "Bản thân").</summary>
     public int MaxProfilesPerOwnerPhone { get; set; } = 5;
 
+    /// <summary>Số hồ sơ tối đa được phép dùng chung một địa chỉ email (mặc định 3 hồ sơ cho gia đình: bản thân + 2 người thân).</summary>
+    public int MaxProfilesPerEmail { get; set; } = 3;
+
     /// <summary>
     /// Người dưới độ tuổi này (chưa đến tuổi được cấp CCCD) bắt buộc phải khai CCCD của một người thân
     /// đã có hồ sơ ACTIVE thuộc chính tài khoản. Từ độ tuổi này trở lên thì bắt buộc có CCCD của chính mình.
@@ -70,6 +73,7 @@ public static class BookingOptionsRegistration
             .Validate(o => o.MaxAdvanceDays >= 1, "MaxAdvanceDays phải >= 1.")
             .Validate(o => o.MaxProfilesPerAccount >= 1, "MaxProfilesPerAccount phải >= 1.")
             .Validate(o => o.MaxProfilesPerOwnerPhone >= 1, "MaxProfilesPerOwnerPhone phải >= 1.")
+            .Validate(o => o.MaxProfilesPerEmail >= 1, "MaxProfilesPerEmail phải >= 1.")
             .Validate(o => o.OwnIdFromAge is >= 0 and <= 60, "OwnIdFromAge phải nằm trong 0..60.")
             .Validate(o => o.MaxRelativesPerDay >= 1, "MaxRelativesPerDay phải >= 1.")
             .Validate(o => o.MaxBookingsPerDay >= o.MaxRelativesPerDay,

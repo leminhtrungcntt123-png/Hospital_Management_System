@@ -1,5 +1,6 @@
 using HIS.BLL.Common;
 using HIS.BLL.DTOs;
+using HIS.BLL.Interfaces;
 using HIS.BLL.Options;
 using HIS.BLL.Services;
 using HIS.DAL;
@@ -356,6 +357,108 @@ public class ReceptionAndStaffPortalPart4Tests
         Assert.Equal(VisitType.WalkIn, created.VisitType);
         Assert.Equal((int)AppointmentStatusId.CheckedIn, created.StatusId);
         Assert.Equal("Trần Khắc Vãng Lai", created.Patient.FullName);
+    }
+
+    [Fact]
+    public async Task FindPatientByNationalIdAsync_ExistingCccd_ReturnsPatient()
+    {
+        var (context, _, reception, _, _, _, _, _, patientId) = CreateHarness();
+
+        var result = await reception.FindPatientByNationalIdAsync("001090012345");
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Equal("Nguyễn Văn Hùng", result.Value.FullName);
+        Assert.Equal("0912345678", result.Value.PhoneNumber);
+    }
+
+    [Fact]
+    public async Task RegisterWalkInAsync_ChildWithGuardian_SetsReasonAndGuardianPhone()
+    {
+        var (context, _, reception, nurseAccountId, _, doc1Id, room1Id, scheduleId, _) = CreateHarness();
+
+        var slot = new AppointmentSlot
+        {
+            DoctorId = doc1Id,
+            RoomId = room1Id,
+            StartTime = new DateTime(2026, 11, 9, 9, 0, 0),
+            EndTime = new DateTime(2026, 11, 9, 9, 15, 0),
+            Capacity = 2,
+            OnlineQuota = 1,
+            BookedCount = 0,
+            Status = SlotStatus.Available
+        };
+        context.AppointmentSlots.Add(slot);
+        await context.SaveChangesAsync();
+
+        var req = new WalkInReceptionRequest
+        {
+            ScheduleId = scheduleId,
+            IdentityVerified = true,
+            IsChild = true,
+            FullName = "Bé Nguyễn Văn Tí",
+            DateOfBirth = new DateOnly(2020, 5, 1),
+            Gender = Gender.Male,
+            GuardianName = "Nguyễn Văn Bố",
+            GuardianRelationship = "Bố",
+            GuardianPhone = "0977889900",
+            GuardianNationalId = "001201009988",
+            Reason = "Sốt cao 39 độ",
+            PriorityLevel = 1
+        };
+
+        var result = await reception.RegisterWalkInAsync(nurseAccountId, req);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+
+        var app = await context.Appointments
+            .Include(a => a.Patient)
+            .FirstOrDefaultAsync(a => a.Patient.FullName == "Bé Nguyễn Văn Tí");
+
+        Assert.NotNull(app);
+        Assert.Contains("Nguyễn Văn Bố", app.Reason);
+        Assert.Contains("0977889900", app.Reason);
+        Assert.Equal("0977889900", app.Patient.PhoneNumber);
+    }
+
+    [Fact]
+    public async Task ValidateNewProfileAsync_WhenEmailReachesQuota_RejectsWithQuotaError()
+    {
+        var (context, _, _, nurseAccountId, _, _, _, _, _) = CreateHarness();
+        var bookingOpts = Options.Create(new BookingOptions { MaxProfilesPerEmail = 3 });
+        var profileService = new PatientProfileService(context, bookingOpts);
+
+        // Thêm 3 bệnh nhân đã dùng email family@example.com
+        for (int i = 1; i <= 3; i++)
+        {
+            context.Patients.Add(new Patient
+            {
+                FullName = $"Người nhà {i}",
+                DateOfBirth = new DateOnly(2010, 1, i),
+                Gender = Gender.Male,
+                PhoneNumber = $"098765432{i}",
+                Email = "family@example.com",
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+        await context.SaveChangesAsync();
+
+        var req = new CreateProfileRequest
+        {
+            FullName = "Người nhà thứ 4",
+            DateOfBirth = new DateOnly(2012, 5, 5),
+            Gender = "MALE",
+            PhoneNumber = "0987111222",
+            Email = "family@example.com",
+            Relationship = "CHILD",
+            GuardianNationalId = "001090012345"
+        };
+
+        var err = await profileService.ValidateNewProfileAsync(nurseAccountId, req);
+
+        Assert.NotNull(err);
+        Assert.Contains("tối đa 3 hồ sơ", err);
     }
 }
 

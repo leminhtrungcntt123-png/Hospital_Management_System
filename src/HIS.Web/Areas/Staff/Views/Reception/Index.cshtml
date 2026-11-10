@@ -5,6 +5,7 @@
     ViewData["Title"] = "Tiếp nhận và hàng chờ";
     var online = Model.Desk.Visits.Where(a => a.Channel == BookingChannel.Web).ToList();
     var queue = Model.Desk.Visits.Where(a => a.StatusId is 3 or 4 or 5).ToList();
+    var activeTab = string.IsNullOrWhiteSpace(Model.ActiveTab) ? "web-visits" : Model.ActiveTab;
 }
 
 <div class="reception-desk">
@@ -12,9 +13,9 @@
         <div>
             <span class="reception-eyebrow">QUẦY TIẾP NHẬN · @Model.Desk.Department</span>
             <h1>Tiếp nhận người khám</h1>
-            <p>@Model.Desk.Date.ToString("dd/MM/yyyy") · Xác minh lịch web hoặc đăng ký khách vãng lai tại quầy.</p>
+            <p>@Model.Desk.Date.ToString("dd/MM/yyyy") · Tiếp nhận lịch hẹn trực tuyến và đăng ký khách vãng lai.</p>
         </div>
-        <a class="btn outline" asp-action="Index">@await Html.PartialAsync("_AdminIcon", "refresh") Làm mới danh sách</a>
+        <a class="btn outline" asp-action="Index" asp-route-tab="@activeTab">@await Html.PartialAsync("_AdminIcon", "refresh") Làm mới danh sách</a>
     </header>
 
     @if (TempData["ReceptionSuccess"] is string success)
@@ -26,186 +27,391 @@
         <div class="reception-alert error" role="alert">@error</div>
     }
 
-    <nav class="reception-shortcuts" aria-label="Tác vụ tiếp nhận">
-        <a href="#web-visits">Lịch đặt trên web</a>
-        <a href="#walk-in">Đăng ký khách vãng lai</a>
-        <a href="#reception-queue">Hàng chờ đã tiếp nhận</a>
+    <!-- TAB NAVIGATION BAR: Chỉ hiển thị 1 màn hình duy nhất tại một thời điểm -->
+    <nav class="reception-tabs-nav" role="tablist">
+        <button type="button" class="reception-tab-btn @(activeTab == "web-visits" ? "active" : "")" data-tab="web-visits" onclick="switchReceptionTab('web-visits')">
+            @await Html.PartialAsync("_AdminIcon", "calendar")
+            <span>Lịch đặt trên web</span>
+            <span class="badge-pill">@online.Count</span>
+        </button>
+        <button type="button" class="reception-tab-btn @(activeTab == "walk-in" ? "active" : "")" data-tab="walk-in" onclick="switchReceptionTab('walk-in')">
+            @await Html.PartialAsync("_AdminIcon", "plus")
+            <span>Đăng ký khách vãng lai</span>
+        </button>
+        <button type="button" class="reception-tab-btn @(activeTab == "reception-queue" ? "active" : "")" data-tab="reception-queue" onclick="switchReceptionTab('reception-queue')">
+            @await Html.PartialAsync("_AdminIcon", "users")
+            <span>Hàng chờ đã tiếp nhận</span>
+            <span class="badge-pill">@queue.Count</span>
+        </button>
     </nav>
 
-    <form asp-action="Index" method="get" class="reception-search">
-        <label for="reception-search">Tìm mã lịch, số thứ tự, số điện thoại hoặc CCCD</label>
-        <div class="reception-search-input field">
-            <input id="reception-search" name="search" value="@Model.Search" maxlength="50" class="form-control" placeholder="Nhập chính xác thông tin cần tìm" />
-            <button class="btn primary" type="submit">Tìm kiếm</button>
-        </div>
-        <small>Danh sách khám hiển thị tối đa 100 lượt hôm nay trong khoa. Tra hồ sơ sẵn có bằng số điện thoại hoặc CCCD chính xác.</small>
-    </form>
+    <!-- ==========================================
+         TAB 1: LỊCH ĐẶT TRÊN WEB
+         ========================================== -->
+    <div id="tab-web-visits" class="reception-tab-content" style="@(activeTab == "web-visits" ? "display: block;" : "display: none;")">
+        <form asp-action="Index" method="get" class="reception-search">
+            <input type="hidden" name="tab" value="web-visits" />
+            <label for="reception-search">Tìm mã lịch, số điện thoại hoặc CCCD người khám web</label>
+            <div class="reception-search-input field">
+                <input id="reception-search" name="search" value="@Model.Search" maxlength="50" class="form-control" placeholder="Nhập chính xác mã lịch, SĐT hoặc CCCD..." />
+                <button class="btn primary" type="submit">Tìm kiếm</button>
+            </div>
+            <small>Chỉ những lượt đặt lịch web đã xác nhận mới đủ điều kiện tiếp nhận và cấp số thứ tự vào phòng khám.</small>
+        </form>
 
-    <section id="web-visits" class="reception-panel">
-        <h2>Lịch đặt trên web <span>@online.Count</span></h2>
-        <p>Đối chiếu mã lịch và thông tin người đến khám trước khi cấp số. Chỉ lịch đã xác nhận được tiếp nhận.</p>
-        <div class="table-responsive">
-            <table class="table align-middle">
-                <thead>
-                    <tr>
-                        <th>Mã lịch / giờ</th>
-                        <th>Người khám</th>
-                        <th>Bác sĩ / phòng</th>
-                        <th>Trạng thái</th>
-                        <th>Tiếp nhận</th>
-                    </tr>
-                </thead>
-                <tbody>
-                @foreach (var visit in online)
-                {
-                    <tr>
-                        <td><strong>@visit.Code</strong><br />@visit.ArrivalTime.ToString("HH:mm")</td>
-                        <td><strong>@visit.PatientName</strong><br />@visit.BirthDate.ToString("dd/MM/yyyy") · @visit.Phone</td>
-                        <td>@visit.Doctor<br />Phòng @visit.Room</td>
-                        <td>@StatusName(visit.StatusId)</td>
-                        <td>
-                            @if (visit.StatusId == 2)
+        <section class="reception-panel">
+            <h2>Danh sách lịch hẹn trực tuyến <span>@online.Count</span></h2>
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Mã lịch / Giờ</th>
+                            <th>Người khám</th>
+                            <th>Bác sĩ / Phòng</th>
+                            <th>Trạng thái</th>
+                            <th>Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var visit in online)
+                    {
+                        <tr>
+                            <td><strong>@visit.Code</strong><br />@visit.ArrivalTime.ToString("HH:mm")</td>
+                            <td><strong>@visit.PatientName</strong><br />@visit.BirthDate.ToString("dd/MM/yyyy") · @visit.Phone</td>
+                            <td>@visit.Doctor<br />Phòng @visit.Room</td>
+                            <td>@StatusName(visit.StatusId)</td>
+                            <td>
+                                @if (visit.StatusId == 2)
+                                {
+                                    <form asp-action="CheckIn" method="post">
+                                        <input type="hidden" name="appointmentId" value="@visit.Id" />
+                                        <label class="reception-verify"><input type="checkbox" name="identityVerified" value="true" required /> Đã đối chiếu giấy tờ</label>
+                                        <button type="submit" class="btn primary sm">Tiếp nhận &amp; cấp số</button>
+                                    </form>
+                                }
+                                else if (visit.QueueNumber != null)
+                                {
+                                    <strong class="reception-number">@visit.QueueNumber</strong>
+                                }
+                                else
+                                {
+                                    <span class="muted">Chưa đủ điều kiện</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    @if (online.Count == 0)
+                    {
+                        <tr><td colspan="5" class="reception-empty">Không có lịch web phù hợp trong danh sách hôm nay.</td></tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <!-- ==========================================
+         TAB 2: ĐĂNG KÝ KHÁCH VÃNG LAI (MỚI & CẢI TIẾN)
+         ========================================== -->
+    <div id="tab-walk-in" class="reception-tab-content" style="@(activeTab == "walk-in" ? "display: block;" : "display: none;")">
+        <section class="reception-panel">
+            <h2>Đăng ký khám vãng lai tại quầy</h2>
+            <p>Hệ thống tự động tra cứu hồ sơ người cũ qua CCCD hoặc tạo hồ sơ bệnh nhi kèm người giám hộ hợp pháp.</p>
+
+            <!-- 1. BỘ CHỌN ĐỐI TƯỢNG (NGƯỜI LỚN / TRẺ EM) -->
+            <div class="patient-type-selector">
+                <div class="patient-type-card selected" id="card-type-adult" onclick="switchPatientType(false)">
+                    <div class="patient-type-icon">🧑</div>
+                    <div>
+                        <strong>Người lớn (Từ 15 tuổi trở lên)</strong>
+                        <small>Có CCCD 12 số · Tra cứu tự động điền hồ sơ cũ</small>
+                    </div>
+                </div>
+                <div class="patient-type-card" id="card-type-child" onclick="switchPatientType(true)">
+                    <div class="patient-type-icon">🧒</div>
+                    <div>
+                        <strong>Trẻ em (&lt; 15 tuổi)</strong>
+                        <small>Chưa có CCCD · Cần thông tin Phụ huynh / Người bảo hộ</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FORM ĐĂNG KÝ KHÁM VÃNG LAI -->
+            <form id="form-walkin-registration" asp-action="WalkIn" method="post">
+                <input type="hidden" name="tab" value="walk-in" />
+                <input type="hidden" id="walkin-is-child" name="WalkIn.IsChild" value="false" />
+                <input type="hidden" id="walkin-patient-id" name="WalkIn.PatientId" value="@Model.WalkIn.PatientId" />
+                <input type="hidden" id="walkin-schedule-id" name="WalkIn.ScheduleId" value="@Model.WalkIn.ScheduleId" required />
+
+                <div asp-validation-summary="All" class="danger-text" role="alert"></div>
+
+                <div class="reception-form-grid">
+
+                    <!-- KHỐI 1: TRA CỨU CCCD (DÀNH CHO NGƯỜI LỚN) -->
+                    <div class="reception-field reception-wide" id="field-wrap-cccd">
+                        <label for="walkin-national-id">Số Căn cước công dân (CCCD) *</label>
+                        <div class="cccd-search-group">
+                            <input id="walkin-national-id" name="WalkIn.NationalId" value="@Model.WalkIn.NationalId" maxlength="12" class="form-control" placeholder="Nhập 12 số CCCD người khám..." autocomplete="off" />
+                            <button type="button" class="btn-lookup" id="btn-lookup-cccd" onclick="lookupPatientCccd()">
+                                @await Html.PartialAsync("_AdminIcon", "pulse") Tra cứu CCCD
+                            </button>
+                        </div>
+                        <div id="patient-lookup-status"></div>
+                        <small>Nhập CCCD và nhấn "Tra cứu". Nếu người bệnh đã từng khám, toàn bộ thông tin sẽ được tự động điền.</small>
+                    </div>
+
+                    <!-- THÔNG TIN CHUNG CỦA NGƯỜI KHÁM / BỆNH NHI -->
+                    <div class="reception-field">
+                        <label for="walkin-fullname" id="lbl-fullname">Họ và tên người khám *</label>
+                        <input id="walkin-fullname" name="WalkIn.FullName" value="@Model.WalkIn.FullName" class="form-control" placeholder="Họ và tên đầy đủ..." required autocomplete="name" />
+                    </div>
+
+                    <div class="reception-field">
+                        <label for="walkin-dob" id="lbl-dob">Ngày sinh *</label>
+                        <input id="walkin-dob" name="WalkIn.DateOfBirth" type="date" value="@(Model.WalkIn.DateOfBirth?.ToString("yyyy-MM-dd"))" max="@Model.Desk.Date.ToString("yyyy-MM-dd")" class="form-control" required />
+                    </div>
+
+                    <div class="reception-field">
+                        <label for="walkin-gender">Giới tính *</label>
+                        <select id="walkin-gender" name="WalkIn.Gender" class="form-select">
+                            <option value="Male" selected>Nam</option>
+                            <option value="Female">Nữ</option>
+                        </select>
+                    </div>
+
+                    <div class="reception-field" id="field-wrap-phone">
+                        <label for="walkin-phone">Số điện thoại liên hệ *</label>
+                        <input id="walkin-phone" name="WalkIn.PhoneNumber" value="@Model.WalkIn.PhoneNumber" type="tel" class="form-control" placeholder="Số điện thoại di động..." required />
+                    </div>
+
+                    <div class="reception-field" id="field-wrap-email">
+                        <label for="walkin-email" id="lbl-email">Địa chỉ Email (Nhận đơn thuốc / OTP web)</label>
+                        <input id="walkin-email" name="WalkIn.Email" value="@Model.WalkIn.Email" type="email" class="form-control" placeholder="nhap-email@example.com" />
+                    </div>
+
+                    <div class="reception-field">
+                        <label for="walkin-insurance">Số thẻ BHYT (nếu có)</label>
+                        <input id="walkin-insurance" name="WalkIn.InsuranceCardNumber" value="@Model.WalkIn.InsuranceCardNumber" class="form-control" placeholder="Ví dụ: DN401..." />
+                    </div>
+
+                    <div class="reception-field reception-wide">
+                        <label for="walkin-address">Địa chỉ cư trú</label>
+                        <input id="walkin-address" name="WalkIn.Address" value="@Model.WalkIn.Address" class="form-control" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành..." />
+                    </div>
+
+                    <!-- KHỐI 2: THÔNG TIN PHỤ HUYNH / NGƯỜI GIÁM HỘ (CHỈ HIỆN KHI CHỌN TRẺ EM) -->
+                    <div class="guardian-box" id="box-child-guardian" style="display: none;">
+                        <div class="guardian-box-title">
+                            @await Html.PartialAsync("_AdminIcon", "shield")
+                            <span>THÔNG TIN PHỤ HUYNH / NGƯỜI BẢO HỘ ĐƯA BÉ ĐI KHÁM (BẮT BUỘC)</span>
+                        </div>
+                        <div class="reception-form-grid">
+                            <div class="reception-field">
+                                <label for="walkin-guardian-name">Họ và tên Phụ huynh / Người giám hộ *</label>
+                                <input id="walkin-guardian-name" name="WalkIn.GuardianName" value="@Model.WalkIn.GuardianName" class="form-control" placeholder="Tên Bố/Mẹ hoặc người đưa bé đi..." />
+                            </div>
+                            <div class="reception-field">
+                                <label for="walkin-guardian-relation">Mối quan hệ với bé *</label>
+                                <select id="walkin-guardian-relation" name="WalkIn.GuardianRelationship" class="form-select">
+                                    <option value="Mẹ" selected>Mẹ</option>
+                                    <option value="Bố">Bố</option>
+                                    <option value="Ông / Bà">Ông / Bà</option>
+                                    <option value="Người giám hộ hợp pháp">Người giám hộ hợp pháp</option>
+                                </select>
+                            </div>
+                            <div class="reception-field">
+                                <label for="walkin-guardian-phone">Số điện thoại phụ huynh *</label>
+                                <input id="walkin-guardian-phone" name="WalkIn.GuardianPhone" value="@Model.WalkIn.GuardianPhone" type="tel" class="form-control" placeholder="SĐT phụ huynh để nhận thông báo..." />
+                            </div>
+                            <div class="reception-field">
+                                <label for="walkin-guardian-cccd">CCCD phụ huynh *</label>
+                                <input id="walkin-guardian-cccd" name="WalkIn.GuardianNationalId" value="@Model.WalkIn.GuardianNationalId" maxlength="12" class="form-control" placeholder="12 số CCCD người bảo hộ..." />
+                            </div>
+                            <div class="reception-field reception-wide">
+                                <label for="walkin-guardian-email">Địa chỉ Email phụ huynh (Nhận kết quả khám, đơn thuốc &amp; mã OTP)</label>
+                                <input id="walkin-guardian-email" type="email" class="form-control" placeholder="email.phuhuynh@example.com" oninput="syncGuardianEmail(this.value)" />
+                                <small>Email của Bố/Mẹ/Người giám hộ để bệnh viện gửi thông tin đơn thuốc và mã xác thực tra cứu cho bé.</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- KHỐI 3: CHỌN CHUYÊN KHOA & BÁC SĨ -->
+                    <div class="reception-field reception-wide">
+                        <label for="walkin-department">Chọn Chuyên khoa khám *</label>
+                        <select id="walkin-department" name="WalkIn.DepartmentId" class="form-select" onchange="onDepartmentChanged(this.value)">
+                            @if (Model.Desk.Departments != null && Model.Desk.Departments.Count > 0)
                             {
-                                <form asp-action="CheckIn" method="post">
-                                    <input type="hidden" name="appointmentId" value="@visit.Id" />
-                                    <label class="reception-verify"><input type="checkbox" name="identityVerified" value="true" required /> Đã đối chiếu danh tính</label>
-                                    <button type="submit" class="btn primary sm">Tiếp nhận &amp; cấp số</button>
-                                </form>
-                            }
-                            else if (visit.QueueNumber != null)
-                            {
-                                <strong class="reception-number">@visit.QueueNumber</strong>
+                                @foreach (var dept in Model.Desk.Departments)
+                                {
+                                    <option value="@dept.Id">@dept.Name</option>
+                                }
                             }
                             else
                             {
-                                <span class="muted">Chưa đủ điều kiện</span>
+                                <option value="1">Khoa Nội tổng hợp</option>
+                                <option value="2">Khoa Ngoại tổng hợp</option>
+                                <option value="3">Khoa Nhi</option>
+                                <option value="4">Khoa Tai Mũi Họng</option>
                             }
-                        </td>
-                    </tr>
-                }
-                @if (online.Count == 0)
-                {
-                    <tr><td colspan="5" class="reception-empty">Không có lịch web phù hợp trong danh sách hôm nay.</td></tr>
-                }
-                </tbody>
-            </table>
-        </div>
-    </section>
+                        </select>
+                    </div>
 
-    <section id="walk-in" class="reception-panel">
-        <h2>Đăng ký khách vãng lai</h2>
-        <p>Chọn hồ sơ sẵn có từ kết quả tìm kiếm, hoặc nhập thông tin người khám mới. Khách vãng lai không cần tài khoản web.</p>
-        <form asp-action="WalkIn" method="post">
-            <input type="hidden" name="search" value="@Model.Search" />
-            <div asp-validation-summary="All" class="danger-text" role="alert"></div>
-            <div class="reception-form-grid">
-                <div class="reception-field reception-wide">
-                    <label asp-for="WalkIn.PatientId">Hồ sơ người khám</label>
-                    <select asp-for="WalkIn.PatientId" class="form-select">
-                        <option value="">Tạo hồ sơ người khám mới</option>
-                        @foreach (var patient in Model.Desk.Patients)
-                        {
-                            <option value="@patient.Id">#@patient.Id · @patient.Name · @patient.BirthDate.ToString("dd/MM/yyyy") · @patient.Phone</option>
-                        }
-                    </select>
-                    <small>Với hồ sơ đã chọn, không cần nhập lại các thông tin cá nhân bên dưới.</small>
+                    <div class="reception-field reception-wide">
+                        <label>Chọn Bác sĩ &amp; Phòng khám tiếp nhận *</label>
+                        <div id="doctor-choices-container" class="doctor-cards-wrap">
+                            <div class="text-center p-3 text-muted">Đang tải lịch trực bác sĩ hôm nay...</div>
+                        </div>
+                        <small>Hệ thống tự động kích hoạt <strong>"Tốt nhất hiện tại"</strong> (bác sĩ có ít lượt chờ nhất) để tối ưu thời gian chờ cho bệnh nhân.</small>
+                    </div>
+
+                    <div class="reception-field">
+                        <label for="walkin-priority">Mức ưu tiên tại quầy</label>
+                        <select id="walkin-priority" name="WalkIn.PriorityLevel" class="form-select">
+                            <option value="0" selected>Bình thường</option>
+                            <option value="1">Ưu tiên 1 (Người cao tuổi &gt;75t, Trẻ sơ sinh)</option>
+                            <option value="2">Ưu tiên 2 (Cán bộ chính sách, Khuyết tật)</option>
+                            <option value="3">Ưu tiên 3 (Khẩn cấp tại quầy)</option>
+                        </select>
+                    </div>
+
+                    <div class="reception-field">
+                        <label for="walkin-reason">Lý do khám / Triệu chứng ban đầu *</label>
+                        <textarea id="walkin-reason" name="WalkIn.Reason" class="form-control" rows="2" placeholder="Ví dụ: Đau đầu, sốt 39 độ 2 ngày, ho có đờm..." required>@Model.WalkIn.Reason</textarea>
+                    </div>
+
                 </div>
-                <div class="reception-field">
-                    <label asp-for="WalkIn.FullName">Họ và tên (người khám mới)</label>
-                    <input asp-for="WalkIn.FullName" class="form-control" autocomplete="name" />
-                </div>
-                <div class="reception-field">
-                    <label asp-for="WalkIn.DateOfBirth">Ngày sinh (người khám mới)</label>
-                    <input asp-for="WalkIn.DateOfBirth" type="date" max="@Model.Desk.Date.ToString("yyyy-MM-dd")" class="form-control" />
-                </div>
-                <div class="reception-field">
-                    <label asp-for="WalkIn.PhoneNumber">Điện thoại (người khám mới)</label>
-                    <input asp-for="WalkIn.PhoneNumber" type="tel" class="form-control" />
-                </div>
-                <div class="reception-field">
-                    <label asp-for="WalkIn.NationalId">CCCD (nếu có)</label>
-                    <input asp-for="WalkIn.NationalId" class="form-control" />
-                </div>
-                <div class="reception-field">
-                    <label asp-for="WalkIn.Gender">Giới tính</label>
-                    <select asp-for="WalkIn.Gender" class="form-select">
-                        <option value="">Chưa cung cấp</option>
-                        <option value="Male">Nam</option>
-                        <option value="Female">Nữ</option>
-                        <option value="Other">Khác</option>
-                    </select>
-                </div>
-                <div class="reception-field">
-                    <label asp-for="WalkIn.Address">Địa chỉ</label>
-                    <input asp-for="WalkIn.Address" class="form-control" />
-                </div>
-                <div class="reception-field">
-                    <label asp-for="WalkIn.ScheduleId">Bác sĩ / phòng / ca đang tiếp nhận *</label>
-                    <select asp-for="WalkIn.ScheduleId" class="form-select" required>
-                        <option value="">Chọn ca khám</option>
-                        @foreach (var schedule in Model.Desk.Schedules)
-                        {
-                            <option value="@schedule.Id">@schedule.Label</option>
-                        }
-                    </select>
-                    @if (Model.Desk.Schedules.Count == 0)
+
+                <label class="reception-verify">
+                    <input type="checkbox" id="walkin-verified" name="WalkIn.IdentityVerified" value="true" checked required />
+                    <span>Đã đối chiếu thông tin và xác minh danh tính người đến khám trực tiếp</span>
+                </label>
+
+                <button type="submit" class="btn primary" id="btn-submit-walkin" style="min-width: 220px; font-size: 16px; padding: 12px 24px;">
+                    @await Html.PartialAsync("_AdminIcon", "plus") Đăng ký khám &amp; Cấp số thứ tự
+                </button>
+            </form>
+        </section>
+    </div>
+
+    <!-- ==========================================
+         TAB 3: HÀNG CHỜ ĐÃ TIẾP NHẬN
+         ========================================== -->
+    <div id="tab-reception-queue" class="reception-tab-content" style="@(activeTab == "reception-queue" ? "display: block;" : "display: none;")">
+        <section class="reception-panel">
+            <h2>Hàng chờ khám bệnh hôm nay <span>@queue.Count</span></h2>
+            <p>Danh sách người khám đã được cấp số thứ tự và đang chờ bác sĩ tại các phòng khám.</p>
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Số thứ tự</th>
+                            <th>Người khám</th>
+                            <th>Nguồn</th>
+                            <th>Phòng / Bác sĩ</th>
+                            <th>Ưu tiên</th>
+                            <th>Trạng thái</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var visit in queue)
                     {
-                        <small>Hiện chưa có ca tiếp nhận hợp lệ. Liên hệ người phụ trách lịch khoa.</small>
+                        <tr>
+                            <td class="reception-number">@visit.QueueNumber</td>
+                            <td><strong>@visit.PatientName</strong><br /><small class="text-muted">@visit.Phone</small></td>
+                            <td>@(visit.Channel == BookingChannel.Web ? "Đặt web" : "Vãng lai")</td>
+                            <td><strong>@visit.Room</strong> · @visit.Doctor</td>
+                            <td>
+                                @if (visit.PriorityLevel > 0)
+                                {
+                                    <span class="badge-tag waiting">Ưu tiên @visit.PriorityLevel</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">Thường</span>
+                                }
+                            </td>
+                            <td><span class="badge-tag waiting">@StatusName(visit.StatusId)</span></td>
+                        </tr>
                     }
-                </div>
-                <div class="reception-field">
-                    <label asp-for="WalkIn.PriorityLevel">Mức ưu tiên tại quầy</label>
-                    <select asp-for="WalkIn.PriorityLevel" class="form-select">
-                        <option value="0">Bình thường</option>
-                        <option value="1">Ưu tiên 1</option>
-                        <option value="2">Ưu tiên 2</option>
-                        <option value="3">Ưu tiên 3</option>
-                    </select>
-                </div>
-                <div class="reception-field reception-wide">
-                    <label asp-for="WalkIn.Reason">Lý do khám</label>
-                    <textarea asp-for="WalkIn.Reason" class="form-control" rows="2"></textarea>
-                </div>
+                    @if (queue.Count == 0)
+                    {
+                        <tr><td colspan="6" class="reception-empty">Chưa có người khám trong hàng chờ hôm nay.</td></tr>
+                    }
+                    </tbody>
+                </table>
             </div>
-            <label class="reception-verify"><input asp-for="WalkIn.IdentityVerified" required /> Đã đối chiếu thông tin và danh tính người đến khám</label>
-            <button type="submit" class="btn primary">Đăng ký &amp; cấp số khách vãng lai</button>
-        </form>
-    </section>
+        </section>
+    </div>
+</div>
 
-    <section id="reception-queue" class="reception-panel">
-        <h2>Hàng chờ đã tiếp nhận <span>@queue.Count</span></h2>
-        <div class="table-responsive">
-            <table class="table align-middle">
-                <thead>
-                    <tr>
-                        <th>Số thứ tự</th>
-                        <th>Người khám</th>
-                        <th>Nguồn</th>
-                        <th>Phòng / bác sĩ</th>
-                        <th>Ưu tiên</th>
-                        <th>Trạng thái</th>
-                    </tr>
-                </thead>
-                <tbody>
-                @foreach (var visit in queue)
-                {
-                    <tr>
-                        <td class="reception-number">@visit.QueueNumber</td>
-                        <td>@visit.PatientName</td>
-                        <td>@(visit.Channel == BookingChannel.Web ? "Web" : "Vãng lai")</td>
-                        <td>@visit.Room · @visit.Doctor</td>
-                        <td>@visit.PriorityLevel</td>
-                        <td>@StatusName(visit.StatusId)</td>
-                    </tr>
-                }
-                @if (queue.Count == 0)
-                {
-                    <tr><td colspan="6" class="reception-empty">Chưa có người khám trong hàng chờ phù hợp.</td></tr>
-                }
-                </tbody>
+<!-- ==========================================
+     MODAL HIỂN THỊ PHIẾU KHÁM & IN (K80 THERMAL)
+     ========================================== -->
+<div id="ticket-modal" class="ticket-modal-overlay" style="display: none;">
+    <div class="ticket-modal-card">
+        <div class="ticket-modal-header">
+            <h3>PHIẾU TIẾP NHẬN KHÁM BỆNH</h3>
+            <button type="button" class="btn outline sm" style="color:#fff; border-color:#fff;" onclick="closeTicketModal()">✕</button>
+        </div>
+        <div class="ticket-modal-body">
+            <p style="margin: 0; color: #557288;">Số thứ tự khám của bạn:</p>
+            <div class="ticket-number-display">
+                <strong id="modal-ticket-number">T-001</strong>
+            </div>
+            <table class="ticket-details-table">
+                <tr>
+                    <td>Người khám:</td>
+                    <td id="modal-patient-name">Nguyễn Văn A</td>
+                </tr>
+                <tr>
+                    <td>Khoa khám:</td>
+                    <td id="modal-dept-name">Khoa Nội tổng hợp</td>
+                </tr>
+                <tr>
+                    <td>Phòng khám:</td>
+                    <td id="modal-room-number">Phòng 101</td>
+                </tr>
+                <tr>
+                    <td>Bác sĩ khám:</td>
+                    <td id="modal-doctor-name">BS. Lê Văn Cường</td>
+                </tr>
+                <tr>
+                    <td>Lượt chờ trước:</td>
+                    <td id="modal-waiting-ahead">0 người</td>
+                </tr>
+                <tr>
+                    <td>Thời gian cấp:</td>
+                    <td id="modal-time-issued">10:30 10/11/2026</td>
+                </tr>
             </table>
         </div>
-    </section>
+        <div class="ticket-modal-actions">
+            <button type="button" class="btn primary" onclick="printThermalTicket()">
+                🖨️ In phiếu khám (K80)
+            </button>
+            <button type="button" class="btn outline" onclick="closeTicketModal()">
+                Tiếp nhận ca tiếp theo
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- KHUNG IN NHIỆT K80 (CHỈ HIỂN THỊ KHI IN ẤN) -->
+<div id="thermal-ticket-print" style="display: none;">
+    <div class="print-title">BỆNH VIỆN MEDICARE</div>
+    <div class="print-sub">PHIẾU TIẾP NHẬN KHÁM BỆNH</div>
+    <div class="print-divider"></div>
+    <div>SỐ THỨ TỰ:</div>
+    <div class="print-num" id="print-ticket-number">T-001</div>
+    <div class="print-divider"></div>
+    <div class="print-row"><span>Bệnh nhân:</span><strong id="print-patient-name">...</strong></div>
+    <div class="print-row"><span>Khoa:</span><span id="print-dept-name">...</span></div>
+    <div class="print-row"><span>Phòng khám:</span><strong id="print-room-number">...</strong></div>
+    <div class="print-row"><span>Bác sĩ:</span><span id="print-doctor-name">...</span></div>
+    <div class="print-row"><span>Chờ trước:</span><span id="print-waiting-ahead">0 lượt</span></div>
+    <div class="print-row"><span>Thời gian:</span><span id="print-time-issued">...</span></div>
+    <div class="print-divider"></div>
+    <div class="print-footer">Vui lòng ngồi chờ tại cửa phòng khám để được gọi tên theo số thứ tự.<br/>Xin cảm ơn!</div>
 </div>
 
 @functions {
@@ -224,3 +430,423 @@
         _ => "Chưa xác định"
     };
 }
+
+<script>
+    // Trạng thái ứng dụng
+    let currentDoctors = [];
+    let isChildMode = false;
+
+    document.addEventListener("DOMContentLoaded", function () {
+        // Khôi phục tab từ URL Hash hoặc sessionStorage
+        const hash = window.location.hash ? window.location.hash.replace("#", "") : "";
+        if (hash && (hash === "web-visits" || hash === "walk-in" || hash === "reception-queue")) {
+            switchReceptionTab(hash);
+        }
+
+        // Tự động tải bác sĩ cho khoa đầu tiên
+        const deptSelect = document.getElementById("walkin-department");
+        if (deptSelect && deptSelect.value) {
+            onDepartmentChanged(deptSelect.value);
+        }
+
+        // Kiểm tra xem có vé vừa tạo từ server (TempData) không
+        @if (Model.Ticket != null)
+        {
+            <text>
+            const initialTicket = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Ticket));
+            showTicketModal(initialTicket);
+            </text>
+        }
+    });
+
+    // Chuyển đổi Tab (chỉ hiện 1 màn hình duy nhất)
+    function switchReceptionTab(tabId) {
+        document.querySelectorAll(".reception-tab-btn").forEach(btn => {
+            btn.classList.toggle("active", btn.dataset.tab === tabId);
+        });
+
+        document.querySelectorAll(".reception-tab-content").forEach(content => {
+            content.style.display = content.id === "tab-" + tabId ? "block" : "none";
+        });
+
+        window.location.hash = tabId;
+        sessionStorage.setItem("active_reception_tab", tabId);
+    }
+
+    // Chuyển đổi giữa Người lớn vs Trẻ em
+    function switchPatientType(isChild) {
+        isChildMode = isChild;
+        document.getElementById("walkin-is-child").value = isChild ? "true" : "false";
+
+        const adultCard = document.getElementById("card-type-adult");
+        const childCard = document.getElementById("card-type-child");
+        const cccdField = document.getElementById("field-wrap-cccd");
+        const guardianBox = document.getElementById("box-child-guardian");
+        const lblFullname = document.getElementById("lbl-fullname");
+        const lblDob = document.getElementById("lbl-dob");
+        const guardianNameInput = document.getElementById("walkin-guardian-name");
+        const guardianPhoneInput = document.getElementById("walkin-guardian-phone");
+        const guardianCccdInput = document.getElementById("walkin-guardian-cccd");
+        const phoneField = document.getElementById("field-wrap-phone");
+        const emailField = document.getElementById("field-wrap-email");
+        const adultEmailInput = document.getElementById("walkin-email");
+        const guardianEmailInput = document.getElementById("walkin-guardian-email");
+
+        if (isChild) {
+            adultCard.classList.remove("selected");
+            childCard.classList.add("selected");
+            cccdField.style.display = "none";
+            guardianBox.style.display = "block";
+            phoneField.style.display = "none"; // Trẻ dùng SĐT phụ huynh
+            emailField.style.display = "none"; // Email chuyển vào khối phụ huynh
+            lblFullname.innerText = "Họ và tên của bé *";
+            lblDob.innerText = "Ngày sinh của bé *";
+            guardianNameInput.required = true;
+            guardianPhoneInput.required = true;
+            guardianCccdInput.required = true;
+            document.getElementById("walkin-phone").required = false;
+
+            // Đồng bộ email nếu đã nhập ở ô chính
+            if (adultEmailInput && guardianEmailInput && adultEmailInput.value) {
+                guardianEmailInput.value = adultEmailInput.value;
+            }
+
+            // Gợi ý chọn Khoa Nhi nếu có
+            const deptSelect = document.getElementById("walkin-department");
+            for (let i = 0; i < deptSelect.options.length; i++) {
+                if (deptSelect.options[i].text.toLowerCase().includes("nhi")) {
+                    deptSelect.selectedIndex = i;
+                    onDepartmentChanged(deptSelect.value);
+                    break;
+                }
+            }
+        } else {
+            childCard.classList.remove("selected");
+            adultCard.classList.add("selected");
+            cccdField.style.display = "block";
+            guardianBox.style.display = "none";
+            phoneField.style.display = "block";
+            emailField.style.display = "block";
+            lblFullname.innerText = "Họ và tên người khám *";
+            lblDob.innerText = "Ngày sinh *";
+            guardianNameInput.required = false;
+            guardianPhoneInput.required = false;
+            guardianCccdInput.required = false;
+            document.getElementById("walkin-phone").required = true;
+
+            // Đồng bộ email nếu đã nhập ở khối phụ huynh
+            if (guardianEmailInput && adultEmailInput && guardianEmailInput.value) {
+                adultEmailInput.value = guardianEmailInput.value;
+            }
+        }
+    }
+
+    // Đồng bộ email phụ huynh vào ô email chính để submit form
+    function syncGuardianEmail(val) {
+        const adultEmailInput = document.getElementById("walkin-email");
+        if (adultEmailInput) {
+            adultEmailInput.value = val;
+        }
+    }
+
+    // Tra cứu CCCD với SweetAlert2
+    async function lookupPatientCccd() {
+        const cccdInput = document.getElementById("walkin-national-id");
+        const cccd = cccdInput.value.trim();
+        const statusDiv = document.getElementById("patient-lookup-status");
+
+        if (!cccd || cccd.length < 9) {
+            Swal.fire({
+                icon: "warning",
+                title: "CCCD chưa hợp lệ",
+                text: "Vui lòng nhập tối thiểu 9 đến 12 số CCCD để tra cứu.",
+                confirmButtonColor: "#006b91"
+            });
+            return;
+        }
+
+        statusDiv.innerHTML = '<span class="text-muted"><small>Đang tra cứu dữ liệu...</small></span>';
+
+        try {
+            const resp = await fetch(`/Staff/Reception/FindPatientByCccd?cccd=${encodeURIComponent(cccd)}`);
+            const data = await resp.json();
+
+            if (data.success && data.found && data.patient) {
+                const p = data.patient;
+                document.getElementById("walkin-patient-id").value = p.id;
+                document.getElementById("walkin-fullname").value = p.fullName;
+                if (p.dateOfBirth) document.getElementById("walkin-dob").value = p.dateOfBirth;
+                if (p.gender) document.getElementById("walkin-gender").value = p.gender;
+                if (p.phoneNumber) document.getElementById("walkin-phone").value = p.phoneNumber;
+                if (p.email) {
+                    document.getElementById("walkin-email").value = p.email;
+                    const gEmail = document.getElementById("walkin-guardian-email");
+                    if (gEmail) gEmail.value = p.email;
+                }
+                if (p.address) document.getElementById("walkin-address").value = p.address;
+                if (p.insuranceCardNumber) document.getElementById("walkin-insurance").value = p.insuranceCardNumber;
+
+                statusDiv.innerHTML = `<div class="patient-found-badge">✓ Đã tìm thấy hồ sơ: ${p.fullName} (#${p.id})</div>`;
+
+                Swal.fire({
+                    toast: true,
+                    position: "top-end",
+                    icon: "success",
+                    title: `Đã tìm thấy: ${p.fullName}`,
+                    text: "Đã tự động điền các thông tin có sẵn vào form.",
+                    showConfirmButton: false,
+                    timer: 3500
+                });
+            } else {
+                document.getElementById("walkin-patient-id").value = "";
+                statusDiv.innerHTML = '<span class="text-muted"><small>Số CCCD mới, chưa từng khám tại bệnh viện.</small></span>';
+
+                Swal.fire({
+                    icon: "info",
+                    title: "Chưa có hồ sơ",
+                    text: "Số CCCD này hiện chưa có hồ sơ trong hệ thống. Vui lòng điền thông tin bên dưới để đăng ký mới.",
+                    confirmButtonText: "Nhập thông tin mới",
+                    confirmButtonColor: "#006b91"
+                });
+            }
+        } catch (err) {
+            statusDiv.innerHTML = "";
+            console.error(err);
+            Swal.fire({
+                icon: "error",
+                title: "Lỗi kết nối",
+                text: "Không thể kết nối đến máy chủ để tra cứu CCCD.",
+                confirmButtonColor: "#006b91"
+            });
+        }
+    }
+
+    // Khi chọn chuyên khoa khác -> Tải danh sách bác sĩ trực ca
+    async function onDepartmentChanged(departmentId) {
+        const container = document.getElementById("doctor-choices-container");
+        container.innerHTML = '<div class="text-center p-3 text-muted">Đang tải danh sách bác sĩ trực...</div>';
+
+        try {
+            const resp = await fetch(`/Staff/Reception/GetDepartmentDoctors?departmentId=${encodeURIComponent(departmentId)}`);
+            const data = await resp.json();
+
+            if (!data.success || !data.doctors || data.doctors.length === 0) {
+                container.innerHTML = '<div class="p-3 text-danger">Khoa này hiện chưa có bác sĩ nào trực ca hôm nay. Vui lòng chọn khoa khác hoặc liên hệ phụ trách lịch.</div>';
+                document.getElementById("walkin-schedule-id").value = "";
+                return;
+            }
+
+            currentDoctors = data.doctors;
+            renderDoctorCards(currentDoctors);
+        } catch (err) {
+            console.error(err);
+            container.innerHTML = '<div class="p-3 text-danger">Lỗi nạp danh sách bác sĩ trực.</div>';
+        }
+    }
+
+    // Render danh sách bác sĩ và ô "Tốt nhất hiện tại"
+    function renderDoctorCards(doctors) {
+        const container = document.getElementById("doctor-choices-container");
+        container.innerHTML = "";
+
+        // Tìm bác sĩ tối ưu: ưu tiên ca còn hiệu lực (!isShiftEnded), còn chỗ (!isFull) và ít lượt chờ nhất
+        let availableDocs = doctors.filter(d => !d.isFull && !d.isShiftEnded);
+        if (availableDocs.length === 0) {
+            availableDocs = doctors.filter(d => !d.isFull);
+        }
+
+        let bestDoc = null;
+        if (availableDocs.length > 0) {
+            // Ưu tiên ca đang trực hiện tại nếu có
+            const currentShiftDocs = availableDocs.filter(d => d.isCurrentShift);
+            const pool = currentShiftDocs.length > 0 ? currentShiftDocs : availableDocs;
+            bestDoc = pool.reduce((prev, curr) => (prev.waitingCount <= curr.waitingCount ? prev : curr));
+        }
+
+        // 1. CARD "TỐT NHẤT HIỆN TẠI" (MẶC ĐỊNH CHỌN)
+        if (bestDoc) {
+            const bestCard = document.createElement("div");
+            bestCard.className = "doctor-card-item best-recommended selected";
+            bestCard.id = "doc-card-best";
+            bestCard.onclick = () => selectDoctor(bestDoc.scheduleId, true);
+
+            bestCard.innerHTML = `
+                <div class="doc-info">
+                    <strong>⭐ Tốt nhất hiện tại (Tự động chọn phòng chờ ít nhất)</strong>
+                    <span>Hệ thống phân luồng sang: <strong>${bestDoc.doctorName}</strong> (Phòng ${bestDoc.roomNumber} · <span class="badge bg-success-subtle text-success font-monospace">${bestDoc.shiftName || 'Ca trực'}: ${bestDoc.shiftTime || ''}</span>)</span>
+                </div>
+                <div class="doc-status-badges">
+                    <span class="badge-tag best">Khuyến nghị</span>
+                    <span class="badge-tag waiting">${bestDoc.waitingCount} người chờ</span>
+                </div>
+            `;
+            container.appendChild(bestCard);
+            document.getElementById("walkin-schedule-id").value = bestDoc.scheduleId;
+        }
+
+        // 2. CÁC BÁC SĨ & CA TRỰC CỤ THỂ
+        doctors.forEach(doc => {
+            const isEnded = doc.isShiftEnded;
+            const isFull = doc.isFull;
+            const isDisabled = isEnded || isFull;
+
+            const card = document.createElement("div");
+            card.className = "doctor-card-item" + (isDisabled ? " disabled" : "");
+            card.id = `doc-card-${doc.scheduleId}`;
+
+            if (!isDisabled) {
+                card.onclick = () => selectDoctor(doc.scheduleId, false);
+            }
+
+            let statusBadge = "";
+            if (isEnded) {
+                statusBadge = '<span class="badge-tag full">Đã hết ca</span>';
+            } else if (isFull) {
+                statusBadge = '<span class="badge-tag full">Đã hết slot</span>';
+            } else {
+                statusBadge = `<span class="badge-tag waiting">${doc.waitingCount} đang chờ</span>`;
+            }
+
+            card.innerHTML = `
+                <div class="doc-info">
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <strong>${doc.doctorName}</strong>
+                        <span class="badge ${doc.shiftName === 'Ca sáng' ? 'bg-primary-subtle text-primary border border-primary-subtle' : 'bg-warning-subtle text-dark border border-warning-subtle'}" style="font-size: 0.78rem;">
+                            ${doc.shiftName || 'Ca khám'}: ${doc.shiftTime || ''}
+                        </span>
+                        ${doc.isCurrentShift ? '<span class="badge bg-success text-white" style="font-size: 0.75rem;">Đang trực</span>' : ''}
+                    </div>
+                    <span class="text-muted small">Phòng ${doc.roomNumber} · ${doc.specialty}</span>
+                </div>
+                <div class="doc-status-badges">
+                    ${statusBadge}
+                </div>
+            `;
+            container.appendChild(card);
+        });
+
+        if (!bestDoc && doctors.length > 0) {
+            container.innerHTML += '<div class="p-2 text-danger small">Tất cả các ca khám của khoa này đã kín chỗ hoặc hết ca hôm nay.</div>';
+        }
+    }
+
+    // Chọn bác sĩ
+    function selectDoctor(scheduleId, isBest) {
+        document.getElementById("walkin-schedule-id").value = scheduleId;
+
+        document.querySelectorAll(".doctor-card-item").forEach(c => c.classList.remove("selected"));
+
+        if (isBest) {
+            const bestCard = document.getElementById("doc-card-best");
+            if (bestCard) bestCard.classList.add("selected");
+        } else {
+            const specificCard = document.getElementById(`doc-card-${scheduleId}`);
+            if (specificCard) specificCard.classList.add("selected");
+        }
+    }
+
+    // Xử lý gửi Form Đăng ký Vãng Lai qua AJAX để hiển thị Modal tức thì
+    document.getElementById("form-walkin-registration").addEventListener("submit", async function (e) {
+        e.preventDefault();
+
+        // Kiểm tra scheduleId
+        const scheduleId = document.getElementById("walkin-schedule-id").value;
+        if (!scheduleId) {
+            Swal.fire({
+                icon: "warning",
+                title: "Chưa chọn bác sĩ",
+                text: "Vui lòng chọn bác sĩ hoặc phòng khám tiếp nhận.",
+                confirmButtonColor: "#006b91"
+            });
+            return;
+        }
+
+        const submitBtn = document.getElementById("btn-submit-walkin");
+        submitBtn.disabled = true;
+        submitBtn.innerText = "Đang xử lý cấp số...";
+
+        const formData = new FormData(this);
+
+        try {
+            const resp = await fetch(this.action, {
+                method: "POST",
+                body: formData,
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest"
+                }
+            });
+
+            const data = await resp.json();
+
+            if (data.success && data.ticket) {
+                // Hiển thị modal phiếu khám
+                showTicketModal(data.ticket);
+                // Reset form để sẵn sàng cho ca tiếp theo
+                document.getElementById("walkin-fullname").value = "";
+                document.getElementById("walkin-national-id").value = "";
+                document.getElementById("walkin-dob").value = "";
+                document.getElementById("walkin-phone").value = "";
+                document.getElementById("walkin-email").value = "";
+                document.getElementById("walkin-insurance").value = "";
+                document.getElementById("walkin-address").value = "";
+                document.getElementById("walkin-reason").value = "";
+                document.getElementById("walkin-patient-id").value = "";
+                document.getElementById("patient-lookup-status").innerHTML = "";
+
+                // Tải lại bác sĩ để cập nhật số lượt chờ
+                const deptSelect = document.getElementById("walkin-department");
+                if (deptSelect && deptSelect.value) {
+                    onDepartmentChanged(deptSelect.value);
+                }
+            } else {
+                Swal.fire({
+                    icon: "error",
+                    title: "Chưa tiếp nhận được",
+                    text: data.message || "Có lỗi xảy ra trong quá trình đăng ký.",
+                    confirmButtonColor: "#006b91"
+                });
+            }
+        } catch (err) {
+            console.error(err);
+            Swal.fire({
+                icon: "error",
+                title: "Lỗi kết nối",
+                text: "Không thể hoàn tất đăng ký do lỗi mạng hoặc máy chủ.",
+                confirmButtonColor: "#006b91"
+            });
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerText = "Đăng ký khám & Cấp số thứ tự";
+        }
+    });
+
+    // Modal Phiếu Khám
+    function showTicketModal(ticket) {
+        document.getElementById("modal-ticket-number").innerText = ticket.queueNumber;
+        document.getElementById("modal-patient-name").innerText = ticket.patientName;
+        document.getElementById("modal-dept-name").innerText = ticket.departmentName;
+        document.getElementById("modal-room-number").innerText = ticket.roomNumber;
+        document.getElementById("modal-doctor-name").innerText = ticket.doctorName;
+        document.getElementById("modal-waiting-ahead").innerText = ticket.waitingCount + " người";
+        document.getElementById("modal-time-issued").innerText = new Date(ticket.createdAt).toLocaleString("vi-VN");
+
+        // Ghi dữ liệu vào khung in nhiệt
+        document.getElementById("print-ticket-number").innerText = ticket.queueNumber;
+        document.getElementById("print-patient-name").innerText = ticket.patientName;
+        document.getElementById("print-dept-name").innerText = ticket.departmentName;
+        document.getElementById("print-room-number").innerText = ticket.roomNumber;
+        document.getElementById("print-doctor-name").innerText = ticket.doctorName;
+        document.getElementById("print-waiting-ahead").innerText = ticket.waitingCount + " lượt";
+        document.getElementById("print-time-issued").innerText = new Date(ticket.createdAt).toLocaleString("vi-VN");
+
+        document.getElementById("ticket-modal").style.display = "flex";
+    }
+
+    function closeTicketModal() {
+        document.getElementById("ticket-modal").style.display = "none";
+    }
+
+    function printThermalTicket() {
+        window.print();
+    }
+</script>
