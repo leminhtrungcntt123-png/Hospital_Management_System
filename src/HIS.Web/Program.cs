@@ -236,13 +236,28 @@ if (app.Environment.IsDevelopment())
         logger?.LogWarning(ex, "Không thể tự động nạp dữ liệu mẫu (DbSeeder): {Message}", ex.Message);
     }
 
-    // Endpoint dev để làm mới dữ liệu test: Chỉ cho phép gọi từ localhost/loopback trong môi trường Development
-    var handleSeedFresh = async (HttpContext httpContext, IServiceProvider sp) =>
+    // Endpoint dev để làm mới dữ liệu test: Chỉ cho phép gọi bằng POST từ localhost/loopback kèm token xác nhận chống CSRF
+    app.MapGet("/dev/seed-fresh", () => Results.Ok(new
+    {
+        message = "Để làm mới CSDL, hãy gửi request POST tới /dev/seed-fresh?confirm=reset-dev-data từ localhost."
+    }));
+
+    app.MapPost("/dev/seed-fresh", async (HttpContext httpContext, IServiceProvider sp) =>
     {
         var remoteIp = httpContext.Connection.RemoteIpAddress;
-        if (remoteIp != null && !System.Net.IPAddress.IsLoopback(remoteIp))
+        if (remoteIp == null || !System.Net.IPAddress.IsLoopback(remoteIp))
         {
             return Results.StatusCode(StatusCodes.Status403Forbidden);
+        }
+
+        var confirm = httpContext.Request.Query["confirm"].ToString();
+        if (confirm != "reset-dev-data")
+        {
+            return Results.BadRequest(new
+            {
+                success = false,
+                message = "Hành động nguy hiểm. Vui lòng truyền tham số xác nhận: /dev/seed-fresh?confirm=reset-dev-data"
+            });
         }
 
         using var scope = sp.CreateScope();
@@ -264,10 +279,7 @@ if (app.Environment.IsDevelopment())
                 new { username = "patient02", role = "PATIENT", name = "Bệnh nhân mẫu (Trần Thu Hà & Bé Trần Bảo Nam)" }
             }
         });
-    };
-
-    app.MapGet("/dev/seed-fresh", handleSeedFresh);
-    app.MapPost("/dev/seed-fresh", handleSeedFresh);
+    });
 }
 
 // Trang mặc định: trang bắt đầu đặt lịch

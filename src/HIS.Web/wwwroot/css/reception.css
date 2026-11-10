@@ -496,7 +496,7 @@
     animation: ticketPop 0.25s ease-out;
 }
 
-@@keyframes ticketPop {
+@keyframes ticketPop {
     from { opacity: 0; transform: scale(0.92); }
     to { opacity: 1; transform: scale(1); }
 }
@@ -581,17 +581,32 @@
         background: #fff !important;
         margin: 0 !important;
         padding: 0 !important;
+        width: 100% !important;
     }
-    .staff-app,
+
+    /* Giữ các thẻ cha hiển thị để con không bị ẩn theo, xóa sạch layout flex/grid của workspace */
+    body, .staff-app, .reception-workspace, main, .content {
+        display: block !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        width: 100% !important;
+    }
+
+    /* Ẩn toàn bộ các thành phần quản trị khác ngoài phiếu in */
+    aside,
     .sidebar,
+    .staff-nav,
     .reception-desk,
-    .ticket-modal-overlay,
-    .reception-tabs-nav,
     .reception-header,
+    .reception-tabs-nav,
+    .ticket-modal-overlay,
     nav,
     header,
     footer,
-    aside {
+    .btn {
         display: none !important;
     }
 
@@ -612,30 +627,29 @@
         visibility: visible !important;
     }
 
-    @page {
-        size: 80mm auto;
-        margin: 0;
-    }
-}
     #thermal-ticket-print .print-title {
         font-size: 16px;
         font-weight: bold;
         text-transform: uppercase;
         margin-bottom: 4px;
     }
+
     #thermal-ticket-print .print-sub {
         font-size: 12px;
         margin-bottom: 8px;
     }
+
     #thermal-ticket-print .print-divider {
         border-top: 1px dashed #000;
         margin: 6px 0;
     }
+
     #thermal-ticket-print .print-num {
         font-size: 32px;
         font-weight: 900;
         margin: 6px 0;
     }
+
     #thermal-ticket-print .print-row {
         display: flex;
         justify-content: space-between;
@@ -643,9 +657,15 @@
         margin: 4px 0;
         text-align: left;
     }
+
     #thermal-ticket-print .print-footer {
         font-size: 11px;
         margin-top: 10px;
+    }
+
+    @page {
+        size: 80mm auto;
+        margin: 2mm;
     }
 }
 

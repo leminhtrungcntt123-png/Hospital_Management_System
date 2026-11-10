@@ -958,40 +958,43 @@ CREATE TABLE IF NOT EXISTS ""__EFMigrationsHistory"" (
 );
 
 DO $$
+DECLARE
+    history_empty boolean;
 BEGIN
-    -- Chỉ ghi baseline nếu CSDL đã tồn tại bảng nghiệp vụ (trường hợp DB cũ không quản lý bằng EF migration)
-    -- Nếu là DB trống hoàn toàn, để EF Core MigrateAsync tự động tạo schema từ đầu
-    IF EXISTS (
+    SELECT NOT EXISTS (SELECT 1 FROM ""__EFMigrationsHistory"") INTO history_empty;
+
+    -- Các migration cơ sở ban đầu chỉ chèn khi __EFMigrationsHistory hoàn toàn rỗng VÀ bảng accounts đã tồn tại sẵn
+    -- (tức là database cũ được tạo bằng script SQL thủ công, không có EF quản lý từ đầu)
+    IF history_empty AND EXISTS (
         SELECT 1 FROM information_schema.tables 
         WHERE table_schema = 'public' AND table_name = 'accounts'
     ) THEN
-        -- Nếu cột has_health_insurance đã tồn tại, đánh dấu migration là đã chạy
-        IF EXISTS (
-            SELECT 1 FROM information_schema.columns 
-            WHERE table_name = 'appointments' AND column_name = 'has_health_insurance'
-        ) THEN
-            INSERT INTO ""__EFMigrationsHistory"" (migration_id, product_version)
-            VALUES ('20261105131631_AppointmentInsuranceDeclaration', '10.0.13')
-            ON CONFLICT (migration_id) DO NOTHING;
-        END IF;
-
-        -- Nếu cột email của patients đã tồn tại, đánh dấu migration là đã chạy
-        IF EXISTS (
-            SELECT 1 FROM information_schema.columns 
-            WHERE table_name = 'patients' AND column_name = 'email'
-        ) THEN
-            INSERT INTO ""__EFMigrationsHistory"" (migration_id, product_version)
-            VALUES ('20261105141229_PatientEmail', '10.0.13')
-            ON CONFLICT (migration_id) DO NOTHING;
-        END IF;
-
-        -- Các migration cơ sở ban đầu chỉ chèn khi bảng accounts đã tồn tại sẵn
         INSERT INTO ""__EFMigrationsHistory"" (migration_id, product_version)
         VALUES
             ('20261015010838_InitialCreate', '10.0.13'),
             ('20261103165420_AlignToGroupSpec', '10.0.13'),
             ('20261103173448_SanityCheck', '10.0.13'),
             ('20261104144910_QueuePositionNumbering', '10.0.13')
+        ON CONFLICT (migration_id) DO NOTHING;
+    END IF;
+
+    -- Nếu cột has_health_insurance đã tồn tại, đánh dấu migration là đã chạy
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'appointments' AND column_name = 'has_health_insurance'
+    ) THEN
+        INSERT INTO ""__EFMigrationsHistory"" (migration_id, product_version)
+        VALUES ('20261105131631_AppointmentInsuranceDeclaration', '10.0.13')
+        ON CONFLICT (migration_id) DO NOTHING;
+    END IF;
+
+    -- Nếu cột email của patients đã tồn tại, đánh dấu migration là đã chạy
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'patients' AND column_name = 'email'
+    ) THEN
+        INSERT INTO ""__EFMigrationsHistory"" (migration_id, product_version)
+        VALUES ('20261105141229_PatientEmail', '10.0.13')
         ON CONFLICT (migration_id) DO NOTHING;
     END IF;
 END $$;

@@ -593,5 +593,75 @@ public class ReceptionAndStaffPortalPart4Tests
         Assert.Equal("VALIDATION_ERROR", result.Error.Code);
         Assert.Contains("tối đa 3 hồ sơ", result.Error.Message);
     }
+
+    [Fact]
+    public async Task RegisterWalkInAsync_WithInsuranceCardBelongingToAnotherPatient_ReturnsValidationError()
+    {
+        var (context, _, reception, nurseAccountId, _, doc1Id, room1Id, scheduleId, existingPatientId) = CreateHarness();
+
+        // Thêm một bệnh nhân khác sở hữu thẻ BHYT GD4010123456789
+        var anotherPatient = new Patient
+        {
+            FullName = "Nguyễn Văn Chủ Thẻ",
+            DateOfBirth = new DateOnly(1985, 3, 10),
+            Gender = Gender.Male,
+            PhoneNumber = "0901234567",
+            NationalId = "001185099999",
+            CreatedAt = DateTime.UtcNow
+        };
+        context.Patients.Add(anotherPatient);
+        await context.SaveChangesAsync();
+
+        var plan = new InsurancePlan { Name = "BHYT Chuẩn", CoveragePct = 80m };
+        context.InsurancePlans.Add(plan);
+        await context.SaveChangesAsync();
+
+        context.InsuranceCards.Add(new InsuranceCard
+        {
+            PatientId = anotherPatient.Id,
+            InsurancePlanId = plan.Id,
+            CardNumber = "GD4010123456789",
+            ValidFrom = new DateOnly(2025, 1, 1),
+            ValidTo = new DateOnly(2027, 12, 31),
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        });
+        await context.SaveChangesAsync();
+
+        var slot = new AppointmentSlot
+        {
+            DoctorId = doc1Id,
+            RoomId = room1Id,
+            StartTime = new DateTime(2026, 11, 9, 11, 0, 0),
+            EndTime = new DateTime(2026, 11, 9, 11, 15, 0),
+            Capacity = 2,
+            OnlineQuota = 1,
+            BookedCount = 0,
+            Status = SlotStatus.Available
+        };
+        context.AppointmentSlots.Add(slot);
+        await context.SaveChangesAsync();
+
+        // Bệnh nhân mới cố tình đăng ký với thẻ BHYT của người khác
+        var req = new WalkInReceptionRequest
+        {
+            ScheduleId = scheduleId,
+            IdentityVerified = true,
+            FullName = "Bệnh nhân chiếm dụng thẻ",
+            DateOfBirth = new DateOnly(2000, 1, 1),
+            Gender = Gender.Male,
+            PhoneNumber = "0988777666",
+            NationalId = "001200088888",
+            InsuranceCardNumber = "GD4010123456789",
+            Reason = "Khám sốt",
+            PriorityLevel = 0
+        };
+
+        var result = await reception.RegisterWalkInAsync(nurseAccountId, req);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("VALIDATION_ERROR", result.Error.Code);
+        Assert.Contains("đã được liên kết với một bệnh nhân khác", result.Error.Message);
+    }
 }
 

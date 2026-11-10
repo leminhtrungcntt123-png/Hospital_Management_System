@@ -482,15 +482,29 @@
 
     // Chuyển đổi giữa Người lớn vs Trẻ em
     function switchPatientType(isChild) {
+        if (isChild === isChildMode) return; // Bỏ qua nếu bấm lại loại bệnh nhân đang chọn
         isChildMode = isChild;
         document.getElementById("walkin-is-child").value = isChild ? "true" : "false";
 
-        // Luôn làm sạch patient-id và trạng thái tra cứu cũ để tránh ghi đè nhầm hồ sơ
+        // Luôn làm sạch toàn bộ thông tin bệnh nhân cũ (ID, CCCD, Tên, Ngày sinh, SĐT, Email, Địa chỉ, BHYT)
+        // để tránh ghi đè nhầm hồ sơ người lớn hoặc chuyển nhượng thẻ BHYT của người lớn sang cho trẻ
         document.getElementById("walkin-patient-id").value = "";
         document.getElementById("patient-lookup-status").replaceChildren();
         document.getElementById("walkin-fullname").value = "";
         document.getElementById("walkin-dob").value = "";
         document.getElementById("walkin-national-id").value = "";
+        document.getElementById("walkin-phone").value = "";
+        document.getElementById("walkin-email").value = "";
+        document.getElementById("walkin-address").value = "";
+        document.getElementById("walkin-insurance").value = "";
+        const gEmail = document.getElementById("walkin-guardian-email");
+        if (gEmail) gEmail.value = "";
+        const gName = document.getElementById("walkin-guardian-name");
+        if (gName) gName.value = "";
+        const gPhone = document.getElementById("walkin-guardian-phone");
+        if (gPhone) gPhone.value = "";
+        const gCccd = document.getElementById("walkin-guardian-cccd");
+        if (gCccd) gCccd.value = "";
 
         const adultCard = document.getElementById("card-type-adult");
         const childCard = document.getElementById("card-type-child");
@@ -598,6 +612,12 @@
         try {
             const resp = await fetch(`/Staff/Reception/FindPatientByCccd?cccd=${encodeURIComponent(cccd)}`);
             const data = await resp.json();
+
+            // Nếu người dùng đã chuyển sang chế độ Trẻ em trong lúc tra cứu, bỏ qua kết quả
+            if (isChildMode) {
+                statusDiv.replaceChildren();
+                return;
+            }
 
             if (data.success && data.found && data.patient) {
                 const p = data.patient;

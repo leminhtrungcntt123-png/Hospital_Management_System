@@ -17,6 +17,7 @@ public sealed class CreateReceptionRequest
     public string? InsuranceCardNumber { get; set; }
     public int DepartmentId { get; set; }
     public int? DoctorId { get; set; }
+    public int? RoomId { get; set; }
     public int PriorityLevel { get; set; }
     public string? Reason { get; set; }
 

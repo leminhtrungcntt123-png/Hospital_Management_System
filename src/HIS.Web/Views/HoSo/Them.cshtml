@@ -2,6 +2,7 @@
    quầy đối chiếu giấy tờ); "Chưa từng khám" khai đầy đủ nhân thân rồi đặt lịch được ngay (link ACTIVE).
    Panel không được chọn bị disabled nên trường của nhánh kia không gửi lên và không xen vào validation. *@
 @model ThemHoSoRequest
+@inject Microsoft.Extensions.Options.IOptions<HIS.BLL.Options.BookingOptions> BookingOptionsAccessor
 @{
     ViewData["Title"] = "Tạo hồ sơ";
     var seenOptions = (List<RelationshipOptionVm>)ViewData["RelationshipOptions"]!;
@@ -156,7 +157,7 @@
                     <div class="duplicate-note">
                         <i data-lucide="mail"></i>
                         <span>Hệ thống gửi mã xác thực 6 số tới email bạn vừa nhập. Nhập đúng mã thì hồ sơ mới được tạo và đặt lịch được ngay;
-                            bỏ giữa chừng thì màn hình chưa lưu gì cả, bạn có thể khai lại. Một địa chỉ email có thể dùng để đăng ký tối đa 3 hồ sơ người thân trong gia đình.</span>
+                            bỏ giữa chừng thì màn hình chưa lưu gì cả, bạn có thể khai lại. Một địa chỉ email có thể dùng để đăng ký tối đa @(BookingOptionsAccessor.Value.MaxProfilesPerEmail) hồ sơ người thân trong gia đình.</span>
                     </div>
                 </div>
 

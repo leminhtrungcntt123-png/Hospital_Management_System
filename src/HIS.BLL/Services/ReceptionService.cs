@@ -256,8 +256,8 @@ public class ReceptionService : IReceptionService
                 ?? throw new ArgumentException("Bác sĩ đã chọn không thuộc khoa/phòng này.");
         }
 
-        int? roomId = null;
-        if (doctor != null)
+        int? roomId = request.RoomId;
+        if (roomId == null && doctor != null)
         {
             roomId = await _context.DoctorSchedules
                 .AsNoTracking()
@@ -973,13 +973,26 @@ public class ReceptionService : IReceptionService
             return;
         }
 
-        var existing = await _context.InsuranceCards
-            .FirstOrDefaultAsync(c => c.CardNumber == cardNumber || c.PatientId == patient.Id, cancellationToken);
+        var normalizedCard = cardNumber.Trim();
 
-        if (existing != null)
+        // 1. Kiểm tra xem thẻ này đã được cấp cho bệnh nhân khác chưa (tránh chuyển nhượng trái phép thẻ BHYT sang người khác)
+        var cardByNumber = await _context.InsuranceCards
+            .FirstOrDefaultAsync(c => c.CardNumber == normalizedCard, cancellationToken);
+
+        if (cardByNumber != null && cardByNumber.PatientId != patient.Id)
         {
-            existing.Patient = patient;
-            existing.IsActive = true;
+            throw new ArgumentException($"Thẻ BHYT '{normalizedCard}' đã được liên kết với một bệnh nhân khác trong hệ thống.");
+        }
+
+        // 2. Tìm thẻ của chính bệnh nhân này
+        var patientCard = cardByNumber ?? await _context.InsuranceCards
+            .FirstOrDefaultAsync(c => c.PatientId == patient.Id, cancellationToken);
+
+        if (patientCard != null)
+        {
+            patientCard.CardNumber = normalizedCard;
+            patientCard.Patient = patient;
+            patientCard.IsActive = true;
             return;
         }
 
@@ -1336,6 +1349,13 @@ public class ReceptionService : IReceptionService
             return Result.Failure<WalkInTicketDto>("INVALID_DEPARTMENT", "Bác sĩ hoặc phòng khám được chọn không thuộc chuyên khoa đã chọn.");
         }
 
+        // Kiểm tra ca khám đã kết thúc hôm nay chưa
+        var currentTime = TimeOnly.FromDateTime(Now);
+        if (schedule.DayOfWeek == Now.DayOfWeek && currentTime > schedule.EndTime)
+        {
+            return Result.Failure<WalkInTicketDto>("SHIFT_ENDED", "Ca khám của bác sĩ đã kết thúc hôm nay. Vui lòng chọn ca trực tiếp theo.");
+        }
+
         Patient? patient = null;
         int? resolvedPatientId = request.PatientId;
         if (resolvedPatientId.HasValue && resolvedPatientId.Value > 0)
@@ -1396,42 +1416,56 @@ public class ReceptionService : IReceptionService
             InsuranceCardNumber = request.InsuranceCardNumber?.Trim(),
             DepartmentId = schedule.Doctor.DepartmentId,
             DoctorId = schedule.DoctorId,
+            RoomId = schedule.RoomId,
             PriorityLevel = request.PriorityLevel,
             Reason = combinedReason,
             IsEmergency = false,
             OperatorAccountId = staffAccountId
         };
 
+        CreateReceptionResult createRes;
         try
         {
-            var createRes = await CreateReceptionAsync(createReq, ct);
-            var ticketRes = await GetWalkInTicketAsync(null, createRes.AppointmentId, ct);
-            if (ticketRes.IsSuccess && ticketRes.Value != null)
-            {
-                return Result.Success(ticketRes.Value);
-            }
-
-            var fallbackTicket = new WalkInTicketDto(
-                createRes.AppointmentId,
-                createRes.AppointmentCode,
-                createRes.QueueNumber,
-                fullName,
-                schedule.Doctor.Department?.Name ?? "Khoa khám",
-                schedule.Room?.RoomNumber ?? "Phòng khám",
-                schedule.Doctor.FullName,
-                0,
-                Now
-            );
-            return Result.Success(fallbackTicket);
+            createRes = await CreateReceptionAsync(createReq, ct);
         }
         catch (ArgumentException ex)
         {
             return Result.Failure<WalkInTicketDto>("VALIDATION_ERROR", ex.Message);
         }
-        catch (Exception ex)
+        catch (InvalidOperationException ex)
         {
-            return Result.Failure<WalkInTicketDto>("REGISTER_WALKIN_FAILED", ex.Message);
+            return Result.Failure<WalkInTicketDto>("INVALID_OPERATION", ex.Message);
         }
+
+        // Tác vụ lấy phiếu khám diễn ra sau khi lượt khám đã lưu thành công vào CSDL.
+        // Nếu có lỗi truy vấn vé thì dùng vé dự phòng fallback, tuyệt đối không báo false failure làm nhân viên đăng ký trùng lặp.
+        WalkInTicketDto? ticket = null;
+        try
+        {
+            var ticketRes = await GetWalkInTicketAsync(null, createRes.AppointmentId, ct);
+            if (ticketRes.IsSuccess)
+            {
+                ticket = ticketRes.Value;
+            }
+        }
+        catch
+        {
+            // Bỏ qua lỗi query vé, dùng fallback bên dưới
+        }
+
+        ticket ??= new WalkInTicketDto(
+            createRes.AppointmentId,
+            createRes.AppointmentCode,
+            createRes.QueueNumber,
+            fullName,
+            schedule.Doctor.Department?.Name ?? "Khoa khám",
+            schedule.Room?.RoomNumber ?? "Phòng khám",
+            schedule.Doctor.FullName,
+            0,
+            Now
+        );
+
+        return Result.Success(ticket);
     }
 
     /// <summary>
@@ -1576,24 +1610,32 @@ public class ReceptionService : IReceptionService
             .Select(g => new { DoctorId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.DoctorId, x => x.Count, ct);
 
-        // Kiểm tra slot còn trống trong ngày
+        // Kiểm tra slot và lượt đặt theo từng ca khám cụ thể (Ca sáng vs Ca chiều)
         var roomIds = schedules.Select(s => s.RoomId).Distinct().ToList();
-        var totalSlotsByRoom = await _context.AppointmentSlots
+        var allSlots = await _context.AppointmentSlots
             .AsNoTracking()
             .Where(sl => roomIds.Contains(sl.RoomId) && sl.StartTime >= start && sl.StartTime < end)
-            .GroupBy(sl => sl.RoomId)
-            .Select(g => new { RoomId = g.Key, TotalCapacity = g.Sum(x => x.Capacity) })
-            .ToDictionaryAsync(x => x.RoomId, x => x.TotalCapacity, ct);
+            .ToListAsync(ct);
 
-        var bookedCountsByRoom = await _context.Appointments
+        var slotsByRoomShift = allSlots
+            .GroupBy(sl => (sl.RoomId, IsAfternoon: sl.StartTime.Hour >= 12))
+            .ToDictionary(g => g.Key, g => g.Sum(x => x.Capacity));
+
+        var allAppointments = await _context.Appointments
             .AsNoTracking()
+            .Include(a => a.Slot)
             .Where(a => a.RoomId.HasValue && roomIds.Contains(a.RoomId.Value)
                 && (a.StatusId == 1 || a.StatusId == 2 || a.StatusId == 3 || a.StatusId == 4 || a.StatusId == 5)
                 && ((a.Slot != null && a.Slot.StartTime >= start && a.Slot.StartTime < end)
                     || (a.Slot == null && a.CreatedAt >= start && a.CreatedAt < end)))
-            .GroupBy(a => a.RoomId!.Value)
-            .Select(g => new { RoomId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.RoomId, x => x.Count, ct);
+            .ToListAsync(ct);
+
+        var bookedCountsByRoomShift = allAppointments
+            .GroupBy(a => (
+                RoomId: a.RoomId!.Value,
+                IsAfternoon: (a.Slot != null ? a.Slot.StartTime.Hour : a.CreatedAt.Hour) >= 12
+            ))
+            .ToDictionary(g => g.Key, g => g.Count());
 
         var currentTime = TimeOnly.FromDateTime(Now);
         var todayDate = DateOnly.FromDateTime(Now);
@@ -1603,8 +1645,9 @@ public class ReceptionService : IReceptionService
         foreach (var s in schedules)
         {
             int waiting = waitingCounts.GetValueOrDefault(s.DoctorId, 0);
-            int roomCap = totalSlotsByRoom.GetValueOrDefault(s.RoomId, 30);
-            int roomBooked = bookedCountsByRoom.GetValueOrDefault(s.RoomId, 0);
+            bool isAfternoon = s.Shift == ExamShift.Afternoon;
+            int roomCap = slotsByRoomShift.GetValueOrDefault((s.RoomId, isAfternoon), 15);
+            int roomBooked = bookedCountsByRoomShift.GetValueOrDefault((s.RoomId, isAfternoon), 0);
             bool isFull = roomCap > 0 && roomBooked >= roomCap;
 
             string shiftName = s.Shift == ExamShift.Morning ? "Ca sáng" : "Ca chiều";
