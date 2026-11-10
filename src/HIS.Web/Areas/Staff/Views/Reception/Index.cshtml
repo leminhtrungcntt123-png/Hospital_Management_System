@@ -282,7 +282,7 @@
                 </div>
 
                 <label class="reception-verify">
-                    <input type="checkbox" id="walkin-verified" name="WalkIn.IdentityVerified" value="true" checked required />
+                    <input type="checkbox" id="walkin-verified" name="WalkIn.IdentityVerified" value="true" required />
                     <span>Đã đối chiếu thông tin và xác minh danh tính người đến khám trực tiếp</span>
                 </label>
 
@@ -624,7 +624,7 @@
                     toast: true,
                     position: "top-end",
                     icon: "success",
-                    title: `Đã tìm thấy: ${p.fullName}`,
+                    titleText: `Đã tìm thấy: ${p.fullName}`,
                     text: "Đã tự động điền các thông tin có sẵn vào form.",
                     showConfirmButton: false,
                     timer: 3500
@@ -705,7 +705,7 @@
             bestCard.innerHTML = `
                 <div class="doc-info">
                     <strong>⭐ Tốt nhất hiện tại (Tự động chọn phòng chờ ít nhất)</strong>
-                    <span>Hệ thống phân luồng sang: <strong>${bestDoc.doctorName}</strong> (Phòng ${bestDoc.roomNumber} · <span class="badge bg-success-subtle text-success font-monospace">${bestDoc.shiftName || 'Ca trực'}: ${bestDoc.shiftTime || ''}</span>)</span>
+                    <span>Hệ thống phân luồng sang: <strong>${escapeHtml(bestDoc.doctorName)}</strong> (Phòng ${escapeHtml(bestDoc.roomNumber)} · <span class="badge bg-success-subtle text-success font-monospace">${escapeHtml(bestDoc.shiftName || 'Ca trực')}: ${escapeHtml(bestDoc.shiftTime || '')}</span>)</span>
                 </div>
                 <div class="doc-status-badges">
                     <span class="badge-tag best">Khuyến nghị</span>
@@ -742,13 +742,13 @@
             card.innerHTML = `
                 <div class="doc-info">
                     <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <strong>${doc.doctorName}</strong>
+                        <strong>${escapeHtml(doc.doctorName)}</strong>
                         <span class="badge ${doc.shiftName === 'Ca sáng' ? 'bg-primary-subtle text-primary border border-primary-subtle' : 'bg-warning-subtle text-dark border border-warning-subtle'}" style="font-size: 0.78rem;">
-                            ${doc.shiftName || 'Ca khám'}: ${doc.shiftTime || ''}
+                            ${escapeHtml(doc.shiftName || 'Ca khám')}: ${escapeHtml(doc.shiftTime || '')}
                         </span>
                         ${doc.isCurrentShift ? '<span class="badge bg-success text-white" style="font-size: 0.75rem;">Đang trực</span>' : ''}
                     </div>
-                    <span class="text-muted small">Phòng ${doc.roomNumber} · ${doc.specialty}</span>
+                    <span class="text-muted small">Phòng ${escapeHtml(doc.roomNumber)} · ${escapeHtml(doc.specialty)}</span>
                 </div>
                 <div class="doc-status-badges">
                     ${statusBadge}
@@ -823,7 +823,20 @@
                 document.getElementById("walkin-address").value = "";
                 document.getElementById("walkin-reason").value = "";
                 document.getElementById("walkin-patient-id").value = "";
-                document.getElementById("patient-lookup-status").innerHTML = "";
+                document.getElementById("patient-lookup-status").replaceChildren();
+
+                // Bỏ tích xác minh danh tính sau khi submit thành công
+                const chkVerified = document.getElementById("walkin-verified");
+                if (chkVerified) chkVerified.checked = false;
+
+                const gName = document.getElementById("walkin-guardian-name");
+                if (gName) gName.value = "";
+                const gPhone = document.getElementById("walkin-guardian-phone");
+                if (gPhone) gPhone.value = "";
+                const gCccd = document.getElementById("walkin-guardian-cccd");
+                if (gCccd) gCccd.value = "";
+                const gEmail = document.getElementById("walkin-guardian-email");
+                if (gEmail) gEmail.value = "";
 
                 // Tải lại bác sĩ để cập nhật số lượt chờ
                 const deptSelect = document.getElementById("walkin-department");
