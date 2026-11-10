@@ -302,6 +302,7 @@ public class ReceptionService : IReceptionService
                 patient.Address = address;
                 if (!string.IsNullOrWhiteSpace(request.Email))
                 {
+                    await ValidateEmailQuotaAsync(request.Email, existingPatientId, cancellationToken);
                     patient.Email = request.Email.Trim();
                 }
             }
@@ -321,11 +322,17 @@ public class ReceptionService : IReceptionService
                     patient.Address = address;
                     if (!string.IsNullOrWhiteSpace(request.Email))
                     {
+                        await ValidateEmailQuotaAsync(request.Email, duplicate.Id, cancellationToken);
                         patient.Email = request.Email.Trim();
                     }
                 }
                 else
                 {
+                    if (!string.IsNullOrWhiteSpace(request.Email))
+                    {
+                        await ValidateEmailQuotaAsync(request.Email, null, cancellationToken);
+                    }
+
                     // Quầy không còn tự sinh tài khoản đăng nhập: hồ sơ vãng lai chỉ là Patient,
                     // muốn liên kết tài khoản phải đi qua account_patient_profiles.
                     patient = new Patient
@@ -1417,9 +1424,32 @@ public class ReceptionService : IReceptionService
             );
             return Result.Success(fallbackTicket);
         }
+        catch (ArgumentException ex)
+        {
+            return Result.Failure<WalkInTicketDto>("VALIDATION_ERROR", ex.Message);
+        }
         catch (Exception ex)
         {
             return Result.Failure<WalkInTicketDto>("REGISTER_WALKIN_FAILED", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Kiểm tra giới hạn số lượng hồ sơ dùng chung 1 địa chỉ email.
+    /// </summary>
+    private async Task ValidateEmailQuotaAsync(string? email, int? excludePatientId, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return;
+        var normalized = email.Trim().ToLowerInvariant();
+        var query = _context.Patients.AsNoTracking().Where(p => p.Email != null && p.Email.ToLower() == normalized);
+        if (excludePatientId.HasValue && excludePatientId.Value > 0)
+        {
+            query = query.Where(p => p.Id != excludePatientId.Value);
+        }
+        int count = await query.CountAsync(ct);
+        if (count >= _options.MaxProfilesPerEmail)
+        {
+            throw new ArgumentException($"Email '{email.Trim()}' đã được dùng cho tối đa {_options.MaxProfilesPerEmail} hồ sơ bệnh nhân.");
         }
     }
 

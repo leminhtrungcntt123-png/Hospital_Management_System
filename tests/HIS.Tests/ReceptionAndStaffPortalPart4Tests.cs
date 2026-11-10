@@ -539,5 +539,59 @@ public class ReceptionAndStaffPortalPart4Tests
         Assert.NotNull(child);
         Assert.NotEqual(adultPatientId, child.Id);
     }
+
+    [Fact]
+    public async Task RegisterWalkInAsync_WhenEmailExceedsQuota_ReturnsValidationError()
+    {
+        var (context, _, reception, nurseAccountId, _, doc1Id, room1Id, scheduleId, _) = CreateHarness();
+
+        // Đã có 3 bệnh nhân dùng chung email shared@hospital.vn
+        for (int i = 1; i <= 3; i++)
+        {
+            context.Patients.Add(new Patient
+            {
+                FullName = $"Bệnh nhân cũ {i}",
+                DateOfBirth = new DateOnly(1990, 1, i),
+                Gender = Gender.Male,
+                PhoneNumber = $"091200000{i}",
+                Email = "shared@hospital.vn",
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+        await context.SaveChangesAsync();
+
+        var slot = new AppointmentSlot
+        {
+            DoctorId = doc1Id,
+            RoomId = room1Id,
+            StartTime = new DateTime(2026, 11, 9, 11, 0, 0),
+            EndTime = new DateTime(2026, 11, 9, 11, 15, 0),
+            Capacity = 2,
+            OnlineQuota = 1,
+            BookedCount = 0,
+            Status = SlotStatus.Available
+        };
+        context.AppointmentSlots.Add(slot);
+        await context.SaveChangesAsync();
+
+        var req = new WalkInReceptionRequest
+        {
+            ScheduleId = scheduleId,
+            IdentityVerified = true,
+            FullName = "Người khám thứ 4",
+            DateOfBirth = new DateOnly(1995, 5, 5),
+            Gender = Gender.Female,
+            PhoneNumber = "0944555666",
+            Email = "shared@hospital.vn",
+            Reason = "Đau họng",
+            PriorityLevel = 0
+        };
+
+        var result = await reception.RegisterWalkInAsync(nurseAccountId, req);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("VALIDATION_ERROR", result.Error.Code);
+        Assert.Contains("tối đa 3 hồ sơ", result.Error.Message);
+    }
 }
 

@@ -684,11 +684,8 @@
         const container = document.getElementById("doctor-choices-container");
         container.innerHTML = "";
 
-        // Tìm bác sĩ tối ưu: ưu tiên ca còn hiệu lực (!isShiftEnded), còn chỗ (!isFull) và ít lượt chờ nhất
-        let availableDocs = doctors.filter(d => !d.isFull && !d.isShiftEnded);
-        if (availableDocs.length === 0) {
-            availableDocs = doctors.filter(d => !d.isFull);
-        }
+        // Tìm bác sĩ tối ưu: chỉ chọn ca còn hiệu lực (!isShiftEnded), còn chỗ (!isFull) và ít lượt chờ nhất
+        const availableDocs = doctors.filter(d => !d.isFull && !d.isShiftEnded);
 
         let bestDoc = null;
         if (availableDocs.length > 0) {

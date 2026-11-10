@@ -934,15 +934,16 @@ public static class DbSeeder
                 await context.Database.MigrateAsync();
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            Console.WriteLine($"[SafeMigrateOrBaselineAsync] Lưu ý khi chạy migration tự động: {ex.Message}");
             try
             {
                 await BaselineMigrationsHistoryAsync(context);
             }
-            catch
+            catch (Exception retryEx)
             {
-                // Bỏ qua lỗi DDL nếu schema đã sẵn sàng
+                Console.WriteLine($"[SafeMigrateOrBaselineAsync] Baseline retry error: {retryEx.Message}");
             }
         }
     }
