@@ -236,10 +236,10 @@ if (app.Environment.IsDevelopment())
         logger?.LogWarning(ex, "Không thể tự động nạp dữ liệu mẫu (DbSeeder): {Message}", ex.Message);
     }
 
-    // Endpoint dev để làm mới dữ liệu test: Chỉ cho phép gọi bằng POST từ localhost/loopback kèm token xác nhận chống CSRF
+    // Endpoint dev để làm mới dữ liệu test: Chỉ cho phép gọi bằng POST từ localhost/loopback kèm header xác nhận chống CSRF
     app.MapGet("/dev/seed-fresh", () => Results.Ok(new
     {
-        message = "Để làm mới CSDL, hãy gửi request POST tới /dev/seed-fresh?confirm=reset-dev-data từ localhost."
+        message = "Để làm mới CSDL, hãy gửi request POST tới /dev/seed-fresh từ localhost kèm header 'X-Confirm-Reset: reset-dev-data'."
     }));
 
     app.MapPost("/dev/seed-fresh", async (HttpContext httpContext, IServiceProvider sp) =>
@@ -250,13 +250,14 @@ if (app.Environment.IsDevelopment())
             return Results.StatusCode(StatusCodes.Status403Forbidden);
         }
 
-        var confirm = httpContext.Request.Query["confirm"].ToString();
-        if (confirm != "reset-dev-data")
+        // Chống CSRF từ cross-site POST: Chỉ chấp nhận request có custom header 'X-Confirm-Reset: reset-dev-data'
+        var confirmHeader = httpContext.Request.Headers["X-Confirm-Reset"].ToString();
+        if (confirmHeader != "reset-dev-data")
         {
             return Results.BadRequest(new
             {
                 success = false,
-                message = "Hành động nguy hiểm. Vui lòng truyền tham số xác nhận: /dev/seed-fresh?confirm=reset-dev-data"
+                message = "Hành động nguy hiểm. Yêu cầu truyền header xác nhận chống CSRF: 'X-Confirm-Reset: reset-dev-data'."
             });
         }
 

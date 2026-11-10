@@ -582,6 +582,7 @@ public class ReceptionAndStaffPortalPart4Tests
             DateOfBirth = new DateOnly(1995, 5, 5),
             Gender = Gender.Female,
             PhoneNumber = "0944555666",
+            NationalId = "001195000004",
             Email = "shared@hospital.vn",
             Reason = "Đau họng",
             PriorityLevel = 0
@@ -662,6 +663,138 @@ public class ReceptionAndStaffPortalPart4Tests
         Assert.False(result.IsSuccess);
         Assert.Equal("VALIDATION_ERROR", result.Error.Code);
         Assert.Contains("đã được liên kết với một bệnh nhân khác", result.Error.Message);
+    }
+
+    [Fact]
+    public async Task RegisterWalkInAsync_WithoutNationalIdForAdult_ReturnsValidationError()
+    {
+        var (context, _, reception, nurseAccountId, _, doc1Id, room1Id, scheduleId, _) = CreateHarness();
+
+        var req = new WalkInReceptionRequest
+        {
+            ScheduleId = scheduleId,
+            IdentityVerified = true,
+            FullName = "Người Lớn Không CCCD",
+            DateOfBirth = new DateOnly(1990, 1, 1),
+            Gender = Gender.Male,
+            PhoneNumber = "0988112233",
+            NationalId = null, // Thiếu CCCD cho người lớn
+            Reason = "Đau lưng",
+            PriorityLevel = 0
+        };
+
+        var result = await reception.RegisterWalkInAsync(nurseAccountId, req);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("INVALID_NATIONAL_ID", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task RegisterWalkInAsync_ScheduleWrongDay_ReturnsInvalidSchedule()
+    {
+        var (context, _, reception, nurseAccountId, _, doc1Id, room1Id, _, _) = CreateHarness();
+
+        // Harness có clock là Thứ 2 (2026-11-09). Tạo lịch khám cho ngày Chủ Nhật (Sunday)
+        var sundaySchedule = new DoctorSchedule
+        {
+            DoctorId = doc1Id,
+            RoomId = room1Id,
+            DayOfWeek = DayOfWeek.Sunday,
+            Shift = ExamShift.Morning,
+            StartTime = new TimeOnly(7, 30),
+            EndTime = new TimeOnly(11, 30),
+            EffectiveFrom = new DateOnly(2026, 1, 1),
+            IsActive = true
+        };
+        context.DoctorSchedules.Add(sundaySchedule);
+        await context.SaveChangesAsync();
+
+        var req = new WalkInReceptionRequest
+        {
+            ScheduleId = sundaySchedule.Id,
+            IdentityVerified = true,
+            FullName = "Bệnh Nhân Thử Lịch Sai Ngày",
+            DateOfBirth = new DateOnly(1990, 1, 1),
+            Gender = Gender.Male,
+            PhoneNumber = "0988112233",
+            NationalId = "001190001122",
+            Reason = "Khám",
+            PriorityLevel = 0
+        };
+
+        var result = await reception.RegisterWalkInAsync(nurseAccountId, req);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("INVALID_SCHEDULE", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task UpsertInsuranceCardAsync_WithNewCardNumber_DeactivatesOldCardAndCreatesNewOne()
+    {
+        var (context, _, reception, nurseAccountId, _, doc1Id, room1Id, scheduleId, existingPatientId) = CreateHarness();
+
+        var plan = new InsurancePlan { Name = "BHYT Chuẩn", CoveragePct = 80m };
+        context.InsurancePlans.Add(plan);
+        await context.SaveChangesAsync();
+
+        // Bệnh nhân đã có 1 thẻ BHYT cũ đang active
+        var oldCard = new InsuranceCard
+        {
+            PatientId = existingPatientId,
+            InsurancePlanId = plan.Id,
+            CardNumber = "OLD1234567890",
+            ValidFrom = new DateOnly(2024, 1, 1),
+            ValidTo = new DateOnly(2024, 12, 31),
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
+        context.InsuranceCards.Add(oldCard);
+        await context.SaveChangesAsync();
+
+        var slot = new AppointmentSlot
+        {
+            DoctorId = doc1Id,
+            RoomId = room1Id,
+            StartTime = new DateTime(2026, 11, 9, 11, 0, 0),
+            EndTime = new DateTime(2026, 11, 9, 11, 15, 0),
+            Capacity = 2,
+            OnlineQuota = 1,
+            BookedCount = 0,
+            Status = SlotStatus.Available
+        };
+        context.AppointmentSlots.Add(slot);
+        await context.SaveChangesAsync();
+
+        // Đăng ký với thẻ mới
+        var req = new WalkInReceptionRequest
+        {
+            PatientId = existingPatientId,
+            ScheduleId = scheduleId,
+            IdentityVerified = true,
+            FullName = "Nguyễn Văn Hùng", // Khớp đúng với patient trong harness
+            DateOfBirth = new DateOnly(1990, 3, 15),
+            Gender = Gender.Male,
+            PhoneNumber = "0912345678",
+            NationalId = "001090012345",
+            InsuranceCardNumber = "NEW9876543210",
+            Reason = "Khám định kỳ",
+            PriorityLevel = 0
+        };
+
+        var result = await reception.RegisterWalkInAsync(nurseAccountId, req);
+
+        Assert.True(result.IsSuccess);
+
+        // Kiểm tra thẻ cũ đã bị tắt active, thẻ mới được tạo riêng biệt
+        var cards = await context.InsuranceCards.Where(c => c.PatientId == existingPatientId).ToListAsync();
+        Assert.Equal(2, cards.Count);
+
+        var updatedOldCard = cards.First(c => c.CardNumber == "OLD1234567890");
+        Assert.False(updatedOldCard.IsActive);
+
+        var newCard = cards.First(c => c.CardNumber == "NEW9876543210");
+        Assert.True(newCard.IsActive);
+        Assert.Equal(new DateOnly(2026, 1, 1), newCard.ValidFrom);
     }
 }
 

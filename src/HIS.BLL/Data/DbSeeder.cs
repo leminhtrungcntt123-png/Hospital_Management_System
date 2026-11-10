@@ -32,46 +32,80 @@ public static class DbSeeder
                 await SafeMigrateOrBaselineAsync(context);
             }
 
-            // 2. Nếu không yêu cầu dọn sạch, kiểm tra xem đã có dữ liệu nền chưa
+            // 2. Nếu không yêu cầu dọn sạch, kiểm tra xem đã có dữ liệu nền đầy đủ chưa
             if (!forceFresh)
             {
-                var hasAdmin = await context.Accounts.AnyAsync(a => a.Username == "admin");
-                if (hasAdmin)
+                var isFullySeeded = await context.Accounts.AnyAsync(a => a.Username == "admin")
+                    && await context.AppointmentSlots.AnyAsync()
+                    && await context.Appointments.AnyAsync();
+
+                if (isFullySeeded)
                 {
                     await EnsureTodaySlotsAndSchedulesAsync(context);
                     return;
                 }
             }
 
-            // 3. Nếu forceFresh: dọn dẹp dữ liệu động cũ
-            if (forceFresh)
+            // 3. Nếu trên relational DB (PostgreSQL), bọc toàn bộ chu kỳ seed/reset trong một Transaction
+            // để đảm bảo tính nguyên tử (atomic): nếu có lỗi giữa chừng, CSDL sẽ rollback sạch sẽ.
+            Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction = null;
+            if (context.Database.IsRelational())
             {
-                await ClearDynamicDataAsync(context);
+                transaction = await context.Database.BeginTransactionAsync();
             }
 
-            // 4. Master Data
-            await SeedRolesAsync(context);
-            await SeedAppointmentStatusesAsync(context);
-            await SeedDepartmentsAndRoomsAsync(context);
-            await SeedInsurancePlansAsync(context);
-            await SeedServicesAsync(context);
-            await SeedMedicationsAsync(context);
+            try
+            {
+                // Nếu forceFresh: dọn dẹp dữ liệu động cũ
+                if (forceFresh)
+                {
+                    await ClearDynamicDataAsync(context);
+                }
 
-            // 5. Nhân sự & Tài khoản
-            var passwordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword, workFactor: 10);
-            await SeedStaffAndDoctorsAsync(context, passwordHash);
+                // 4. Master Data
+                await SeedRolesAsync(context);
+                await SeedAppointmentStatusesAsync(context);
+                await SeedDepartmentsAndRoomsAsync(context);
+                await SeedInsurancePlansAsync(context);
+                await SeedServicesAsync(context);
+                await SeedMedicationsAsync(context);
 
-            // 6. Bệnh nhân mẫu (Người lớn, Trẻ em, Người già, Thẻ BHYT)
-            await SeedPatientsAsync(context, passwordHash);
+                // 5. Nhân sự & Tài khoản
+                var passwordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword, workFactor: 10);
+                await SeedStaffAndDoctorsAsync(context, passwordHash);
 
-            // 7. Lịch trực Bác sĩ (Tất cả 7 ngày trong tuần)
-            await SeedDoctorSchedulesAsync(context);
+                // 6. Bệnh nhân mẫu (Người lớn, Trẻ em, Người già, Thẻ BHYT)
+                await SeedPatientsAsync(context, passwordHash);
 
-            // 8. Khung giờ khám (Slots) cho Hôm nay và 3 ngày tới
-            await SeedAppointmentSlotsAsync(context);
+                // 7. Lịch trực Bác sĩ (Tất cả 7 ngày trong tuần)
+                await SeedDoctorSchedulesAsync(context);
 
-            // 9. Lượt khám mẫu phong phú mô phỏng bệnh viện đang hoạt động
-            await SeedSampleAppointmentsAsync(context);
+                // 8. Khung giờ khám (Slots) cho Hôm nay và 3 ngày tới
+                await SeedAppointmentSlotsAsync(context);
+
+                // 9. Lượt khám mẫu phong phú mô phỏng bệnh viện đang hoạt động
+                await SeedSampleAppointmentsAsync(context);
+
+                if (transaction != null)
+                {
+                    await transaction.CommitAsync();
+                }
+            }
+            catch
+            {
+                if (transaction != null)
+                {
+                    await transaction.RollbackAsync();
+                }
+                throw;
+            }
+            finally
+            {
+                if (transaction != null)
+                {
+                    await transaction.DisposeAsync();
+                }
+            }
         }
         finally
         {

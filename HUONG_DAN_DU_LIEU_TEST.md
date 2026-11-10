@@ -106,9 +106,15 @@ Khi bạn mở trang Tiếp đón (`/Staff/Reception`):
 ## 7. Cách làm mới (Reset) lại toàn bộ dữ liệu test
 
 Nếu trong lúc test dữ liệu bị rối và bạn muốn đưa toàn bộ database về lại trạng thái chuẩn ban đầu của nhóm:
-* **Cách 1 (Nhanh nhất qua trình duyệt):** Mở trình duyệt và truy cập:
-  `https://localhost:7024/dev/seed-fresh` (hoặc `http://localhost:5044/dev/seed-fresh`)
-* **Cách 2 (Qua dòng lệnh):** Chạy ứng dụng với cờ `--seed-fresh`:
+* **Cách 1 (Qua PowerShell / cURL trên máy dev):**
+  ```powershell
+  Invoke-RestMethod -Uri "https://localhost:7024/dev/seed-fresh" -Method Post -Headers @{"X-Confirm-Reset"="reset-dev-data"} -SkipCertificateCheck
+  ```
+  hoặc với cURL:
+  ```bash
+  curl -k -X POST "https://localhost:7024/dev/seed-fresh" -H "X-Confirm-Reset: reset-dev-data"
+  ```
+* **Cách 2 (Khởi động với cờ lệnh):**
   ```bash
   dotnet run --project src/HIS.Web -- --seed-fresh
   ```

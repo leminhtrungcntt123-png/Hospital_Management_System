@@ -984,21 +984,32 @@ public class ReceptionService : IReceptionService
             throw new ArgumentException($"Thẻ BHYT '{normalizedCard}' đã được liên kết với một bệnh nhân khác trong hệ thống.");
         }
 
-        // 2. Tìm thẻ của chính bệnh nhân này
-        var patientCard = cardByNumber ?? await _context.InsuranceCards
-            .FirstOrDefaultAsync(c => c.PatientId == patient.Id, cancellationToken);
-
-        if (patientCard != null)
+        // 2. Nếu chính bệnh nhân này đã có thẻ với số này, kích hoạt lại thẻ
+        if (cardByNumber != null)
         {
-            patientCard.CardNumber = normalizedCard;
-            patientCard.Patient = patient;
-            patientCard.IsActive = true;
+            cardByNumber.IsActive = true;
             return;
+        }
+
+        // 3. Nếu số thẻ mới hoàn toàn, tắt các thẻ cũ của bệnh nhân (không ghi đè số lên thẻ cũ để bảo toàn lịch sử và quyền lợi bảo hiểm)
+        var oldActiveCards = await _context.InsuranceCards
+            .Where(c => c.PatientId == patient.Id && c.IsActive)
+            .ToListAsync(cancellationToken);
+
+        foreach (var old in oldActiveCards)
+        {
+            old.IsActive = false;
         }
 
         int? defaultPlanId = await _context.InsurancePlans
             .AsNoTracking()
             .Where(p => p.ReferralType == ReferralType.InNetwork)
+            .OrderBy(p => p.Id)
+            .Select(p => (int?)p.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        defaultPlanId ??= await _context.InsurancePlans
+            .AsNoTracking()
             .OrderBy(p => p.Id)
             .Select(p => (int?)p.Id)
             .FirstOrDefaultAsync(cancellationToken);
@@ -1335,6 +1346,8 @@ public class ReceptionService : IReceptionService
         var schedule = await _context.DoctorSchedules
             .Include(s => s.Doctor)
                 .ThenInclude(d => d.Department)
+            .Include(s => s.Doctor)
+                .ThenInclude(d => d.Account)
             .Include(s => s.Room)
             .FirstOrDefaultAsync(s => s.Id == request.ScheduleId && s.IsActive, ct);
 
@@ -1349,9 +1362,19 @@ public class ReceptionService : IReceptionService
             return Result.Failure<WalkInTicketDto>("INVALID_DEPARTMENT", "Bác sĩ hoặc phòng khám được chọn không thuộc chuyên khoa đã chọn.");
         }
 
+        // Kiểm tra lịch khám có hiệu lực cho ngày hôm nay hay không (tránh cache cũ qua nửa đêm)
+        var today = DateOnly.FromDateTime(Now);
+        if (schedule.DayOfWeek != Now.DayOfWeek ||
+            schedule.EffectiveFrom > today ||
+            (schedule.EffectiveTo.HasValue && schedule.EffectiveTo.Value < today) ||
+            (schedule.Doctor.Account != null && !schedule.Doctor.Account.IsActive))
+        {
+            return Result.Failure<WalkInTicketDto>("INVALID_SCHEDULE", "Lịch trực này không áp dụng cho ngày hôm nay hoặc bác sĩ tạm ngưng tiếp nhận.");
+        }
+
         // Kiểm tra ca khám đã kết thúc hôm nay chưa
         var currentTime = TimeOnly.FromDateTime(Now);
-        if (schedule.DayOfWeek == Now.DayOfWeek && currentTime > schedule.EndTime)
+        if (currentTime > schedule.EndTime)
         {
             return Result.Failure<WalkInTicketDto>("SHIFT_ENDED", "Ca khám của bác sĩ đã kết thúc hôm nay. Vui lòng chọn ca trực tiếp theo.");
         }
@@ -1403,6 +1426,15 @@ public class ReceptionService : IReceptionService
             phone = request.GuardianPhone.Trim();
         }
 
+        var resolvedNationalId = isChild && string.IsNullOrWhiteSpace(request.NationalId)
+            ? null
+            : (request.NationalId?.Trim() ?? patient?.NationalId);
+
+        if (!isChild && string.IsNullOrWhiteSpace(resolvedNationalId))
+        {
+            return Result.Failure<WalkInTicketDto>("INVALID_NATIONAL_ID", "Vui lòng nhập số CCCD/Định danh cho bệnh nhân người lớn.");
+        }
+
         var createReq = new CreateReceptionRequest
         {
             PatientId = resolvedPatientId,
@@ -1410,7 +1442,7 @@ public class ReceptionService : IReceptionService
             DateOfBirth = birthDate,
             Gender = gender,
             PhoneNumber = phone,
-            NationalId = isChild && string.IsNullOrWhiteSpace(request.NationalId) ? null : (request.NationalId?.Trim() ?? patient?.NationalId),
+            NationalId = resolvedNationalId,
             Email = request.Email?.Trim() ?? patient?.Email,
             Address = request.Address?.Trim() ?? patient?.Address,
             InsuranceCardNumber = request.InsuranceCardNumber?.Trim(),
