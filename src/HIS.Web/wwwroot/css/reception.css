@@ -576,26 +576,47 @@
 }
 
 /* Thermal Print Stylesheet (Khổ K80: 80mm) */
-@@media print {
-    body * {
-        visibility: hidden !important;
+@media print {
+    html, body {
+        background: #fff !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
-    #thermal-ticket-print, #thermal-ticket-print * {
-        visibility: visible !important;
+    .staff-app,
+    .sidebar,
+    .reception-desk,
+    .ticket-modal-overlay,
+    .reception-tabs-nav,
+    .reception-header,
+    nav,
+    header,
+    footer,
+    aside {
+        display: none !important;
     }
+
     #thermal-ticket-print {
         display: block !important;
-        position: fixed;
-        left: 0;
-        top: 0;
-        width: 72mm;
-        margin: 0;
-        padding: 5mm;
-        background: #fff;
-        color: #000;
-        font-family: 'Courier New', Courier, monospace, sans-serif;
-        text-align: center;
+        visibility: visible !important;
+        position: static !important;
+        width: 76mm !important;
+        margin: 0 auto !important;
+        padding: 4mm !important;
+        background: #fff !important;
+        color: #000 !important;
+        font-family: 'Courier New', Courier, monospace, sans-serif !important;
+        text-align: center !important;
     }
+
+    #thermal-ticket-print * {
+        visibility: visible !important;
+    }
+
+    @page {
+        size: 80mm auto;
+        margin: 0;
+    }
+}
     #thermal-ticket-print .print-title {
         font-size: 16px;
         font-weight: bold;

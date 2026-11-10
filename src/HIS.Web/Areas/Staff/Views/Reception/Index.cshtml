@@ -473,10 +473,24 @@
         sessionStorage.setItem("active_reception_tab", tabId);
     }
 
+    function escapeHtml(str) {
+        if (!str) return "";
+        const div = document.createElement("div");
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
     // Chuyển đổi giữa Người lớn vs Trẻ em
     function switchPatientType(isChild) {
         isChildMode = isChild;
         document.getElementById("walkin-is-child").value = isChild ? "true" : "false";
+
+        // Luôn làm sạch patient-id và trạng thái tra cứu cũ để tránh ghi đè nhầm hồ sơ
+        document.getElementById("walkin-patient-id").value = "";
+        document.getElementById("patient-lookup-status").replaceChildren();
+        document.getElementById("walkin-fullname").value = "";
+        document.getElementById("walkin-dob").value = "";
+        document.getElementById("walkin-national-id").value = "";
 
         const adultCard = document.getElementById("card-type-adult");
         const childCard = document.getElementById("card-type-child");
@@ -541,6 +555,17 @@
         }
     }
 
+    // Lắng nghe thay đổi ô CCCD: xóa patient-id nếu người dùng sửa đổi
+    document.addEventListener("DOMContentLoaded", function () {
+        const cccdEl = document.getElementById("walkin-national-id");
+        if (cccdEl) {
+            cccdEl.addEventListener("input", function () {
+                document.getElementById("walkin-patient-id").value = "";
+                document.getElementById("patient-lookup-status").replaceChildren();
+            });
+        }
+    });
+
     // Đồng bộ email phụ huynh vào ô email chính để submit form
     function syncGuardianEmail(val) {
         const adultEmailInput = document.getElementById("walkin-email");
@@ -549,7 +574,7 @@
         }
     }
 
-    // Tra cứu CCCD với SweetAlert2
+    // Tra cứu CCCD với SweetAlert2 (xử lý DOM an toàn, chống XSS)
     async function lookupPatientCccd() {
         const cccdInput = document.getElementById("walkin-national-id");
         const cccd = cccdInput.value.trim();
@@ -565,7 +590,10 @@
             return;
         }
 
-        statusDiv.innerHTML = '<span class="text-muted"><small>Đang tra cứu dữ liệu...</small></span>';
+        const loadingSpan = document.createElement("span");
+        loadingSpan.className = "text-muted";
+        loadingSpan.innerHTML = "<small>Đang tra cứu dữ liệu...</small>";
+        statusDiv.replaceChildren(loadingSpan);
 
         try {
             const resp = await fetch(`/Staff/Reception/FindPatientByCccd?cccd=${encodeURIComponent(cccd)}`);
@@ -586,7 +614,11 @@
                 if (p.address) document.getElementById("walkin-address").value = p.address;
                 if (p.insuranceCardNumber) document.getElementById("walkin-insurance").value = p.insuranceCardNumber;
 
-                statusDiv.innerHTML = `<div class="patient-found-badge">✓ Đã tìm thấy hồ sơ: ${p.fullName} (#${p.id})</div>`;
+                // An toàn tuyệt đối chống XSS với textContent
+                const badge = document.createElement("div");
+                badge.className = "patient-found-badge";
+                badge.textContent = `✓ Đã tìm thấy hồ sơ: ${p.fullName} (#${p.id})`;
+                statusDiv.replaceChildren(badge);
 
                 Swal.fire({
                     toast: true,
@@ -599,7 +631,10 @@
                 });
             } else {
                 document.getElementById("walkin-patient-id").value = "";
-                statusDiv.innerHTML = '<span class="text-muted"><small>Số CCCD mới, chưa từng khám tại bệnh viện.</small></span>';
+                const notFoundSpan = document.createElement("span");
+                notFoundSpan.className = "text-muted";
+                notFoundSpan.innerHTML = "<small>Số CCCD mới, chưa từng khám tại bệnh viện.</small>";
+                statusDiv.replaceChildren(notFoundSpan);
 
                 Swal.fire({
                     icon: "info",
@@ -610,7 +645,7 @@
                 });
             }
         } catch (err) {
-            statusDiv.innerHTML = "";
+            statusDiv.replaceChildren();
             console.error(err);
             Swal.fire({
                 icon: "error",

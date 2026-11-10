@@ -82,7 +82,18 @@ public class DataSeederTests
 
         // Verify Sample Appointments
         var appointments = await context.Appointments.ToListAsync();
-        Assert.NotEmpty(appointments);
+        Assert.Equal(32, appointments.Count);
         Assert.Contains(appointments, a => a.QueueNumber == "A001");
+        Assert.Contains(appointments, a => a.QueueNumber == "A017");
+
+        // Verify that multiple rooms in the department are distributed
+        var doctors = await context.Doctors.Include(d => d.Department).ToListAsync();
+        var internalDocs = doctors.Where(d => d.Department.Name == "Khoa Nội tổng hợp").ToList();
+        if (internalDocs.Count > 1)
+        {
+            var internalDocIds = internalDocs.Select(d => d.Id).ToList();
+            var distinctRooms = schedules.Where(s => internalDocIds.Contains(s.DoctorId)).Select(s => s.RoomId).Distinct().Count();
+            Assert.True(distinctRooms > 1, "Các bác sĩ cùng khoa phải được phân bổ các phòng khám khác nhau");
+        }
     }
 }

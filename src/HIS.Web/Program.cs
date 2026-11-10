@@ -236,9 +236,15 @@ if (app.Environment.IsDevelopment())
         logger?.LogWarning(ex, "Không thể tự động nạp dữ liệu mẫu (DbSeeder): {Message}", ex.Message);
     }
 
-    // Endpoint dev để làm mới dữ liệu test bất cứ lúc nào qua trình duyệt: /dev/seed-fresh
-    app.MapGet("/dev/seed-fresh", async (IServiceProvider sp) =>
+    // Endpoint dev để làm mới dữ liệu test: Chỉ cho phép gọi từ localhost/loopback trong môi trường Development
+    var handleSeedFresh = async (HttpContext httpContext, IServiceProvider sp) =>
     {
+        var remoteIp = httpContext.Connection.RemoteIpAddress;
+        if (remoteIp != null && !System.Net.IPAddress.IsLoopback(remoteIp))
+        {
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
+        }
+
         using var scope = sp.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await HIS.BLL.Data.DbSeeder.SeedAsync(db, forceFresh: true);
@@ -258,7 +264,10 @@ if (app.Environment.IsDevelopment())
                 new { username = "patient02", role = "PATIENT", name = "Bệnh nhân mẫu (Trần Thu Hà & Bé Trần Bảo Nam)" }
             }
         });
-    });
+    };
+
+    app.MapGet("/dev/seed-fresh", handleSeedFresh);
+    app.MapPost("/dev/seed-fresh", handleSeedFresh);
 }
 
 // Trang mặc định: trang bắt đầu đặt lịch

@@ -66,9 +66,9 @@ public interface IReceptionService
     // --- Web Quầy Tiếp Nhận (Reception Desk) ---
     Task<Result<ReceptionDesk>> GetDeskAsync(int staffAccountId, string? search, CancellationToken ct = default);
     Task<Result<string>> CheckInAsync(int staffAccountId, int appointmentId, bool identityVerified, CancellationToken ct = default);
-    Task<Result<string>> RegisterWalkInAsync(int staffAccountId, WalkInReceptionRequest request, CancellationToken ct = default);
+    Task<Result<WalkInTicketDto>> RegisterWalkInAsync(int staffAccountId, WalkInReceptionRequest request, CancellationToken ct = default);
     Task<Result<PatientSearchResultDto?>> FindPatientByNationalIdAsync(string nationalId, CancellationToken ct = default);
     Task<Result<IReadOnlyList<PatientSearchResultDto>>> SearchPatientsAsync(string keyword, CancellationToken ct = default);
     Task<Result<IReadOnlyList<DepartmentDoctorScheduleDto>>> GetDepartmentSchedulesWithLoadAsync(int departmentId, DateOnly? date = null, CancellationToken ct = default);
-    Task<Result<WalkInTicketDto?>> GetWalkInTicketAsync(string queueNumber, int? appointmentId = null, CancellationToken ct = default);
+    Task<Result<WalkInTicketDto?>> GetWalkInTicketAsync(string? queueNumber = null, int? appointmentId = null, CancellationToken ct = default);
 }

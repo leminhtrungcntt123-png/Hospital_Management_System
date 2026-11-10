@@ -17,57 +17,66 @@ namespace HIS.BLL.Data;
 public static class DbSeeder
 {
     public const string DefaultPassword = "Demo@123";
+    private static readonly SemaphoreSlim _seedLock = new(1, 1);
 
     private static DateTime GetNow() => DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified);
 
     public static async Task SeedAsync(AppDbContext context, bool forceFresh = false)
     {
-        // 1. Áp dụng Migration hoặc Baseline an toàn (tránh lỗi xung đột cột đã có sẵn)
-        if (context.Database.IsRelational())
+        await _seedLock.WaitAsync();
+        try
         {
-            await SafeMigrateOrBaselineAsync(context);
-        }
-
-        // 2. Nếu không yêu cầu dọn sạch, kiểm tra xem đã có dữ liệu nền chưa
-        if (!forceFresh)
-        {
-            var hasAdmin = await context.Accounts.AnyAsync(a => a.Username == "admin");
-            if (hasAdmin)
+            // 1. Áp dụng Migration hoặc Baseline an toàn (tránh lỗi xung đột cột đã có sẵn)
+            if (context.Database.IsRelational())
             {
-                await EnsureTodaySlotsAndSchedulesAsync(context);
-                return;
+                await SafeMigrateOrBaselineAsync(context);
             }
-        }
 
-        // 3. Nếu forceFresh: dọn dẹp dữ liệu động cũ
-        if (forceFresh)
+            // 2. Nếu không yêu cầu dọn sạch, kiểm tra xem đã có dữ liệu nền chưa
+            if (!forceFresh)
+            {
+                var hasAdmin = await context.Accounts.AnyAsync(a => a.Username == "admin");
+                if (hasAdmin)
+                {
+                    await EnsureTodaySlotsAndSchedulesAsync(context);
+                    return;
+                }
+            }
+
+            // 3. Nếu forceFresh: dọn dẹp dữ liệu động cũ
+            if (forceFresh)
+            {
+                await ClearDynamicDataAsync(context);
+            }
+
+            // 4. Master Data
+            await SeedRolesAsync(context);
+            await SeedAppointmentStatusesAsync(context);
+            await SeedDepartmentsAndRoomsAsync(context);
+            await SeedInsurancePlansAsync(context);
+            await SeedServicesAsync(context);
+            await SeedMedicationsAsync(context);
+
+            // 5. Nhân sự & Tài khoản
+            var passwordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword, workFactor: 10);
+            await SeedStaffAndDoctorsAsync(context, passwordHash);
+
+            // 6. Bệnh nhân mẫu (Người lớn, Trẻ em, Người già, Thẻ BHYT)
+            await SeedPatientsAsync(context, passwordHash);
+
+            // 7. Lịch trực Bác sĩ (Tất cả 7 ngày trong tuần)
+            await SeedDoctorSchedulesAsync(context);
+
+            // 8. Khung giờ khám (Slots) cho Hôm nay và 3 ngày tới
+            await SeedAppointmentSlotsAsync(context);
+
+            // 9. Lượt khám mẫu phong phú mô phỏng bệnh viện đang hoạt động
+            await SeedSampleAppointmentsAsync(context);
+        }
+        finally
         {
-            await ClearDynamicDataAsync(context);
+            _seedLock.Release();
         }
-
-        // 4. Master Data
-        await SeedRolesAsync(context);
-        await SeedAppointmentStatusesAsync(context);
-        await SeedDepartmentsAndRoomsAsync(context);
-        await SeedInsurancePlansAsync(context);
-        await SeedServicesAsync(context);
-        await SeedMedicationsAsync(context);
-
-        // 5. Nhân sự & Tài khoản
-        var passwordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword, workFactor: 10);
-        await SeedStaffAndDoctorsAsync(context, passwordHash);
-
-        // 6. Bệnh nhân mẫu (Người lớn, Trẻ em, Người già, Thẻ BHYT)
-        await SeedPatientsAsync(context, passwordHash);
-
-        // 7. Lịch trực Bác sĩ (Tất cả 7 ngày trong tuần)
-        await SeedDoctorSchedulesAsync(context);
-
-        // 8. Khung giờ khám (Slots) cho Hôm nay và 3 ngày tới
-        await SeedAppointmentSlotsAsync(context);
-
-        // 9. Lượt khám mẫu phong phú mô phỏng bệnh viện đang hoạt động
-        await SeedSampleAppointmentsAsync(context);
     }
 
     private static async Task ClearDynamicDataAsync(AppDbContext context)
@@ -564,6 +573,9 @@ public static class DbSeeder
             ("Lâm Thanh Trúc",   new DateOnly(1997, 3, 7),  Gender.Female, "001197019012", "0968222111", "truc.lam@gmail.com",    "9 Ung Văn Khiêm, Bình Thạnh",            "DN4010190123457", (int?)null, PatientRelationship.Other),
             ("Trần Quốc Cường",  new DateOnly(1981, 5, 12), Gender.Male,   "001181022345", "0944777888", "cuong.tran@gmail.com",  "19 Bạch Đằng, Tân Bình",                 "DN4010223456780", (int?)null, PatientRelationship.Other),
             ("Nguyễn Hải Yến",   new DateOnly(2003, 10, 22),Gender.Female, "001203023456", "0909888777", "yen.nguyen@gmail.com",  "74 Phạm Văn Đồng, TP. Thủ Đức",          "HS4010234567891", (int?)null, PatientRelationship.Other),
+            ("Lê Thu Trang",     new DateOnly(1978, 8, 14), Gender.Female, "001178001234", "0908112233", "trang.le@gmail.com",    "15 Pasteur, Quận 1",                     "DN4010780012345", (int?)null, PatientRelationship.Other),
+            ("Hoàng Minh Trí",   new DateOnly(1970, 5, 20), Gender.Male,   "001170012345", "0918334455", "tri.hoang@gmail.com",   "28 Lê Duẩn, Quận 1",                     "DN4010700123456", (int?)null, PatientRelationship.Other),
+            ("Phạm Quốc Bảo",    new DateOnly(2001, 12, 5), Gender.Male,   "001218006789", "0938556677", "bao.pham@gmail.com",    "42 Nguyễn Đình Chiểu, Quận 3",           "HS4010218006789", (int?)null, PatientRelationship.Other),
 
             // [Trẻ em khác < 15 tuổi]
             ("Phạm Ngọc Lan",    new DateOnly(2018, 6, 17), Gender.Female, (string?)null,  "0938111222", "lan.pham.mom@gmail.com","23 Võ Văn Tần, Quận 3",                  "TE4010067890456", (int?)null, PatientRelationship.Child),
@@ -628,6 +640,16 @@ public static class DbSeeder
         await context.SaveChangesAsync();
     }
 
+    private static ClinicRoom GetRoomForDoctor(Doctor doc, List<ClinicRoom> rooms, List<Doctor> allDoctors)
+    {
+        var deptRooms = rooms.Where(r => r.DepartmentId == doc.DepartmentId).OrderBy(r => r.RoomNumber).ToList();
+        if (deptRooms.Count == 0) return rooms.First();
+        var docsInDept = allDoctors.Where(d => d.DepartmentId == doc.DepartmentId).OrderBy(d => d.Id).ToList();
+        int docIndex = docsInDept.FindIndex(d => d.Id == doc.Id);
+        if (docIndex < 0) docIndex = 0;
+        return deptRooms[docIndex % deptRooms.Count];
+    }
+
     private static async Task SeedDoctorSchedulesAsync(AppDbContext context)
     {
         var doctors = await context.Doctors.Include(d => d.Department).ToListAsync();
@@ -638,7 +660,7 @@ public static class DbSeeder
 
         foreach (var doc in doctors)
         {
-            var room = rooms.FirstOrDefault(r => r.DepartmentId == doc.DepartmentId) ?? rooms.First();
+            var room = GetRoomForDoctor(doc, rooms, doctors);
 
             for (int dow = 0; dow <= 6; dow++)
             {
@@ -706,7 +728,7 @@ public static class DbSeeder
 
             foreach (var doc in doctors)
             {
-                var room = rooms.FirstOrDefault(r => r.DepartmentId == doc.DepartmentId) ?? rooms.First();
+                var room = GetRoomForDoctor(doc, rooms, doctors);
 
                 foreach (var st in slotTimes)
                 {
@@ -813,7 +835,11 @@ public static class DbSeeder
             // Tìm bác sĩ theo giấy phép
             var doc = doctors.FirstOrDefault(d => d.LicenseNumber == item.Item3);
 
-            if (patient == null || doc == null) continue;
+            if (patient == null || doc == null)
+            {
+                Console.WriteLine($"[WARN DbSeeder] Bỏ qua lịch khám mẫu {apptCode}: không tìm thấy bệnh nhân ({item.Item2}) hoặc bác sĩ ({item.Item3})");
+                continue;
+            }
 
             // Tìm slot tương ứng trong ngày
             var slot = await context.AppointmentSlots.FirstOrDefaultAsync(s =>
@@ -932,34 +958,41 @@ CREATE TABLE IF NOT EXISTS ""__EFMigrationsHistory"" (
 
 DO $$
 BEGIN
-    -- Nếu cột has_health_insurance đã tồn tại, đánh dấu migration là đã chạy
+    -- Chỉ ghi baseline nếu CSDL đã tồn tại bảng nghiệp vụ (trường hợp DB cũ không quản lý bằng EF migration)
+    -- Nếu là DB trống hoàn toàn, để EF Core MigrateAsync tự động tạo schema từ đầu
     IF EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'appointments' AND column_name = 'has_health_insurance'
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name = 'accounts'
     ) THEN
+        -- Nếu cột has_health_insurance đã tồn tại, đánh dấu migration là đã chạy
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'appointments' AND column_name = 'has_health_insurance'
+        ) THEN
+            INSERT INTO ""__EFMigrationsHistory"" (migration_id, product_version)
+            VALUES ('20261105131631_AppointmentInsuranceDeclaration', '10.0.13')
+            ON CONFLICT (migration_id) DO NOTHING;
+        END IF;
+
+        -- Nếu cột email của patients đã tồn tại, đánh dấu migration là đã chạy
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'patients' AND column_name = 'email'
+        ) THEN
+            INSERT INTO ""__EFMigrationsHistory"" (migration_id, product_version)
+            VALUES ('20261105141229_PatientEmail', '10.0.13')
+            ON CONFLICT (migration_id) DO NOTHING;
+        END IF;
+
+        -- Các migration cơ sở ban đầu chỉ chèn khi bảng accounts đã tồn tại sẵn
         INSERT INTO ""__EFMigrationsHistory"" (migration_id, product_version)
-        VALUES ('20261105131631_AppointmentInsuranceDeclaration', '10.0.13')
+        VALUES
+            ('20261015010838_InitialCreate', '10.0.13'),
+            ('20261103165420_AlignToGroupSpec', '10.0.13'),
+            ('20261103173448_SanityCheck', '10.0.13'),
+            ('20261104144910_QueuePositionNumbering', '10.0.13')
         ON CONFLICT (migration_id) DO NOTHING;
     END IF;
-
-    -- Nếu cột email của patients đã tồn tại, đánh dấu migration là đã chạy
-    IF EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'patients' AND column_name = 'email'
-    ) THEN
-        INSERT INTO ""__EFMigrationsHistory"" (migration_id, product_version)
-        VALUES ('20261105141229_PatientEmail', '10.0.13')
-        ON CONFLICT (migration_id) DO NOTHING;
-    END IF;
-
-    -- Các migration cơ sở ban đầu
-    INSERT INTO ""__EFMigrationsHistory"" (migration_id, product_version)
-    VALUES
-        ('20261015010838_InitialCreate', '10.0.13'),
-        ('20261103165420_AlignToGroupSpec', '10.0.13'),
-        ('20261103173448_SanityCheck', '10.0.13'),
-        ('20261104144910_QueuePositionNumbering', '10.0.13')
-    ON CONFLICT (migration_id) DO NOTHING;
 END $$;
 ";
         await context.Database.ExecuteSqlRawAsync(sql);

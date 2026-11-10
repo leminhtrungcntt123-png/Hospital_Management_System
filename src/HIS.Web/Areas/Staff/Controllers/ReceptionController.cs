@@ -180,24 +180,21 @@ public class ReceptionController : Controller
                 return await DeskAsync(search, request, "walk-in", ct);
             }
 
-            var ticketRes = await _reception.GetWalkInTicketAsync(result.Value!, null, ct);
+            var ticket = result.Value!;
 
             if (isAjax)
             {
                 return Json(new
                 {
                     success = true,
-                    queueNumber = result.Value,
-                    ticket = ticketRes.Value,
-                    message = $"Đã tiếp nhận. Số thứ tự: {result.Value}."
+                    queueNumber = ticket.QueueNumber,
+                    ticket = ticket,
+                    message = $"Đã tiếp nhận. Số thứ tự: {ticket.QueueNumber}."
                 });
             }
 
-            TempData["ReceptionSuccess"] = $"Đã đăng ký và tiếp nhận khách vãng lai. Số thứ tự: {result.Value}.";
-            if (ticketRes.Value != null)
-            {
-                TempData["WalkInTicketJson"] = System.Text.Json.JsonSerializer.Serialize(ticketRes.Value);
-            }
+            TempData["ReceptionSuccess"] = $"Đã đăng ký và tiếp nhận khách vãng lai. Số thứ tự: {ticket.QueueNumber}.";
+            TempData["WalkInTicketJson"] = System.Text.Json.JsonSerializer.Serialize(ticket);
 
             return RedirectToAction(nameof(Index), new { tab = "walk-in" });
         }

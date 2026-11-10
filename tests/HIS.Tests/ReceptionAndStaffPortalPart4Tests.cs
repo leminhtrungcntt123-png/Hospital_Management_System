@@ -346,7 +346,7 @@ public class ReceptionAndStaffPortalPart4Tests
 
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Value);
-        Assert.NotEmpty(result.Value!);
+        Assert.NotEmpty(result.Value.QueueNumber);
 
         var created = await context.Appointments
             .Include(a => a.Patient)
@@ -459,6 +459,85 @@ public class ReceptionAndStaffPortalPart4Tests
 
         Assert.NotNull(err);
         Assert.Contains("tối đa 3 hồ sơ", err);
+    }
+
+    [Fact]
+    public async Task RegisterWalkInAsync_WrongDepartmentDoctor_ReturnsFailure()
+    {
+        var (context, _, reception, nurseAccountId, _, doc1Id, room1Id, scheduleId, _) = CreateHarness();
+
+        var otherDept = new Department { Name = "Khoa Nhi", Description = "Khoa Nhi" };
+        context.Departments.Add(otherDept);
+        await context.SaveChangesAsync();
+
+        var req = new WalkInReceptionRequest
+        {
+            ScheduleId = scheduleId, // Thuộc Khoa Nội (Department 1)
+            DepartmentId = otherDept.Id, // Nhưng yêu cầu Khoa Nhi (mismatch)
+            IdentityVerified = true,
+            FullName = "Phan Văn Nam",
+            DateOfBirth = new DateOnly(1990, 1, 1),
+            Gender = Gender.Male,
+            PhoneNumber = "0911223344",
+            Reason = "Khám sức khỏe",
+            PriorityLevel = 0
+        };
+
+        var result = await reception.RegisterWalkInAsync(nurseAccountId, req);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("INVALID_DEPARTMENT", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task RegisterWalkInAsync_ChildModeWithStaleAdultPatientId_ReconcilesToNewPatient()
+    {
+        var (context, _, reception, nurseAccountId, _, doc1Id, room1Id, scheduleId, adultPatientId) = CreateHarness();
+
+        // adultPatientId là người lớn "Nguyễn Văn Hùng", sinh năm 1990
+        var slot = new AppointmentSlot
+        {
+            DoctorId = doc1Id,
+            RoomId = room1Id,
+            StartTime = new DateTime(2026, 11, 9, 10, 0, 0),
+            EndTime = new DateTime(2026, 11, 9, 10, 15, 0),
+            Capacity = 2,
+            OnlineQuota = 1,
+            BookedCount = 0,
+            Status = SlotStatus.Available
+        };
+        context.AppointmentSlots.Add(slot);
+        await context.SaveChangesAsync();
+
+        var req = new WalkInReceptionRequest
+        {
+            PatientId = adultPatientId, // ID người lớn còn sót lại từ tra cứu trước
+            ScheduleId = scheduleId,
+            IdentityVerified = true,
+            IsChild = true, // Nhưng đăng ký cho trẻ em
+            FullName = "Bé Nguyễn Văn Tí Nị",
+            DateOfBirth = new DateOnly(2022, 1, 1),
+            Gender = Gender.Male,
+            GuardianName = "Nguyễn Văn Bố",
+            GuardianPhone = "0988001122",
+            Reason = "Sốt mọc răng",
+            PriorityLevel = 0
+        };
+
+        var result = await reception.RegisterWalkInAsync(nurseAccountId, req);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+
+        // Kiểm tra rằng hồ sơ người lớn Nguyễn Văn Hùng KHÔNG bị ghi đè thành Bé Tí Nị
+        var adult = await context.Patients.FindAsync(adultPatientId);
+        Assert.NotNull(adult);
+        Assert.Equal("Nguyễn Văn Hùng", adult.FullName);
+
+        // Kiểm tra rằng một hồ sơ bệnh nhân mới đã được tạo cho Bé Tí Nị
+        var child = await context.Patients.FirstOrDefaultAsync(p => p.FullName == "Bé Nguyễn Văn Tí Nị");
+        Assert.NotNull(child);
+        Assert.NotEqual(adultPatientId, child.Id);
     }
 }
 

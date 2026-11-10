@@ -1304,34 +1304,42 @@ public class ReceptionService : IReceptionService
     /// <param name="staffAccountId">Mã tài khoản nhân viên tiếp nhận.</param>
     /// <param name="request">Thông tin đăng ký vãng lai (bệnh nhân, lịch trực, BHYT, mức ưu tiên).</param>
     /// <param name="ct">Token hủy tác vụ bất đồng bộ.</param>
-    /// <returns>Số thứ tự khám (STT) vừa được cấp phát.</returns>
-    public async Task<Result<string>> RegisterWalkInAsync(int staffAccountId, WalkInReceptionRequest request, CancellationToken ct = default)
+    /// <returns>Thông tin phiếu khám vừa được cấp phát.</returns>
+    public async Task<Result<WalkInTicketDto>> RegisterWalkInAsync(int staffAccountId, WalkInReceptionRequest request, CancellationToken ct = default)
     {
         if (!request.IdentityVerified)
         {
-            return Result.Failure<string>("NOT_VERIFIED", "Cần đối chiếu danh tính người khám trước khi tiếp nhận.");
+            return Result.Failure<WalkInTicketDto>("NOT_VERIFIED", "Cần đối chiếu danh tính người khám trước khi tiếp nhận.");
         }
 
         var schedule = await _context.DoctorSchedules
             .Include(s => s.Doctor)
+                .ThenInclude(d => d.Department)
             .Include(s => s.Room)
             .FirstOrDefaultAsync(s => s.Id == request.ScheduleId && s.IsActive, ct);
 
         if (schedule == null)
         {
-            return Result.Failure<string>("NOT_FOUND", "Không tìm thấy lịch khám hoặc phòng khám được chọn.");
+            return Result.Failure<WalkInTicketDto>("NOT_FOUND", "Không tìm thấy lịch khám hoặc phòng khám được chọn.");
+        }
+
+        // Bác sĩ được chọn phải thuộc đúng chuyên khoa đăng ký
+        if (request.DepartmentId > 0 && schedule.Doctor.DepartmentId != request.DepartmentId)
+        {
+            return Result.Failure<WalkInTicketDto>("INVALID_DEPARTMENT", "Bác sĩ hoặc phòng khám được chọn không thuộc chuyên khoa đã chọn.");
         }
 
         Patient? patient = null;
-        if (request.PatientId.HasValue && request.PatientId.Value > 0)
+        int? resolvedPatientId = request.PatientId;
+        if (resolvedPatientId.HasValue && resolvedPatientId.Value > 0)
         {
-            patient = await _context.Patients.FirstOrDefaultAsync(p => p.Id == request.PatientId.Value, ct);
+            patient = await _context.Patients.FirstOrDefaultAsync(p => p.Id == resolvedPatientId.Value, ct);
         }
 
         var fullName = request.FullName?.Trim() ?? patient?.FullName ?? "";
         if (string.IsNullOrWhiteSpace(fullName))
         {
-            return Result.Failure<string>("INVALID_NAME", "Vui lòng nhập họ và tên người khám.");
+            return Result.Failure<WalkInTicketDto>("INVALID_NAME", "Vui lòng nhập họ và tên người khám.");
         }
 
         var birthDate = request.DateOfBirth ?? patient?.DateOfBirth ?? DateOnly.FromDateTime(DateTime.Today);
@@ -1339,6 +1347,18 @@ public class ReceptionService : IReceptionService
         var phone = request.PhoneNumber?.Trim() ?? patient?.PhoneNumber ?? "";
 
         var isChild = request.IsChild || birthDate > DateOnly.FromDateTime(DateTime.Today.AddYears(-15));
+
+        // Đối chiếu danh tính hồ sơ cũ: Nếu chuyển sang chế độ trẻ em hoặc tên người khám không khớp hồ sơ cũ -> coi như bệnh nhân mới, không ghi đè hồ sơ người lớn
+        if (patient != null)
+        {
+            bool nameMatches = string.Equals(patient.FullName.Trim(), fullName, StringComparison.OrdinalIgnoreCase);
+            bool adultToChildMismatch = isChild && patient.DateOfBirth <= DateOnly.FromDateTime(DateTime.Today.AddYears(-15));
+            if (!nameMatches || adultToChildMismatch)
+            {
+                patient = null;
+                resolvedPatientId = null;
+            }
+        }
 
         string? combinedReason = request.Reason?.Trim();
         if (isChild && !string.IsNullOrWhiteSpace(request.GuardianName))
@@ -1358,7 +1378,7 @@ public class ReceptionService : IReceptionService
 
         var createReq = new CreateReceptionRequest
         {
-            PatientId = request.PatientId,
+            PatientId = resolvedPatientId,
             FullName = fullName,
             DateOfBirth = birthDate,
             Gender = gender,
@@ -1378,11 +1398,28 @@ public class ReceptionService : IReceptionService
         try
         {
             var createRes = await CreateReceptionAsync(createReq, ct);
-            return Result.Success(createRes.QueueNumber);
+            var ticketRes = await GetWalkInTicketAsync(null, createRes.AppointmentId, ct);
+            if (ticketRes.IsSuccess && ticketRes.Value != null)
+            {
+                return Result.Success(ticketRes.Value);
+            }
+
+            var fallbackTicket = new WalkInTicketDto(
+                createRes.AppointmentId,
+                createRes.AppointmentCode,
+                createRes.QueueNumber,
+                fullName,
+                schedule.Doctor.Department?.Name ?? "Khoa khám",
+                schedule.Room?.RoomNumber ?? "Phòng khám",
+                schedule.Doctor.FullName,
+                0,
+                Now
+            );
+            return Result.Success(fallbackTicket);
         }
         catch (Exception ex)
         {
-            return Result.Failure<string>("REGISTER_WALKIN_FAILED", ex.Message);
+            return Result.Failure<WalkInTicketDto>("REGISTER_WALKIN_FAILED", ex.Message);
         }
     }
 
@@ -1567,7 +1604,7 @@ public class ReceptionService : IReceptionService
     /// <summary>
     /// Lấy thông tin phiếu khám vừa cấp phát cho lượt vãng lai để in hoặc hiển thị modal.
     /// </summary>
-    public async Task<Result<WalkInTicketDto?>> GetWalkInTicketAsync(string queueNumber, int? appointmentId = null, CancellationToken ct = default)
+    public async Task<Result<WalkInTicketDto?>> GetWalkInTicketAsync(string? queueNumber = null, int? appointmentId = null, CancellationToken ct = default)
     {
         var todayDate = DateOnly.FromDateTime(Now);
         var start = todayDate.ToDateTime(TimeOnly.MinValue);
