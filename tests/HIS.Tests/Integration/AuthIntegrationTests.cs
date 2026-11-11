@@ -103,6 +103,12 @@ public static class AuthIntegrationScenario
             Assert.Equal(HttpStatusCode.Redirect, login.StatusCode);
             Assert.Equal(role.Home, login.Headers.Location?.OriginalString);
             var ownPage = await client.GetAsync(role.Home);
+            if (role.Name == "patient")
+            {
+                Assert.Equal(HttpStatusCode.Redirect, ownPage.StatusCode);
+                Assert.Equal("/Booking", ownPage.Headers.Location?.OriginalString);
+                ownPage = await client.GetAsync("/Booking");
+            }
             Assert.Equal(HttpStatusCode.OK, ownPage.StatusCode);
             var ownHtml = await ownPage.Content.ReadAsStringAsync();
             Assert.DoesNotContain("ui-preview-toolbar", ownHtml);
@@ -111,7 +117,7 @@ public static class AuthIntegrationScenario
             Assert.DoesNotContain("database-bridge.js", ownHtml);
             if (role.Name == "nurse")
             {
-                Assert.Contains("id=\"reception-sidebar\"", ownHtml);
+                Assert.Contains("id=\"staff-sidebar\"", ownHtml);
                 Assert.Contains("QA Role Matrix", ownHtml);
                 Assert.Contains("/Staff/Cashier", ownHtml);
                 var invalidWalkIn = await client.PostAsync("/Staff/Reception/WalkIn", new FormUrlEncodedContent(new Dictionary<string, string>
@@ -120,7 +126,7 @@ public static class AuthIntegrationScenario
                     ["__RequestVerificationToken"] = Token(ownHtml)
                 }));
                 Assert.Equal(HttpStatusCode.OK, invalidWalkIn.StatusCode);
-                Assert.Contains("id=\"reception-sidebar\"", await invalidWalkIn.Content.ReadAsStringAsync());
+                Assert.Contains("id=\"staff-sidebar\"", await invalidWalkIn.Content.ReadAsStringAsync());
             }
             var denied = await client.GetAsync(role.Forbidden);
             Assert.Equal(HttpStatusCode.Redirect, denied.StatusCode);
@@ -142,7 +148,10 @@ public static class AuthIntegrationScenario
                 ["__RequestVerificationToken"] = Token(await ownPage.Content.ReadAsStringAsync())
             }));
             Assert.Equal(HttpStatusCode.Redirect, logout.StatusCode);
-            Assert.Equal(HttpStatusCode.Redirect, (await client.GetAsync(role.Home)).StatusCode);
+            var protectedPage = role.Name == "patient" ? "/Patient/MedicalRecords" : role.Home;
+            var afterLogout = await client.GetAsync(protectedPage);
+            Assert.Equal(HttpStatusCode.Redirect, afterLogout.StatusCode);
+            Assert.Contains("/Account/Login", afterLogout.Headers.Location?.OriginalString);
         }
 
         await using (var publicFactory = new IntegratedAuthFactory(connection, email))
