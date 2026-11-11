@@ -13,7 +13,9 @@
 }
 
 @{
+    var canManageSchedule = User.IsInRole("DEPARTMENT_HEAD");
     var tab = string.IsNullOrWhiteSpace(Model.ActiveTab) ? "schedule" : Model.ActiveTab.ToLowerInvariant();
+    ViewData["StaffDepartment"] = Model.DepartmentName;
     ViewData["Title"] = tab switch
     {
         "exceptions" => "Nghỉ / đổi ca",
@@ -24,107 +26,9 @@
     };
 }
 
-<style>
-    /* Styling đồng bộ chuẩn MediCare UI */
-    .medicare-tabs {
-        display: flex;
-        gap: 8px;
-        padding: 12px 16px;
-        border-bottom: 1px solid #eef3f7;
-        background: #fbfcfe;
-    }
-    .medicare-tab-btn {
-        background: none;
-        border: none;
-        padding: 6px 14px;
-        border-radius: 50px;
-        font-size: 12px;
-        font-weight: 600;
-        color: #596a7c;
-        cursor: pointer;
-        transition: all 0.15s ease;
-    }
-    .medicare-tab-btn:hover {
-        background: #e2ebf3;
-        color: #0f172a;
-    }
-    .medicare-tab-btn.active {
-        background: #079bc9;
-        color: #ffffff;
-    }
-    .app-modal-backdrop {
-        position: fixed;
-        inset: 0;
-        background: rgba(17, 38, 56, 0.55);
-        backdrop-filter: blur(2px);
-        z-index: 9999;
-        display: none;
-        align-items: center;
-        justify-content: center;
-        padding: 16px;
-    }
-    .app-modal-backdrop.show {
-        display: flex !important;
-    }
-    .app-modal-card {
-        background: #ffffff;
-        border-radius: 12px;
-        box-shadow: 0 20px 45px rgba(0, 0, 0, 0.25);
-        width: 100%;
-        max-width: 540px;
-        max-height: 90vh;
-        overflow-y: auto;
-        display: flex;
-        flex-direction: column;
-        animation: appModalIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .app-modal-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 16px 20px;
-        background: #111f38;
-        color: #fff;
-        border-top-left-radius: 12px;
-        border-top-right-radius: 12px;
-    }
-    .app-modal-close {
-        background: rgba(255, 255, 255, 0.12);
-        border: none;
-        color: #ffffff;
-        font-size: 16px;
-        font-weight: 700;
-        width: 30px;
-        height: 30px;
-        border-radius: 6px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-    }
-    .app-modal-close:hover {
-        background: rgba(255, 255, 255, 0.25);
-    }
-    .app-modal-body {
-        padding: 20px;
-        font-size: 13px;
-        color: #334155;
-    }
-    .app-modal-footer {
-        padding: 12px 20px;
-        border-top: 1px solid #f1f5f9;
-        display: flex;
-        justify-content: flex-end;
-        gap: 10px;
-        background: #fbfcfe;
-        border-bottom-left-radius: 12px;
-        border-bottom-right-radius: 12px;
-    }
-    @@keyframes appModalIn {
-        from { transform: translateY(-12px) scale(0.98); opacity: 0; }
-        to { transform: translateY(0) scale(1); opacity: 1; }
-    }
-</style>
+@section Styles {
+    <link rel="stylesheet" href="~/css/staff-schedule.css" asp-append-version="true" />
+}
 
 @if (TempData["SuccessMessage"] != null)
 {
@@ -176,36 +80,7 @@
                 <tbody id="exceptionsTableBody">
                     @if (Model.Exceptions.Count == 0)
                     {
-                        <!-- Dữ liệu mẫu khớp 100% hình 1 nếu DB chưa có -->
-                        <tr class="exception-row" data-status="PENDING">
-                            <td><strong>BS. Trần Minh Thư</strong></td>
-                            <td>
-                                <div>05/11/2026</div>
-                                <small class="text-muted">Ca sáng</small>
-                            </td>
-                            <td>
-                                <div><strong>Đào tạo</strong></div>
-                                <small class="text-muted">Tham gia đào tạo chuyên môn</small>
-                            </td>
-                            <td>BS. Nguyễn Hoàng Nam</td>
-                            <td>
-                                <span class="badge" style="background:#fef3c7; color:#b45309; border:1px solid #fde68a; padding:4px 8px; border-radius:50px; font-size:11px;">
-                                    • Chờ duyệt
-                                </span>
-                            </td>
-                            <td>
-                                <div style="display:flex; gap:8px; align-items:center;">
-                                    <button type="button" class="btn primary sm" onclick="openApproveModal(1, 'BS. Trần Minh Thư', '05/11/2026', 'BS. Nguyễn Hoàng Nam', 3)">
-                                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                                        <span>Duyệt</span>
-                                    </button>
-                                    <button type="button" class="btn ghost sm" onclick="openRejectModal(1)">
-                                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                                        <span>Từ chối</span>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
+                        <tr><td colspan="6" class="reception-empty">Chưa có đề nghị nghỉ / đổi ca.</td></tr>
                     }
                     else
                     {
@@ -235,7 +110,7 @@
                                     @(ex.ReplacementDoctorName != null ? "BS. " + ex.ReplacementDoctorName : "Tự tìm cùng khoa")
                                 </td>
                                 <td>
-                                    @if (ex.Status == ScheduleExceptionStatus.Pending)
+                                    @if (canManageSchedule && ex.Status == ScheduleExceptionStatus.Pending)
                                     {
                                         <span class="badge" style="background:#fef3c7; color:#b45309; border:1px solid #fde68a; padding:4px 8px; border-radius:50px; font-size:11px;">
                                             • Chờ duyệt
@@ -255,7 +130,7 @@
                                     }
                                 </td>
                                 <td>
-                                    @if (ex.Status == ScheduleExceptionStatus.Pending)
+                                    @if (canManageSchedule && ex.Status == ScheduleExceptionStatus.Pending)
                                     {
                                         <div style="display:flex; gap:8px; align-items:center;">
                                             <button type="button" class="btn primary sm" onclick="openApproveModal(@ex.Id, 'BS. @ex.DoctorName', '@ex.Date.ToString("dd/MM/yyyy")', '@(ex.ReplacementDoctorName != null ? "BS. " + ex.ReplacementDoctorName : "Điều phối trong khoa")', 2)">
@@ -306,11 +181,11 @@
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px; margin-bottom:14px;">
                         <div>
                             <small style="color:#64748b; display:block; font-size:11px;">Lượt cần xử lý</small>
-                            <strong id="approveAffectedCount" style="font-size:18px; color:#0f172a;">2</strong>
+                            <strong id="approveAffectedCount" style="font-size:18px; color:#0f172a;">—</strong>
                         </div>
                         <div>
                             <small style="color:#64748b; display:block; font-size:11px;">Đề xuất thay thế</small>
-                            <strong id="approveReplacementName" style="font-size:14px; color:#079bc9;">BS. Nguyễn Hoàng Nam</strong>
+                            <strong id="approveReplacementName" style="font-size:14px; color:#079bc9;">Chưa chọn</strong>
                         </div>
                     </div>
                     <p style="font-size:12px; color:#64748b; margin:0; line-height:1.5;">
@@ -374,7 +249,7 @@ else if (tab == "records")
                 <input type="text" id="recordSearchInput" oninput="filterRecords(this.value)" placeholder="Tìm người khám hoặc kết luận..." style="width:100%; padding:7px 12px 7px 34px; border:1px solid #cbd5e1; border-radius:8px; font-size:12px;" />
             </div>
             <span id="recordCountDisplay" style="font-size:12px; color:#64748b; font-weight:600;">
-                @(Model.MedicalRecords.Count > 0 ? Model.MedicalRecords.Count : 2) phiếu khám
+                @Model.MedicalRecords.Count phiếu khám
             </span>
         </div>
 
@@ -392,47 +267,7 @@ else if (tab == "records")
                 <tbody id="recordsTableBody">
                     @if (Model.MedicalRecords.Count == 0)
                     {
-                        <!-- Mẫu chuẩn theo hình 2 -->
-                        <tr class="record-row" data-search="đỗ gia khang bn0010 đã hoàn tất khám theo yêu cầu">
-                            <td>
-                                <div style="display:flex; align-items:center; gap:10px;">
-                                    <span class="avatar" style="background:#e0f2fe; color:#0369a1; font-weight:700; width:32px; height:32px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:11px;">GK</span>
-                                    <div>
-                                        <strong>Đỗ Gia Khang</strong>
-                                        <div class="text-muted small">BN0010 · 43 tuổi</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td>04/11/2026</td>
-                            <td>BS. Lê Quang Huy</td>
-                            <td>Đã hoàn tất khám theo yêu cầu</td>
-                            <td>
-                                <button type="button" class="btn outline sm" onclick="openRecordDetailModal('Đỗ Gia Khang', 'BN0010', '43 tuổi', 'BS. Lê Quang Huy', '04/11/2026', 'Đã hoàn tất khám theo yêu cầu', 'I10 Tăng huyết áp nguyên phát', 'Khám lâm sàng tim mạch ổn định, không ghi nhận tiếng ran.')">
-                                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><circle cx="12" cy="12" r="3"></circle><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path></svg>
-                                    <span>Xem phiếu</span>
-                                </button>
-                            </td>
-                        </tr>
-                        <tr class="record-row" data-search="nguyễn thanh hà bn0001 khám sức khỏe định kỳ">
-                            <td>
-                                <div style="display:flex; align-items:center; gap:10px;">
-                                    <span class="avatar" style="background:#fce7f3; color:#be185d; font-weight:700; width:32px; height:32px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:11px;">TH</span>
-                                    <div>
-                                        <strong>Nguyễn Thanh Hà</strong>
-                                        <div class="text-muted small">BN0001 · 32 tuổi</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td>15/10/2026</td>
-                            <td>BS. Nguyễn Hoàng Nam</td>
-                            <td>Khám sức khỏe định kỳ</td>
-                            <td>
-                                <button type="button" class="btn outline sm" onclick="openRecordDetailModal('Nguyễn Thanh Hà', 'BN0001', '32 tuổi', 'BS. Nguyễn Hoàng Nam', '15/10/2026', 'Khám sức khỏe định kỳ', 'Z00.0 Khám sức khỏe tổng quát', 'Thể trạng tốt, các chỉ số sinh hiệu trong giới hạn bình thường.')">
-                                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><circle cx="12" cy="12" r="3"></circle><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path></svg>
-                                    <span>Xem phiếu</span>
-                                </button>
-                            </td>
-                        </tr>
+                        <tr><td colspan="5" class="reception-empty">Chưa có bệnh án.</td></tr>
                     }
                     else
                     {
@@ -510,7 +345,7 @@ else if (tab == "overview")
             <p>Theo dõi tiến độ khám và điều phối nhân sự trong khoa.</p>
         </div>
         <div style="display:flex; gap:10px;">
-            <a href="/Staff/Consultation" class="btn outline" style="text-decoration:none;">
+            <a href="@Url.Action("Index", User.IsInRole("NURSE") ? "Reception" : "Consultation", new { area = "Staff" })" class="btn outline" style="text-decoration:none;">
                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M5 3v5a5 5 0 0 0 10 0V3 M3 3h4 M13 3h4 M10 13v3a5 5 0 0 0 10 0v-2 M22 11a2 2 0 1 1-4 0 2 2 0 0 1 4 0"></path></svg>
                 <span>Bàn khám bệnh</span>
             </a>
@@ -680,7 +515,7 @@ else if (tab == "overview")
                 </div>
                 <small style="color:#64748b; font-size:12px;">@(callingItem != null ? (callingItem.DoctorName + " · " + callingItem.RoomNumber) : "Tất cả lượt khám đã hoàn tất")</small>
                 <div style="margin-top:14px;">
-                    <a href="/Staff/Consultation" class="btn primary sm" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; width:100%; justify-content:center;">
+                    <a href="@Url.Action("Index", User.IsInRole("NURSE") ? "Reception" : "Consultation", new { area = "Staff" })" class="btn primary sm" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; width:100%; justify-content:center;">
                         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><path d="M5 3v5a5 5 0 0 0 10 0V3 M3 3h4 M13 3h4 M10 13v3a5 5 0 0 0 10 0v-2 M22 11a2 2 0 1 1-4 0 2 2 0 0 1 4 0"></path></svg>
                         <span>Vào phòng khám bệnh</span>
                     </a>
@@ -739,7 +574,7 @@ else if (tab == "overview")
             </div>
             <div class="app-modal-footer">
                 <button type="button" class="btn ghost" onclick="closeQueueDetailModal()">Đóng</button>
-                <a href="/Staff/Consultation" class="btn primary" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+                <a href="@Url.Action("Index", User.IsInRole("NURSE") ? "Reception" : "Consultation", new { area = "Staff" })" class="btn primary" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
                     <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><path d="M5 3v5a5 5 0 0 0 10 0V3 M3 3h4 M13 3h4 M10 13v3a5 5 0 0 0 10 0v-2 M22 11a2 2 0 1 1-4 0 2 2 0 0 1 4 0"></path></svg>
                     <span>Vào bàn khám bệnh</span>
                 </a>
@@ -749,199 +584,16 @@ else if (tab == "overview")
 }
 else if (tab == "patients")
 {
-    <!-- ========================================== -->
-    <!-- 5. THÔNG TIN NGƯỜI KHÁM (IMAGE 5)          -->
-    <!-- ========================================== -->
     <div class="page-heading">
         <div>
             <h1>Thông tin người khám</h1>
-            <p>Thông tin hành chính phục vụ tiếp nhận. Nội dung bệnh án theo quyền chuyên môn.</p>
+            <p>Thông tin hành chính phục vụ tiếp nhận theo quyền được cấp.</p>
         </div>
     </div>
-
-    <section class="card" style="background:#fff; border:1px solid #e2ebf3; border-radius:10px; overflow:hidden;">
-        <div class="toolbar" style="padding:14px 18px; border-bottom:1px solid #e5edf5; display:flex; justify-content:space-between; align-items:center;">
-            <div style="position:relative; width:360px;">
-                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute; left:12px; top:9px; width:15px; height:15px; color:#94a3b8;">
-                    <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-                <input type="text" id="patientSearchInput" oninput="filterPatients(this.value)" placeholder="Tìm tên, mã hoặc số điện thoại..." style="width:100%; padding:7px 12px 7px 34px; border:1px solid #cbd5e1; border-radius:8px; font-size:12px;" />
-            </div>
-            <span id="patientCountDisplay" style="font-size:12px; color:#64748b; font-weight:600;">6 hồ sơ</span>
-        </div>
-
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Người khám</th>
-                        <th>Giới tính</th>
-                        <th>Điện thoại</th>
-                        <th>Ngày sinh</th>
-                        <th>Hồ sơ</th>
-                    </tr>
-                </thead>
-                <tbody id="patientsTableBody">
-                    <tr class="patient-row" data-search="nguyễn thanh hà bn0001 0901234567">
-                        <td>
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                <span class="avatar" style="background:#fce7f3; color:#be185d; font-weight:700; width:32px; height:32px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:11px;">TH</span>
-                                <div>
-                                    <strong>Nguyễn Thanh Hà</strong>
-                                    <div class="text-muted small">BN0001 · 32 tuổi</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td>Nữ</td>
-                        <td>0901234567</td>
-                        <td>15/06/1994</td>
-                        <td>
-                            <button type="button" class="btn outline sm" onclick="openPatientModal('Nguyễn Thanh Hà', 'BN0001', 'Nữ', '15/06/1994 (32 tuổi)', '0901234567', 'Quận 1, TP. Hồ Chí Minh')">
-                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><circle cx="12" cy="12" r="3"></circle><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path></svg>
-                                <span>Thông tin</span>
-                            </button>
-                        </td>
-                    </tr>
-                    <tr class="patient-row" data-search="nguyễn văn minh bn0003 0902223344">
-                        <td>
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                <span class="avatar" style="background:#e0f2fe; color:#0369a1; font-weight:700; width:32px; height:32px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:11px;">VM</span>
-                                <div>
-                                    <strong>Nguyễn Văn Minh</strong>
-                                    <div class="text-muted small">BN0003 · 64 tuổi</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td>Nam</td>
-                        <td>0902223344</td>
-                        <td>16/02/1962</td>
-                        <td>
-                            <button type="button" class="btn outline sm" onclick="openPatientModal('Nguyễn Văn Minh', 'BN0003', 'Nam', '16/02/1962 (64 tuổi)', '0902223344', 'Quận 3, TP. Hồ Chí Minh')">
-                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><circle cx="12" cy="12" r="3"></circle><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path></svg>
-                                <span>Thông tin</span>
-                            </button>
-                        </td>
-                    </tr>
-                    <tr class="patient-row" data-search="trần quốc bảo bn0006 0912345678">
-                        <td>
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                <span class="avatar" style="background:#e0f2fe; color:#0369a1; font-weight:700; width:32px; height:32px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:11px;">QB</span>
-                                <div>
-                                    <strong>Trần Quốc Bảo</strong>
-                                    <div class="text-muted small">BN0006 · 40 tuổi</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td>Nam</td>
-                        <td>0912345678</td>
-                        <td>22/03/1986</td>
-                        <td>
-                            <button type="button" class="btn outline sm" onclick="openPatientModal('Trần Quốc Bảo', 'BN0006', 'Nam', '22/03/1986 (40 tuổi)', '0912345678', 'Quận Bình Thạnh, TP. Hồ Chí Minh')">
-                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><circle cx="12" cy="12" r="3"></circle><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path></svg>
-                                <span>Thông tin</span>
-                            </button>
-                        </td>
-                    </tr>
-                    <tr class="patient-row" data-search="phạm minh tuấn bn0007 0934567890">
-                        <td>
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                <span class="avatar" style="background:#fef3c7; color:#92400e; font-weight:700; width:32px; height:32px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:11px;">MT</span>
-                                <div>
-                                    <strong>Phạm Minh Tuấn</strong>
-                                    <div class="text-muted small">BN0007 · 36 tuổi</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td>Nam</td>
-                        <td>0934567890</td>
-                        <td>08/01/1990</td>
-                        <td>
-                            <button type="button" class="btn outline sm" onclick="openPatientModal('Phạm Minh Tuấn', 'BN0007', 'Nam', '08/01/1990 (36 tuổi)', '0934567890', 'Quận Phú Nhuận, TP. Hồ Chí Minh')">
-                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><circle cx="12" cy="12" r="3"></circle><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path></svg>
-                                <span>Thông tin</span>
-                            </button>
-                        </td>
-                    </tr>
-                    <tr class="patient-row" data-search="lê thị ngọc bn0008 0923456789">
-                        <td>
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                <span class="avatar" style="background:#fce7f3; color:#be185d; font-weight:700; width:32px; height:32px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:11px;">TN</span>
-                                <div>
-                                    <strong>Lê Thị Ngọc</strong>
-                                    <div class="text-muted small">BN0008 · 48 tuổi</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td>Nữ</td>
-                        <td>0923456789</td>
-                        <td>12/09/1978</td>
-                        <td>
-                            <button type="button" class="btn outline sm" onclick="openPatientModal('Lê Thị Ngọc', 'BN0008', 'Nữ', '12/09/1978 (48 tuổi)', '0923456789', 'Quận 5, TP. Hồ Chí Minh')">
-                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><circle cx="12" cy="12" r="3"></circle><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path></svg>
-                                <span>Thông tin</span>
-                            </button>
-                        </td>
-                    </tr>
-                    <tr class="patient-row" data-search="đỗ gia khang bn0010 0978901234">
-                        <td>
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                <span class="avatar" style="background:#e0f2fe; color:#0369a1; font-weight:700; width:32px; height:32px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:11px;">GK</span>
-                                <div>
-                                    <strong>Đỗ Gia Khang</strong>
-                                    <div class="text-muted small">BN0010 · 43 tuổi</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td>Nam</td>
-                        <td>0978901234</td>
-                        <td>03/12/1982</td>
-                        <td>
-                            <button type="button" class="btn outline sm" onclick="openPatientModal('Đỗ Gia Khang', 'BN0010', 'Nam', '03/12/1982 (43 tuổi)', '0978901234', 'Quận 10, TP. Hồ Chí Minh')">
-                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><circle cx="12" cy="12" r="3"></circle><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path></svg>
-                                <span>Thông tin</span>
-                            </button>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+    <section class="reception-panel" role="status">
+        <h2>Chưa tích hợp danh sách người khám của khoa</h2>
+        <p>Danh sách sẽ hiển thị khi hệ thống hoàn tất kết nối. Hiện chưa thể tra cứu tại mục này.</p>
     </section>
-
-    <!-- Modal Thông tin người khám -->
-    <div id="patientInfoModal" class="app-modal-backdrop">
-        <div class="app-modal-card">
-            <div class="app-modal-header">
-                <div>
-                    <h5 id="pInfoName" style="margin:0; font-size:15px; font-weight:700;">Thông tin người khám</h5>
-                    <small id="pInfoCode" style="color:#94a3b8; font-size:12px;"></small>
-                </div>
-                <button type="button" class="app-modal-close" onclick="closePatientModal()">✕</button>
-            </div>
-            <div class="app-modal-body">
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px;">
-                    <div>
-                        <small style="color:#64748b; font-size:11px;">Giới tính</small>
-                        <strong id="pInfoGender" style="display:block; color:#0f172a; font-size:13px;"></strong>
-                    </div>
-                    <div>
-                        <small style="color:#64748b; font-size:11px;">Ngày sinh & Tuổi</small>
-                        <strong id="pInfoDob" style="display:block; color:#0f172a; font-size:13px;"></strong>
-                    </div>
-                    <div>
-                        <small style="color:#64748b; font-size:11px;">Số điện thoại</small>
-                        <strong id="pInfoPhone" style="display:block; color:#0f172a; font-size:13px;"></strong>
-                    </div>
-                    <div>
-                        <small style="color:#64748b; font-size:11px;">Địa chỉ cư trú</small>
-                        <strong id="pInfoAddress" style="display:block; color:#0f172a; font-size:13px;"></strong>
-                    </div>
-                </div>
-            </div>
-            <div class="app-modal-footer">
-                <button type="button" class="btn ghost" onclick="closePatientModal()">Đóng</button>
-            </div>
-        </div>
-    </div>
 }
 else
 {
@@ -953,6 +605,8 @@ else
             <h1>Lịch khám & điều phối khoa</h1>
             <p>Lịch khám sáng / chiều và lịch trực nhân sự được quản lý riêng.</p>
         </div>
+        @if (canManageSchedule)
+        {
         <div style="display:flex; gap:10px;">
             <button type="button" class="btn outline" onclick="openDutyModal()">
                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -963,6 +617,7 @@ else
                 <span>Thiết lập lịch khám & Quota</span>
             </button>
         </div>
+        }
     </div>
 
     <!-- Thanh chuyển tuần chuẩn hình 4 (Đồng bộ theo tuần thực tế và URL) -->
@@ -1017,7 +672,7 @@ else
             <select id="selectDoctorFilter" onchange="filterDoctorsBySelect(this.value)"
                     style="padding:6px 10px; font-size:12px; border:1px solid #cbd5e1; border-radius:6px; background:#fff; max-width:180px;">
                 <option value="">-- Tất cả bác sĩ --</option>
-                @foreach (var doc in (Model.AvailableDoctors.Count > 0 ? Model.AvailableDoctors : new List<DoctorListItemDto> { new(1, "Nguyễn Hoàng Nam", "Nội tổng quát", Model.DepartmentName, "P.201"), new(2, "Trần Minh Thư", "Tim mạch", Model.DepartmentName, "P.203") }))
+                @foreach (var doc in Model.AvailableDoctors)
                 {
                     <option value="@doc.FullName.ToLowerInvariant()">@CleanDocName(doc.FullName)</option>
                 }
@@ -1032,7 +687,7 @@ else
                 <h3 style="font-size:13px; font-weight:700; margin:0; color:#0f172a; display:flex; align-items:center; gap:6px;">
                     <span>📅</span> Lịch khám trong tuần
                 </h3>
-                <small style="color:#64748b; font-size:11px;">Nhấp vào ca khám để xem hoặc chỉnh sửa Quota tiếp nhận (Tổng chỉ tiêu / Đặt online / Khám tại quầy)</small>
+                <small style="color:#64748b; font-size:11px;">@(canManageSchedule ? "Nhấp vào ca khám để chỉnh sửa chỉ tiêu tiếp nhận." : "Theo dõi lịch khám và ca trực trong khoa.")</small>
             </div>
             <span style="font-size:11px; background:#f1f5f9; color:#475569; padding:4px 8px; border-radius:6px;">
                 Sáng: 07:30–11:30 · Chiều: 13:00–16:30 · Tối: 18:00–07:00
@@ -1046,9 +701,9 @@ else
                     Bác sĩ / Nhân sự
                 </div>
                 <!-- 5 Cột Header ngày trong tuần: render động theo Model.WeekDates -->
-                @for (int c = 0; c < (Model.WeekDates.Count > 0 ? Model.WeekDates.Count : 5); c++)
+                @for (int c = 0; c < Model.WeekDates.Count; c++)
                 {
-                    var d = Model.WeekDates.Count > c ? Model.WeekDates[c] : new DateOnly(2026, 11, 2).AddDays(c);
+                    var d = Model.WeekDates[c];
                     var isToday = (d == Model.Today);
                     var dayName = c switch { 0 => "Thứ Hai", 1 => "Thứ Ba", 2 => "Thứ Tư", 3 => "Thứ Năm", _ => "Thứ Sáu" };
 
@@ -1070,24 +725,8 @@ else
                 }
 
                 @{
-                    var weekDates = Model.WeekDates.Count == 5
-                        ? Model.WeekDates
-                        : new List<DateOnly>
-                        {
-                            new(2026, 11, 2),
-                            new(2026, 11, 3),
-                            new(2026, 11, 4),
-                            new(2026, 11, 5),
-                            new(2026, 11, 6)
-                        };
-
-                    var doctorsList = Model.AvailableDoctors.Count > 0
-                        ? Model.AvailableDoctors
-                        : new List<DoctorListItemDto>
-                        {
-                            new(1, "Nguyễn Hoàng Nam", "Nội tổng quát", Model.DepartmentName, "P.201"),
-                            new(2, "Trần Minh Thư", "Tim mạch", Model.DepartmentName, "P.203")
-                        };
+                    var weekDates = Model.WeekDates;
+                    var doctorsList = Model.AvailableDoctors;
                 }
 
                 @foreach (var doc in doctorsList)
@@ -1101,7 +740,7 @@ else
                             <span class="avatar" style="@docColor font-weight:700; width:32px; height:32px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:11px;">@docInit</span>
                             <div>
                                 <strong style="font-size:12px; color:#0f172a;">@CleanDocName(doc.FullName)</strong>
-                                <div class="text-muted" style="font-size:11px;">@doc.Specialty · @(doc.LicenseNumber.StartsWith("P.") ? doc.LicenseNumber : "P.20" + doc.Id)</div>
+                                <div class="text-muted" style="font-size:11px;">@doc.Specialty</div>
                             </div>
                         </div>
 
@@ -1195,10 +834,10 @@ else
                                     else if (schedMorning != null)
                                     {
                                         var mQuay = Math.Max(0, schedMorning.MaxPatients - schedMorning.OnlineSlots);
-                                        if (curDate < Model.Today)
+                                        if (curDate < Model.Today || !canManageSchedule)
                                         {
                                             <div style="background:#e0f2fe; border-left:3px solid #0284c7; border-radius:6px; padding:6px 8px; cursor:default; opacity:0.85;"
-                                                 title="Ca khám trong quá khứ - Không thể chỉnh sửa">
+                                                 title="Thông tin ca khám">
                                                 <div style="display:flex; justify-content:space-between; align-items:center;">
                                                     <strong style="font-size:11px; color:#0369a1;">Ca sáng</strong>
                                                     <span style="font-size:10px; color:#0284c7; font-weight:600;">@(schedMorning.StartTime.ToString("HH:mm"))–@(schedMorning.EndTime.ToString("HH:mm"))</span>
@@ -1238,11 +877,11 @@ else
                                     }
                                     else
                                     {
-                                        if (curDate < Model.Today)
+                                        if (curDate < Model.Today || !canManageSchedule)
                                         {
                                             <div style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px; padding:5px 8px; font-size:10px; color:#94a3b8; text-align:center; cursor:not-allowed;"
-                                                 title="Đã qua ngày - Không thể thiết lập lịch khám trong quá khứ">
-                                                <span style="opacity:0.6;">Đã qua</span>
+                                                 title="Thông tin lịch khám">
+                                                <span style="opacity:0.6;">@(curDate < Model.Today ? "Đã qua" : "Chưa có ca khám")</span>
                                             </div>
                                         }
                                         else
@@ -1289,10 +928,10 @@ else
                                     else if (schedAfternoon != null)
                                     {
                                         var aQuay = Math.Max(0, schedAfternoon.MaxPatients - schedAfternoon.OnlineSlots);
-                                        if (curDate < Model.Today)
+                                        if (curDate < Model.Today || !canManageSchedule)
                                         {
                                             <div style="background:#ede9fe; border-left:3px solid #7c3aed; border-radius:6px; padding:6px 8px; cursor:default; opacity:0.85;"
-                                                 title="Ca khám trong quá khứ - Không thể chỉnh sửa">
+                                                 title="Thông tin ca khám">
                                                 <div style="display:flex; justify-content:space-between; align-items:center;">
                                                     <strong style="font-size:11px; color:#5b21b6;">Ca chiều</strong>
                                                     <span style="font-size:10px; color:#7c3aed; font-weight:600;">@(schedAfternoon.StartTime.ToString("HH:mm"))–@(schedAfternoon.EndTime.ToString("HH:mm"))</span>
@@ -1332,11 +971,11 @@ else
                                     }
                                     else
                                     {
-                                        if (curDate < Model.Today)
+                                        if (curDate < Model.Today || !canManageSchedule)
                                         {
                                             <div style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px; padding:5px 8px; font-size:10px; color:#94a3b8; text-align:center; cursor:not-allowed;"
-                                                 title="Đã qua ngày - Không thể thiết lập lịch khám trong quá khứ">
-                                                <span style="opacity:0.6;">Đã qua</span>
+                                                 title="Thông tin lịch khám">
+                                                <span style="opacity:0.6;">@(curDate < Model.Today ? "Đã qua" : "Chưa có ca khám")</span>
                                             </div>
                                         }
                                         else
@@ -1362,6 +1001,8 @@ else
                                                 </strong>
                                                 <div style="display:flex; align-items:center; gap:6px;">
                                                     <span style="font-size:9px; background:#334155; color:#94a3b8; padding:1px 5px; border-radius:4px;">@(docDutyNight.StartTime.ToString("HH:mm"))–@(docDutyNight.EndTime.ToString("HH:mm"))</span>
+                                                    @if (canManageSchedule)
+                                                    {
                                                     <button type="button"
                                                             onclick="event.stopPropagation(); openDeleteDutyModal(@docDutyNight.Id, '@CleanDocName(docDutyNight.StaffName)', '@docDutyNight.StartTime.ToString("dd/MM/yyyy HH:mm")')"
                                                             style="background:rgba(239,68,68,0.2); border:1px solid rgba(239,68,68,0.4); color:#fca5a5; width:18px; height:18px; border-radius:4px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; cursor:pointer; padding:0; line-height:1; transition:all 0.15s ease;"
@@ -1370,6 +1011,7 @@ else
                                                             title="Xóa ca trực đêm này">
                                                         ✕
                                                     </button>
+                                                    }
                                                 </div>
                                             </div>
                                             @if (!string.IsNullOrEmpty(docDutyNight.Note))
@@ -1423,7 +1065,9 @@ else
                                                     </strong>
                                                     <div style="display:flex; align-items:center; gap:6px;">
                                                         <span style="font-size:9px; background:#334155; color:#94a3b8; padding:1px 5px; border-radius:4px;">@(staffNight.StartTime.ToString("HH:mm"))–@(staffNight.EndTime.ToString("HH:mm"))</span>
-                                                        <button type="button"
+                                                        @if (canManageSchedule)
+                                                    {
+                                                    <button type="button"
                                                                 onclick="event.stopPropagation(); openDeleteDutyModal(@staffNight.Id, '@CleanDocName(staffNight.StaffName)', '@staffNight.StartTime.ToString("dd/MM/yyyy HH:mm")')"
                                                                 style="background:rgba(239,68,68,0.2); border:1px solid rgba(239,68,68,0.4); color:#fca5a5; width:18px; height:18px; border-radius:4px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; cursor:pointer; padding:0; line-height:1; transition:all 0.15s ease;"
                                                                 onmouseover="this.style.background='#ef4444'; this.style.color='#fff';"
@@ -1431,6 +1075,7 @@ else
                                                                 title="Xóa ca trực đêm này">
                                                             ✕
                                                         </button>
+                                                    }
                                                     </div>
                                                 </div>
                                                 @if (!string.IsNullOrEmpty(staffNight.Note))
@@ -1462,9 +1107,12 @@ else
                 </h3>
                 <small style="color:#64748b; font-size:11px;">Tổng hợp phân công trực ngoài giờ / cấp cứu / theo dõi bệnh phòng</small>
             </div>
-            <button type="button" class="btn outline sm" onclick="openDutyModal()">
+            @if (canManageSchedule)
+            {
+                <button type="button" class="btn outline sm" onclick="openDutyModal()">
                 <span>+ Phân công trực</span>
             </button>
+            }
         </div>
         <div class="table-responsive">
             <table class="table" style="width:100%; border-collapse:collapse; font-size:12px;">
@@ -1502,12 +1150,15 @@ else
                                 <td style="padding:10px 16px; color:#334155;">@(ds.AssignedByName ?? "Trưởng khoa")</td>
                                 <td style="padding:10px 16px; color:#475569;">@(ds.Note ?? "Trực định kỳ")</td>
                                 <td style="padding:10px 16px; text-align:center;">
-                                    <button type="button" class="btn outline sm" style="color:#ef4444; border-color:#fca5a5; font-size:11px; padding:3px 8px; display:inline-flex; align-items:center; gap:4px;"
+                                    @if (canManageSchedule)
+                                                    {
+                                                    <button type="button" class="btn outline sm" style="color:#ef4444; border-color:#fca5a5; font-size:11px; padding:3px 8px; display:inline-flex; align-items:center; gap:4px;"
                                             onclick="openDeleteDutyModal(@ds.Id, '@CleanDocName(ds.StaffName)', '@ds.StartTime.ToString("dd/MM/yyyy HH:mm")')"
                                             title="Xóa ca trực này">
                                         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:11px;height:11px;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                                         <span>Xóa</span>
                                     </button>
+                                                    }
                                 </td>
                             </tr>
                         }
@@ -1535,9 +1186,7 @@ else
                         <select name="accountId" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" required>
                             @if (Model.AvailableStaff.Count == 0)
                             {
-                                <option value="1">BS. Nguyễn Hoàng Nam (Bác sĩ)</option>
-                                <option value="2">BS. Trần Minh Thư (Bác sĩ)</option>
-                                <option value="3">Điều dưỡng Hoàng Lan (Y tá)</option>
+                                <option value="" disabled selected>Chưa có dữ liệu</option>
                             }
                             else
                             {
@@ -1600,8 +1249,7 @@ else
                             <select name="doctorId" id="scheduleModalDoctorSelect" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" required>
                                 @if (Model.AvailableDoctors.Count == 0)
                                 {
-                                    <option value="1">BS. Nguyễn Hoàng Nam</option>
-                                    <option value="2">BS. Trần Minh Thư</option>
+                                    <option value="" disabled selected>Chưa có dữ liệu</option>
                                 }
                                 else
                                 {
@@ -1617,8 +1265,7 @@ else
                             <select name="roomId" id="scheduleModalRoomSelect" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" required>
                                 @if (Model.AvailableRooms.Count == 0)
                                 {
-                                    <option value="1">P.201 - Khám Nội 1</option>
-                                    <option value="2">P.203 - Khám Tim mạch</option>
+                                    <option value="" disabled selected>Chưa có dữ liệu</option>
                                 }
                                 else
                                 {
@@ -1749,7 +1396,7 @@ else
         document.getElementById('approveExceptionId').value = id;
         document.getElementById('approveModalSub').textContent = doctorName + ' · ' + date;
         document.getElementById('approveReplacementName').textContent = replacementName;
-        document.getElementById('approveAffectedCount').textContent = affectedCount || 2;
+        document.getElementById('approveAffectedCount').textContent = 'Kiểm tra khi duyệt';
         document.getElementById('approveModal').classList.add('show');
     }
     function closeApproveModal() {
@@ -1786,8 +1433,8 @@ else
         document.getElementById('recDetailTitle').textContent = 'Hồ sơ: ' + name;
         document.getElementById('recDetailSub').textContent = code + ' · ' + age + ' · ' + doctor + ' · ' + date;
         document.getElementById('recDetailDiagnosis').textContent = diagnosis || 'Chưa cập nhật mã ICD';
-        document.getElementById('recDetailExam').textContent = exam || 'Khám lâm sàng tim mạch ổn định.';
-        document.getElementById('recDetailConclusion').textContent = conclusion || 'Đã hoàn tất khám theo yêu cầu.';
+        document.getElementById('recDetailExam').textContent = exam || 'Chưa cập nhật';
+        document.getElementById('recDetailConclusion').textContent = conclusion || 'Chưa cập nhật';
         document.getElementById('recordDetailModal').classList.add('show');
     }
     function closeRecordDetailModal() {
@@ -1825,37 +1472,6 @@ else
     }
     function closeQueueDetailModal() {
         document.getElementById('queueDetailModal').classList.remove('show');
-    }
-
-    // --- Xử lý Tìm kiếm Người Khám (Image 5) ---
-    function filterPatients(query) {
-        const q = (query || '').toLowerCase().trim();
-        const rows = document.querySelectorAll('.patient-row');
-        let count = 0;
-        rows.forEach(r => {
-            const text = (r.getAttribute('data-search') || '').toLowerCase();
-            if (!q || text.includes(q)) {
-                r.style.display = '';
-                count++;
-            } else {
-                r.style.display = 'none';
-            }
-        });
-        const countDisplay = document.getElementById('patientCountDisplay');
-        if (countDisplay) countDisplay.textContent = count + ' hồ sơ';
-    }
-
-    function openPatientModal(name, code, gender, dob, phone, address) {
-        document.getElementById('pInfoName').textContent = name;
-        document.getElementById('pInfoCode').textContent = code;
-        document.getElementById('pInfoGender').textContent = gender;
-        document.getElementById('pInfoDob').textContent = dob;
-        document.getElementById('pInfoPhone').textContent = phone;
-        document.getElementById('pInfoAddress').textContent = address;
-        document.getElementById('patientInfoModal').classList.add('show');
-    }
-    function closePatientModal() {
-        document.getElementById('patientInfoModal').classList.remove('show');
     }
 
     // --- Xử lý Lịch khám tuần & Modal Phân ca (Image 4) ---
@@ -1974,10 +1590,10 @@ else
         if (etInput) etInput.value = endTime || (shift === 1 ? '16:30' : '11:30');
 
         const mpInput = document.getElementById('scheduleModalMaxPatients');
-        if (mpInput) mpInput.value = maxPatients || 40;
+        if (mpInput) mpInput.value = maxPatients ?? 40;
 
         const osInput = document.getElementById('scheduleModalOnlineSlots');
-        if (osInput) osInput.value = onlineSlots || 25;
+        if (osInput) osInput.value = onlineSlots ?? 25;
 
         document.getElementById('scheduleModal').classList.add('show');
     }

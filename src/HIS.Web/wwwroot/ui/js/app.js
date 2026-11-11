@@ -1,10 +1,12 @@
 function boot() {
     const route = location.hash.replace(/^#\//, '');
-    if (config.initialRoute === 'public/home' && route.startsWith('public/'))
-        ui.route = route;
     bindEvents();
+    if (config.initialRoute === 'public/home' && route.startsWith('public/')) {
+        go(route);
+        return;
+    }
     render();
-    if (ui.route.startsWith('public/')) loadCatalog();
+    if (ui.route.startsWith('public/') || ui.route === 'patient/booking') loadCatalog();
 }
 
 window.addEventListener('DOMContentLoaded', boot);

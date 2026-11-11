@@ -1,5 +1,6 @@
 /* views / shared */
 const pageTitles = {
+    'public/booking': 'Đặt lịch khám',
     'public/home': 'Chăm sóc sức khỏe',
     'public/specialties': 'Chuyên khoa',
     'public/doctors': 'Đội ngũ bác sĩ',
@@ -37,7 +38,7 @@ function button(label, action, name = '', classes = '', attributes = '') {
 }
 
 function link(label, route, name = '', classes = '') {
-    return `<a href="${esc(routeUrl(route))}" data-route="${esc(route)}" class="${classes}">
+    return `<a href="${esc(routeUrl(route))}" data-route="${esc(route)}" class="${classes}" ${ui.route === route ? 'aria-current="page"' : ''}>
         ${name ? icon(name) : ''}${label}
     </a>`;
 }
@@ -47,7 +48,7 @@ function avatar(name) {
 }
 
 function heading(title, description = '', actions = '') {
-    return `<div class="page-heading"><div><h1>${esc(title)}</h1>
+    return `<div class="page-heading"><div><h1 tabindex="-1">${esc(title)}</h1>
         <p>${esc(description)}</p></div><div class="heading-actions">${actions}</div></div>`;
 }
 
@@ -58,7 +59,7 @@ function empty(title, description = '', action = '') {
 
 function unavailableNotice() {
     return `<div class="notice" role="status">${icon('info')}
-        <span>Chức năng đang được hoàn thiện. Hiện chưa có dữ liệu để hiển thị hoặc lưu thay đổi.</span>
+        <span>Chức năng đang được hoàn thiện. Hiện chưa thể tra cứu hoặc gửi yêu cầu tại màn hình này.</span>
     </div>`;
 }
 
@@ -83,9 +84,7 @@ function pendingStats(labels) {
     return `<div class="stats-grid ${labels.length === 3 ? 'three' : ''}">
         ${labels
             .map(
-                (
-                    label,
-                ) => `<div class="stat-card"><span class="stat-label">${esc(label)}</span>
+                (label) => `<div class="stat-card"><span class="stat-label">${esc(label)}</span>
             <strong aria-label="Chưa có dữ liệu">—</strong><small>Chưa có dữ liệu</small></div>`,
             )
             .join('')}
@@ -95,6 +94,6 @@ function pendingStats(labels) {
 function pageIntro(kicker, title, description) {
     return `<section class="page-intro"><div class="breadcrumb">
         ${link('Trang chủ', 'public/home')}${icon('chevron')}<span>${esc(title)}</span>
-        </div><span class="eyebrow">${esc(kicker)}</span><h1>${esc(title)}</h1><p>${esc(description)}</p>
+        </div><span class="eyebrow">${esc(kicker)}</span><h1 tabindex="-1">${esc(title)}</h1><p>${esc(description)}</p>
     </section>`;
 }

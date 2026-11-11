@@ -1,10 +1,13 @@
 function render() {
-    document.title =
-        'MediCare — ' + (pageTitles[ui.route] || 'Chăm sóc sức khỏe');
+    const bookingFocus = ui.route === 'public/booking' ? document.activeElement?.id : null;
+    document.title = 'MediCare — ' + (pageTitles[ui.route] || 'Chăm sóc sức khỏe');
     $('#app').innerHTML =
         ui.route.startsWith('public/') || ui.route.startsWith('patient/')
             ? publicShell()
             : staffShell();
+    syncHeroCarousel();
+    if (ui.route === 'public/booking' || ui.route === 'patient/booking') ensureGuestSlots();
+    if (bookingFocus) document.getElementById(bookingFocus)?.focus();
 }
 
 function openModal(title, body, footer = '') {

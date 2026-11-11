@@ -1,0 +1,268 @@
+@media (max-width: 1280px) {
+    .hospital-portal
+        :is(.public-main, .patient-main, .header-inner, .utility-bar > div, .patient-nav > div) {
+        width: calc(100% - 48px);
+    }
+    .hospital-portal .header-inner {
+        gap: 18px;
+    }
+    .hospital-portal .public-nav {
+        gap: 17px;
+    }
+    .hospital-portal .home-hero {
+        gap: 35px;
+    }
+}
+
+@media (max-width: 1000px) {
+    .hospital-portal .public-nav {
+        gap: 13px;
+    }
+    .hospital-portal .public-nav a {
+        font-size: 11px;
+    }
+    .hospital-portal .header-inner {
+        gap: 12px;
+    }
+    .hospital-portal .public-header-actions {
+        gap: 8px;
+        margin-left: 0;
+    }
+    .hospital-portal .patient-account > span:not(.avatar) {
+        display: none;
+    }
+    .hospital-portal .quick-item {
+        padding: 18px;
+        gap: 11px;
+    }
+    .hospital-portal .quick-item > .icon {
+        display: none;
+    }
+    .hospital-portal .hero-copy h1 {
+        font-size: 34px;
+    }
+    .hospital-portal .hero-copy > p {
+        font-size: 13px;
+    }
+}
+
+@media (max-width: 850px) {
+    .hospital-portal .public-nav.open > .nav-mobile {
+        display: flex;
+    }
+    .hospital-portal .public-nav .menu-book {
+        background: #edf8fc;
+        color: #007895;
+        border-radius: 7px;
+    }
+
+    .hospital-portal .header-inner {
+        min-height: 72px;
+    }
+    .hospital-portal .public-nav {
+        display: none;
+    }
+    .hospital-portal .public-nav.open {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        position: absolute;
+        top: 100%;
+        left: -24px;
+        right: -24px;
+        padding: 12px 24px 20px;
+        margin: 0;
+        gap: 0;
+        background: #fff;
+        border-bottom: 1px solid #d0e1ea;
+        box-shadow: 0 12px 18px #15334d10;
+    }
+    .hospital-portal .public-nav a {
+        font-size: 14px;
+        padding: 13px 10px;
+    }
+    .hospital-portal .public-header-actions {
+        margin-left: auto;
+    }
+    .hospital-portal .public-header-actions > .btn.ghost {
+        display: none;
+    }
+    .hospital-portal .home-hero {
+        grid-template-columns: 1fr 1fr;
+        gap: 25px;
+        padding-top: 30px;
+    }
+    .hospital-portal .hero-trust {
+        display: none;
+    }
+    .hospital-portal .hero-actions {
+        gap: 9px;
+        margin-top: 20px;
+    }
+    .hospital-portal .hero-actions .btn {
+        font-size: 11px;
+        padding: 9px 12px;
+    }
+    .hospital-portal .quick-access {
+        grid-template-columns: 1fr;
+        margin-bottom: 30px;
+    }
+    .hospital-portal .quick-item {
+        border-right: 0;
+        border-bottom: 1px solid #dbe9f0;
+        padding: 15px 20px;
+    }
+    .hospital-portal .quick-item:last-child {
+        border-bottom: 0;
+    }
+    .hospital-portal .quick-item > .icon {
+        display: block;
+    }
+    .home-doctor-search {
+        grid-template-columns: 1fr 1fr;
+    }
+    .home-doctor-search > .btn {
+        grid-column: 1 / -1;
+    }
+    .portal-journey {
+        gap: 28px;
+        padding: 25px;
+    }
+    .hospital-portal .booking-layout {
+        grid-template-columns: 1fr;
+    }
+    .hospital-portal .patient-nav {
+        overflow-x: auto;
+    }
+    .hospital-portal .patient-nav > div {
+        width: max-content;
+    }
+    .hospital-portal .footer-top {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    .hospital-portal .public-nav.open {
+        left: -16px;
+        right: -16px;
+    }
+    .hospital-portal :is(.public-main, .patient-main, .header-inner, .utility-bar > div) {
+        width: calc(100% - 32px);
+    }
+    .hospital-portal .utility-bar > div {
+        padding: 6px 0;
+        font-size: 9px;
+    }
+    .hospital-portal .utility-bar > div > span:nth-child(2) {
+        display: none;
+    }
+    .hospital-portal .brand {
+        font-size: 24px;
+    }
+    .hospital-portal .brand-mark {
+        width: 34px;
+        height: 34px;
+        font-size: 28px;
+    }
+    .hospital-portal .public-header-actions .header-book {
+        padding: 9px 10px;
+        min-height: 40px;
+        font-size: 11px;
+    }
+    .hospital-portal .public-header-actions:has(.patient-account) .header-book {
+        display: none;
+    }
+    .hospital-portal .home-hero {
+        grid-template-columns: 1fr;
+        padding: 28px 0 26px;
+        gap: 26px;
+    }
+    .hospital-portal .hero-copy h1 {
+        font-size: 34px;
+        margin: 12px 0 15px;
+    }
+    .hospital-portal .hero-copy > p {
+        font-size: 13px;
+        line-height: 1.85;
+    }
+    .hospital-portal .hero-actions .btn {
+        flex: 1;
+        font-size: 12px;
+    }
+    .hospital-portal .hero-photo {
+        aspect-ratio: 1.48;
+        border-radius: 13px;
+    }
+    .hospital-portal .photo-note {
+        bottom: 60px;
+        left: 12px;
+        font-size: 10px;
+        padding: 7px 10px;
+    }
+    .doctor-search-section {
+        padding: 20px;
+        margin-bottom: 30px;
+    }
+    .doctor-search-section h2 {
+        font-size: 22px;
+    }
+    .home-doctor-search {
+        grid-template-columns: 1fr;
+    }
+    .hospital-portal .home-section {
+        margin-bottom: 32px;
+    }
+    .hospital-portal .section-heading {
+        flex-direction: column;
+        align-items: start;
+        gap: 12px;
+        margin-bottom: 17px;
+    }
+    .hospital-portal .section-heading h2 {
+        font-size: 23px;
+    }
+    .hospital-portal .doctor-card {
+        grid-template-columns: 92px minmax(0, 1fr);
+    }
+    .hospital-portal .doctor-card-body {
+        padding: 20px 16px;
+    }
+    .hospital-portal .doctor-card h3 {
+        font-size: 16px;
+    }
+    .portal-journey {
+        grid-template-columns: 1fr;
+        gap: 28px;
+        margin-bottom: 30px;
+    }
+    .portal-journey h2 {
+        font-size: 25px;
+    }
+    .hospital-portal .patient-main {
+        padding-top: 22px;
+    }
+    .hospital-portal .public-footer {
+        padding: 30px 16px 0;
+    }
+    .hospital-portal .footer-top {
+        gap: 24px;
+    }
+    .hospital-portal .footer-top > div:first-child {
+        grid-column: 1 / -1;
+    }
+    .hospital-portal .footer-bottom {
+        flex-direction: column;
+        gap: 6px;
+    }
+}
+
+@media (max-width: 380px) {
+    .hospital-portal .public-header-actions .header-book {
+        display: none;
+    }
+    .hospital-portal .hero-copy h1 {
+        font-size: 28px;
+        letter-spacing: -1px;
+    }
+}

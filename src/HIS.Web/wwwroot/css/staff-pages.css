@@ -1,0 +1,43 @@
+.reception-workspace .staff-main,
+.reception-workspace .staff-main > * {
+    min-width: 0;
+}
+
+.reception-workspace .sidebar-scrim[hidden] {
+    display: none;
+}
+
+.reception-workspace .page-heading {
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.reception-workspace .page-heading > div {
+    flex-wrap: wrap;
+}
+
+.reception-workspace .table-responsive {
+    overflow-x: auto;
+}
+
+.reception-workspace .reception-account-menu {
+    z-index: 40;
+}
+
+.reception-workspace :is(input, select, textarea).form-control {
+    width: 100%;
+    min-height: 40px;
+    padding: 9px 11px;
+    color: #15334d;
+    background: #fff;
+    border: 1px solid #b7cbd8;
+    border-radius: 7px;
+}
+
+.reception-workspace .text-muted {
+    color: #536a7e;
+}
+.reception-workspace .text-end {
+    text-align: right;
+}

@@ -4,6 +4,7 @@
 
 @{
     var tab = Model.ActiveTab;
+    ViewData["StaffDepartment"] = Model.DepartmentName;
     ViewData["Title"] = tab switch
     {
         "labs" => "Chỉ định & kết quả",
@@ -23,85 +24,9 @@
     var sunday = monday.AddDays(6);
 }
 
-<style>
-    /* Dialog nổi độc lập - không bị xung đột CSS modal hay che trắng màn hình */
-    .app-dialog-backdrop {
-        position: fixed;
-        inset: 0;
-        background: rgba(17, 38, 56, 0.55);
-        backdrop-filter: blur(2px);
-        z-index: 9999;
-        display: none;
-        align-items: center;
-        justify-content: center;
-        padding: 16px;
-    }
-    .app-dialog-backdrop.show {
-        display: flex !important;
-    }
-    .app-dialog-card {
-        background: #ffffff;
-        border-radius: 12px;
-        box-shadow: 0 20px 45px rgba(0, 0, 0, 0.25);
-        width: 100%;
-        max-width: 580px;
-        max-height: 90vh;
-        overflow-y: auto;
-        display: flex;
-        flex-direction: column;
-        animation: appDialogSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .app-dialog-card.lg {
-        max-width: 760px;
-    }
-    .app-dialog-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 16px 20px;
-        background: #111f38;
-        color: #fff;
-        border-top-left-radius: 12px;
-        border-top-right-radius: 12px;
-    }
-    .app-dialog-close {
-        background: rgba(255, 255, 255, 0.12);
-        border: none;
-        color: #ffffff;
-        font-size: 16px;
-        font-weight: 700;
-        width: 30px;
-        height: 30px;
-        border-radius: 6px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: background 0.15s;
-    }
-    .app-dialog-close:hover {
-        background: rgba(255, 255, 255, 0.28);
-    }
-    .app-dialog-body {
-        padding: 20px;
-        font-size: 13px;
-        color: #334155;
-    }
-    .app-dialog-footer {
-        padding: 12px 20px;
-        border-top: 1px solid #f1f5f9;
-        display: flex;
-        justify-content: flex-end;
-        gap: 10px;
-        background: #fbfcfe;
-        border-bottom-left-radius: 12px;
-        border-bottom-right-radius: 12px;
-    }
-    @@keyframes appDialogSlideIn {
-        from { transform: translateY(-14px) scale(0.98); opacity: 0; }
-        to { transform: translateY(0) scale(1); opacity: 1; }
-    }
-</style>
+@section Styles {
+    <link rel="stylesheet" href="~/css/staff-consultation.css" asp-append-version="true" />
+}
 
 @if (tab == "labs")
 {
@@ -380,7 +305,7 @@ else if (tab == "schedule")
     var docDisplayName = string.IsNullOrWhiteSpace(Model.CurrentDoctorName) ? "BS. Nguyễn Hoàng Nam" : Model.CurrentDoctorName;
     var docDisplayInit = docDisplayName.Split(' ').Last()[..Math.Min(2, docDisplayName.Split(' ').Last().Length)].ToUpper();
     var docDisplayRoom = string.IsNullOrWhiteSpace(Model.CurrentDoctorRoom) ? "P.201" : Model.CurrentDoctorRoom;
-    var deptDisplayName = string.IsNullOrWhiteSpace(Model.DepartmentName) ? "Khoa Nội" : Model.DepartmentName;
+    var deptDisplayName = string.IsNullOrWhiteSpace(Model.DepartmentName) ? "Chưa liên kết khoa" : Model.DepartmentName;
     var currentClaimId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
     int.TryParse(currentClaimId, out var currentAccId);
 
@@ -856,7 +781,7 @@ else
         <div class="heading-actions">
             @if (Model.IsDepartmentHead)
             {
-                <a href="/Staff/Schedule?tab=schedule" class="btn outline" style="border:1px solid #cbd5e1; padding:8px 16px; border-radius:6px; color:#334155; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:6px; text-decoration:none;">
+                <a href="@Url.Action("Index", "Schedule", new { area = "Staff" })" class="btn outline" style="border:1px solid #cbd5e1; padding:8px 16px; border-radius:6px; color:#334155; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:6px; text-decoration:none;">
                     <span>Điều phối khoa</span>
                 </a>
             }
