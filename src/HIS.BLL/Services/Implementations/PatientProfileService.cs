@@ -47,7 +47,7 @@ public class PatientProfileService(AppDbContext db, TimeProvider clock) : IPatie
                 p.DateOfBirth,
                 p.Gender,
                 p.PhoneNumber,
-                account.Email,
+                link.Relationship == PatientRelationship.Self ? account.Email : null,
                 p.Address,
                 p.NationalId,
                 link.Relationship.ToString(),
@@ -172,7 +172,7 @@ public class PatientProfileService(AppDbContext db, TimeProvider clock) : IPatie
             Patient = relativePatient,
             Relationship = rel,
             Status = LinkStatus.Active,
-            CanViewRecords = rel == PatientRelationship.Child && (DateOnly.FromDateTime(now).Year - request.DateOfBirth.Year < 18),
+            CanViewRecords = rel == PatientRelationship.Child && (DateOnly.FromDateTime(now) < request.DateOfBirth.AddYears(18)),
             CreatedAt = now
         };
         db.AccountPatientProfiles.Add(link);

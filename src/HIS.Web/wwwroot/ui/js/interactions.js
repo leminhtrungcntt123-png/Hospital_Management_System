@@ -21,6 +21,7 @@ function accountMenu() {
                 <a class="account-popover-item" href="${esc(routeUrl('patient/family'))}" data-route="patient/family">
                     ${icon('users')}<span>Thông tin người thân</span>
                 </a>
+                <a class="account-popover-item" href="${esc(config.changePassword)}">${icon('shield')}<span>Đổi mật khẩu</span></a>
                 ${config.role !== 'PATIENT' ? `<a class="account-popover-item" href="${esc(config.home)}">${icon('grid')}<span>Bàn làm việc</span></a>` : ''}
             </div>
         </div>`,

@@ -166,7 +166,7 @@ function renderRelativesContent() {
                             <strong class="relative-card-name">${esc(r.fullName)}</strong>
                             <div class="relative-card-meta">
                                 <span><strong>Ngày sinh:</strong> ${esc(r.dateOfBirth || '—')}</span>
-                                <span><strong>Giới tính:</strong> ${Number(r.gender) === 1 ? 'Nữ' : 'Nam'}</span>
+                                <span><strong>Giới tính:</strong> ${Number(r.gender) === 1 ? 'Nữ' : Number(r.gender) === 2 ? 'Khác' : 'Nam'}</span>
                                 <span><strong>Số điện thoại:</strong> ${esc(r.phoneNumber || '—')}</span>
                                 ${r.medicalCode ? `<span><strong>Mã y tế:</strong> ${esc(r.medicalCode)}</span>` : ''}
                             </div>
@@ -313,7 +313,9 @@ function openAddRelativeModal() {
     );
 }
 
+let isSubmittingRelative = false;
 async function submitAddRelative() {
+    if (isSubmittingRelative) return;
     const nameEl = document.getElementById('rel-name');
     const genderEl = document.getElementById('rel-gender');
     const relationEl = document.getElementById('rel-relation');
@@ -322,6 +324,7 @@ async function submitAddRelative() {
     const emailEl = document.getElementById('rel-email');
     const codeEl = document.getElementById('rel-code');
     const errEl = document.getElementById('relativeModalError');
+    const submitBtn = document.querySelector('#modal [data-action="save"]') || document.querySelector('#modal .btn.primary');
 
     if (!nameEl || !dobEl || !phoneEl) return;
     if (!nameEl.value.trim() || !dobEl.value || !phoneEl.value.trim()) {
@@ -341,6 +344,9 @@ async function submitAddRelative() {
         email: emailEl?.value.trim() || null,
         medicalCode: codeEl?.value.trim() || null,
     };
+
+    isSubmittingRelative = true;
+    if (submitBtn) submitBtn.disabled = true;
 
     try {
         const csrf = document.querySelector('[name="__RequestVerificationToken"]')?.value || '';
@@ -365,6 +371,9 @@ async function submitAddRelative() {
             errEl.textContent = err.message;
             errEl.style.display = 'block';
         }
+    } finally {
+        isSubmittingRelative = false;
+        if (submitBtn) submitBtn.disabled = false;
     }
 }
 

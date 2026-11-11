@@ -102,6 +102,11 @@ function bookingTime(value) {
     return new Date(value).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 }
 function bookingDate(value) {
+    if (!value) return '';
+    const parts = String(value).split('T')[0].split('-');
+    if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
     return new Date(value).toLocaleDateString('vi-VN');
 }
 
@@ -689,7 +694,7 @@ function renderBookingConfirmationStep() {
                     <dl class="confirm-dl">
                         <div><dt>Họ và tên</dt><dd><strong>${esc(p.fullName)}</strong></dd></div>
                         <div><dt>Ngày sinh</dt><dd>${esc(p.dateOfBirth)}</dd></div>
-                        <div><dt>Giới tính</dt><dd>${Number(p.gender) === 1 ? 'Nữ' : 'Nam'}</dd></div>
+                        <div><dt>Giới tính</dt><dd>${Number(p.gender) === 1 ? 'Nữ' : Number(p.gender) === 2 ? 'Khác' : 'Nam'}</dd></div>
                         <div><dt>Điện thoại</dt><dd>${esc(p.phoneNumber)}</dd></div>
                         <div><dt>Email</dt><dd>${esc(p.email || 'Chưa cung cấp')}</dd></div>
                         ${p.medicalCode ? `<div><dt>Mã y tế</dt><dd>${esc(p.medicalCode)}</dd></div>` : ''}

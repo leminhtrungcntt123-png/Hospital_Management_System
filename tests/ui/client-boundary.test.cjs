@@ -403,6 +403,7 @@ test('patient profile screen renders personal form and family navigation', () =>
 test('booking confirmation step displays two-column summary and policy checkbox', () => {
     const client = createClient(undefined, { initialRoute: 'public/booking', authenticated: false });
     client.run(`
+        Date.now = () => new Date('2026-11-11T00:00:00Z').getTime();
         catalog = { status: 'ready', departments: [], doctors: [{ id: 17, name: 'BS. Lê Minh', department: 'Nội' }] };
         guestBooking.doctorId = '17';
         guestBooking.date = '2026-11-12';
@@ -421,6 +422,7 @@ test('booking confirmation step displays two-column summary and policy checkbox'
 test('booking form requires valid email and blocks progression to confirm step without it', () => {
     const client = createClient(undefined, { initialRoute: 'public/booking', authenticated: false });
     client.run(`
+        Date.now = () => new Date('2026-11-11T00:00:00Z').getTime();
         catalog = { status: 'ready', departments: [], doctors: [{ id: 17, name: 'BS. Lê Minh', department: 'Nội' }] };
         guestBooking.status = 'ready';
         guestBooking.doctorId = '17';
@@ -437,6 +439,7 @@ test('booking form requires valid email and blocks progression to confirm step w
 test('guest booking submit event navigates to confirmation step instead of immediately calling submitGuestBooking', () => {
     const client = createClient(undefined, { initialRoute: 'public/booking', authenticated: false });
     client.run(`
+        Date.now = () => new Date('2026-11-11T00:00:00Z').getTime();
         bindEvents();
         catalog = { status: 'ready', departments: [], doctors: [{ id: 17, name: 'BS. Lê Minh', department: 'Nội' }] };
         guestBooking.status = 'ready';

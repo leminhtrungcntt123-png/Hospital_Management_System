@@ -98,12 +98,14 @@ public class BookingController(
     {
         if (!ModelState.IsValid || request == null) return BadRequest(new { message = "Kiểm tra họ tên, ngày sinh và số điện thoại người khám." });
 
+        request.BookedByAccountId = null;
         if (User.Identity?.IsAuthenticated == true && int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var accountId))
         {
             request.BookedByAccountId = accountId;
         }
 
         var isTestEnvironment = env.IsEnvironment("Testing");
+        string? cacheKey = null;
         if (!isTestEnvironment || !string.IsNullOrWhiteSpace(request.Email) || !string.IsNullOrWhiteSpace(request.OtpCode))
         {
             if (string.IsNullOrWhiteSpace(request.Email) || !request.Email.Contains('@'))
@@ -117,7 +119,7 @@ public class BookingController(
             }
 
             var normalizedEmail = request.Email.Trim().ToLowerInvariant();
-            var cacheKey = $"booking_otp:{normalizedEmail}";
+            cacheKey = $"booking_otp:{normalizedEmail}";
 
             if (!cache.TryGetValue<string>(cacheKey, out var expectedOtp))
             {
@@ -128,14 +130,20 @@ public class BookingController(
             {
                 return BadRequest(new { message = "Mã OTP không chính xác. Vui lòng kiểm tra lại email của bạn." });
             }
-
-            cache.Remove(cacheKey);
         }
 
         try
         {
             var result = await booking.ConfirmAsync(request, ct);
-            return result.IsSuccess ? Json(new { receipt = result.Value }) : BadRequest(new { message = result.Error.Message });
+            if (result.IsSuccess)
+            {
+                if (cacheKey != null)
+                {
+                    cache.Remove(cacheKey);
+                }
+                return Json(new { receipt = result.Value });
+            }
+            return BadRequest(new { message = result.Error.Message });
         }
         catch (OperationCanceledException)
         {

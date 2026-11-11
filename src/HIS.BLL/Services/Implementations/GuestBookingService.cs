@@ -76,8 +76,7 @@ public sealed class GuestBookingService(
             for (var index = 0; index < count; index++)
             {
                 var time = start.AddMinutes(index * schedule.SlotDurationMinutes);
-                // Chặn các khung giờ đã qua hoặc quá sát giờ hiện tại (cần tối thiểu 30 phút để chuẩn bị tiếp nhận)
-                if (time <= Now.AddMinutes(30))
+                if (time <= Now)
                 {
                     continue;
                 }
@@ -175,9 +174,17 @@ public sealed class GuestBookingService(
 
                 // Matching submitted identity never grants a guest access to the existing medical record.
                 Patient? patient = null;
-                if (request.PatientId.HasValue && request.PatientId.Value > 0)
+                if (request.PatientId.HasValue && request.PatientId.Value > 0 && request.BookedByAccountId.HasValue)
                 {
-                    patient = await db.Patients.FirstOrDefaultAsync(p => p.Id == request.PatientId.Value, ct);
+                    var isAuthorized = await db.AccountPatientProfiles.AnyAsync(
+                        link => link.AccountId == request.BookedByAccountId.Value
+                             && link.PatientId == request.PatientId.Value
+                             && link.Status == LinkStatus.Active, ct);
+
+                    if (isAuthorized)
+                    {
+                        patient = await db.Patients.FirstOrDefaultAsync(p => p.Id == request.PatientId.Value, ct);
+                    }
                 }
                 if (patient == null)
                 {
