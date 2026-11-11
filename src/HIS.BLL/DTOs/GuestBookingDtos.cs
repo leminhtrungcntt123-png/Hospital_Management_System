@@ -26,6 +26,30 @@ public sealed class GuestBookingRequest
 
     [StringLength(255)]
     public string? Reason { get; set; }
+
+    [EmailAddress, StringLength(100)]
+    public string? Email { get; set; }
+
+    [StringLength(50)]
+    public string? MedicalCode { get; set; }
+
+    public string? OtpCode { get; set; }
+
+    public int? PatientId { get; set; }
+
+    public int? BookedByAccountId { get; set; }
+}
+
+public sealed class SendBookingOtpRequest
+{
+    [Required, EmailAddress]
+    public string Email { get; set; } = "";
+
+    public string FullName { get; set; } = "";
+
+    public int ScheduleId { get; set; }
+
+    public DateTime StartTime { get; set; }
 }
 
 public sealed record GuestBookingSlot(

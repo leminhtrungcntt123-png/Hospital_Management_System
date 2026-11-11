@@ -82,6 +82,8 @@ function publicContent() {
             return guidePage();
         case 'patient/appointments':
             return appointmentsPage();
+        case 'patient/profile':
+            return personalProfilePage();
         case 'patient/family':
             return familyPage();
         case 'patient/records':

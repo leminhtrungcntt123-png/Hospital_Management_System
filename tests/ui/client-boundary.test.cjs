@@ -391,3 +391,67 @@ test('carousel exposes three images and respects reduced motion', () => {
     assert.doesNotMatch(client.app.innerHTML, /data-act="hero-pause"/);
     assert.match(client.run('doctorPhoto()'), /Ảnh minh hoạ/);
 });
+
+test('patient profile screen renders personal form and family navigation', () => {
+    const client = createClient(undefined, { role: 'PATIENT', authenticated: true, displayName: 'Bùi Gia Phúc' });
+    client.run("ui.route = 'patient/profile'; render();");
+    assert.match(client.app.innerHTML, /Thông tin cá nhân/);
+    assert.match(client.app.innerHTML, /Thông tin người thân/);
+    assert.match(client.app.innerHTML, /Thay ảnh/);
+});
+
+test('booking confirmation step displays two-column summary and policy checkbox', () => {
+    const client = createClient(undefined, { initialRoute: 'public/booking', authenticated: false });
+    client.run(`
+        catalog = { status: 'ready', departments: [], doctors: [{ id: 17, name: 'BS. Lê Minh', department: 'Nội' }] };
+        guestBooking.doctorId = '17';
+        guestBooking.date = '2026-11-12';
+        guestBooking.slots = [{ scheduleId: 1, startTime: '2026-11-12T08:00:00', endTime: '2026-11-12T08:30:00', room: 'P101', remaining: 2 }];
+        guestBooking.selected = slotKey(guestBooking.slots[0]);
+        guestBooking.patient = { fullName: 'Nguyễn Văn An', dateOfBirth: '1990-01-01', phoneNumber: '0912345678', email: 'an@example.com' };
+        proceedToConfirmation();
+    `);
+    assert.equal(client.run('guestBooking.step'), 'confirm');
+    assert.match(client.app.innerHTML, /Xác nhận đặt lịch/);
+    assert.match(client.app.innerHTML, /Thông tin lịch hẹn/);
+    assert.match(client.app.innerHTML, /Thông tin người khám/);
+    assert.match(client.app.innerHTML, /Chính sách bảo vệ dữ liệu cá nhân/);
+});
+
+test('booking form requires valid email and blocks progression to confirm step without it', () => {
+    const client = createClient(undefined, { initialRoute: 'public/booking', authenticated: false });
+    client.run(`
+        catalog = { status: 'ready', departments: [], doctors: [{ id: 17, name: 'BS. Lê Minh', department: 'Nội' }] };
+        guestBooking.status = 'ready';
+        guestBooking.doctorId = '17';
+        guestBooking.date = '2026-11-12';
+        guestBooking.slots = [{ scheduleId: 1, startTime: '2026-11-12T08:00:00', endTime: '2026-11-12T08:30:00', room: 'P101', remaining: 2 }];
+        guestBooking.selected = slotKey(guestBooking.slots[0]);
+        guestBooking.patient = { fullName: 'Nguyễn Văn An', dateOfBirth: '1990-01-01', phoneNumber: '0912345678', email: '' };
+        proceedToConfirmation();
+    `);
+    assert.equal(client.run('guestBooking.step'), 'form');
+    assert.match(client.run('guestBooking.error'), /Email/);
+});
+
+test('guest booking submit event navigates to confirmation step instead of immediately calling submitGuestBooking', () => {
+    const client = createClient(undefined, { initialRoute: 'public/booking', authenticated: false });
+    client.run(`
+        bindEvents();
+        catalog = { status: 'ready', departments: [], doctors: [{ id: 17, name: 'BS. Lê Minh', department: 'Nội' }] };
+        guestBooking.status = 'ready';
+        guestBooking.doctorId = '17';
+        guestBooking.date = '2026-11-12';
+        guestBooking.slots = [{ scheduleId: 1, startTime: '2026-11-12T08:00:00', endTime: '2026-11-12T08:30:00', room: 'P101', remaining: 2 }];
+        guestBooking.selected = slotKey(guestBooking.slots[0]);
+        guestBooking.patient = { fullName: 'Nguyễn Văn An', dateOfBirth: '1990-01-01', phoneNumber: '0912345678', email: 'an@example.com' };
+    `);
+    let prevented = false;
+    client.listeners.submit({
+        target: { matches: (sel) => sel === '[data-guest-booking]' },
+        preventDefault: () => { prevented = true; },
+    });
+    assert.equal(prevented, true);
+    assert.equal(client.run('guestBooking.step'), 'confirm');
+    assert.equal(client.run('guestBooking.receipt'), null);
+});
