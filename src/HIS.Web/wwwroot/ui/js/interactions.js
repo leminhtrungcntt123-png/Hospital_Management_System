@@ -3,13 +3,28 @@ function accountMenu() {
         location.assign(config.login);
         return;
     }
+    const email = config.userEmail || '';
     openModal(
         'Tài khoản của bạn',
-        `<div class="menu-links">
-        <p>${esc(config.displayName)}</p>
-        <a href="${esc(config.home)}">${icon('grid')}Không gian làm việc</a>
-        <a href="${esc(config.changePassword)}">${icon('shield')}Đổi mật khẩu</a>
-    </div>`,
+        `<div class="account-menu-popover">
+            <div class="account-popover-header">
+                <span class="account-popover-avatar">${avatar(config.displayName)}</span>
+                <div class="account-popover-meta">
+                    <strong>${esc(config.displayName)}</strong>
+                    ${email ? `<span>${esc(email)}</span>` : ''}
+                </div>
+            </div>
+            <div class="account-popover-links">
+                <a class="account-popover-item" href="${esc(routeUrl('patient/profile'))}" data-route="patient/profile">
+                    ${icon('user')}<span>Thông tin cá nhân</span>
+                </a>
+                <a class="account-popover-item" href="${esc(routeUrl('patient/family'))}" data-route="patient/family">
+                    ${icon('users')}<span>Thông tin người thân</span>
+                </a>
+                <a class="account-popover-item" href="${esc(config.changePassword)}">${icon('shield')}<span>Đổi mật khẩu</span></a>
+                ${config.role !== 'PATIENT' ? `<a class="account-popover-item" href="${esc(config.home)}">${icon('grid')}<span>Bàn làm việc</span></a>` : ''}
+            </div>
+        </div>`,
         button('Đóng', 'close') + button('Đăng xuất', 'logout', 'logout', 'outline'),
     );
 }
@@ -18,7 +33,7 @@ function bindEvents() {
     document.addEventListener('submit', (event) => {
         if (event.target.matches('[data-guest-booking]')) {
             event.preventDefault();
-            submitGuestBooking();
+            proceedToConfirmation();
             return;
         }
         if (!event.target.matches('[data-doctor-search]')) return;

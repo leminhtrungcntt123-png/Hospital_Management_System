@@ -15,6 +15,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Add DAL & BLL
 builder.Services.AddHisDataAccess(builder.Configuration);
 builder.Services.AddHisBusiness(builder.Configuration);
+builder.Services.AddMemoryCache();
 builder.Services.ConfigureOptions<HIS.Web.Common.AccountStatusCookieOptions>();
 
 // Cookie Authentication

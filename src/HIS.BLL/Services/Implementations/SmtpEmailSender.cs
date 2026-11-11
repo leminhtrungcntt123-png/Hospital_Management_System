@@ -44,7 +44,7 @@ public class SmtpEmailSender : IEmailSender
             {
                 Subject = subject,
                 Body = body,
-                IsBodyHtml = false
+                IsBodyHtml = true
             };
 
             await client.SendMailAsync(message, ct);

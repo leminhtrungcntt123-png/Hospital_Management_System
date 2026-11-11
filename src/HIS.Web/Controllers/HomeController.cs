@@ -51,9 +51,14 @@ public class HomeController(
                 })
             });
         }
-        catch (Exception error) when (error is not OperationCanceledException)
+        catch (OperationCanceledException)
         {
-            logger.LogError("Public catalog could not be loaded: {Type}", error.GetType().Name);
+            // Trình duyệt reload/chuyển trang làm hủy request - tránh Visual Studio debug exception popup
+            return new EmptyResult();
+        }
+        catch (Exception error)
+        {
+            logger.LogError(error, "Public catalog could not be loaded: {Message}", error.Message);
             return StatusCode(StatusCodes.Status503ServiceUnavailable,
                 new { message = "Chưa tải được thông tin bác sĩ và chuyên khoa. Vui lòng thử lại sau." });
         }

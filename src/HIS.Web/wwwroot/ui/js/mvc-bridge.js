@@ -1,7 +1,8 @@
 const mvcEntries = {
     'patient/booking': '/Booking',
     'patient/appointments': '/Patient/MyAppointments',
-    'patient/family': '/Patient/FamilyProfiles',
+    'patient/profile': '/Patient/FamilyProfiles?tab=personal',
+    'patient/family': '/Patient/FamilyProfiles?tab=family',
     'patient/records': '/Patient/MedicalRecords',
     'patient/notifications': '/Patient/Notifications',
     'staff/reception': '/Staff/Reception',
