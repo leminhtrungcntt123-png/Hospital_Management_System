@@ -114,7 +114,6 @@ public sealed class GuestBookingService(
         var strategy = db.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
         {
-            db.ChangeTracker.Clear();
             await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
             try
             {
@@ -122,6 +121,7 @@ public sealed class GuestBookingService(
                 await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({phone}))", ct);
                 var schedule = await db.DoctorSchedules
                     .FromSqlInterpolated($"SELECT * FROM doctor_schedules WHERE id = {request.ScheduleId} FOR UPDATE")
+                    .AsNoTracking()
                     .SingleOrDefaultAsync(ct);
                 if (schedule == null)
                 {
@@ -211,7 +211,7 @@ public sealed class GuestBookingService(
                     SlotId = slot.Id,
                     DoctorId = schedule.DoctorId,
                     RoomId = schedule.RoomId,
-                    DepartmentId = (await db.Doctors.SingleAsync(d => d.Id == schedule.DoctorId, ct)).DepartmentId,
+                    DepartmentId = (await db.Doctors.AsNoTracking().SingleAsync(d => d.Id == schedule.DoctorId, ct)).DepartmentId,
                     StatusId = (int)AppointmentStatusId.Confirmed,
                     BookingChannel = BookingChannel.Web,
                     VisitType = VisitType.Scheduled,
