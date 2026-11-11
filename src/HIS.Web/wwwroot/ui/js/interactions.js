@@ -10,28 +10,43 @@ function accountMenu() {
         <a href="${esc(config.home)}">${icon('grid')}Không gian làm việc</a>
         <a href="${esc(config.changePassword)}">${icon('shield')}Đổi mật khẩu</a>
     </div>`,
-        button('Đóng', 'close') +
-            button('Đăng xuất', 'logout', 'logout', 'outline'),
+        button('Đóng', 'close') + button('Đăng xuất', 'logout', 'logout', 'outline'),
     );
 }
 
 function bindEvents() {
+    document.addEventListener('submit', (event) => {
+        if (event.target.matches('[data-guest-booking]')) {
+            event.preventDefault();
+            submitGuestBooking();
+            return;
+        }
+        if (!event.target.matches('[data-doctor-search]')) return;
+        event.preventDefault();
+        const filters = new URLSearchParams({ q: ui.query, department: ui.department });
+        go('public/doctors?' + filters.toString());
+    });
     document.addEventListener('click', (event) => {
         const target = event.target.closest('[data-act], [data-route]');
         if (!target || target.disabled) return;
         if (target.dataset.route) {
-            if (
-                event.ctrlKey ||
-                event.metaKey ||
-                event.shiftKey ||
-                event.altKey
-            )
-                return;
+            if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
             event.preventDefault();
             go(target.dataset.route);
             return;
         }
         switch (target.dataset.act) {
+            case 'hero-slide':
+                setHeroSlide(Number(target.dataset.index));
+                syncHeroCarousel();
+                break;
+            case 'new-guest-booking':
+                resetGuestBooking();
+                render();
+                break;
+            case 'retry-guest-slots':
+                loadGuestSlots();
+                break;
             case 'menu':
                 ui.mobileMenu = !ui.mobileMenu;
                 render();
@@ -52,6 +67,10 @@ function bindEvents() {
         }
     });
     document.addEventListener('input', (event) => {
+        if (event.target.matches('[data-booking-field]')) {
+            guestBooking.patient[event.target.name] = event.target.value;
+            return;
+        }
         if (!event.target.matches('[data-search]')) return;
         const cursor = event.target.selectionStart;
         ui.query = event.target.value;
@@ -61,6 +80,14 @@ function bindEvents() {
         input?.setSelectionRange(cursor, cursor);
     });
     document.addEventListener('change', (event) => {
+        if (event.target.matches('[data-booking-field]')) {
+            guestBooking.patient[event.target.name] = event.target.value;
+            return;
+        }
+        if (event.target.matches('[data-booking-choice]')) {
+            changeGuestChoice(event.target.dataset.bookingChoice, event.target.value);
+            return;
+        }
         if (!event.target.matches('[data-department]')) return;
         ui.department = event.target.value;
         render();
@@ -71,6 +98,7 @@ function bindEvents() {
             if (ui.mobileMenu) {
                 ui.mobileMenu = false;
                 render();
+                $('[data-act="menu"]')?.focus();
             }
         }
         const modal = $('#overlay-root .modal');
@@ -90,7 +118,8 @@ function bindEvents() {
         if (event.target.classList.contains('modal-backdrop')) closeModal();
     });
     window.addEventListener('hashchange', () => {
+        if (location.hash && !location.hash.startsWith('#/')) return;
         const route = location.hash.replace(/^#\//, '') || 'public/home';
-        if (ui.route !== route) go(route);
+        if (ui.address !== route) go(route);
     });
 }

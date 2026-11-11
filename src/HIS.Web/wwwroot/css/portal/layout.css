@@ -1,0 +1,216 @@
+.hospital-portal {
+    background: #fff;
+    color: #15334d;
+    font-size: 14px;
+    line-height: 1.65;
+}
+
+.hospital-portal :is(a, button, input, select, textarea):focus-visible {
+    outline: 3px solid #56b8d2;
+    outline-offset: 3px;
+}
+
+.skip-link {
+    position: fixed;
+    top: -100px;
+    left: 20px;
+    z-index: 200;
+    padding: 12px 18px;
+    background: #fff;
+    color: #005f80;
+    border: 2px solid #079bc9;
+    border-radius: 8px;
+}
+
+.skip-link:focus {
+    top: 12px;
+}
+
+.hospital-portal .utility-bar {
+    background: #eef7fb;
+}
+.hospital-portal .utility-bar > div {
+    max-width: 1200px;
+    margin: auto;
+    padding: 8px 0;
+    font-size: 11px;
+}
+
+.hospital-portal .utility-bar > div > a {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.hospital-portal .public-header {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    background: #fff;
+    border-bottom: 1px solid #dce8ef;
+}
+
+.hospital-portal .header-inner {
+    position: relative;
+    max-width: 1200px;
+    min-height: 82px;
+    height: auto;
+    margin: auto;
+    padding: 12px 0;
+    gap: 26px;
+}
+
+.hospital-portal .brand {
+    font-size: 27px;
+    letter-spacing: -1px;
+}
+.hospital-portal .brand-mark {
+    width: 39px;
+    height: 39px;
+    font-size: 32px;
+}
+.hospital-portal .public-nav {
+    margin-left: auto;
+    gap: 24px;
+}
+.hospital-portal .public-nav a {
+    font-size: 13px;
+    padding: 13px 0;
+    color: #3e5870;
+}
+.hospital-portal .public-nav a.active {
+    color: #00718e;
+    font-weight: 750;
+}
+
+.hospital-portal .public-nav > .nav-mobile {
+    display: none;
+}
+.hospital-portal .public-header-actions {
+    gap: 12px;
+    margin-left: 10px;
+}
+.hospital-portal .public-main {
+    max-width: 1200px;
+    margin: auto;
+}
+.hospital-portal .btn {
+    min-height: 44px;
+    padding: 10px 17px;
+    font-size: 13px;
+    border-radius: 8px;
+    font-weight: 650;
+}
+.hospital-portal .btn.primary {
+    background: #007d9f;
+    border-color: #007d9f;
+    color: #fff;
+    box-shadow: 0 4px 12px #007d9f15;
+}
+.hospital-portal .btn.primary:hover {
+    background: #006583;
+    border-color: #006583;
+}
+.hospital-portal .btn.outline {
+    background: #fff;
+    border: 1px solid #a8c3d3;
+    color: #075f7f;
+}
+.hospital-portal .patient-account > span:not(.avatar) {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.hospital-portal .page-intro {
+    padding: 34px 0 28px;
+    background: #fff;
+}
+.hospital-portal .page-intro h1 {
+    font-size: 32px;
+    margin: 12px 0;
+}
+.hospital-portal .page-intro > p {
+    font-size: 14px;
+}
+.hospital-portal .listing-section {
+    padding: 0 0 44px;
+}
+.hospital-portal .listing-toolbar {
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+}
+.hospital-portal .listing-toolbar .search-input {
+    flex: 1;
+    min-width: min(100%, 240px);
+}
+.hospital-portal .patient-main {
+    max-width: 1200px;
+    padding: 30px 0 46px;
+    margin: auto;
+}
+.hospital-portal .patient-nav > div {
+    max-width: 1200px;
+    margin: auto;
+}
+.hospital-portal .patient-nav a {
+    padding: 17px;
+    font-size: 13px;
+}
+.hospital-portal .booking-layout {
+    grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
+}
+.hospital-portal .booking-summary {
+    align-self: start;
+}
+.hospital-portal .booking-summary .btn {
+    margin-top: 12px;
+}
+.hospital-portal .notice {
+    font-size: 13px;
+    line-height: 1.8;
+}
+.hospital-portal fieldset:disabled {
+    opacity: 0.8;
+}
+.hospital-portal .empty h3 {
+    font-size: 16px;
+}
+.hospital-portal .public-footer {
+    border-top: 1px solid #dce8ef;
+    background: #f7fafc;
+    padding: 38px max(24px, calc((100vw - 1200px) / 2)) 0;
+}
+.hospital-portal .footer-top {
+    max-width: 1200px;
+    gap: 32px;
+    padding: 0 0 30px;
+}
+.hospital-portal .footer-top h3 {
+    font-size: 13px;
+    margin-bottom: 12px;
+}
+.hospital-portal .footer-top :is(p, a) {
+    font-size: 12px;
+    line-height: 1.9;
+}
+.hospital-portal .footer-account {
+    min-height: 36px;
+    padding: 0;
+    box-shadow: none;
+    justify-content: start;
+    background: transparent;
+    font-size: 12px;
+}
+.hospital-portal .footer-bottom {
+    display: flex;
+    justify-content: space-between;
+    max-width: 1200px;
+    padding: 17px 0;
+    margin: auto;
+    font-size: 10px;
+    border-top: 1px solid #dce8ef;
+}

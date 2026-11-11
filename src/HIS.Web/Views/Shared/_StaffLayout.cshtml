@@ -1,0 +1,138 @@
+@{
+    var displayName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? "Nhân viên";
+    var initials = string.Concat(displayName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+        .TakeLast(2).Select(part => part[..1])).ToUpperInvariant();
+    var isHead = User.IsInRole("DEPARTMENT_HEAD") || User.IsInRole("DEPT_HEAD");
+    var isDoctor = User.IsInRole("DOCTOR");
+    var isNurse = User.IsInRole("NURSE") || User.IsInRole("RECEPTIONIST");
+    var roleName = isHead ? "Trưởng khoa" : isDoctor ? "Bác sĩ" : isNurse ? "Y tá / Lễ tân"
+        : User.IsInRole("ADMIN") ? "Quản trị viên" : "Thu ngân / BHYT";
+    var department = ViewData["StaffDepartment"]?.ToString() ?? User.FindFirst("DepartmentName")?.Value;
+    var controller = ViewContext.RouteData.Values["controller"]?.ToString();
+    var tab = Context.Request.Query["tab"].FirstOrDefault() ?? "";
+    var activePage = controller is "Schedule" or "Consultation" && !string.IsNullOrEmpty(tab)
+        ? controller + "/" + tab : controller;
+    string StaffUrl(string name, string? page = null) => Url.Action("Index", name, new { area = "Staff", tab = page })!;
+    string WorkspaceUrl(string page) => Url.Content("~/Workspace/staff/" + page);
+    var links = new List<(string Key, string Icon, string Label, string Url)>();
+
+    if (isNurse)
+    {
+        links.AddRange([
+            ("dashboard", "grid", "Bàn làm việc", WorkspaceUrl("dashboard")),
+            ("Reception", "users", "Tiếp nhận & gọi số", StaffUrl("Reception")),
+            ("vitals", "pulse", "Sinh hiệu", WorkspaceUrl("vitals")),
+            ("Cashier", "wallet", "Thu phí & BHYT", StaffUrl("Cashier")),
+            ("patients", "clipboard", "Người khám", WorkspaceUrl("patients")),
+            ("Schedule", "calendar", "Lịch làm việc", StaffUrl("Schedule"))
+        ]);
+    }
+    else if (isDoctor)
+    {
+        links.AddRange([
+            ("Consultation", "stethoscope", "Khám & kê đơn", StaffUrl("Consultation")),
+            ("Consultation/labs", "pulse", "Chỉ định & kết quả", StaffUrl("Consultation", "labs")),
+            ("Consultation/records", "clipboard", "Bệnh án", StaffUrl("Consultation", "records")),
+            ("Consultation/schedule", "calendar", "Lịch làm việc", StaffUrl("Consultation", "schedule")),
+            ("Consultation/exceptions", "calendar", "Nghỉ / đổi ca", StaffUrl("Consultation", "exceptions"))
+        ]);
+    }
+    else if (isHead)
+    {
+        links.AddRange([
+            ("Schedule", "calendar", "Lịch khám & trực", StaffUrl("Schedule")),
+            ("Schedule/exceptions", "calendar", "Duyệt nghỉ / đổi ca", StaffUrl("Schedule", "exceptions")),
+            ("Schedule/overview", "grid", "Tổng quan khoa", StaffUrl("Schedule", "overview")),
+            ("Schedule/records", "clipboard", "Bệnh án trong khoa", StaffUrl("Schedule", "records")),
+            ("Schedule/patients", "users", "Người khám", StaffUrl("Schedule", "patients"))
+        ]);
+    }
+    else
+    {
+        if (User.IsInRole("ADMIN"))
+        {
+            links.Add(("Management", "grid", "Quản trị hệ thống", Url.Action("Index", "Management", new { area = "Admin" })!));
+        }
+    }
+
+    var splitAt = isNurse ? 4 : 3;
+    var menuGroups = new[]
+    {
+        (Title: isNurse ? "CÔNG VIỆC HÔM NAY" : isDoctor ? "CHUYÊN MÔN" : isHead ? "ĐIỀU PHỐI KHOA" : "CÔNG VIỆC", Items: links.Take(splitAt)),
+        (Title: isNurse ? "HỒ SƠ & LỊCH" : isDoctor ? "CÁ NHÂN" : "THEO DÕI", Items: links.Skip(splitAt))
+    };
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#079bc9" />
+    <title>@ViewData["Title"] — MediCare HIS</title>
+    <partial name="MediCare/_Styles" />
+    <link rel="stylesheet" href="~/css/reception.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/staff-pages.css" asp-append-version="true" />
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body>
+    <div class="staff-app reception-workspace">
+        <aside class="sidebar" id="staff-sidebar" aria-label="Điều hướng nhân viên">
+            <div>
+                <a class="brand-link" asp-area="" asp-controller="Home" asp-action="Index" aria-label="MediCare, về trang chủ">
+                    <span class="brand"><span class="brand-mark">+</span><span>MediCare<sup>+</sup></span></span>
+                </a>
+                <div class="workspace">
+                    @await Html.PartialAsync("_AdminIcon", "building")
+                    <span><strong>@(string.IsNullOrWhiteSpace(department) ? "Không gian nhân viên" : department)</strong><small>@roleName</small></span>
+                </div>
+            </div>
+            <nav class="staff-nav" aria-label="Chức năng theo vai trò">
+                @foreach (var group in menuGroups.Where(group => group.Items.Any()))
+                {
+                    <div class="nav-group">
+                        <span>@group.Title</span>
+                        @foreach (var link in group.Items)
+                        {
+                            var isActive = activePage == link.Key || (link.Key == "Schedule" && controller == "Schedule" && tab == "schedule");
+                            <a href="@link.Url" class="@(isActive ? "active" : null)" aria-current="@(isActive ? "page" : null)">
+                                @await Html.PartialAsync("_AdminIcon", link.Icon)<span>@link.Label</span>
+                            </a>
+                        }
+                    </div>
+                }
+            </nav>
+            <div class="sidebar-bottom">
+                <a class="portal-link" asp-area="" asp-controller="Home" asp-action="Index">
+                    @await Html.PartialAsync("_AdminIcon", "external") Cổng bệnh nhân
+                </a>
+                <div><span><i></i>MediCare HIS</span></div>
+            </div>
+        </aside>
+        <button class="sidebar-scrim" id="staff-scrim" type="button" aria-label="Đóng điều hướng" hidden></button>
+        <div class="staff-shell">
+            <header class="staff-topbar">
+                <button class="icon-btn mobile-only" id="staff-menu" type="button" aria-controls="staff-sidebar" aria-expanded="false" aria-label="Mở điều hướng">
+                    @await Html.PartialAsync("_AdminIcon", "menu")
+                </button>
+                <div class="staff-breadcrumb"><span>@roleName</span><i>/</i><strong>@ViewData["Title"]</strong></div>
+                <details class="reception-account">
+                    <summary class="staff-profile" aria-label="Tài khoản của @displayName">
+                        <span class="avatar">@initials</span>
+                        <span><strong>@displayName</strong><small>@roleName</small></span>
+                        @await Html.PartialAsync("_AdminIcon", "down")
+                    </summary>
+                    <div class="reception-account-menu">
+                        <a asp-area="" asp-controller="Account" asp-action="ChangePassword">Đổi mật khẩu</a>
+                        <form asp-area="" asp-controller="Account" asp-action="Logout" method="post">
+                            <button type="submit">Đăng xuất</button>
+                        </form>
+                    </div>
+                </details>
+            </header>
+            <main class="staff-main" id="main-content">@RenderBody()</main>
+        </div>
+    </div>
+    <script src="~/js/staff-layout.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

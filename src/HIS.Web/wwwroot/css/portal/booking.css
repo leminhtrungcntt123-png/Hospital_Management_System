@@ -1,0 +1,299 @@
+.guest-booking-steps {
+    display: flex;
+    gap: 25px;
+    padding: 0;
+    margin: 0 0 28px;
+    list-style: none;
+    color: #61798b;
+}
+.guest-booking-steps li {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-weight: 600;
+}
+.guest-booking-steps li > span,
+.booking-section-title > span {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: #e7f1f7;
+    color: #526f83;
+}
+.guest-booking-steps .active {
+    color: #007c9c;
+}
+.guest-booking-steps .active > span {
+    background: #007d9f;
+    color: #fff;
+}
+.guest-booking-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    align-items: start;
+    gap: 24px;
+    margin-bottom: 45px;
+}
+.guest-booking-panels {
+    display: grid;
+    gap: 24px;
+    min-width: 0;
+    border: 0;
+    padding: 0;
+    margin: 0;
+}
+.guest-booking-panel {
+    padding: 26px;
+}
+.booking-section-title {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 23px;
+}
+.booking-section-title h2 {
+    font-size: 20px;
+    margin-bottom: 5px;
+}
+.booking-section-title p,
+.guest-booking-summary > p {
+    color: #516e83;
+    font-size: 13px;
+}
+.guest-booking-panel label > span,
+.guest-slot-picker legend > span {
+    color: #ad3247;
+}
+.guest-slot-picker {
+    border: 0;
+    padding: 0;
+    margin: 24px 0 0;
+    min-width: 0;
+}
+.guest-slot-picker legend {
+    margin-bottom: 12px;
+    font-weight: 600;
+}
+.guest-slot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 10px;
+}
+.guest-slot {
+    position: relative;
+    display: grid;
+    gap: 4px;
+    padding: 12px 7px;
+    text-align: center;
+    border: 1px solid #bdd6e2;
+    border-radius: 9px;
+    background: #fff;
+    cursor: pointer;
+    color: #173950;
+}
+.guest-slot input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+}
+.guest-slot small {
+    font-size: 11px;
+    color: #53758a;
+}
+.guest-slot.selected {
+    border: 2px solid #007d9f;
+    padding: 11px 6px;
+    background: #eaf7fb;
+    color: #006581;
+}
+.guest-slot:has(input:focus-visible) {
+    outline: 3px solid #098aa96b;
+    outline-offset: 3px;
+}
+.slot-empty {
+    padding: 18px;
+    border-radius: 9px;
+    border: 1px dashed #bdd5e2;
+    background: #f5f9fc;
+    color: #506c7f;
+    font-size: 13px;
+}
+.guest-booking-summary {
+    position: sticky;
+    top: 130px;
+    padding: 24px;
+}
+.guest-booking-summary h2 {
+    font-size: 20px;
+    margin: 15px 0 6px;
+}
+.guest-booking-summary .doctor-photo {
+    margin: 16px 0 0;
+    height: 170px;
+    width: 100%;
+    border-radius: 9px;
+    overflow: hidden;
+}
+.guest-booking-summary dl,
+.booking-receipt dl {
+    margin: 23px 0;
+}
+.guest-booking-summary dl > div,
+.booking-receipt dl > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 12px 0;
+    border-bottom: 1px solid #e1ebf2;
+}
+.guest-booking-summary dt,
+.booking-receipt dt {
+    color: #567185;
+}
+.guest-booking-summary dd,
+.booking-receipt dd {
+    margin: 0;
+    font-weight: 600;
+    text-align: right;
+}
+.booking-hint {
+    display: flex;
+    align-items: start;
+    gap: 8px;
+    font-size: 12px;
+    line-height: 1.7;
+    color: #4b6d82;
+    padding: 13px;
+    border-radius: 8px;
+    background: #edf7fc;
+}
+.booking-hint .icon {
+    flex-shrink: 0;
+    margin-top: 3px;
+}
+.booking-confirm-check {
+    display: flex;
+    align-items: start;
+    gap: 10px;
+    font-size: 12px;
+    margin: 20px 0;
+}
+.booking-confirm-check input {
+    margin-top: 4px;
+    flex-shrink: 0;
+    accent-color: #007d9f;
+}
+.guest-booking-summary > small {
+    display: block;
+    text-align: center;
+    font-size: 11px;
+    color: #607b8d;
+    margin-top: 12px;
+}
+.booking-error {
+    color: #9d243c;
+    background: #fff0f2;
+    border: 1px solid #ebc2cb;
+    padding: 12px;
+    border-radius: 8px;
+    margin: 15px 0;
+    font-size: 13px;
+}
+.booking-receipt {
+    max-width: 700px;
+    margin: 35px auto 55px;
+    padding: 35px;
+    text-align: center;
+}
+.booking-receipt h1 {
+    font-size: 30px;
+    margin: 12px 0;
+}
+.receipt-check {
+    display: grid;
+    place-items: center;
+    width: 60px;
+    height: 60px;
+    margin: 0 auto 20px;
+    color: #16806a;
+    background: #e6f5ef;
+    border-radius: 50%;
+}
+.receipt-code {
+    display: block;
+    padding: 18px;
+    margin-top: 25px;
+    font-size: 24px;
+    letter-spacing: 1px;
+    background: #eaf7fc;
+    color: #00728f;
+    border: 1px dashed #58a9bf;
+    border-radius: 10px;
+    overflow-wrap: anywhere;
+}
+.receipt-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 25px;
+}
+@media (max-width: 950px) {
+    .guest-booking-layout {
+        grid-template-columns: minmax(0, 1fr) 300px;
+        gap: 18px;
+    }
+    .guest-booking-panel,
+    .guest-booking-summary {
+        padding: 20px;
+    }
+}
+@media (max-width: 760px) {
+    .guest-booking-layout {
+        grid-template-columns: 1fr;
+    }
+    .guest-booking-summary {
+        position: static;
+    }
+    .guest-booking-summary .doctor-photo {
+        max-width: 300px;
+    }
+    .guest-booking-steps {
+        gap: 12px;
+        font-size: 11px;
+    }
+    .guest-booking-steps li {
+        flex: 1;
+        align-items: start;
+    }
+    .guest-booking-steps li > span {
+        width: 26px;
+        height: 26px;
+    }
+}
+@media (max-width: 420px) {
+    .guest-booking-panel .form-grid {
+        grid-template-columns: 1fr;
+    }
+    .guest-booking-steps {
+        gap: 9px;
+    }
+    .guest-booking-steps li {
+        display: grid;
+        gap: 8px;
+    }
+    .booking-receipt {
+        padding: 22px 18px;
+    }
+    .receipt-actions {
+        flex-direction: column;
+    }
+    .receipt-code {
+        font-size: 19px;
+    }
+}
+.hospital-portal .public-main:has(.guest-booking-steps) {
+    padding-top: 30px;
+}

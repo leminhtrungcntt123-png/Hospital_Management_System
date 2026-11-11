@@ -3,6 +3,7 @@ window.hisUiConfig = config;
 
 const ui = {
     route: config.initialRoute || 'public/home',
+    address: config.initialRoute || 'public/home',
     query: '',
     department: '',
     mobileMenu: false,
