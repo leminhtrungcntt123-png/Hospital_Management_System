@@ -81,7 +81,7 @@ public record DecisionMatrixCandidateDto(
     DoctorScheduleStatus Status,
     string? DoctorNote,
     int? ReallocatedFromId,
-    
+
     // 4 chỉ số hỗ trợ quyết định (Decision Matrix)
     bool HasNightDutyConflict,
     int RotationPriorityScore,           // 2 = ⭐⭐ Đền bù, 1 = ⭐ Luân phiên, 0 = Đã duyệt ca hot

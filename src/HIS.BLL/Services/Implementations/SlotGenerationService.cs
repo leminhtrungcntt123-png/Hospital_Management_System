@@ -31,8 +31,8 @@ public class SlotGenerationService : ISlotGenerationService
         var query = _context.DoctorSchedules
             .Include(s => s.Doctor)
             .Include(s => s.Room)
-            .Where(s => s.WorkDate >= startDate && s.WorkDate <= endDate 
-                     && s.Status == DoctorScheduleStatus.Approved 
+            .Where(s => s.WorkDate >= startDate && s.WorkDate <= endDate
+                     && s.Status == DoctorScheduleStatus.Approved
                      && s.RoomId.HasValue);
 
         if (departmentId.HasValue && departmentId.Value > 0)
@@ -49,8 +49,8 @@ public class SlotGenerationService : ISlotGenerationService
         var doctorIds = schedules.Select(s => s.DoctorId).Distinct().ToList();
         var approvedExceptions = await _context.ScheduleExceptions
             .AsNoTracking()
-            .Where(e => doctorIds.Contains(e.DoctorId) 
-                     && e.Date >= startDate && e.Date <= endDate 
+            .Where(e => doctorIds.Contains(e.DoctorId)
+                     && e.Date >= startDate && e.Date <= endDate
                      && e.Status == ScheduleExceptionStatus.Approved)
             .ToListAsync(ct);
 
@@ -71,8 +71,8 @@ public class SlotGenerationService : ISlotGenerationService
 
         foreach (var s in schedules)
         {
-            bool isSkipped = approvedExceptions.Any(e => e.DoctorId == s.DoctorId 
-                                                     && e.Date == s.WorkDate 
+            bool isSkipped = approvedExceptions.Any(e => e.DoctorId == s.DoctorId
+                                                     && e.Date == s.WorkDate
                                                      && (e.Shift == null || e.Shift == s.Shift));
             if (isSkipped)
             {
