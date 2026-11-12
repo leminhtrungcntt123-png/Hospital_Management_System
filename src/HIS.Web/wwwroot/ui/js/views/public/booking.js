@@ -453,16 +453,9 @@ function guestSlotsMarkup() {
     if (guestBooking.status === 'error')
         return `<p class="slot-empty" role="alert">${esc(guestBooking.error)}</p>${button('Tải lại giờ khám', 'retry-guest-slots', 'refresh', 'btn outline')}`;
 
-    // Tự động loại bỏ các khung giờ đã trôi qua thời gian hiện tại
-    const now = Date.now();
-    const availableSlots = guestBooking.slots.filter((slot) => {
-        const t = new Date(slot.startTime).getTime();
-        return isNaN(t) || t > now;
-    });
-
-    if (!availableSlots.length)
-        return '<p class="slot-empty">Chưa có khung giờ còn chỗ trong ngày này (hoặc các khung giờ trong ngày đã kết thúc). Bạn hãy chọn ngày khác hoặc bác sĩ khác.</p>';
-    return `<div class="guest-slot-grid">${availableSlots.map((slot, index) => `<label class="guest-slot ${guestBooking.selected === slotKey(slot) ? 'selected' : ''}"><input id="guest-slot-${index}" type="radio" name="booking-slot" data-booking-choice="slot" value="${esc(slotKey(slot))}" ${guestBooking.selected === slotKey(slot) ? 'checked' : ''} required /><strong>${bookingTime(slot.startTime)}</strong><small>Còn ${esc(slot.remaining)} chỗ</small></label>`).join('')}</div>`;
+    if (!guestBooking.slots.length)
+        return '<p class="slot-empty">Chưa có khung giờ còn chỗ trong ngày này. Bạn hãy chọn ngày khác hoặc bác sĩ khác.</p>';
+    return `<div class="guest-slot-grid">${guestBooking.slots.map((slot, index) => `<label class="guest-slot ${guestBooking.selected === slotKey(slot) ? 'selected' : ''}"><input id="guest-slot-${index}" type="radio" name="booking-slot" data-booking-choice="slot" value="${esc(slotKey(slot))}" ${guestBooking.selected === slotKey(slot) ? 'checked' : ''} required /><strong>${bookingTime(slot.startTime)}</strong><small>Còn ${esc(slot.remaining)} chỗ</small></label>`).join('')}</div>`;
 }
 
 function guestBookingReceipt() {

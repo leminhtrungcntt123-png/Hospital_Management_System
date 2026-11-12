@@ -2866,7 +2866,7 @@ else
         const delBtn = document.getElementById('btnDeleteSchedule');
         if (delBtn) {
             delBtn.style.display = (scheduleId && scheduleId > 0) ? 'inline-flex' : 'none';
-            delBtn.setAttribute('data-booked-count', bookedCount || 0);
+            delBtn.setAttribute?.('data-booked-count', bookedCount || 0);
         }
 
         const efInput = document.getElementById('scheduleModalEffectiveFrom');
@@ -2891,10 +2891,12 @@ else
         if (mpInput) mpInput.value = maxPatients || 40;
 
         const osInput = document.getElementById('scheduleModalOnlineSlots');
-        if (osInput) osInput.value = onlineSlots || 28;
+        if (osInput) osInput.value = (onlineSlots !== undefined && onlineSlots !== null && onlineSlots !== '') ? onlineSlots : 28;
 
         // Cập nhật danh sách buồng khám trống / đã có người cho ngày & ca đã chọn:
-        updateModalRoomAvailability(roomId);
+        if (typeof updateModalRoomAvailability === 'function') {
+            updateModalRoomAvailability(roomId);
+        }
 
         document.getElementById('scheduleModal').classList.add('show');
     }
