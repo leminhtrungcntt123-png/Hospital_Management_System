@@ -42,6 +42,7 @@
         links.AddRange([
             ("Schedule/my-schedule", "user", "Lịch của tôi", StaffUrl("Schedule", "my-schedule")),
             ("Schedule", "calendar", "Lịch khám khoa", StaffUrl("Schedule")),
+            ("Schedule/bidding", "clipboard", "Duyệt pick ca", StaffUrl("Schedule", "bidding")),
             ("Schedule/slots", "clock", "Quản lý Slot", StaffUrl("Schedule", "slots")),
             ("Schedule/exceptions", "calendar", "Duyệt nghỉ / đổi ca", StaffUrl("Schedule", "exceptions")),
             ("Schedule/overview", "grid", "Tổng quan khoa", StaffUrl("Schedule", "overview")),
@@ -57,7 +58,7 @@
         }
     }
 
-    var splitAt = isNurse ? 4 : isHead ? 4 : 3;
+    var splitAt = isNurse ? 4 : isHead ? 5 : 3;
     var menuGroups = new[]
     {
         (Title: isNurse ? "CÔNG VIỆC HÔM NAY" : isDoctor ? "CHUYÊN MÔN" : isHead ? "ĐIỀU PHỐI KHOA" : "CÔNG VIỆC", Items: links.Take(splitAt)),
