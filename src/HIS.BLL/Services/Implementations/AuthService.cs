@@ -167,15 +167,15 @@ public class AuthService : IAuthService
         // Conflicts must perform the same expensive password operation as a new registration.
         var passwordHash = _hashPassword(request.Password);
 
-        // 1. Kiểm tra Username đã tồn tại chưa
+        // 1. Kiểm tra Username đã tồn tại chưa (tận dụng B-tree index)
         var isUsernameTaken = await _db.Accounts
-            .AnyAsync(a => a.Username.ToLower() == normalizedUsername.ToLower(), ct);
+            .AnyAsync(a => a.Username == normalizedUsername, ct);
         // 2. Kiểm tra Email đã tồn tại chưa (nếu người dùng có nhập email)
         var isEmailTaken = false;
         if (!string.IsNullOrWhiteSpace(normalizedEmail))
         {
             isEmailTaken = await _db.Accounts
-                .AnyAsync(a => a.Email != null && a.Email.ToLower() == normalizedEmail.ToLower(), ct);
+                .AnyAsync(a => a.Email != null && a.Email == normalizedEmail, ct);
         }
         if (isUsernameTaken || isEmailTaken)
         {

@@ -28,6 +28,11 @@ public class ScheduleExceptionConfiguration : IEntityTypeConfiguration<ScheduleE
         builder.Property(e => e.ApprovedAt).HasColumnType("timestamp without time zone");
         builder.Property(e => e.CreatedAt).HasColumnType("timestamp without time zone").HasDefaultValueSql("now()");
 
+        builder.HasOne(e => e.Schedule)
+            .WithMany(s => s.ScheduleExceptions)
+            .HasForeignKey(e => e.ScheduleId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasOne(e => e.Doctor)
             .WithMany(d => d.ScheduleExceptions)
             .HasForeignKey(e => e.DoctorId)

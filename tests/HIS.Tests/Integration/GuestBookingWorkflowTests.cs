@@ -46,7 +46,7 @@ public static class GuestBookingScenario
         var doctor = Doctor("Test Doctor");
         var raceDoctor = Doctor("Test Race Doctor");
         var httpDoctor = Doctor("Test HTTP Doctor");
-        DoctorSchedule Schedule(Doctor d, int quota) => new() { Doctor = d, Room = room, DayOfWeek = DayOfWeek.Thursday, Shift = ExamShift.Morning, StartTime = new TimeOnly(7, 30), EndTime = new TimeOnly(8, 30), SlotDurationMinutes = 15, OnlineSlots = quota, MaxPatients = 4, IsActive = true, EffectiveFrom = new DateOnly(2026, 1, 1) };
+        DoctorSchedule Schedule(Doctor d, int quota) => new() { Doctor = d, Department = department, Room = room, WorkDate = new DateOnly(2026, 11, 12), Status = DoctorScheduleStatus.Approved, Shift = ExamShift.Morning, StartTime = new TimeOnly(7, 30), EndTime = new TimeOnly(8, 30), SlotDurationMinutes = 15, OnlineSlots = quota, MaxPatients = 4 };
         var schedule = Schedule(doctor, 2);
         var raceSchedule = Schedule(raceDoctor, 1);
         var httpSchedule = Schedule(httpDoctor, 2);

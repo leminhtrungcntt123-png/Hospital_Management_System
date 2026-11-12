@@ -13,15 +13,15 @@ public class DepartmentHeadTests
             null,
             1,
             1,
-            DayOfWeek.Monday,
+            1,
+            1,
+            DateOnly.FromDateTime(DateTime.Today),
             ExamShift.Morning,
             new TimeOnly(7, 30),
             new TimeOnly(11, 30),
             15,
             40,
-            50, // 50 > 40 -> invalid
-            DateOnly.FromDateTime(DateTime.Today),
-            null
+            50 // 50 > 40 -> invalid
         );
 
         Assert.True(request.OnlineSlots > request.MaxPatients);

@@ -24,6 +24,11 @@ public class AppointmentSlotConfiguration : IEntityTypeConfiguration<Appointment
         builder.Property(e => e.Status).HasConversion<UpperSnakeCaseEnumConverter<SlotStatus>>().HasMaxLength(15).HasDefaultValue(SlotStatus.Available);
         builder.Property(e => e.Version).IsConcurrencyToken().HasDefaultValue(0);
 
+        builder.HasOne(e => e.Schedule)
+            .WithMany(s => s.AppointmentSlots)
+            .HasForeignKey(e => e.ScheduleId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasOne(e => e.Doctor)
             .WithMany(d => d.AppointmentSlots)
             .HasForeignKey(e => e.DoctorId)
@@ -36,5 +41,6 @@ public class AppointmentSlotConfiguration : IEntityTypeConfiguration<Appointment
 
         builder.HasIndex(e => new { e.DoctorId, e.StartTime }).IsUnique().HasDatabaseName("uq_slot");
         builder.HasIndex(e => new { e.DoctorId, e.StartTime }).HasDatabaseName("idx_slots_doctor_date");
+        builder.HasIndex(e => e.ScheduleId).HasDatabaseName("idx_slots_schedule");
     }
 }

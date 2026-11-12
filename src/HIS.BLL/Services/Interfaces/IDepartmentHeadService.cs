@@ -22,10 +22,22 @@ public interface IDepartmentHeadService
     Task<Result> ApproveExceptionAsync(ApproveExceptionRequest request, CancellationToken ct = default);
     Task<Result> RejectExceptionAsync(RejectExceptionRequest request, CancellationToken ct = default);
 
-    // 2. Thiết lập lịch khám mẫu & hạn mức
-    Task<IReadOnlyList<DepartmentScheduleItemDto>> GetSchedulesAsync(int departmentId, CancellationToken ct = default);
+    // 2. Thiết lập lịch khám mẫu, Đăng ký ca (Shift Bidding) & Phê duyệt / Điều phối
+    Task<IReadOnlyList<DepartmentScheduleItemDto>> GetSchedulesAsync(int departmentId, int? periodId = null, DateOnly? fromDate = null, DateOnly? toDate = null, CancellationToken ct = default);
     Task<Result<int>> UpsertDoctorScheduleAsync(UpsertDoctorScheduleRequest request, CancellationToken ct = default);
-    Task<Result> DeleteDoctorScheduleAsync(int scheduleId, int departmentId, CancellationToken ct = default);
+    Task<Result> DeleteDoctorScheduleAsync(int scheduleId, int departmentId, int? cancelledByAccountId = null, CancellationToken ct = default);
+    Task<ScheduleCancelImpactDto> GetScheduleCancelImpactAsync(int scheduleId, CancellationToken ct = default);
+
+    // Shift Bidding & Decision Matrix
+    Task<Result<int>> CreateSchedulingPeriodAsync(CreateSchedulingPeriodRequest request, CancellationToken ct = default);
+    Task<SchedulingPeriodDto?> GetActiveSchedulingPeriodAsync(int? departmentId, CancellationToken ct = default);
+    Task<DepartmentDemandGridDto> GetDepartmentDemandGridAsync(int departmentId, int periodId, CancellationToken ct = default);
+    Task<Result<int>> RegisterShiftBidAsync(RegisterShiftBidRequest request, CancellationToken ct = default);
+    Task<Result> CancelShiftBidAsync(int doctorId, int scheduleId, CancellationToken ct = default);
+    Task<DecisionMatrixResultDto> GetDecisionMatrixAsync(int departmentId, DateOnly workDate, ExamShift shift, CancellationToken ct = default);
+    Task<Result> ApproveShiftAsync(ApproveShiftRequest request, CancellationToken ct = default);
+    Task<Result<int>> ReallocateShiftAsync(ReallocateShiftRequest request, CancellationToken ct = default);
+    Task<Result<int>> PublishSchedulingPeriodAsync(int periodId, int reviewedByAccountId, CancellationToken ct = default);
 
     // 3. Phân công ca trực đêm nhân sự
     Task<IReadOnlyList<DepartmentDutyShiftDto>> GetDutyShiftsAsync(int departmentId, CancellationToken ct = default);
@@ -42,5 +54,8 @@ public interface IDepartmentHeadService
     Task<IReadOnlyList<DoctorListItemDto>> GetDoctorsInDepartmentAsync(int departmentId, CancellationToken ct = default);
     Task<IReadOnlyList<StaffListItemDto>> GetStaffInDepartmentAsync(int departmentId, CancellationToken ct = default);
     Task<IReadOnlyList<ClinicRoomDto>> GetRoomsInDepartmentAsync(int departmentId, CancellationToken ct = default);
+
+    // 7. Danh sách người khám thực tế từ database
+    Task<IReadOnlyList<DepartmentPatientListItemDto>> GetPatientsAsync(int? departmentId = null, CancellationToken ct = default);
 }
 

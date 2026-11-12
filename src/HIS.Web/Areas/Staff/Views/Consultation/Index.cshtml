@@ -28,6 +28,21 @@
     <link rel="stylesheet" href="~/css/staff-consultation.css" asp-append-version="true" />
 }
 
+@if (TempData["SuccessMessage"] != null)
+{
+    <div style="background:#f0fdf4; border:1px solid #bbf7d0; color:#166534; padding:12px 16px; border-radius:8px; margin-bottom:16px; font-size:13px; display:flex; align-items:center; gap:10px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;flex-shrink:0;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+        <span>@TempData["SuccessMessage"]</span>
+    </div>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div style="background:#fef2f2; border:1px solid #fecaca; color:#991b1b; padding:12px 16px; border-radius:8px; margin-bottom:16px; font-size:13px; display:flex; align-items:center; gap:10px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;flex-shrink:0;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+        <span>@TempData["ErrorMessage"]</span>
+    </div>
+}
+
 @if (tab == "labs")
 {
     <!-- 1. GIAO DIỆN CHỈ ĐỊNH & KẾT QUẢ -->
@@ -302,10 +317,10 @@ else if (tab == "records")
 }
 else if (tab == "schedule")
 {
-    var docDisplayName = string.IsNullOrWhiteSpace(Model.CurrentDoctorName) ? "BS. Nguyễn Hoàng Nam" : Model.CurrentDoctorName;
+    var docDisplayName = string.IsNullOrWhiteSpace(Model.CurrentDoctorName) ? "Bác sĩ" : Model.CurrentDoctorName;
     var docDisplayInit = docDisplayName.Split(' ').Last()[..Math.Min(2, docDisplayName.Split(' ').Last().Length)].ToUpper();
-    var docDisplayRoom = string.IsNullOrWhiteSpace(Model.CurrentDoctorRoom) ? "P.201" : Model.CurrentDoctorRoom;
-    var deptDisplayName = string.IsNullOrWhiteSpace(Model.DepartmentName) ? "Chưa liên kết khoa" : Model.DepartmentName;
+    var docDisplayRoom = string.IsNullOrWhiteSpace(Model.CurrentDoctorRoom) ? "Chưa phân phòng" : Model.CurrentDoctorRoom;
+    var deptDisplayName = string.IsNullOrWhiteSpace(Model.DepartmentName) ? "Chưa gán khoa" : Model.DepartmentName;
     var currentClaimId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
     int.TryParse(currentClaimId, out var currentAccId);
 
@@ -387,12 +402,12 @@ else if (tab == "schedule")
 
                         // Lịch khám cấu hình từ Model.DoctorSchedules
                         var schedMorning = Model.DoctorSchedules.FirstOrDefault(s =>
-                            s.DayOfWeek == dOfWeek &&
+                            s.WorkDate == curDate &&
                             s.Shift == ExamShift.Morning &&
                             (!s.DoctorId.HasValue || s.DoctorId.Value == currentDocId || s.DoctorName == docDisplayName));
 
                         var schedAfternoon = Model.DoctorSchedules.FirstOrDefault(s =>
-                            s.DayOfWeek == dOfWeek &&
+                            s.WorkDate == curDate &&
                             s.Shift == ExamShift.Afternoon &&
                             (!s.DoctorId.HasValue || s.DoctorId.Value == currentDocId || s.DoctorName == docDisplayName));
 
@@ -603,6 +618,410 @@ else if (tab == "schedule")
                         </div>
                     }
                 }
+            </div>
+        </div>
+
+        <!-- ========================================================================= -->
+        <!-- KHU VỰC BÁC SĨ TỰ ĐĂNG KÝ CA KHÁM (SHIFT BIDDING) DƯỚI LỊCH LÀM VIỆC -->
+        <!-- ========================================================================= -->
+        <div style="margin-top:32px; border-top:2px dashed #e2e8f0; padding-top:28px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                <div>
+                    <h2 style="font-size:18px; font-weight:750; color:#142d4a; margin:0 0 4px; display:flex; align-items:center; gap:8px;">
+                        <span>📝</span> Đăng ký ca khám tự chọn (Shift Bidding)
+                    </h2>
+                   
+                </div>
+                <div>
+                    @if (Model.ActivePeriod != null)
+                    {
+                        var periodBadgeColor = Model.ActivePeriod.Status switch
+                        {
+                            SchedulingPeriodStatus.Open => ("#dcfce7", "#15803d", "🟢 Cổng đang mở"),
+                            SchedulingPeriodStatus.Reviewing => ("#fef3c7", "#b45309", "🟡 Đang xét duyệt"),
+                            SchedulingPeriodStatus.Published => ("#e0f2fe", "#0369a1", "🔵 Đã xuất bản lịch"),
+                            _ => ("#f1f5f9", "#475569", "Đã đóng")
+                        };
+                        <div style="text-align:right;">
+                            <span style="background:@periodBadgeColor.Item1; color:@periodBadgeColor.Item2; font-size:12px; font-weight:700; padding:4px 10px; border-radius:20px;">
+                                @periodBadgeColor.Item3
+                            </span>
+                            <div style="font-size:11px; color:#64748b; margin-top:4px;">
+                                Kỳ: <strong>@Model.ActivePeriod.Name</strong> (@Model.ActivePeriod.StartDate.ToString("dd/MM") - @Model.ActivePeriod.EndDate.ToString("dd/MM/yyyy"))
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <span style="background:#f1f5f9; color:#64748b; font-size:12px; font-weight:600; padding:4px 10px; border-radius:20px;">
+                            Chưa có kỳ đăng ký nào đang mở
+                        </span>
+                    }
+                </div>
+            </div>
+
+            @if (Model.DemandGrid != null && Model.ActivePeriod != null)
+            {
+                var myBids = Model.DemandGrid.Cells
+                    .SelectMany(c => c.Bidders)
+                    .Where(b => b.DoctorId == Model.CurrentDoctorId)
+                    .ToList();
+
+                var totalBids = myBids.Count;
+                var approvedBids = myBids.Count(b => b.Status == DoctorScheduleStatus.Approved);
+                var pendingBids = myBids.Count(b => b.Status == DoctorScheduleStatus.Bidding);
+                var rejectedBids = myBids.Count(b => b.Status == DoctorScheduleStatus.Rejected);
+                var reallocatedBids = myBids.Count(b => b.Status == DoctorScheduleStatus.Reallocated);
+
+                var minQuota = Model.MinShiftsPerWeek > 0 ? Model.MinShiftsPerWeek : 2;
+                var maxQuota = Model.MaxShiftsPerWeek > 0 ? Model.MaxShiftsPerWeek : 10;
+                var pctProgress = Math.Min(100, (int)Math.Round((double)totalBids / minQuota * 100));
+                var isMinQuotaMet = totalBids >= minQuota;
+                var shiftsNeeded = Math.Max(0, minQuota - totalBids);
+
+                <!-- THẺ THEO DÕI ĐỊNH MỨC CA KHÁM CÁ NHÂN -->
+                <div style="background:#fff; border:1px solid #e2ebf3; border-radius:12px; padding:16px 20px; margin-bottom:14px; box-shadow:0 2px 8px rgba(0,0,0,0.03);">
+                    <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; margin-bottom:12px;">
+                        <div>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span style="font-size:18px;">🎯</span>
+                                <strong style="font-size:14px; color:#0f172a;">Tiến độ định mức tuần:</strong>
+                                <span style="font-size:15px; font-weight:800; color:#0369a1;">@totalBids / @minQuota - @maxQuota ca</span>
+                                @if (totalBids >= maxQuota)
+                                {
+                                    <span style="background:#e0f2fe; color:#0369a1; font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px; border:1px solid #bae6fd;">
+                                        🎉 Đã chọn tối đa toàn bộ ca trong tuần (@totalBids/@maxQuota ca)
+                                    </span>
+                                }
+                                else if (isMinQuotaMet)
+                                {
+                                    <span style="background:#dcfce7; color:#15803d; font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px; border:1px solid #bbf7d0;">
+                                        ✓ Đã đạt chỉ tiêu tối thiểu (@totalBids/@minQuota ca) · Có thể chọn thêm tối đa @(maxQuota - totalBids) ca
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span style="background:#fef3c7; color:#b45309; font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px; border:1px solid #fde68a;">
+                                        ⚡ Cần đăng ký thêm @shiftsNeeded ca (chỉ tiêu tối thiểu: @minQuota ca/tuần)
+                                    </span>
+                                }
+                            </div>
+                            <div style="font-size:11px; color:#64748b; margin-top:2px;">Chỉ tiêu tuần: Chọn tối thiểu <strong>@minQuota ca</strong> và tối đa <strong>@maxQuota ca</strong> (toàn bộ ca trong tuần).</div>
+                        </div>
+
+                        <!-- Các huy hiệu phân loại ca -->
+                        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                            <div style="background:#f0fdf4; border:1px solid #bbf7d0; padding:4px 10px; border-radius:6px; font-size:11px; display:flex; align-items:center; gap:5px;">
+                                <span style="width:7px; height:7px; border-radius:50%; background:#22c55e;"></span>
+                                <span style="color:#166534;">Đã duyệt:</span>
+                                <strong style="color:#15803d;">@approvedBids</strong>
+                            </div>
+                            <div style="background:#f0f9ff; border:1px solid #bae6fd; padding:4px 10px; border-radius:6px; font-size:11px; display:flex; align-items:center; gap:5px;">
+                                <span style="width:7px; height:7px; border-radius:50%; background:#0284c7;"></span>
+                                <span style="color:#0369a1;">Chờ duyệt:</span>
+                                <strong style="color:#0284c7;">@pendingBids</strong>
+                            </div>
+                            <div style="background:@(rejectedBids > 0 ? "#fef2f2" : "#f8fafc"); border:1px solid @(rejectedBids > 0 ? "#fca5a5" : "#e2e8f0"); padding:4px 10px; border-radius:6px; font-size:11px; display:flex; align-items:center; gap:5px;">
+                                <span style="width:7px; height:7px; border-radius:50%; background:@(rejectedBids > 0 ? "#ef4444" : "#94a3b8");"></span>
+                                <span style="color:@(rejectedBids > 0 ? "#991b1b" : "#64748b");">Không duyệt / Thất bại:</span>
+                                <strong style="color:@(rejectedBids > 0 ? "#b91c1c" : "#64748b");">@rejectedBids</strong>
+                            </div>
+                            @if (reallocatedBids > 0)
+                            {
+                                <div style="background:#fefce8; border:1px solid #fde047; padding:4px 10px; border-radius:6px; font-size:11px; display:flex; align-items:center; gap:5px;">
+                                    <span style="width:7px; height:7px; border-radius:50%; background:#eab308;"></span>
+                                    <span style="color:#854d0e;">Điều chuyển:</span>
+                                    <strong style="color:#854d0e;">@reallocatedBids</strong>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Thanh Progress Bar định mức -->
+                    <div style="width:100%; height:7px; background:#e2e8f0; border-radius:4px; overflow:hidden;">
+                        <div style="width:@pctProgress%; height:100%; background:@(isMinQuotaMet ? "#10b981" : "#f59e0b"); border-radius:4px; transition:width 0.3s ease;"></div>
+                    </div>
+                </div>
+
+                @if (rejectedBids > 0)
+                {
+                    <!-- CẢNH BÁO CA ĐĂNG KÝ THẤT BẠI VÀ HƯỚNG DẪN PICK CA KHÁC -->
+                    <div style="background:#fff1f2; border:1px solid #fecdd3; border-left:4px solid #e11d48; border-radius:10px; padding:14px 18px; margin-bottom:14px; display:flex; align-items:flex-start; gap:12px; box-shadow:0 1px 4px rgba(225,29,72,0.06);">
+                        <div style="font-size:20px; line-height:1; margin-top:1px;">⚠️</div>
+                        <div style="flex:1;">
+                            <strong style="color:#9f1239; font-size:13px; display:block; margin-bottom:3px;">
+                                Bạn có @rejectedBids ca đăng ký không thành công do buồng khám đã đủ bác sĩ
+                            </strong>
+                            <div style="color:#be123c; font-size:12px; line-height:1.5;">
+                                Ca khám bạn đã chọn đã vượt quá số buồng tiếp nhận của khoa (@Model.DemandGrid.TotalActiveRooms buồng) nên không thể phê duyệt.
+                                @if (Model.ActivePeriod.IsOpenForBidding)
+                                {
+                                    <span>
+                                        Vui lòng kiểm tra các ô <strong>còn chỗ (màu xanh lá 🟢 hoặc màu trắng ⚪)</strong> trong lịch bên dưới và bấm nút <strong>"+ Đăng ký"</strong> để chọn ca khám thay thế ngay, đảm bảo hoàn thành đủ định mức ca khám tuần của bạn!
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span>
+                                        Kỳ đăng ký hiện đã đóng để Trưởng khoa sắp xếp. Vui lòng liên hệ Trưởng khoa nếu bạn cần hỗ trợ điều phối thêm buồng khám.
+                                    </span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <div style="background:#fff; border:1px solid #e2ebf3; border-radius:12px; overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,0.03);">
+                    <!-- Chú thích Live Demand Visibility -->
+                    <div style="background:#f8fafc; border-bottom:1px solid #e2ebf3; padding:12px 20px; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; font-size:12px;">
+                        <div style="display:flex; align-items:center; gap:16px;">
+                            <span style="font-weight:700; color:#334155;">Độ cạnh tranh buồng khám:</span>
+                            <span style="display:inline-flex; align-items:center; gap:6px;">
+                                <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#f1f5f9; border:1px solid #cbd5e1;"></span> ⚪ Đang trống (0/@Model.DemandGrid.TotalActiveRooms phòng)
+                            </span>
+                            <span style="display:inline-flex; align-items:center; gap:6px;">
+                                <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#dcfce7; border:1px solid #86efac;"></span> 🟢 Còn chỗ (1..@Model.DemandGrid.TotalActiveRooms phòng)
+                            </span>
+                            <span style="display:inline-flex; align-items:center; gap:6px;">
+                                <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#fee2e2; border:1px solid #fca5a5;"></span> 🔴 Cạnh tranh cao (>@Model.DemandGrid.TotalActiveRooms phòng)
+                            </span>
+                        </div>
+                        <div style="color:#64748b;">
+                            Tổng số buồng khám khoa: <strong>@Model.DemandGrid.TotalActiveRooms buồng khả dụng</strong>
+                        </div>
+                    </div>
+
+                    <!-- Lưới các ngày trong kỳ đăng ký -->
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:1px; background:#e2e8f0;">
+                        @{
+                            var dates = Model.DemandGrid.Cells.Select(c => c.WorkDate).Distinct().OrderBy(d => d).ToList();
+                        }
+                        @foreach (var d in dates)
+                        {
+                            var morningCell = Model.DemandGrid.Cells.FirstOrDefault(c => c.WorkDate == d && c.Shift == ExamShift.Morning);
+                            var afternoonCell = Model.DemandGrid.Cells.FirstOrDefault(c => c.WorkDate == d && c.Shift == ExamShift.Afternoon);
+                            var isSunday = d.DayOfWeek == DayOfWeek.Sunday;
+                            var isSaturday = d.DayOfWeek == DayOfWeek.Saturday;
+
+                            <div style="background:#fff; padding:14px; display:flex; flex-direction:column; gap:10px;">
+                                <div style="border-bottom:1px solid #f1f5f9; padding-bottom:8px; text-align:center;">
+                                    <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:@(isSunday ? "#ef4444" : isSaturday ? "#0284c7" : "#64748b");">
+                                        @(d.DayOfWeek switch { DayOfWeek.Monday => "Thứ Hai", DayOfWeek.Tuesday => "Thứ Ba", DayOfWeek.Wednesday => "Thứ Tư", DayOfWeek.Thursday => "Thứ Năm", DayOfWeek.Friday => "Thứ Sáu", DayOfWeek.Saturday => "Thứ Bảy", _ => "Chủ Nhật" })
+                                    </div>
+                                    <div style="font-size:15px; font-weight:800; color:#1e293b;">@d.ToString("dd/MM")</div>
+                                </div>
+
+                                <!-- CA SÁNG -->
+                                @if (morningCell != null)
+                                {
+                                    var myBid = morningCell.Bidders.FirstOrDefault(b => b.DoctorId == Model.CurrentDoctorId);
+                                    var (cellBg, cellBorder, cellText) = morningCell.Level switch
+                                    {
+                                        DemandLevel.HighCompetition => ("#fef2f2", "#fca5a5", "#b91c1c"),
+                                        DemandLevel.Available => ("#f0fdf4", "#86efac", "#15803d"),
+                                        _ => ("#f8fafc", "#e2e8f0", "#64748b")
+                                    };
+
+                                    <div style="background:@cellBg; border:1px solid @cellBorder; border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:6px;">
+                                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                                            <strong style="font-size:11px; color:#1e293b;">🌅 Ca Sáng</strong>
+                                            <span style="font-size:11px; font-weight:700; color:@cellText;">
+                                                @morningCell.CurrentBidders / @morningCell.TotalRooms phòng
+                                            </span>
+                                        </div>
+
+                                        @if (morningCell.IsHotShift)
+                                        {
+                                            <span style="font-size:9px; background:#ffedd5; color:#c2410c; font-weight:700; padding:1px 5px; border-radius:4px; align-self:flex-start;">
+                                                🔥 Ca Hot
+                                            </span>
+                                        }
+
+                                        @if (myBid != null)
+                                        {
+                                            <div style="margin-top:4px; border-top:1px dashed @cellBorder; padding-top:6px;">
+                                                @if (myBid.Status == DoctorScheduleStatus.Bidding)
+                                                {
+                                                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                                                        <span style="font-size:10px; font-weight:700; color:#0284c7;">✓ Đã đăng ký</span>
+                                                        @if (Model.ActivePeriod.IsOpenForBidding)
+                                                        {
+                                                            <form asp-action="CancelShiftBid" method="post" style="margin:0;">
+                                                                @Html.AntiForgeryToken()
+                                                                <input type="hidden" name="scheduleId" value="@myBid.ScheduleId" />
+                                                                <button type="submit" style="background:none; border:none; color:#ef4444; font-size:10px; cursor:pointer; text-decoration:underline;">Hủy</button>
+                                                            </form>
+                                                        }
+                                                    </div>
+                                                }
+                                                else if (myBid.Status == DoctorScheduleStatus.Approved)
+                                                {
+                                                    <span style="font-size:10px; font-weight:700; color:#15803d;">🎉 Đã duyệt (P.@myBid.RoomNumber)</span>
+                                                }
+                                                else if (myBid.Status == DoctorScheduleStatus.Rejected)
+                                                {
+                                                    <div style="background:#fee2e2; border:1px solid #fca5a5; border-radius:6px; padding:4px 6px; margin-top:2px;">
+                                                        <span style="font-size:10px; font-weight:700; color:#b91c1c; display:block;">✕ Không duyệt (Hết buồng)</span>
+                                                        @if (Model.ActivePeriod.IsOpenForBidding)
+                                                        {
+                                                            <div style="font-size:9.5px; color:#dc2626; font-weight:600; margin-top:2px;">👉 Hãy chọn ca khác</div>
+                                                        }
+                                                    </div>
+                                                }
+                                                else if (myBid.Status == DoctorScheduleStatus.Reallocated)
+                                                {
+                                                    <span style="font-size:10px; font-weight:700; color:#854d0e;">↪ Đã điều chuyển</span>
+                                                }
+                                            </div>
+                                        }
+                                        else if (Model.ActivePeriod.IsOpenForBidding)
+                                        {
+                                            @if (morningCell.ApprovedCount >= morningCell.TotalRooms)
+                                            {
+                                                <div style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:4px; padding:4px 6px; margin-top:4px; text-align:center;">
+                                                    <span style="font-size:10px; font-weight:700; color:#dc2626;">🔒 Đã duyệt kín buồng (@morningCell.ApprovedCount/@morningCell.TotalRooms)</span>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <button type="button" onclick="openShiftBidModal('@Model.ActivePeriod.Id', '@d.ToString("yyyy-MM-dd")', '@((int)ExamShift.Morning)', 'Ca Sáng (07:30 - 11:30) ngày @d.ToString("dd/MM/yyyy")')"
+                                                        style="background:#079bc9; color:#fff; border:none; border-radius:4px; padding:4px 8px; font-size:11px; font-weight:600; cursor:pointer; margin-top:4px;">
+                                                    + Đăng ký
+                                                </button>
+                                            }
+                                        }
+                                    </div>
+                                }
+
+                                <!-- CA CHIỀU -->
+                                @if (afternoonCell != null)
+                                {
+                                    var myBid = afternoonCell.Bidders.FirstOrDefault(b => b.DoctorId == Model.CurrentDoctorId);
+                                    var (cellBg, cellBorder, cellText) = afternoonCell.Level switch
+                                    {
+                                        DemandLevel.HighCompetition => ("#fef2f2", "#fca5a5", "#b91c1c"),
+                                        DemandLevel.Available => ("#f0fdf4", "#86efac", "#15803d"),
+                                        _ => ("#f8fafc", "#e2e8f0", "#64748b")
+                                    };
+
+                                    <div style="background:@cellBg; border:1px solid @cellBorder; border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:6px;">
+                                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                                            <strong style="font-size:11px; color:#1e293b;">🌤 Ca Chiều</strong>
+                                            <span style="font-size:11px; font-weight:700; color:@cellText;">
+                                                @afternoonCell.CurrentBidders / @afternoonCell.TotalRooms phòng
+                                            </span>
+                                        </div>
+
+                                        @if (afternoonCell.IsHotShift)
+                                        {
+                                            <span style="font-size:9px; background:#ffedd5; color:#c2410c; font-weight:700; padding:1px 5px; border-radius:4px; align-self:flex-start;">
+                                                🔥 Ca Hot
+                                            </span>
+                                        }
+
+                                        @if (myBid != null)
+                                        {
+                                            <div style="margin-top:4px; border-top:1px dashed @cellBorder; padding-top:6px;">
+                                                @if (myBid.Status == DoctorScheduleStatus.Bidding)
+                                                {
+                                                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                                                        <span style="font-size:10px; font-weight:700; color:#0284c7;">✓ Đã đăng ký</span>
+                                                        @if (Model.ActivePeriod.IsOpenForBidding)
+                                                        {
+                                                            <form asp-action="CancelShiftBid" method="post" style="margin:0;">
+                                                                @Html.AntiForgeryToken()
+                                                                <input type="hidden" name="scheduleId" value="@myBid.ScheduleId" />
+                                                                <button type="submit" style="background:none; border:none; color:#ef4444; font-size:10px; cursor:pointer; text-decoration:underline;">Hủy</button>
+                                                            </form>
+                                                        }
+                                                    </div>
+                                                }
+                                                else if (myBid.Status == DoctorScheduleStatus.Approved)
+                                                {
+                                                    <span style="font-size:10px; font-weight:700; color:#15803d;">🎉 Đã duyệt (P.@myBid.RoomNumber)</span>
+                                                }
+                                                else if (myBid.Status == DoctorScheduleStatus.Rejected)
+                                                {
+                                                    <div style="background:#fee2e2; border:1px solid #fca5a5; border-radius:6px; padding:4px 6px; margin-top:2px;">
+                                                        <span style="font-size:10px; font-weight:700; color:#b91c1c; display:block;">✕ Không duyệt (Hết buồng)</span>
+                                                        @if (Model.ActivePeriod.IsOpenForBidding)
+                                                        {
+                                                            <div style="font-size:9.5px; color:#dc2626; font-weight:600; margin-top:2px;">👉 Hãy chọn ca khác</div>
+                                                        }
+                                                    </div>
+                                                }
+                                                else if (myBid.Status == DoctorScheduleStatus.Reallocated)
+                                                {
+                                                    <span style="font-size:10px; font-weight:700; color:#854d0e;">↪ Đã điều chuyển</span>
+                                                }
+                                            </div>
+                                        }
+                                        else if (Model.ActivePeriod.IsOpenForBidding)
+                                        {
+                                            @if (afternoonCell.ApprovedCount >= afternoonCell.TotalRooms)
+                                            {
+                                                <div style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:4px; padding:4px 6px; margin-top:4px; text-align:center;">
+                                                    <span style="font-size:10px; font-weight:700; color:#dc2626;">🔒 Đã duyệt kín buồng (@afternoonCell.ApprovedCount/@afternoonCell.TotalRooms)</span>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <button type="button" onclick="openShiftBidModal('@Model.ActivePeriod.Id', '@d.ToString("yyyy-MM-dd")', '@((int)ExamShift.Afternoon)', 'Ca Chiều (13:00 - 16:30) ngày @d.ToString("dd/MM/yyyy")')"
+                                                        style="background:#079bc9; color:#fff; border:none; border-radius:4px; padding:4px 8px; font-size:11px; font-weight:600; cursor:pointer; margin-top:4px;">
+                                                    + Đăng ký
+                                                </button>
+                                            }
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div style="background:#fff; border:1px dashed #cbd5e1; border-radius:12px; padding:32px 20px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+                    <div style="font-size:32px; margin-bottom:8px;">📅</div>
+                    <strong style="font-size:14px; color:#1e293b; display:block; margin-bottom:4px;">Chưa có kỳ đăng ký ca khám nào đang mở</strong>
+                    <p style="font-size:12px; color:#64748b; margin:0 auto; max-width:540px; line-height:1.5;">
+                        Khoa của bạn hiện chưa có đợt đăng ký ca khám (Shift Bidding) nào đang mở hoặc đợt trước đã hoàn tất điều phối và xuất bản. 
+                        Vui lòng chờ Trưởng khoa mở đợt đăng ký mới cho tuần tiếp theo.
+                    </p>
+                </div>
+            }
+        </div>
+
+        <!-- Modal Dialog Đăng ký ca khám (Shift Bidding) -->
+        <div class="app-dialog-backdrop" id="shiftBidDialog" onclick="handleDialogBackdropClick(event, 'shiftBidDialog')">
+            <div class="app-dialog-card" style="max-width:440px;">
+                <form asp-action="RegisterShiftBid" method="post" style="margin:0;">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="periodId" id="bidModalPeriodId" />
+                    <input type="hidden" name="workDate" id="bidModalWorkDate" />
+                    <input type="hidden" name="shift" id="bidModalShift" />
+
+                    <div class="app-dialog-header">
+                        <h3 style="font-size:15px; margin:0; font-weight:700; color:#fff;">Đăng ký ca khám tự chọn</h3>
+                        <button type="button" class="app-dialog-close" onclick="closeAppDialog('shiftBidDialog')">✕</button>
+                    </div>
+                    <div class="app-dialog-body">
+                        <div style="background:#e0f2fe; border:1px solid #bae6fd; border-radius:8px; padding:12px; margin-bottom:14px; font-size:13px; color:#0369a1;">
+                            📅 Ca khám: <strong id="bidModalLabel">...</strong>
+                        </div>
+                        <div style="margin-bottom:14px;">
+                            <label style="display:block; font-weight:600; color:#1e293b; margin-bottom:4px; font-size:13px;">Ghi chú hoặc nguyện vọng (tùy chọn)</label>
+                            <textarea name="doctorNote" rows="3" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;" placeholder="Ví dụ: Mong muốn khám ca này do có hẹn bệnh nhân cũ..."></textarea>
+                        </div>
+                        <div style="font-size:11px; color:#64748b; line-height:1.5;">
+                            ⚠️ <em>Lưu ý: Nếu bạn vướng ca trực đêm hôm trước kéo sang sáng nay, hệ thống sẽ tự động kích hoạt luật Fatigue Mitigation và chặn đăng ký ca sáng.</em>
+                        </div>
+                    </div>
+                    <div class="app-dialog-footer">
+                        <button type="button" class="btn outline sm" onclick="closeAppDialog('shiftBidDialog')">Hủy</button>
+                        <button type="submit" class="btn primary sm" style="background:#079bc9; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-weight:600;">Xác nhận Đăng ký</button>
+                    </div>
+                </form>
             </div>
         </div>
     </section>
@@ -930,7 +1349,7 @@ else
                     </div>
 
                     <!-- Form bệnh án -->
-                    <form id="consult-form" asp-action="CreateRecord" method="post">
+                    <form id="consult-form" asp-action="CreateRecord" method="post" onsubmit="reindexClinicalServices(); reindexMedications();">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="AppointmentId" id="active-appointment-id" value="@currentPatient.AppointmentId" />
 
@@ -940,6 +1359,10 @@ else
                                 <h3>Thăm khám & chẩn đoán</h3>
                             </div>
                             <div class="form-grid">
+                                <div class="field full">
+                                    <label for="allergies-input">Tiền sử dị ứng / Lưu ý y khoa</label>
+                                    <input id="allergies-input" name="Allergies" maxlength="500" value="@currentPatient.Allergy" placeholder="Ví dụ: Dị ứng Penicillin, Paracetamol, thức ăn biển... (nếu có)" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;" />
+                                </div>
                                 <div class="field full">
                                     <label for="symptoms">Triệu chứng / Lý do khám *</label>
                                     <textarea id="symptoms" name="Symptoms" rows="2" placeholder="Nhập triệu chứng, tiền sử..." required>@currentPatient.Reason</textarea>
@@ -965,20 +1388,22 @@ else
                             <div class="form-section-title">
                                 <span>02</span>
                                 <h3>Chỉ định cận lâm sàng</h3>
-                                <button type="button" class="btn text-link" style="color:#079bc9; font-size:12px; margin-left:auto; border:none; background:none; cursor:pointer;">
+                                <button type="button" class="btn text-link" style="color:#079bc9; font-size:12px; margin-left:auto; border:none; background:none; cursor:pointer;" onclick="addClinicalServiceRow()">
                                     + Thêm chỉ định
                                 </button>
                             </div>
-                            <p class="empty-line" style="font-size:11px; color:#596a7c; padding:4px 0 12px; margin:0;">Chưa có chỉ định. Thêm dịch vụ khi cần thiết theo đánh giá của bác sĩ.</p>
+                            <div id="servicesList" style="display:none; margin-bottom:12px;"></div>
+                            <p id="noServicesNotice" class="empty-line" style="font-size:11px; color:#596a7c; padding:4px 0 12px; margin:0;">Chưa có chỉ định cận lâm sàng. Bấm "+ Thêm chỉ định" khi cần yêu cầu xét nghiệm, chẩn đoán hình ảnh từ danh mục bệnh viện.</p>
 
                             <div class="form-section-title">
                                 <span>03</span>
-                                <h3>Đơn thuốc</h3>
-                                <button type="button" class="btn text-link" style="color:#079bc9; font-size:12px; margin-left:auto; border:none; background:none; cursor:pointer;">
+                                <h3>Đơn thuốc điều trị</h3>
+                                <button type="button" class="btn text-link" style="color:#079bc9; font-size:12px; margin-left:auto; border:none; background:none; cursor:pointer;" onclick="addMedicationRow()">
                                     + Thêm thuốc
                                 </button>
                             </div>
-                            <p class="field-help" style="font-size:11px; color:#718daa; margin:0 0 12px;">Danh mục thuốc minh họa. Liều dùng và hướng dẫn do bác sĩ nhập.</p>
+                            <div id="medicationsList" style="display:none; margin-bottom:12px;"></div>
+                            <p id="noMedicationsNotice" class="field-help" style="font-size:11px; color:#718daa; margin:0 0 12px;">Chưa kê đơn thuốc. Bấm "+ Thêm thuốc" để chọn thuốc trong danh mục dược bệnh viện.</p>
 
                             <div class="form-section-title">
                                 <span>04</span>
@@ -1073,10 +1498,12 @@ else
             const reasonDisplay = document.getElementById('patient-reason-display');
             const inputId = document.getElementById('active-appointment-id');
             const symptomsField = document.getElementById('symptoms');
+            const allergyInput = document.getElementById('allergies-input');
 
             if (nameDisplay) nameDisplay.textContent = name;
             if (infoDisplay) infoDisplay.textContent = code + ' · ' + gender + ' · ' + age + ' tuổi · ' + queue;
             if (allergyDisplay) allergyDisplay.textContent = allergy ? allergy : 'Không ghi nhận';
+            if (allergyInput) allergyInput.value = allergy || '';
             if (reasonDisplay) reasonDisplay.textContent = 'Lý do khám: ' + reason;
             if (inputId) inputId.value = id;
             if (symptomsField && !symptomsField.value) symptomsField.value = reason;
@@ -1333,6 +1760,120 @@ else
             url.searchParams.set('tab', 'schedule');
             url.searchParams.delete('weekOffset');
             window.location.href = url.toString();
+        }
+
+        // --- 7. MODAL ĐĂNG KÝ CA KHÁM (SHIFT BIDDING) ---
+        function openShiftBidModal(periodId, workDate, shift, label) {
+            const pidInput = document.getElementById('bidModalPeriodId');
+            const wdInput = document.getElementById('bidModalWorkDate');
+            const shiftInput = document.getElementById('bidModalShift');
+            const lbl = document.getElementById('bidModalLabel');
+            if (pidInput) pidInput.value = periodId;
+            if (wdInput) wdInput.value = workDate;
+            if (shiftInput) shiftInput.value = shift;
+            if (lbl) lbl.innerText = label;
+            openAppDialog('shiftBidDialog');
+        }
+
+        // --- 8. CHỈ ĐỊNH CẬN LÂM SÀNG & ĐƠN THUỐC ĐỘNG TỪ DATABASE ---
+        const dbServices = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AvailableServices));
+        const dbMedications = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AvailableMedications));
+
+        function addClinicalServiceRow() {
+            const list = document.getElementById('servicesList');
+            const notice = document.getElementById('noServicesNotice');
+            if (!list) return;
+            list.style.display = 'block';
+            if (notice) notice.style.display = 'none';
+
+            const row = document.createElement('div');
+            row.className = 'clinical-service-item';
+            row.style = 'display:flex; gap:8px; align-items:center; margin-bottom:8px;';
+            
+            let options = '<option value="">-- Chọn dịch vụ cận lâm sàng --</option>';
+            if (Array.isArray(dbServices)) {
+                dbServices.forEach(s => {
+                    options += `<option value="${s.Id}">${s.Name} (${Number(s.Price).toLocaleString('vi-VN')} đ)</option>`;
+                });
+            }
+
+            row.innerHTML = `
+                <select class="form-control clinical-service-select" style="flex:1; padding:6px 10px; font-size:12px; border:1px solid #cbd5e1; border-radius:6px;" required>
+                    ${options}
+                </select>
+                <input type="text" class="clinical-service-note" placeholder="Ghi chú lâm sàng..." style="flex:1; padding:6px 10px; font-size:12px; border:1px solid #cbd5e1; border-radius:6px;" />
+                <button type="button" class="btn ghost sm" style="color:#ef4444;" onclick="this.parentElement.remove(); reindexClinicalServices();">✕</button>
+            `;
+            list.appendChild(row);
+            reindexClinicalServices();
+        }
+
+        function reindexClinicalServices() {
+            const list = document.getElementById('servicesList');
+            const notice = document.getElementById('noServicesNotice');
+            if (!list) return;
+            const rows = list.querySelectorAll('.clinical-service-item');
+            if (rows.length === 0) {
+                list.style.display = 'none';
+                if (notice) notice.style.display = 'block';
+                return;
+            }
+            rows.forEach((row, idx) => {
+                const select = row.querySelector('.clinical-service-select');
+                const note = row.querySelector('.clinical-service-note');
+                if (select) select.name = `LabOrders[${idx}].ServiceId`;
+                if (note) note.name = `LabOrders[${idx}].Note`;
+            });
+        }
+
+        function addMedicationRow() {
+            const list = document.getElementById('medicationsList');
+            const notice = document.getElementById('noMedicationsNotice');
+            if (!list) return;
+            list.style.display = 'block';
+            if (notice) notice.style.display = 'none';
+
+            const row = document.createElement('div');
+            row.className = 'prescription-med-item';
+            row.style = 'display:flex; gap:8px; align-items:center; margin-bottom:8px;';
+            
+            let options = '<option value="">-- Chọn thuốc trong danh mục dược --</option>';
+            if (Array.isArray(dbMedications)) {
+                dbMedications.forEach(m => {
+                    options += `<option value="${m.Id}">${m.Name} (${m.Unit}) - ${Number(m.Price).toLocaleString('vi-VN')} đ</option>`;
+                });
+            }
+
+            row.innerHTML = `
+                <select class="form-control med-item-select" style="flex:2; padding:6px 10px; font-size:12px; border:1px solid #cbd5e1; border-radius:6px;" required>
+                    ${options}
+                </select>
+                <input type="number" min="1" value="10" class="form-control med-item-qty" placeholder="Số lượng" style="width:70px; padding:6px 10px; font-size:12px; border:1px solid #cbd5e1; border-radius:6px;" required />
+                <input type="text" class="med-item-dosage" placeholder="Liều dùng (vd: 2 viên/ngày chia 2 lần sau ăn)..." style="flex:2; padding:6px 10px; font-size:12px; border:1px solid #cbd5e1; border-radius:6px;" />
+                <button type="button" class="btn ghost sm" style="color:#ef4444;" onclick="this.parentElement.remove(); reindexMedications();">✕</button>
+            `;
+            list.appendChild(row);
+            reindexMedications();
+        }
+
+        function reindexMedications() {
+            const list = document.getElementById('medicationsList');
+            const notice = document.getElementById('noMedicationsNotice');
+            if (!list) return;
+            const rows = list.querySelectorAll('.prescription-med-item');
+            if (rows.length === 0) {
+                list.style.display = 'none';
+                if (notice) notice.style.display = 'block';
+                return;
+            }
+            rows.forEach((row, idx) => {
+                const select = row.querySelector('.med-item-select');
+                const qty = row.querySelector('.med-item-qty');
+                const dosage = row.querySelector('.med-item-dosage');
+                if (select) select.name = `PrescriptionItems[${idx}].MedicationId`;
+                if (qty) qty.name = `PrescriptionItems[${idx}].Quantity`;
+                if (dosage) dosage.name = `PrescriptionItems[${idx}].Dosage`;
+            });
         }
     </script>
 }

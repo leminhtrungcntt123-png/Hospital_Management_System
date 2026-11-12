@@ -1,4 +1,5 @@
 using HIS.BLL.Common;
+using HIS.BLL.DTOs;
 
 namespace HIS.BLL.Services;
 
@@ -9,5 +10,7 @@ namespace HIS.BLL.Services;
 public interface ISlotGenerationService
 {
     Task<Result<int>> GenerateSlotsForDateRangeAsync(DateOnly fromDate, DateOnly toDate, CancellationToken ct = default);
+    Task<Result<SlotGenerationResultDto>> GenerateSlotsAsync(DateOnly startDate, DateOnly endDate, int? departmentId = null, CancellationToken ct = default);
+    Task<IReadOnlyList<AppointmentSlotItemDto>> SearchSlotsAsync(SlotSearchRequest request, CancellationToken ct = default);
     Task<Result<int>> ExpirePendingHoldsAsync(CancellationToken ct = default);
 }

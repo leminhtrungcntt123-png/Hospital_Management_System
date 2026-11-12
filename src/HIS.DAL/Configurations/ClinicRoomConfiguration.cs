@@ -13,6 +13,7 @@ public class ClinicRoomConfiguration : IEntityTypeConfiguration<ClinicRoom>
 
         builder.Property(e => e.RoomName).HasMaxLength(50).IsRequired();
         builder.Property(e => e.RoomNumber).HasMaxLength(20).IsRequired();
+        builder.Property(e => e.IsActive).HasDefaultValue(true);
 
         builder.HasOne(e => e.Department)
             .WithMany(d => d.Rooms)

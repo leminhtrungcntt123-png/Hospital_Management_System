@@ -12,4 +12,6 @@ public class Department
     public ICollection<Nurse> Nurses { get; set; } = [];
     public DepartmentHead? DepartmentHead { get; set; }
     public ICollection<Appointment> Appointments { get; set; } = [];
+    public ICollection<DoctorSchedule> Schedules { get; set; } = [];
+    public ICollection<SchedulingPeriod> SchedulingPeriods { get; set; } = [];
 }
