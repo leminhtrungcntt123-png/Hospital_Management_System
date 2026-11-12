@@ -9,32 +9,9 @@ public class HomeController(
     ILogger<HomeController> logger) : Controller
 {
     [HttpGet]
-    public async Task<IActionResult> Index(CancellationToken ct = default)
+    public IActionResult Index()
     {
-        if (User.IsInRole("DEPARTMENT_HEAD"))
-        {
-            return RedirectToAction("Index", "Schedule", new { area = "Staff" });
-        }
-
-        if (User.IsInRole("DOCTOR"))
-        {
-            return RedirectToAction("Index", "Consultation", new { area = "Staff" });
-        }
-
-        if (User.IsInRole("NURSE"))
-        {
-            return RedirectToAction("Index", "Reception", new { area = "Staff" });
-        }
-
-        if (User.IsInRole("ADMIN"))
-        {
-            return RedirectToAction("Index", "Management", new { area = "Admin" });
-        }
-
-        var departmentList = await departments.GetDepartmentsAsync(ct);
-        var featuredDoctors = await doctors.GetPublicFeaturedDoctorsAsync(8, ct);
-        ViewBag.FeaturedDoctors = featuredDoctors;
-        return View(departmentList);
+        return View();
     }
 
     [HttpGet, HttpPost]

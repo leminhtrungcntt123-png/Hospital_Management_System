@@ -187,8 +187,8 @@ public sealed class UpsertMedicationRequest
 }
 
 public record AdminAuditLogRow(
-    int Id,
-    int AccountId,
+    long Id,
+    int? AccountId,
     string Username,
     string FullName,
     string Action,

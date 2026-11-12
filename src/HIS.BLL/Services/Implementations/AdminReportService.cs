@@ -120,11 +120,11 @@ public sealed class AdminReportService(AppDbContext db) : IAdminReportService
     {
         await AdminRules.RequireAdminAsync(db, actorId, ct);
         var query = db.AccessLogs.AsNoTracking()
-            .Include(a => a.Account)
+            .Include(a => a.Account!)
                 .ThenInclude(acc => acc.Doctor)
-            .Include(a => a.Account)
+            .Include(a => a.Account!)
                 .ThenInclude(acc => acc.Nurse)
-            .Include(a => a.Account)
+            .Include(a => a.Account!)
                 .ThenInclude(acc => acc.DepartmentHead)
             .Include(a => a.Patient)
             .AsQueryable();
