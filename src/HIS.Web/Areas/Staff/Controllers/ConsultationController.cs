@@ -105,8 +105,15 @@ public class ConsultationController : Controller
                 }
             }
 
-            var selectedDate = date ?? DateOnly.FromDateTime(DateTime.Today);
-            var selectedShift = shift ?? (DateTime.Now.Hour < 12 ? ExamShift.Morning : ExamShift.Afternoon);
+            // Mọi mốc "hôm nay" lấy qua TimeProvider (giờ Việt Nam), không phụ thuộc múi giờ máy chủ
+            var localNow = _timeProvider.GetLocalNow().DateTime;
+            var today = DateOnly.FromDateTime(localNow);
+            var todayStart = today.ToDateTime(TimeOnly.MinValue);
+            var todayEnd = todayStart.AddDays(1);
+            var todayYear = today.Year;
+
+            var selectedDate = date ?? today;
+            var selectedShift = shift ?? (localNow.Hour < 12 ? ExamShift.Morning : ExamShift.Afternoon);
             var activeTab = string.IsNullOrWhiteSpace(tab) ? "consultation" : tab.ToLowerInvariant();
 
             // 1. Hàng đợi bệnh nhân đang chờ khám từ Database
@@ -118,7 +125,10 @@ public class ConsultationController : Controller
                 .Include(a => a.Slot)
                 .Where(a => a.StatusId == (int)AppointmentStatusId.ReadyForDoctor ||
                             a.StatusId == (int)AppointmentStatusId.CheckedIn ||
-                            a.StatusId == (int)AppointmentStatusId.InProgress);
+                            a.StatusId == (int)AppointmentStatusId.InProgress)
+                // Chỉ lượt khám của HÔM NAY (theo giờ slot, hoặc giờ tạo với ca vãng lai không có slot)
+                .Where(a => (a.Slot != null && a.Slot.StartTime >= todayStart && a.Slot.StartTime < todayEnd)
+                            || (a.Slot == null && a.CreatedAt >= todayStart && a.CreatedAt < todayEnd));
 
             if (isDeptHead)
             {
@@ -138,13 +148,13 @@ public class ConsultationController : Controller
             }
 
             var queue = await queueQuery
-                .OrderBy(a => a.PriorityLevel)
+                .OrderByDescending(a => a.PriorityLevel)
                 .ThenBy(a => a.QueueNumber)
                 .Select(a => new ConsultationQueueItemDto(
                     a.Id,
                     a.AppointmentCode,
                     a.Patient.FullName,
-                    DateTime.Today.Year - a.Patient.DateOfBirth.Year,
+                    todayYear - a.Patient.DateOfBirth.Year,
                     a.Patient.Gender == Gender.Male ? "Nam" : "Nữ",
                     a.QueueNumber ?? "—",
                     a.PriorityLevel,
@@ -159,7 +169,8 @@ public class ConsultationController : Controller
                     a.VitalSigns != null ? a.VitalSigns.Spo2 : null,
                     a.VitalSigns != null ? a.VitalSigns.Weight : null,
                     a.Doctor != null ? a.Doctor.FullName : "Chuyên khoa",
-                    a.Slot != null && a.Slot.Room != null ? a.Slot.Room.RoomNumber : (a.Doctor != null ? (a.Doctor.LicenseNumber ?? "") : ""),
+                    // Phòng của lượt khám; nếu chưa có thì lấy phòng của slot (không dùng số chứng chỉ hành nghề)
+                    a.Room != null ? a.Room.RoomNumber : (a.Slot != null && a.Slot.Room != null ? a.Slot.Room.RoomNumber : ""),
                     a.StatusId
                 ))
                 .ToListAsync(ct);
@@ -192,7 +203,7 @@ public class ConsultationController : Controller
                     l.Id,
                     l.MedicalRecord.Appointment.Patient.FullName,
                     l.MedicalRecord.Appointment.AppointmentCode,
-                    DateTime.Today.Year - l.MedicalRecord.Appointment.Patient.DateOfBirth.Year,
+                    todayYear - l.MedicalRecord.Appointment.Patient.DateOfBirth.Year,
                     l.Service.Name,
                     l.Note ?? "Chỉ định chuyên khoa",
                     l.CreatedAt,
@@ -227,7 +238,7 @@ public class ConsultationController : Controller
                     r.Id,
                     r.Appointment.Patient.FullName,
                     r.Appointment.AppointmentCode,
-                    DateTime.Today.Year - r.Appointment.Patient.DateOfBirth.Year,
+                    todayYear - r.Appointment.Patient.DateOfBirth.Year,
                     r.Appointment.Patient.Gender == Gender.Male ? "Nam" : "Nữ",
                     r.CreatedAt,
                     r.Doctor.FullName,
@@ -433,7 +444,7 @@ public class ConsultationController : Controller
                 return RedirectToAction(nameof(Index), new { tab = "exceptions" });
             }
 
-            if (targetDate < DateOnly.FromDateTime(DateTime.Today))
+            if (targetDate < DateOnly.FromDateTime(_timeProvider.GetLocalNow().DateTime))
             {
                 TempData["ErrorMessage"] = "Không thể gửi đề nghị nghỉ hoặc đổi ca cho ngày trong quá khứ.";
                 return RedirectToAction(nameof(Index), new { tab = "exceptions" });

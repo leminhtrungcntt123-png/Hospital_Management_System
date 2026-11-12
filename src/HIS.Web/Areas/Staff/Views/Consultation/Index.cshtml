@@ -16,6 +16,11 @@
 
     var currentPatient = Model.ActivePatient ?? (Model.QueuePatients.Count > 0 ? Model.QueuePatients[0] : null);
 
+    // Tên trong DB có thể đã có sẵn tiền tố "BS." — chỉ thêm khi còn thiếu để không bị "BS. BS."
+    string WithBs(string? name) => string.IsNullOrWhiteSpace(name)
+        ? ""
+        : (name.TrimStart().StartsWith("BS.", StringComparison.OrdinalIgnoreCase) ? name.Trim() : "BS. " + name.Trim());
+
     // Tính ngày Thứ Hai đến Chủ Nhật theo tuần được chọn (hỗ trợ weekOffset)
     var now = DateTime.Today;
     int diff = (7 + (now.DayOfWeek - DayOfWeek.Monday)) % 7;
@@ -775,7 +780,7 @@ else
             }
             else
             {
-                <p>@Model.DepartmentName · BS. @Model.CurrentDoctorName · Phòng @Model.CurrentDoctorRoom · Chỉ chỉnh sửa phiếu do bạn phụ trách.</p>
+                <p>@Model.DepartmentName · @WithBs(Model.CurrentDoctorName) · Phòng @Model.CurrentDoctorRoom · Chỉ chỉnh sửa phiếu do bạn phụ trách.</p>
             }
         </div>
         <div class="heading-actions">
@@ -814,7 +819,7 @@ else
                         <option value="">-- Tất cả bác sĩ trong khoa --</option>
                         @foreach (var doc in Model.AvailableDoctors)
                         {
-                            <option value="@doc.Id" selected="@(Model.SelectedDoctorId == doc.Id)">BS. @doc.FullName (@(doc.RoomNumber ?? doc.Specialty))</option>
+                            <option value="@doc.Id" selected="@(Model.SelectedDoctorId == doc.Id)">@WithBs(doc.FullName) (@(doc.RoomNumber ?? doc.Specialty))</option>
                         }
                     </select>
                 </div>
@@ -823,7 +828,7 @@ else
             {
                 <div style="padding:8px 14px; background:#f8fafc; border-bottom:1px solid #e2e8f0; font-size:11px; color:#64748b; display:flex; justify-content:space-between;">
                     <span>Phòng: <strong>@Model.CurrentDoctorRoom</strong></span>
-                    <span>Bác sĩ: <strong>BS. @Model.CurrentDoctorName</strong></span>
+                    <span>Bác sĩ: <strong>@WithBs(Model.CurrentDoctorName)</strong></span>
                 </div>
             }
 
@@ -860,7 +865,7 @@ else
                                 <small>@p.QueueNumber · @(p.CheckedInAt?.ToString("HH:mm") ?? "Chờ vào") @(!string.IsNullOrEmpty(p.RoomNumber) ? $"· {p.RoomNumber}" : "")</small>
                                 @if (Model.IsDepartmentHead && !string.IsNullOrEmpty(p.DoctorName))
                                 {
-                                    <small style="color:#0284c7; font-size:10px; display:block;">BS. @p.DoctorName</small>
+                                    <small style="color:#0284c7; font-size:10px; display:block;">@WithBs(p.DoctorName)</small>
                                 }
                                 @if (p.StatusId == 3)
                                 {
@@ -1066,7 +1071,30 @@ else
         });
 
         // --- 1. XỬ LÝ KHÁM & KÊ ĐƠN ---
+        // Các ô nhập của phiếu khám (ngoài ô triệu chứng được điền sẵn từ lý do khám)
+        const CONSULT_FORM_FIELDS = ['examination', 'icd', 'diagnosis', 'secondary', 'conclusion'];
+
+        function consultFormHasUserInput() {
+            const symptoms = document.getElementById('symptoms');
+            const autoReason = symptoms ? (symptoms.dataset.auto ?? symptoms.defaultValue) : '';
+            const symptomsEdited = symptoms && symptoms.value !== autoReason;
+            const othersFilled = CONSULT_FORM_FIELDS.some(fid => {
+                const el = document.getElementById(fid);
+                return el && el.value.trim() !== '';
+            });
+            return symptomsEdited || othersFilled;
+        }
+
         function selectConsultPatient(btn) {
+            const activeIdInput = document.getElementById('active-appointment-id');
+            const switching = !!activeIdInput && activeIdInput.value !== btn.getAttribute('data-id');
+
+            // Đổi sang bệnh nhân khác: nếu bác sĩ đã nhập dở thì hỏi trước, tránh mất dữ liệu hoặc ghi nhầm sang người khác
+            if (switching && consultFormHasUserInput()
+                && !confirm('Phiếu khám đang nhập dở của bệnh nhân hiện tại sẽ bị xóa khi chuyển sang bệnh nhân khác. Tiếp tục?')) {
+                return;
+            }
+
             document.querySelectorAll('.consultation-person').forEach(el => el.classList.remove('active'));
             btn.classList.add('active');
 
@@ -1096,7 +1124,17 @@ else
             if (allergyDisplay) allergyDisplay.textContent = allergy ? allergy : 'Không ghi nhận';
             if (reasonDisplay) reasonDisplay.textContent = 'Lý do khám: ' + reason;
             if (inputId) inputId.value = id;
-            if (symptomsField && !symptomsField.value) symptomsField.value = reason;
+            if (switching) {
+                // Xóa phiếu của bệnh nhân trước để không lưu nhầm sang người đang chọn
+                CONSULT_FORM_FIELDS.forEach(fid => {
+                    const el = document.getElementById(fid);
+                    if (el) el.value = '';
+                });
+                if (symptomsField) {
+                    symptomsField.value = reason || '';
+                    symptomsField.dataset.auto = reason || '';
+                }
+            }
 
             const pulseEl = document.getElementById('vital-pulse');
             const bpEl = document.getElementById('vital-bp');
