@@ -159,7 +159,8 @@ public class ConsultationController : Controller
                     a.VitalSigns != null ? a.VitalSigns.Spo2 : null,
                     a.VitalSigns != null ? a.VitalSigns.Weight : null,
                     a.Doctor != null ? a.Doctor.FullName : "Chuyên khoa",
-                    a.Slot != null && a.Slot.Room != null ? a.Slot.Room.RoomNumber : (a.Doctor != null ? (a.Doctor.LicenseNumber ?? "") : "")
+                    a.Slot != null && a.Slot.Room != null ? a.Slot.Room.RoomNumber : (a.Doctor != null ? (a.Doctor.LicenseNumber ?? "") : ""),
+                    a.StatusId
                 ))
                 .ToListAsync(ct);
 
@@ -360,6 +361,20 @@ public class ConsultationController : Controller
             TempData["SuccessMessage"] = $"Đã gọi lượt khám số {result.Value}.";
         }
         return RedirectToAction(nameof(Index));
+    }
+
+    // 2.5. Bác sĩ bắt đầu khám bệnh cho lượt khám (ReadyForDoctor -> InProgress)
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> StartExam([FromBody] StartExamRequest request, CancellationToken ct)
+    {
+        var accountId = GetCurrentAccountId();
+        var result = await _doctorService.StartConsultationAsync(accountId, request.AppointmentId, ct);
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { success = false, message = result.Error.Message });
+        }
+        return Ok(new { success = true });
     }
 
     // 3. Hoàn tất lượt khám và tạo hồ sơ bệnh án

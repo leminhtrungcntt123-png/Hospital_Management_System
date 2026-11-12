@@ -79,6 +79,18 @@ function bindEvents() {
             case 'reload-catalog':
                 loadCatalog();
                 break;
+            case 'open-vitals-modal':
+                openVitalsModal(target.dataset.appId);
+                break;
+            case 'save-vitals':
+                saveVitalsForm(target.dataset.appId);
+                break;
+            case 'refresh-vitals':
+                loadVitalsQueue();
+                break;
+            case 'refresh-dashboard':
+                loadDashboardSummary();
+                break;
         }
     });
     document.addEventListener('input', (event) => {

@@ -851,6 +851,7 @@ else
                                 data-temp="@(p.Temperature?.ToString() ?? "")"
                                 data-spo2="@(p.Spo2?.ToString() ?? "")"
                                 data-weight="@(p.Weight?.ToString() ?? "")"
+                                data-status="@p.StatusId"
                                 onclick="selectConsultPatient(this)"
                                 style="border:none; background:none; cursor:pointer; width:100%; border-bottom:1px solid #f1f5f9; text-align:left;">
                             <div class="avatar" style="width:30px; height:30px; border-radius:50%; background:#e0f2fe; color:#0369a1; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:10px;">@initials</div>
@@ -861,7 +862,18 @@ else
                                 {
                                     <small style="color:#0284c7; font-size:10px; display:block;">BS. @p.DoctorName</small>
                                 }
-                                <span class="badge" style="background:#e0f2fe; color:#0369a1; font-size:10px; padding:2px 8px; border-radius:4px;">Chờ bác sĩ</span>
+                                @if (p.StatusId == 3)
+                                {
+                                    <span class="badge queue-status-badge" style="background:#fef3c7; color:#92400e; font-size:10px; padding:2px 8px; border-radius:4px;">Chờ đo sinh hiệu</span>
+                                }
+                                else if (p.StatusId == 5)
+                                {
+                                    <span class="badge queue-status-badge" style="background:#dcfce7; color:#166534; font-size:10px; padding:2px 8px; border-radius:4px;">Đang khám</span>
+                                }
+                                else
+                                {
+                                    <span class="badge queue-status-badge" style="background:#e0f2fe; color:#0369a1; font-size:10px; padding:2px 8px; border-radius:4px;">Sẵn sàng khám</span>
+                                }
                             </span>
                         </button>
                         isFirst = false;
@@ -915,13 +927,18 @@ else
                         <div><small>Cân nặng</small><strong id="vital-weight">@(currentPatient.Weight.HasValue ? $"{currentPatient.Weight} " : "— ")<span>kg</span></strong></div>
                     </div>
 
+                    @{
+                        var hasVitals = currentPatient.Pulse.HasValue || currentPatient.BloodPressure != null || currentPatient.Temperature.HasValue || currentPatient.Weight.HasValue;
+                        var isUnmeasured = currentPatient.StatusId == 3 || !hasVitals;
+                        var isInProgress = currentPatient.StatusId == 5;
+                    }
                     <!-- Hộp Bắt đầu khám -->
-                    <div class="begin-exam" id="begin-exam-box">
+                    <div class="begin-exam" id="begin-exam-box" style="display:@(isInProgress ? "none" : "flex");">
                         <div>
-                            <h3 style="margin:0 0 4px;">Bệnh nhân đã sẵn sàng</h3>
-                            <p style="margin:0;">Bắt đầu khám để nhập phiếu và tạo chỉ định.</p>
+                            <h3 style="margin:0 0 4px; color:@(isUnmeasured ? "#d97706" : "#142d4a");">@(isUnmeasured ? "Chưa đo sinh hiệu" : "Bệnh nhân đã sẵn sàng")</h3>
+                            <p style="margin:0;">@(isUnmeasured ? "Bệnh nhân cần được điều dưỡng đo sinh hiệu trước khi bắt đầu khám." : "Bắt đầu khám để nhập phiếu và tạo chỉ định.")</p>
                         </div>
-                        <button type="button" class="btn primary" onclick="startExamNow()" style="background:#079bc9; color:#fff; border:none; padding:8px 18px; border-radius:6px; font-weight:600; font-size:13px; display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+                        <button type="button" class="btn primary" onclick="startExamNow()" @(isUnmeasured ? "disabled" : "") style="background:#079bc9; color:#fff; border:none; padding:8px 18px; border-radius:6px; font-weight:600; font-size:13px; display:inline-flex; align-items:center; gap:6px; cursor:@(isUnmeasured ? "not-allowed" : "pointer"); opacity:@(isUnmeasured ? "0.5" : "1");">
                             <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
                                 <path d="M5 3v5a5 5 0 0 0 10 0V3 M3 3h4 M13 3h4 M10 13v3a5 5 0 0 0 10 0v-2 M22 11a2 2 0 1 1-4 0 2 2 0 0 1 4 0"></path>
                             </svg>
@@ -934,7 +951,7 @@ else
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="AppointmentId" id="active-appointment-id" value="@currentPatient.AppointmentId" />
 
-                        <fieldset id="exam-fieldset" disabled>
+                        <fieldset id="exam-fieldset" @(isInProgress ? "" : "disabled")>
                             <div class="form-section-title">
                                 <span>01</span>
                                 <h3>Thăm khám & chẩn đoán</h3>
@@ -994,7 +1011,7 @@ else
                             <span style="font-size:12px; color:#596a7c;">Hoàn tất sẽ tạo hóa đơn thu phí.</span>
                             <!-- Đã xóa nút Lưu nháp và nút Xem bản mẫu 5 vai trò theo yêu cầu -->
                             <div>
-                                <button type="submit" class="btn primary" id="btn-submit-exam" disabled style="background:#079bc9; color:#fff; border:none; padding:8px 24px; border-radius:6px; font-size:13px; font-weight:600; cursor:not-allowed;">
+                                <button type="submit" class="btn primary" id="btn-submit-exam" @(isInProgress ? "" : "disabled") style="background:#079bc9; color:#fff; border:none; padding:8px 24px; border-radius:6px; font-size:13px; font-weight:600; cursor:@(isInProgress ? "pointer" : "not-allowed");">
                                     Hoàn tất khám
                                 </button>
                             </div>
@@ -1092,20 +1109,124 @@ else
             if (tempEl) tempEl.innerHTML = (temp ? temp + ' ' : '— ') + '<span>°C</span>';
             if (spo2El) spo2El.innerHTML = (spo2 ? spo2 + ' ' : '— ') + '<span>%</span>';
             if (weightEl) weightEl.innerHTML = (weight ? weight + ' ' : '— ') + '<span>kg</span>';
-        }
 
-        function startExamNow() {
+            const status = parseInt(btn.getAttribute('data-status') || '4');
             const fieldset = document.getElementById('exam-fieldset');
             const submitBtn = document.getElementById('btn-submit-exam');
             const banner = document.getElementById('begin-exam-box');
+            const bannerTitle = banner ? banner.querySelector('h3') : null;
+            const bannerDesc = banner ? banner.querySelector('p') : null;
+            const btnStart = banner ? banner.querySelector('button') : null;
 
-            if (fieldset) fieldset.removeAttribute('disabled');
-            if (submitBtn) {
-                submitBtn.removeAttribute('disabled');
-                submitBtn.style.cursor = 'pointer';
+            const hasVitals = !!(pulse || bp || temp || weight);
+
+            if (status === 5) {
+                // Đang khám: mở sẵn form
+                if (fieldset) fieldset.removeAttribute('disabled');
+                if (submitBtn) {
+                    submitBtn.removeAttribute('disabled');
+                    submitBtn.style.cursor = 'pointer';
+                }
+                if (banner) banner.style.display = 'none';
+            } else if (status === 3 || !hasVitals) {
+                // Chưa đo sinh hiệu: Khóa form và hiển thị cảnh báo
+                if (fieldset) fieldset.setAttribute('disabled', 'disabled');
+                if (submitBtn) {
+                    submitBtn.setAttribute('disabled', 'disabled');
+                    submitBtn.style.cursor = 'not-allowed';
+                }
+                if (banner) {
+                    banner.style.display = 'flex';
+                    if (bannerTitle) {
+                        bannerTitle.textContent = 'Chưa đo sinh hiệu';
+                        bannerTitle.style.color = '#d97706';
+                    }
+                    if (bannerDesc) {
+                        bannerDesc.textContent = 'Bệnh nhân cần được điều dưỡng đo sinh hiệu trước khi bắt đầu khám.';
+                    }
+                    if (btnStart) {
+                        btnStart.setAttribute('disabled', 'disabled');
+                        btnStart.style.opacity = '0.5';
+                        btnStart.style.cursor = 'not-allowed';
+                    }
+                }
+            } else {
+                // Sẵn sàng khám (Status == 4 và có vitals)
+                if (fieldset) fieldset.setAttribute('disabled', 'disabled');
+                if (submitBtn) {
+                    submitBtn.setAttribute('disabled', 'disabled');
+                    submitBtn.style.cursor = 'not-allowed';
+                }
+                if (banner) {
+                    banner.style.display = 'flex';
+                    if (bannerTitle) {
+                        bannerTitle.textContent = 'Bệnh nhân đã sẵn sàng';
+                        bannerTitle.style.color = '#142d4a';
+                    }
+                    if (bannerDesc) {
+                        bannerDesc.textContent = 'Bắt đầu khám để nhập phiếu và tạo chỉ định.';
+                    }
+                    if (btnStart) {
+                        btnStart.removeAttribute('disabled');
+                        btnStart.style.opacity = '1';
+                        btnStart.style.cursor = 'pointer';
+                    }
+                }
             }
-            if (banner) {
-                banner.style.display = 'none';
+        }
+
+        async function startExamNow() {
+            const inputId = document.getElementById('active-appointment-id');
+            const appointmentId = inputId ? parseInt(inputId.value) : 0;
+            if (!appointmentId) return;
+
+            const banner = document.getElementById('begin-exam-box');
+            const btnStart = banner ? banner.querySelector('button') : null;
+            if (btnStart) btnStart.disabled = true;
+
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+
+            try {
+                const res = await fetch('/Staff/Consultation/StartExam', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': token
+                    },
+                    body: JSON.stringify({ appointmentId })
+                });
+
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    alert(data.message || 'Không thể bắt đầu ca khám.');
+                    if (btnStart) btnStart.disabled = false;
+                    return;
+                }
+
+                const fieldset = document.getElementById('exam-fieldset');
+                const submitBtn = document.getElementById('btn-submit-exam');
+
+                if (fieldset) fieldset.removeAttribute('disabled');
+                if (submitBtn) {
+                    submitBtn.removeAttribute('disabled');
+                    submitBtn.style.cursor = 'pointer';
+                }
+                if (banner) banner.style.display = 'none';
+
+                // Cập nhật badge người bệnh đang chọn
+                const activeBtn = document.querySelector('.consultation-person.active');
+                if (activeBtn) {
+                    activeBtn.setAttribute('data-status', '5');
+                    const badge = activeBtn.querySelector('.queue-status-badge');
+                    if (badge) {
+                        badge.textContent = 'Đang khám';
+                        badge.style.background = '#dcfce7';
+                        badge.style.color = '#166534';
+                    }
+                }
+            } catch (err) {
+                alert('Lỗi kết nối máy chủ: ' + err.message);
+                if (btnStart) btnStart.disabled = false;
             }
         }
 

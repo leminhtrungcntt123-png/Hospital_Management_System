@@ -19,7 +19,8 @@ public record ConsultationQueueItemDto(
     int? Spo2,
     decimal? Weight,
     string? DoctorName = null,
-    string? RoomNumber = null
+    string? RoomNumber = null,
+    int StatusId = 4
 );
 
 public record ConsultationLabItemDto(
