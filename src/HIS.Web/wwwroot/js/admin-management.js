@@ -41,6 +41,7 @@
     let catalog = null;
     let busy = false;
     let reportVersion = 0;
+    let auditVersion = 0;
 
     function notify(message, error = false) {
         const target = find('#admin-message');
@@ -253,7 +254,8 @@
                 ]),
             );
         } catch {
-            // bỏ qua lỗi phụ nếu chưa có dữ liệu khoa
+            table('#department-stats-table', ['Khoa chuyên môn', 'Lượt tiếp nhận', 'Doanh thu thực thu'], []);
+            notify('Chưa tải được thống kê doanh thu theo khoa.', true);
         }
     }
 
@@ -339,37 +341,31 @@
         }
     }
 
-    async function loadAudit(withFilter = false) {
+    async function loadAudit(withFilter = null) {
         const filter = find('#audit-filter');
         let query = '';
         let searchKeyword = '';
-        if (filter && withFilter) {
+        const shouldFilter = withFilter !== null
+            ? withFilter
+            : Boolean(filter && (filter.elements.from?.value || filter.elements.to?.value || filter.elements.action?.value || filter.elements.search?.value));
+
+        if (filter && shouldFilter) {
             const formData = new FormData(filter);
             const params = new URLSearchParams();
             if (formData.get('from')) params.set('from', formData.get('from'));
             if (formData.get('to')) params.set('to', formData.get('to'));
             if (formData.get('action')) params.set('action', formData.get('action'));
-            searchKeyword = (formData.get('search') || '').trim().toLowerCase();
+            if (formData.get('search')) {
+                searchKeyword = (formData.get('search') || '').trim().toLowerCase();
+                params.set('search', (formData.get('search') || '').trim());
+            }
             const qs = params.toString();
             if (qs) query = '?' + qs;
         }
 
+        const currentVersion = ++auditVersion;
         let rows = await request('AuditLogs' + query);
-
-        if (searchKeyword) {
-            rows = rows.filter((r) =>
-                (r.fullName && r.fullName.toLowerCase().includes(searchKeyword)) ||
-                (r.username && r.username.toLowerCase().includes(searchKeyword)) ||
-                (r.patientName && r.patientName.toLowerCase().includes(searchKeyword)) ||
-                (r.ipAddress && r.ipAddress.toLowerCase().includes(searchKeyword)) ||
-                (r.action && r.action.toLowerCase().includes(searchKeyword))
-            );
-        }
-
-        const countEl = find('#audit-count');
-        if (countEl) {
-            countEl.textContent = `${rows.length} sự kiện`;
-        }
+        if (currentVersion !== auditVersion) return;
 
         const actionMap = {
             VIEW_RECORD: { label: 'Xem bệnh án', cls: 'info' },
@@ -384,6 +380,23 @@
             AdminLogin: { label: 'Đăng nhập', cls: 'warning' },
             ViewDepartmentCatalog: { label: 'Xem danh mục', cls: 'neutral' },
         };
+
+        if (searchKeyword) {
+            rows = rows.filter((r) => {
+                const actionLabel = (actionMap[r.action]?.label || '').toLowerCase();
+                return (r.fullName && r.fullName.toLowerCase().includes(searchKeyword)) ||
+                    (r.username && r.username.toLowerCase().includes(searchKeyword)) ||
+                    (r.patientName && r.patientName.toLowerCase().includes(searchKeyword)) ||
+                    (r.ipAddress && r.ipAddress.toLowerCase().includes(searchKeyword)) ||
+                    (r.action && r.action.toLowerCase().includes(searchKeyword)) ||
+                    actionLabel.includes(searchKeyword);
+            });
+        }
+
+        const countEl = find('#audit-count');
+        if (countEl) {
+            countEl.textContent = `${rows.length} sự kiện`;
+        }
 
         table(
             '#audit-table',

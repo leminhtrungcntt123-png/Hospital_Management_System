@@ -109,10 +109,10 @@ test('admin-management.js execution does not throw syntax or runtime errors', as
                     get: (h) => h === 'content-type' ? 'application/json' : null,
                 },
                 json: async () => {
+                    if (url.includes('CatalogDirectory')) return { rooms: [], services: [], serviceTypes: [], medications: [], departments: [] };
                     if (url.includes('Directory')) return { accounts: [], staff: [], roles: [], doctors: [], departments: [] };
                     if (url.includes('Report')) return { from: '2026-11-01', to: '2026-11-06', revenue: 0, visits: 0, deposits: 0, refunds: 0, days: [] };
                     if (url.includes('Requests')) return [];
-                    if (url.includes('CatalogDirectory')) return { rooms: [], services: [], serviceTypes: [], medications: [], departments: [] };
                     if (url.includes('AuditLogs')) return [];
                     if (url.includes('DepartmentStats')) return [];
                     return {};
@@ -138,6 +138,7 @@ test('admin-management.js execution does not throw syntax or runtime errors', as
     assert.doesNotThrow(() => {
         script.runInContext(context);
     });
+    await new Promise((resolve) => setTimeout(resolve, 50));
 });
 
 test('AdminWorkspace has department filter dropdowns for rooms and departments', () => {

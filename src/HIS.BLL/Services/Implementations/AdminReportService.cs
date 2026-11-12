@@ -116,7 +116,7 @@ public sealed class AdminReportService(AppDbContext db) : IAdminReportService
     }
 
     public async Task<IReadOnlyList<AdminAuditLogRow>> GetAuditLogsAsync(
-        int actorId, DateOnly? from = null, DateOnly? to = null, string? action = null, CancellationToken ct = default)
+        int actorId, DateOnly? from = null, DateOnly? to = null, string? action = null, string? search = null, int limit = 200, CancellationToken ct = default)
     {
         await AdminRules.RequireAdminAsync(db, actorId, ct);
         var query = db.AccessLogs.AsNoTracking()
@@ -146,16 +146,32 @@ public sealed class AdminReportService(AppDbContext db) : IAdminReportService
             query = query.Where(a => a.Action == action);
         }
 
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(a =>
+                (a.Account != null && a.Account.Username.Contains(term)) ||
+                (a.Account != null && a.Account.Doctor != null && a.Account.Doctor.FullName.Contains(term)) ||
+                (a.Account != null && a.Account.Nurse != null && a.Account.Nurse.FullName.Contains(term)) ||
+                (a.Account != null && a.Account.DepartmentHead != null && a.Account.DepartmentHead.FullName.Contains(term)) ||
+                (a.Patient != null && a.Patient.FullName.Contains(term)) ||
+                (a.IpAddress != null && a.IpAddress.Contains(term)) ||
+                a.Action.Contains(term));
+        }
+
+        var maxRows = limit > 0 ? Math.Min(limit, 1000) : 200;
+
         return await query
             .OrderByDescending(a => a.OccurredAt)
-            .Take(200)
+            .Take(maxRows)
             .Select(a => new AdminAuditLogRow(
                 a.Id,
                 a.AccountId,
-                a.Account.Username,
-                a.Account.Doctor != null ? a.Account.Doctor.FullName :
-                a.Account.Nurse != null ? a.Account.Nurse.FullName :
-                a.Account.DepartmentHead != null ? a.Account.DepartmentHead.FullName : a.Account.Username,
+                a.Account != null ? a.Account.Username : "—",
+                a.Account != null && a.Account.Doctor != null ? a.Account.Doctor.FullName :
+                a.Account != null && a.Account.Nurse != null ? a.Account.Nurse.FullName :
+                a.Account != null && a.Account.DepartmentHead != null ? a.Account.DepartmentHead.FullName :
+                (a.Account != null ? a.Account.Username : "—"),
                 a.Action,
                 a.Patient != null ? a.Patient.FullName : null,
                 a.MedicalRecordId,

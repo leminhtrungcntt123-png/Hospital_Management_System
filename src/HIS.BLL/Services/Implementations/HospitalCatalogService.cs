@@ -53,25 +53,31 @@ public sealed class HospitalCatalogService(AppDbContext db) : IHospitalCatalogSe
         };
 
         db.ClinicRooms.Add(room);
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            throw new AdminOperationException($"Phòng khám với tên '{trimmedName}' hoặc số phòng '{trimmedNumber}' đã tồn tại trong khoa này.");
+        }
         return room.Id;
     }
 
     public async Task<bool> DeleteRoomAsync(int roomId, CancellationToken ct = default)
     {
-        var room = await db.ClinicRooms
-            .Include(r => r.Appointments)
-            .Include(r => r.Schedules)
-            .FirstOrDefaultAsync(r => r.Id == roomId, ct);
-
+        var room = await db.ClinicRooms.FirstOrDefaultAsync(r => r.Id == roomId, ct);
         if (room == null)
             return false;
 
-        if (room.Appointments.Any())
+        if (await db.Appointments.AnyAsync(a => a.RoomId == roomId, ct))
             throw new AdminOperationException("Không thể xóa phòng khám đã có lịch hẹn hoặc hồ sơ bệnh nhân tiếp nhận.");
 
-        if (room.Schedules.Any())
+        if (await db.DoctorSchedules.AnyAsync(s => s.RoomId == roomId, ct))
             throw new AdminOperationException("Không thể xóa phòng khám đang có lịch trực hoặc phân công ca khám.");
+
+        if (await db.QueueCounters.AnyAsync(q => q.RoomId == roomId, ct))
+            throw new AdminOperationException("Không thể xóa phòng khám đã phát số thứ tự hàng đợi.");
 
         db.ClinicRooms.Remove(room);
         await db.SaveChangesAsync(ct);
@@ -131,7 +137,14 @@ public sealed class HospitalCatalogService(AppDbContext db) : IHospitalCatalogSe
             existing.Price = request.Price;
             existing.IsActive = request.IsActive;
 
-            await db.SaveChangesAsync(ct);
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException)
+            {
+                throw new AdminOperationException($"Dịch vụ y tế tên '{trimmedName}' đã tồn tại trong hệ thống.");
+            }
             return existing.Id;
         }
         else
@@ -149,7 +162,14 @@ public sealed class HospitalCatalogService(AppDbContext db) : IHospitalCatalogSe
             };
 
             db.Services.Add(service);
-            await db.SaveChangesAsync(ct);
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException)
+            {
+                throw new AdminOperationException($"Dịch vụ y tế tên '{trimmedName}' đã tồn tại trong hệ thống.");
+            }
             return service.Id;
         }
     }
@@ -193,7 +213,14 @@ public sealed class HospitalCatalogService(AppDbContext db) : IHospitalCatalogSe
             existing.Price = request.Price;
             existing.IsActive = request.IsActive;
 
-            await db.SaveChangesAsync(ct);
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException)
+            {
+                throw new AdminOperationException($"Thuốc '{trimmedName}' với hàm lượng '{strength}' đã tồn tại.");
+            }
             return existing.Id;
         }
         else
@@ -213,7 +240,14 @@ public sealed class HospitalCatalogService(AppDbContext db) : IHospitalCatalogSe
             };
 
             db.Medications.Add(medication);
-            await db.SaveChangesAsync(ct);
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException)
+            {
+                throw new AdminOperationException($"Thuốc '{trimmedName}' với hàm lượng '{strength}' đã tồn tại.");
+            }
             return medication.Id;
         }
     }

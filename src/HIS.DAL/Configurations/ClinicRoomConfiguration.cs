@@ -14,6 +14,9 @@ public class ClinicRoomConfiguration : IEntityTypeConfiguration<ClinicRoom>
         builder.Property(e => e.RoomName).HasMaxLength(50).IsRequired();
         builder.Property(e => e.RoomNumber).HasMaxLength(20).IsRequired();
 
+        builder.HasIndex(e => e.RoomNumber).IsUnique();
+        builder.HasIndex(e => new { e.DepartmentId, e.RoomName }).IsUnique();
+
         builder.HasOne(e => e.Department)
             .WithMany(d => d.Rooms)
             .HasForeignKey(e => e.DepartmentId)
