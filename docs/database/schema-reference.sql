@@ -1,4 +1,4 @@
-- ─── LOOKUP TABLES ────────────────────────────────────
+-- ─── LOOKUP TABLES ────────────────────────────────────
 CREATE TABLE roles (
     id          INTEGER PRIMARY KEY,
     code        VARCHAR(20) NOT NULL UNIQUE,    -- 'ADMIN', 'DOCTOR'...

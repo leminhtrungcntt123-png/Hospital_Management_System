@@ -72,7 +72,8 @@ Toàn bộ quy trình khám chữa bệnh được kiểm soát chặt chẽ b�
    - **Sửa sinh hiệu:** Chỉ cho phép khi ca khám vẫn đang ở `ReadyForDoctor (4)`. Nếu Bác sĩ đã bắt đầu khám (`StatusId >= 5`), server chặn sửa ngay lập tức.
    - **Bác sĩ bắt đầu khám:** Bắt buộc `appointment.StatusId == ReadyForDoctor` VÀ `appointment.VitalSigns != null` mới chuyển sang `InProgress (5)`. Nút bấm trên giao diện bị khóa nếu bệnh nhân chưa đo sinh hiệu.
    - **Bác sĩ lưu bệnh án:** Bắt buộc `appointment.StatusId == InProgress` mới cho chuyển sang `Completed (6)`.
-4. **Phân định khóa ngoại:**
+4. **Thứ tự hàng đợi:** sắp theo `priority_level` **giảm dần** (3 = khẩn cấp nhất), áp dụng cho điều dưỡng, tiếp nhận và bác sĩ.
+5. **Phân định khóa ngoại:**
    - `vital_signs.recorded_by = nurse.Id` (FK trỏ đến `Nurse`).
    - `appointment_status_history.performed_by = accountId` (FK trỏ đến `Account`).
 
@@ -123,14 +124,16 @@ Toàn bộ quy trình khám chữa bệnh được kiểm soát chặt chẽ b�
 
 * Mật khẩu chung cho tất cả tài khoản seed: **`Admin@123456`**
 
+> Nguồn: `src/HIS.Web/Data/DevDataSeeder.cs`. Mật khẩu lấy từ `Seed:DefaultPassword` (User Secrets); nếu không đặt thì mặc định là `Password123!`. README hướng dẫn đặt `Admin@123456`. Hiện **không có** tài khoản bệnh nhân seed sẵn (đăng ký mới qua `/Account/Register`).
+
 | Tài khoản (Username) | Họ và tên | Vai trò | Chuyên khoa / Vị trí | Đường dẫn truy cập chính |
 | :--- | :--- | :--- | :--- | :--- |
 | `admin` | Quản trị viên | ADMIN | Quản trị hệ thống | `/Admin/Management` |
-| `bs_nam` | BS. Nguyễn Văn Nam | DOCTOR | Khoa Nội tổng quát (P.101) | `/Staff/Consultation` |
-| `bs_huy` | BS. Lê Quang Huy | DOCTOR | Khoa Nội tổng quát (P.102) | `/Staff/Consultation` |
-| `tk_thang` | BS. Trần Văn Thắng | DEPARTMENT_HEAD | Trưởng khoa Nội tổng quát | `/Staff/Consultation` (Tab quản lý khoa) |
-| `yt_lan` | Điều dưỡng Hoàng Lan | NURSE | Khoa Nội tổng quát | `/Workspace/staff/dashboard`, `/Staff/Reception`, `/Workspace/staff/vitals` |
-| `bn_an` | Nguyễn Văn An | PATIENT | Bệnh nhân mẫu | `/Booking`, `/Patient/MyAppointments` |
+| `head_noi` | Phạm Thu Hằng | DEPARTMENT_HEAD | Trưởng khoa Nội tổng quát (cũng có hồ sơ bác sĩ) | `/Staff/Consultation` (Tab quản lý khoa) |
+| `bs_nam` | BS. Nguyễn Hoàng Nam | DOCTOR | Khoa Nội tổng quát (P101) | `/Staff/Consultation` |
+| `bs_huy` | BS. Lê Quang Huy | DOCTOR | Khoa Nội tổng quát (P102) | `/Staff/Consultation` |
+| `bs_thu` | BS. Trần Minh Thư | DOCTOR | Khoa Nội tổng quát (lịch ở P201) | `/Staff/Consultation` |
+| `nurse_lan` | Điều dưỡng Hoàng Lan | NURSE | Khoa Nội tổng quát | `/Workspace/staff/dashboard`, `/Staff/Reception`, `/Workspace/staff/vitals` |
 
 ---
 
