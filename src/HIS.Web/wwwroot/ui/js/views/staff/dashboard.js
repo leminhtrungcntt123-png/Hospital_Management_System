@@ -305,9 +305,14 @@ function vitalsPage() {
 
 // --- MODAL GHI / SỬA SINH HIỆU ---
 
-function openVitalsModal(appointmentId) {
+async function openVitalsModal(appointmentId) {
     appointmentId = parseInt(appointmentId);
-    const item = nurseVitalsState.queue.find((q) => q.appointmentId === appointmentId);
+    let item = nurseVitalsState.queue.find((q) => q.appointmentId === appointmentId);
+    if (!item) {
+        // Mở từ Bàn làm việc: hàng đợi sinh hiệu chưa được tải nên phải tải trước
+        await loadVitalsQueue();
+        item = nurseVitalsState.queue.find((q) => q.appointmentId === appointmentId);
+    }
     if (!item) {
         alert('Không tìm thấy thông tin lượt khám trong hàng đợi.');
         return;

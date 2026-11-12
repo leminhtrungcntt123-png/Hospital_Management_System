@@ -63,7 +63,7 @@ public sealed class VitalSignsService(
         var list = await query
             .OrderByDescending(a => a.PriorityLevel)
             .ThenBy(a => a.StatusId == (int)AppointmentStatusId.CheckedIn ? 0 : 1)
-            .ThenBy(a => a.QueueNumber ?? "ZZZ")
+            .ThenBy(a => a.CheckedInAt ?? a.CreatedAt)
             .ThenBy(a => a.Slot != null ? a.Slot.StartTime : a.CreatedAt)
             .Select(a => new VitalSignsQueueItemDto(
                 a.Id,
@@ -156,6 +156,9 @@ public sealed class VitalSignsService(
 
         return await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
+            db.ChangeTracker.Clear();
+            var dayStart = Today.ToDateTime(TimeOnly.MinValue);
+            var dayEnd = dayStart.AddDays(1);
             await using var tx = await db.Database.BeginTransactionAsync(ct);
 
             // Row-level advisory lock on appointmentId
@@ -165,12 +168,15 @@ public sealed class VitalSignsService(
             var appointment = await db.Appointments
                 .Include(a => a.VitalSigns)
                 .SingleOrDefaultAsync(a => a.Id == request.AppointmentId
-                    && a.DepartmentId == nurse.DepartmentId, ct);
+                    && a.DepartmentId == nurse.DepartmentId
+                    // chỉ lượt khám của hôm nay: ca tồn từ ngày trước không được đẩy sang "chờ bác sĩ"
+                    && ((a.Slot != null && a.Slot.StartTime >= dayStart && a.Slot.StartTime < dayEnd)
+                        || (a.Slot == null && a.CreatedAt >= dayStart && a.CreatedAt < dayEnd)), ct);
 
             if (appointment == null)
             {
                 return Result.Failure<VitalSignsDetailDto>(
-                    "NotFound", "Không tìm thấy lượt khám trong khoa phụ trách.");
+                    "NotFound", "Không tìm thấy lượt khám hôm nay trong khoa phụ trách.");
             }
 
             var now = Now;

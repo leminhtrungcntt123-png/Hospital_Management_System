@@ -66,7 +66,7 @@ public sealed class NurseDashboardService(
             .OrderByDescending(a => a.PriorityLevel)
             .ThenBy(a => a.StatusId == (int)AppointmentStatusId.CheckedIn ? 0
                 : (a.StatusId == (int)AppointmentStatusId.Confirmed ? 1 : 2))
-            .ThenBy(a => a.QueueNumber ?? "ZZZ")
+            .ThenBy(a => a.CheckedInAt ?? a.CreatedAt)
             .ThenBy(a => a.Slot != null ? a.Slot.StartTime : a.CreatedAt)
             .Take(50)
             .Select(a => new VitalSignsQueueItemDto(

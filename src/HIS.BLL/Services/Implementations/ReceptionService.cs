@@ -94,6 +94,8 @@ public sealed class ReceptionService(
                 && s.Status == DoctorScheduleStatus.Approved
                 && s.WorkDate == Today
                 && s.RoomId != null
+                // cùng điều kiện với đăng ký vãng lai (phòng phải thuộc khoa), tránh hiện ca rồi báo "không còn tiếp nhận"
+                && s.Room != null && s.Room.DepartmentId == nurse.DepartmentId
                 && !db.ScheduleExceptions
                     .Any(e => e.DoctorId == s.DoctorId
                         && e.Date == Today
