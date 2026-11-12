@@ -148,40 +148,6 @@
     </div>
 }
 
-<nav class="schedule-tab-nav" aria-label="Phân hệ Trưởng khoa" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; padding-bottom:12px; border-bottom:1px solid #e2ebf3;">
-    <a href="/Staff/Schedule?tab=my-schedule" class="btn sm @(tab == "my-schedule" ? "primary" : "outline")" style="@(tab == "my-schedule" ? "background:#0284c7; border-color:#0284c7; color:#fff;" : "color:#0284c7; border-color:#bae6fd; background:#f0f9ff;") text-decoration:none; display:inline-flex; align-items:center; gap:6px; font-weight:600;">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-        <span>Lịch của tôi (Trưởng khoa)</span>
-    </a>
-    <a href="/Staff/Schedule?tab=schedule" class="btn sm @(tab == "schedule" || string.IsNullOrEmpty(tab) ? "primary" : "ghost")" style="@(tab == "schedule" || string.IsNullOrEmpty(tab) ? "background:#079bc9; border-color:#079bc9; color:#fff;" : "") text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-        <span>Lịch khám khoa</span>
-    </a>
-    <a href="/Staff/Schedule?tab=bidding" class="btn sm @(tab == "bidding" ? "primary" : "outline")" style="@(tab == "bidding" ? "background:#d97706; border-color:#d97706; color:#fff;" : "border-color:#d97706; color:#b45309; background:#fffbeb;") text-decoration:none; display:inline-flex; align-items:center; gap:6px; font-weight:700;">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-        <span>⚖️ Duyệt pick ca</span>
-    </a>
-    <a href="/Staff/Schedule?tab=slots" class="btn sm @(tab == "slots" ? "primary" : "ghost")" style="@(tab == "slots" ? "background:#079bc9; border-color:#079bc9; color:#fff;" : "") text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-        <span>Quản lý Slot</span>
-    </a>
-    <a href="/Staff/Schedule?tab=exceptions" class="btn sm @(tab == "exceptions" ? "primary" : "ghost")" style="@(tab == "exceptions" ? "background:#079bc9; border-color:#079bc9; color:#fff;" : "") text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-        <span>Duyệt nghỉ / đổi ca</span>
-    </a>
-    <a href="/Staff/Schedule?tab=overview" class="btn sm @(tab == "overview" ? "primary" : "ghost")" style="@(tab == "overview" ? "background:#079bc9; border-color:#079bc9; color:#fff;" : "") text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-        <span>Tổng quan khoa</span>
-    </a>
-    <a href="/Staff/Schedule?tab=records" class="btn sm @(tab == "records" ? "primary" : "ghost")" style="@(tab == "records" ? "background:#079bc9; border-color:#079bc9; color:#fff;" : "") text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-        <span>Bệnh án trong khoa</span>
-    </a>
-    <a href="/Staff/Schedule?tab=patients" class="btn sm @(tab == "patients" ? "primary" : "ghost")" style="@(tab == "patients" ? "background:#079bc9; border-color:#079bc9; color:#fff;" : "") text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-        <span>Người khám</span>
-    </a>
-</nav>
 
 @if (tab == "exceptions")
 {
@@ -1241,10 +1207,17 @@ else if (tab == "bidding")
     <!-- ======================================================== -->
     <div class="page-heading" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
         <div>
-            <h1>Duyệt pick ca & Ma trận quyết định</h1>
-            <p>Hệ thống tự động sắp xếp ứng viên theo 4 chỉ số hỗ trợ quyết định: Trực đêm (Fatigue Mitigation), Luân phiên ca Hot, Tiến độ định mức tuần và Bệnh nhân tái khám.</p>
+            <h1 style="display:flex; align-items:center; gap:8px;">
+                <span>⚖️</span>
+                <span>Duyệt pick ca & Ma trận quyết định</span>
+            </h1>
+            <p>Hệ thống tự động xếp hạng ứng viên theo 4 chỉ số hỗ trợ quyết định: Trực đêm (Fatigue Mitigation), Luân phiên ca Hot, Tiến độ định mức tuần và Bệnh nhân tái khám.</p>
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <a href="/Staff/Schedule?tab=schedule" class="btn outline" style="border-color:#cbd5e1; color:#475569; text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                <span>📅 Xem lịch khoa tuần</span>
+            </a>
             <button type="button" class="btn outline" onclick="openCreatePeriodModal()" style="border-color:#059669; color:#059669;">
                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
                 <span>+ Mở đợt đăng ký lịch</span>
@@ -1254,6 +1227,7 @@ else if (tab == "bidding")
                 <form asp-area="Staff" asp-controller="Schedule" asp-action="PublishPeriod" method="post" style="margin:0;" onsubmit="return confirm('Bạn có chắc chắn muốn chốt và xuất bản toàn bộ lịch khám của đợt này? Sau khi xuất bản, các ca khám sẽ sinh slot mở bán trên Cổng người bệnh.');">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="periodId" value="@Model.ActivePeriod.Id" />
+                    <input type="hidden" name="tab" value="bidding" />
                     <button type="submit" class="btn primary" style="background:#16a34a; border-color:#16a34a;">
                         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><polyline points="20 6 9 17 4 12"></polyline></svg>
                         <span>✅ Chốt & Xuất bản lịch tuần</span>
@@ -1295,16 +1269,235 @@ else if (tab == "bidding")
                 <small style="color:#64748b; font-size:11px;">Sẵn sàng xuất bản lịch</small>
             </div>
         </div>
+
+        @if (Model.DemandGrid != null)
+        {
+            var dates = Model.DemandGrid.Cells.Select(c => c.WorkDate).Distinct().OrderBy(d => d).ToList();
+            var totalRooms = Model.DemandGrid.TotalActiveRooms;
+
+            <!-- ======================================================== -->
+            <!-- LƯỚI CÁC CA TRỰC ĐỢT ĐĂNG KÝ (SHIFT BIDDING GRID)        -->
+            <!-- ======================================================== -->
+            <section class="card" style="background:#fff; border:1px solid #e2ebf3; border-radius:12px; overflow:hidden; margin-bottom:20px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                <div style="background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:12px 18px; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; font-size:12px;">
+                    <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+                        <span style="font-weight:700; color:#334155;">Lưới ca trực đợt đăng ký:</span>
+                        <span style="display:inline-flex; align-items:center; gap:6px;">
+                            <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#f1f5f9; border:1px solid #cbd5e1;"></span> ⚪ Đang trống (0/@totalRooms phòng)
+                        </span>
+                        <span style="display:inline-flex; align-items:center; gap:6px;">
+                            <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#dcfce7; border:1px solid #86efac;"></span> 🟢 Còn chỗ (1..@totalRooms phòng)
+                        </span>
+                        <span style="display:inline-flex; align-items:center; gap:6px;">
+                            <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#fee2e2; border:1px solid #fca5a5;"></span> 🔴 Cạnh tranh cao (>@totalRooms phòng)
+                        </span>
+                        <span style="display:inline-flex; align-items:center; gap:6px;">
+                            <span style="font-size:11px; background:#ffedd5; color:#c2410c; font-weight:700; padding:1px 6px; border-radius:4px;">🔥 Ca Hot</span>
+                        </span>
+                    </div>
+                    <div style="font-size:12px; color:#64748b;">
+                        💡 <em>Nhấp vào bất kỳ ca nào trên lưới để tải Bảng Ma trận quyết định bên dưới</em>
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:1px; background:#e2e8f0; padding:1px;">
+                    @foreach (var d in dates)
+                    {
+                        var morningCell = Model.DemandGrid.Cells.FirstOrDefault(c => c.WorkDate == d && c.Shift == ExamShift.Morning);
+                        var afternoonCell = Model.DemandGrid.Cells.FirstOrDefault(c => c.WorkDate == d && c.Shift == ExamShift.Afternoon);
+                        var isSunday = d.DayOfWeek == DayOfWeek.Sunday;
+                        var isSaturday = d.DayOfWeek == DayOfWeek.Saturday;
+                        var isToday = d == Model.Today;
+
+                        <div style="background:#fff; padding:12px; display:flex; flex-direction:column; gap:10px;">
+                            <div style="border-bottom:1px solid #f1f5f9; padding-bottom:8px; text-align:center; background:@(isToday ? "#eff6ff" : "transparent"); border-radius:6px; padding:6px;">
+                                <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:@(isSunday ? "#ef4444" : isSaturday ? "#0284c7" : isToday ? "#1d4ed8" : "#64748b");">
+                                    @(d.DayOfWeek switch { DayOfWeek.Monday => "Thứ Hai", DayOfWeek.Tuesday => "Thứ Ba", DayOfWeek.Wednesday => "Thứ Tư", DayOfWeek.Thursday => "Thứ Năm", DayOfWeek.Friday => "Thứ Sáu", DayOfWeek.Saturday => "Thứ Bảy", _ => "Chủ Nhật" })
+                                    @(isToday ? " (Hôm nay)" : "")
+                                </div>
+                                <div style="font-size:15px; font-weight:800; color:#1e293b;">@d.ToString("dd/MM")</div>
+                            </div>
+
+                            <!-- CA SÁNG -->
+                            @if (morningCell != null)
+                            {
+                                var pendingMorning = morningCell.Bidders.Count(b => b.Status == DoctorScheduleStatus.Bidding);
+                                var approvedMorning = morningCell.Bidders.Count(b => b.Status == DoctorScheduleStatus.Approved);
+                                var (bgM, borderM, textM) = morningCell.Level switch
+                                {
+                                    DemandLevel.HighCompetition => ("#fff1f2", "#fecdd3", "#be123c"),
+                                    DemandLevel.Available => ("#f0fdf4", "#bbf7d0", "#15803d"),
+                                    _ => ("#f8fafc", "#e2e8f0", "#64748b")
+                                };
+
+                                <div class="bidding-grid-cell"
+                                     id="grid_cell_@(d.ToString("yyyyMMdd"))_Morning"
+                                     data-date="@d.ToString("yyyy-MM-dd")"
+                                     data-shift="Morning"
+                                     data-has-pending="@(pendingMorning > 0 ? "true" : "false")"
+                                     data-orig-border="1.5px solid @borderM"
+                                     onclick="selectBiddingShift('@d.ToString("yyyy-MM-dd")', 'Morning')"
+                                     style="background:@bgM; border:1.5px solid @borderM; border-radius:8px; padding:10px; cursor:pointer; transition:all 0.15s ease; display:flex; flex-direction:column; gap:6px;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                                        <span style="font-size:12px; font-weight:700; color:#0f172a;">🌅 Sáng (07:30–11:30)</span>
+                                        @if (morningCell.IsHotShift)
+                                        {
+                                            <span style="font-size:10px; background:#ffedd5; color:#c2410c; font-weight:700; padding:1px 5px; border-radius:4px;">🔥 Hot</span>
+                                        }
+                                    </div>
+
+                                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:11.5px;">
+                                        <span style="color:@textM; font-weight:700;">@morningCell.CurrentBidders/@totalRooms phòng</span>
+                                        @if (pendingMorning > 0)
+                                        {
+                                            <span style="background:#fef3c7; color:#b45309; padding:1px 6px; border-radius:10px; font-weight:700; font-size:10.5px;">⏳ @pendingMorning chờ duyệt</span>
+                                        }
+                                        else if (approvedMorning > 0)
+                                        {
+                                            <span style="background:#dcfce7; color:#15803d; padding:1px 6px; border-radius:10px; font-weight:700; font-size:10.5px;">✓ @approvedMorning đã duyệt</span>
+                                        }
+                                        else
+                                        {
+                                            <span style="color:#94a3b8; font-size:10.5px;">Chưa có bác sĩ</span>
+                                        }
+                                    </div>
+
+                                    @if (morningCell.Bidders.Count > 0)
+                                    {
+                                        <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:2px;">
+                                            @foreach (var b in morningCell.Bidders.Take(3))
+                                            {
+                                                if (b.Status == DoctorScheduleStatus.Approved)
+                                                {
+                                                    <span style="font-size:10px; background:#dcfce7; color:#166534; padding:2px 5px; border-radius:4px; border:1px solid #86efac; white-space:nowrap;" title="Đã duyệt phòng @b.RoomNumber">
+                                                        ✓ @b.DoctorName (P.@b.RoomNumber)
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span style="font-size:10px; background:#fef3c7; color:#854d0e; padding:2px 5px; border-radius:4px; border:1px solid #fde047; white-space:nowrap;" title="Chờ duyệt pick ca">
+                                                        ⏳ @b.DoctorName
+                                                    </span>
+                                                }
+                                            }
+                                            @if (morningCell.Bidders.Count > 3)
+                                            {
+                                                <span style="font-size:10px; color:#64748b; font-weight:600;">+@(morningCell.Bidders.Count - 3)</span>
+                                            }
+                                        </div>
+                                    }
+
+                                    <div style="margin-top:4px; text-align:right;">
+                                        <span style="font-size:11px; color:#0284c7; font-weight:600; text-decoration:underline;">Duyệt ca này →</span>
+                                    </div>
+                                </div>
+                            }
+
+                            <!-- CA CHIỀU -->
+                            @if (afternoonCell != null)
+                            {
+                                var pendingAfternoon = afternoonCell.Bidders.Count(b => b.Status == DoctorScheduleStatus.Bidding);
+                                var approvedAfternoon = afternoonCell.Bidders.Count(b => b.Status == DoctorScheduleStatus.Approved);
+                                var (bgA, borderA, textA) = afternoonCell.Level switch
+                                {
+                                    DemandLevel.HighCompetition => ("#fff1f2", "#fecdd3", "#be123c"),
+                                    DemandLevel.Available => ("#f0fdf4", "#bbf7d0", "#15803d"),
+                                    _ => ("#f8fafc", "#e2e8f0", "#64748b")
+                                };
+
+                                <div class="bidding-grid-cell"
+                                     id="grid_cell_@(d.ToString("yyyyMMdd"))_Afternoon"
+                                     data-date="@d.ToString("yyyy-MM-dd")"
+                                     data-shift="Afternoon"
+                                     data-has-pending="@(pendingAfternoon > 0 ? "true" : "false")"
+                                     data-orig-border="1.5px solid @borderA"
+                                     onclick="selectBiddingShift('@d.ToString("yyyy-MM-dd")', 'Afternoon')"
+                                     style="background:@bgA; border:1.5px solid @borderA; border-radius:8px; padding:10px; cursor:pointer; transition:all 0.15s ease; display:flex; flex-direction:column; gap:6px;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                                        <span style="font-size:12px; font-weight:700; color:#0f172a;">🌇 Chiều (13:00–16:30)</span>
+                                        @if (afternoonCell.IsHotShift)
+                                        {
+                                            <span style="font-size:10px; background:#ffedd5; color:#c2410c; font-weight:700; padding:1px 5px; border-radius:4px;">🔥 Hot</span>
+                                        }
+                                    </div>
+
+                                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:11.5px;">
+                                        <span style="color:@textA; font-weight:700;">@afternoonCell.CurrentBidders/@totalRooms phòng</span>
+                                        @if (pendingAfternoon > 0)
+                                        {
+                                            <span style="background:#fef3c7; color:#b45309; padding:1px 6px; border-radius:10px; font-weight:700; font-size:10.5px;">⏳ @pendingAfternoon chờ duyệt</span>
+                                        }
+                                        else if (approvedAfternoon > 0)
+                                        {
+                                            <span style="background:#dcfce7; color:#15803d; padding:1px 6px; border-radius:10px; font-weight:700; font-size:10.5px;">✓ @approvedAfternoon đã duyệt</span>
+                                        }
+                                        else
+                                        {
+                                            <span style="color:#94a3b8; font-size:10.5px;">Chưa có bác sĩ</span>
+                                        }
+                                    </div>
+
+                                    @if (afternoonCell.Bidders.Count > 0)
+                                    {
+                                        <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:2px;">
+                                            @foreach (var b in afternoonCell.Bidders.Take(3))
+                                            {
+                                                if (b.Status == DoctorScheduleStatus.Approved)
+                                                {
+                                                    <span style="font-size:10px; background:#dcfce7; color:#166534; padding:2px 5px; border-radius:4px; border:1px solid #86efac; white-space:nowrap;" title="Đã duyệt phòng @b.RoomNumber">
+                                                        ✓ @b.DoctorName (P.@b.RoomNumber)
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span style="font-size:10px; background:#fef3c7; color:#854d0e; padding:2px 5px; border-radius:4px; border:1px solid #fde047; white-space:nowrap;" title="Chờ duyệt pick ca">
+                                                        ⏳ @b.DoctorName
+                                                    </span>
+                                                }
+                                            }
+                                            @if (afternoonCell.Bidders.Count > 3)
+                                            {
+                                                <span style="font-size:10px; color:#64748b; font-weight:600;">+@(afternoonCell.Bidders.Count - 3)</span>
+                                            }
+                                        </div>
+                                    }
+
+                                    <div style="margin-top:4px; text-align:right;">
+                                        <span style="font-size:11px; color:#0284c7; font-weight:600; text-decoration:underline;">Duyệt ca này →</span>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+    }
+    else
+    {
+        <div style="background:#fff; border:1px dashed #cbd5e1; border-radius:12px; padding:36px 20px; text-align:center; margin-bottom:20px;">
+            <div style="font-size:36px; margin-bottom:12px;">📅</div>
+            <h3 style="font-size:16px; font-weight:700; color:#0f172a; margin-bottom:6px;">Chưa có đợt đăng ký ca khám (Scheduling Period) nào đang mở</h3>
+            <p style="color:#64748b; font-size:13px; max-width:540px; margin:0 auto 16px;">Vui lòng mở đợt đăng ký mới để các bác sĩ trong khoa có thể đăng ký pick ca theo nguyện vọng. Sau đó Trưởng khoa sẽ sử dụng Ma trận quyết định tại đây để xét duyệt.</p>
+            <button type="button" class="btn primary" onclick="openCreatePeriodModal()" style="background:#059669; border-color:#059669; font-weight:700;">
+                + Mở đợt đăng ký lịch
+            </button>
+        </div>
     }
 
+    <!-- ======================================================== -->
     <!-- KHU VỰC BẢNG CHỈ SỐ QUYẾT ĐỊNH (DECISION MATRIX WORKSPACE) -->
-    <section class="card" style="background:#fff; border:1px solid #e2ebf3; border-radius:10px; overflow:hidden; margin-bottom:16px;">
+    <!-- ======================================================== -->
+    <div id="decisionMatrixWorkspace"></div>
+    <section class="card" style="background:#fff; border:1px solid #e2ebf3; border-radius:12px; overflow:hidden; margin-bottom:16px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
         <div style="padding:14px 18px; border-bottom:1px solid #eef3f7; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <span style="font-size:18px;">⚖️</span>
                 <div>
                     <h3 style="font-size:14px; font-weight:700; margin:0; color:#0f172a;">Bảng xếp hạng ưu tiên xét duyệt ca (Decision Matrix)</h3>
-                    <small style="color:#64748b; font-size:11px;">Chọn Ngày và Ca để tải danh sách bác sĩ đã pick ca và duyệt buồng khám trực tiếp</small>
+                    <small style="color:#64748b; font-size:11px;">
+                        Đang chọn ca: <strong id="dmSelectedShiftTitle" style="color:#0284c7;">--</strong>
+                    </small>
                 </div>
             </div>
             <button type="button" class="btn primary sm" onclick="openDecisionMatrixQuick()" style="background:#d97706; border-color:#d97706; color:#fff; font-weight:700; display:inline-flex; align-items:center; gap:6px;">
@@ -1690,10 +1883,10 @@ else
                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
                 <span>⚡ Quản lý Khung giờ (Slot)</span>
             </a>
-            <button type="button" class="btn outline" onclick="openDecisionMatrixQuick()" style="border-color:#d97706; color:#b45309; background:#fffbeb; font-weight:700; display:inline-flex; align-items:center; gap:6px;">
+            <a href="/Staff/Schedule?tab=bidding" class="btn outline" style="border-color:#d97706; color:#b45309; background:#fffbeb; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                 <span>⚖️ Duyệt pick ca</span>
-            </button>
+            </a>
             <button type="button" class="btn outline" onclick="openCreatePeriodModal()" style="border-color:#059669; color:#059669;">
                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
                 <span>+ Mở đợt đăng ký lịch</span>
@@ -1750,15 +1943,16 @@ else
                 </div>
             </div>
             <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                <button type="button" class="btn primary sm" onclick="openDecisionMatrixQuick()" style="background:#d97706; border-color:#d97706; color:#fff; font-weight:700; padding:6px 14px; display:inline-flex; align-items:center; gap:6px;">
+                <a href="/Staff/Schedule?tab=bidding" class="btn primary sm" style="background:#d97706; border-color:#d97706; color:#fff; font-weight:700; padding:6px 14px; text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
                     <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                     <span>⚖️ Duyệt pick ca</span>
-                </button>
+                </a>
                 @if (Model.ActivePeriod.Status != SchedulingPeriodStatus.Published)
                 {
                     <form asp-area="Staff" asp-controller="Schedule" asp-action="PublishPeriod" method="post" style="margin:0;" onsubmit="return confirm('Bạn có chắc chắn muốn chốt và xuất bản toàn bộ lịch khám của đợt này? Sau khi xuất bản, các ca khám sẽ sinh slot mở bán trên Cổng người bệnh.');">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="periodId" value="@Model.ActivePeriod.Id" />
+                        <input type="hidden" name="tab" value="schedule" />
                         <button type="submit" class="btn outline sm" style="border-color:#16a34a; color:#16a34a; background:#f0fdf4; font-weight:700; padding:6px 14px;">
                             <span>✅ Xuất bản lịch tuần</span>
                         </button>
@@ -2036,9 +2230,9 @@ else
                                     }
                                     else if (bidMorning != null)
                                     {
-                                        <div onclick="loadDecisionMatrix('@curDate.ToString("yyyy-MM-dd")', 'Morning')"
+                                        <div onclick="window.location.href='/Staff/Schedule?tab=bidding&date=@curDate.ToString("yyyy-MM-dd")&shift=Morning'"
                                              style="background:#fef9c3; border-left:3px solid #eab308; border-radius:6px; padding:6px 8px; cursor:pointer;"
-                                             title="Bác sĩ đã pick ca này - Nhấp để mở Bảng Chỉ Số Quyết Định và Duyệt">
+                                             title="Bác sĩ đã pick ca này - Nhấp để chuyển sang tab Duyệt pick ca và xét duyệt">
                                             <div style="display:flex; justify-content:space-between; align-items:center;">
                                                 <strong style="font-size:11px; color:#854d0e;">Ca sáng (07:30–11:30)</strong>
                                                 <span style="font-size:9px; background:#fde047; color:#713f12; padding:1px 5px; border-radius:4px; font-weight:700;">Chờ duyệt pick</span>
@@ -2145,9 +2339,9 @@ else
                                     }
                                     else if (bidAfternoon != null)
                                     {
-                                        <div onclick="loadDecisionMatrix('@curDate.ToString("yyyy-MM-dd")', 'Afternoon')"
+                                        <div onclick="window.location.href='/Staff/Schedule?tab=bidding&date=@curDate.ToString("yyyy-MM-dd")&shift=Afternoon'"
                                              style="background:#fef9c3; border-left:3px solid #eab308; border-radius:6px; padding:6px 8px; cursor:pointer;"
-                                             title="Bác sĩ đã pick ca này - Nhấp để mở Bảng Chỉ Số Quyết Định và Duyệt">
+                                             title="Bác sĩ đã pick ca này - Nhấp để chuyển sang tab Duyệt pick ca và xét duyệt">
                                             <div style="display:flex; justify-content:space-between; align-items:center;">
                                                 <strong style="font-size:11px; color:#854d0e;">Ca chiều (13:00–16:30)</strong>
                                                 <span style="font-size:9px; background:#fde047; color:#713f12; padding:1px 5px; border-radius:4px; font-weight:700;">Chờ duyệt pick</span>
@@ -2721,6 +2915,7 @@ else
         @Html.AntiForgeryToken()
         <input type="hidden" name="scheduleId" id="approveShiftScheduleId" value="" />
         <input type="hidden" name="roomId" id="approveShiftRoomId" value="" />
+        <input type="hidden" name="tab" value="@(string.IsNullOrEmpty(tab) ? "schedule" : tab)" />
     </form>
 
     <!-- Modal: Điều chuyển bù ca trượt -->
@@ -2736,6 +2931,7 @@ else
             <form asp-area="Staff" asp-controller="Schedule" asp-action="ReallocateShift" method="post">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="oldScheduleId" id="reallocOldScheduleId" value="" />
+                <input type="hidden" name="tab" value="@(string.IsNullOrEmpty(tab) ? "schedule" : tab)" />
                 <div class="app-modal-body" style="padding:16px;">
                     <div style="margin-bottom:12px; font-size:13px; color:#1e293b;">
                         Điều chuyển bác sĩ: <strong id="reallocDoctorName"></strong>
@@ -3643,8 +3839,12 @@ else
     let cachedAvailableRooms = [];
 
     function openDecisionMatrixQuick() {
-        const defaultDate = '@(Model.ActivePeriod != null ? Model.ActivePeriod.StartDate.ToString("yyyy-MM-dd") : Model.WeekStart.ToString("yyyy-MM-dd"))';
-        loadDecisionMatrix(defaultDate, 'Morning');
+        if ('@tab' === 'bidding') {
+            const ws = document.getElementById('decisionMatrixWorkspace');
+            if (ws) ws.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+            window.location.href = '/Staff/Schedule?tab=bidding';
+        }
     }
 
     function onDmDateShiftChanged() {
@@ -3847,12 +4047,47 @@ else
         document.getElementById('reallocateModal')?.classList.remove('show');
     }
 
-    // INLINE DECISION MATRIX (TAB BIDDING)
+    // INLINE DECISION MATRIX & SHIFT GRID (TAB BIDDING)
+    function selectBiddingShift(dateStr, shiftStr) {
+        if (!dateStr || !shiftStr) return;
+
+        // 1. Reset cell styles and highlight target cell
+        document.querySelectorAll('.bidding-grid-cell').forEach(el => {
+            el.style.border = el.dataset.origBorder || '1.5px solid #e2e8f0';
+            el.style.boxShadow = 'none';
+            el.style.transform = 'none';
+        });
+
+        const key = dateStr.replace(/-/g, '') + '_' + shiftStr;
+        const targetCell = document.getElementById('grid_cell_' + key);
+        if (targetCell) {
+            targetCell.style.border = '2.5px solid #0284c7';
+            targetCell.style.boxShadow = '0 0 0 3px rgba(2, 132, 199, 0.25)';
+            targetCell.style.transform = 'translateY(-2px)';
+        }
+
+        // 2. Update subtitle
+        const titleEl = document.getElementById('dmSelectedShiftTitle');
+        if (titleEl) {
+            const shiftVn = shiftStr === 'Morning' ? 'Ca Sáng (07:30–11:30)' : 'Ca Chiều (13:00–16:30)';
+            titleEl.textContent = `${dateStr} – ${shiftVn}`;
+        }
+
+        // 3. Update input controls
+        const dInput = document.getElementById('dmInlineDateSelect');
+        const sInput = document.getElementById('dmInlineShiftSelect');
+        if (dInput && dInput.value !== dateStr) dInput.value = dateStr;
+        if (sInput && sInput.value !== shiftStr) sInput.value = shiftStr;
+
+        // 4. Load Decision Matrix
+        loadDecisionMatrixInline(dateStr, shiftStr);
+    }
+
     function onDmInlineChange() {
         const d = document.getElementById('dmInlineDateSelect')?.value;
         const s = document.getElementById('dmInlineShiftSelect')?.value;
         if (d && s) {
-            loadDecisionMatrixInline(d, s);
+            selectBiddingShift(d, s);
         }
     }
 
@@ -3984,7 +4219,25 @@ else
 
     document.addEventListener('DOMContentLoaded', function () {
         if ('@tab' === 'bidding') {
-            onDmInlineChange();
+            const urlParams = new URLSearchParams(window.location.search);
+            const qDate = urlParams.get('date');
+            const qShift = urlParams.get('shift');
+            if (qDate && qShift) {
+                selectBiddingShift(qDate, qShift);
+            } else {
+                const pendingCell = document.querySelector('.bidding-grid-cell[data-has-pending="true"]');
+                if (pendingCell && pendingCell.dataset.date && pendingCell.dataset.shift) {
+                    selectBiddingShift(pendingCell.dataset.date, pendingCell.dataset.shift);
+                } else {
+                    const firstCell = document.querySelector('.bidding-grid-cell');
+                    if (firstCell && firstCell.dataset.date && firstCell.dataset.shift) {
+                        selectBiddingShift(firstCell.dataset.date, firstCell.dataset.shift);
+                    } else {
+                        onDmInlineChange();
+                    }
+                }
+            }
         }
     });
+</script>
 </script>
