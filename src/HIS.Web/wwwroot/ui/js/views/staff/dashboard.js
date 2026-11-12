@@ -46,6 +46,7 @@ async function loadVitalsQueue() {
         nurseVitalsState.error = '';
     } catch (e) {
         nurseVitalsState.error = e.message;
+        nurseVitalsState.loaded = true;
     } finally {
         nurseVitalsState.loading = false;
         render();
@@ -65,6 +66,7 @@ async function loadDashboardSummary() {
         nurseDashboardState.error = '';
     } catch (e) {
         nurseDashboardState.error = e.message;
+        nurseDashboardState.loaded = true;
     } finally {
         nurseDashboardState.loading = false;
         render();
@@ -86,6 +88,7 @@ async function loadNursePatients(keyword = '') {
         nursePatientsState.error = '';
     } catch (e) {
         nursePatientsState.error = e.message;
+        nursePatientsState.loaded = true;
     } finally {
         nursePatientsState.loading = false;
         render();
@@ -414,6 +417,8 @@ function calcBmiPreview() {
 
 async function saveVitalsForm(appointmentId) {
     appointmentId = parseInt(appointmentId);
+    const currentItem = nurseVitalsState.queue.find((q) => q.appointmentId === appointmentId);
+    const isEdit = !!currentItem && currentItem.hasVitalSigns && currentItem.statusId === 4;
     const pulse = parseInt(document.getElementById('v-pulse')?.value);
     const temp = parseFloat(document.getElementById('v-temp')?.value);
     const sys = parseInt(document.getElementById('v-sys')?.value);
@@ -480,18 +485,27 @@ async function saveVitalsForm(appointmentId) {
 
         const data = await res.json();
         if (!res.ok) {
-            throw new Error(data.message || 'Lỗi khi lưu sinh hiệu.');
+            let errorMsg = data.message;
+            if (data.errors && typeof data.errors === 'object') {
+                const fieldErrors = Object.entries(data.errors)
+                    .map(([field, errs]) => `${field}: ${Array.isArray(errs) ? errs.join(', ') : errs}`)
+                    .join(' | ');
+                errorMsg = fieldErrors || errorMsg;
+            }
+            throw new Error(errorMsg || 'Lỗi khi lưu sinh hiệu.');
         }
 
         closeModal();
-        nurseVitalsState.successMessage = 'Đã lưu sinh hiệu thành công. Bệnh nhân đã chuyển sang trạng thái Sẵn sàng khám.';
+        nurseVitalsState.successMessage = isEdit
+            ? 'Đã cập nhật sinh hiệu thành công.'
+            : 'Đã lưu sinh hiệu thành công. Bệnh nhân đã chuyển sang trạng thái Sẵn sàng khám.';
         await loadVitalsQueue();
         if (nurseDashboardState.loaded) loadDashboardSummary();
     } catch (err) {
         showError(err.message);
         if (saveBtn) {
             saveBtn.disabled = false;
-            saveBtn.textContent = 'Lưu & Chuyển Bác sĩ';
+            saveBtn.textContent = isEdit ? 'Cập nhật sinh hiệu' : 'Lưu & Chuyển Bác sĩ';
         }
     }
 }
