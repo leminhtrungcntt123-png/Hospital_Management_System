@@ -132,7 +132,8 @@ public class ScheduleController : Controller
             : (IReadOnlyList<DepartmentPatientListItemDto>)[];
 
         var headDoctor = doctors.FirstOrDefault(d => d.AccountId == accountId)
-            ?? doctors.FirstOrDefault(d => d.Specialty.Contains("chuyên sâu") || d.FullName.Contains("Hằng"));
+            ?? doctors.FirstOrDefault(d => d.Specialty.Contains("chuyên sâu") || d.FullName.Contains("Hằng"))
+            ?? doctors.FirstOrDefault();
 
         var vm = new ScheduleViewModel
         {

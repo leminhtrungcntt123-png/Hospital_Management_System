@@ -147,6 +147,37 @@
     </div>
 }
 
+<nav class="schedule-tab-nav" aria-label="Phân hệ Trưởng khoa" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; padding-bottom:12px; border-bottom:1px solid #e2ebf3;">
+    <a href="/Staff/Schedule?tab=my-schedule" class="btn sm @(tab == "my-schedule" ? "primary" : "outline")" style="@(tab == "my-schedule" ? "background:#0284c7; border-color:#0284c7; color:#fff;" : "color:#0284c7; border-color:#bae6fd; background:#f0f9ff;") text-decoration:none; display:inline-flex; align-items:center; gap:6px; font-weight:600;">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        <span>Lịch của tôi (Trưởng khoa)</span>
+    </a>
+    <a href="/Staff/Schedule?tab=schedule" class="btn sm @(tab == "schedule" || string.IsNullOrEmpty(tab) ? "primary" : "ghost")" style="@(tab == "schedule" || string.IsNullOrEmpty(tab) ? "background:#079bc9; border-color:#079bc9; color:#fff;" : "") text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+        <span>Lịch khám khoa</span>
+    </a>
+    <a href="/Staff/Schedule?tab=slots" class="btn sm @(tab == "slots" ? "primary" : "ghost")" style="@(tab == "slots" ? "background:#079bc9; border-color:#079bc9; color:#fff;" : "") text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+        <span>Quản lý Slot</span>
+    </a>
+    <a href="/Staff/Schedule?tab=exceptions" class="btn sm @(tab == "exceptions" ? "primary" : "ghost")" style="@(tab == "exceptions" ? "background:#079bc9; border-color:#079bc9; color:#fff;" : "") text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        <span>Duyệt nghỉ / đổi ca</span>
+    </a>
+    <a href="/Staff/Schedule?tab=overview" class="btn sm @(tab == "overview" ? "primary" : "ghost")" style="@(tab == "overview" ? "background:#079bc9; border-color:#079bc9; color:#fff;" : "") text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+        <span>Tổng quan khoa</span>
+    </a>
+    <a href="/Staff/Schedule?tab=records" class="btn sm @(tab == "records" ? "primary" : "ghost")" style="@(tab == "records" ? "background:#079bc9; border-color:#079bc9; color:#fff;" : "") text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+        <span>Bệnh án trong khoa</span>
+    </a>
+    <a href="/Staff/Schedule?tab=patients" class="btn sm @(tab == "patients" ? "primary" : "ghost")" style="@(tab == "patients" ? "background:#079bc9; border-color:#079bc9; color:#fff;" : "") text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+        <span>Người khám</span>
+    </a>
+</nav>
+
 @if (tab == "exceptions")
 {
     <!-- ========================================== -->
@@ -2157,6 +2188,7 @@ else
             </div>
             <form asp-area="Staff" asp-controller="Schedule" asp-action="AssignDuty" method="post">
                 @Html.AntiForgeryToken()
+                <input type="hidden" name="returnTab" value="@tab" />
                 <div class="app-modal-body">
                     <div style="margin-bottom:12px;">
                         <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Nhân sự trực *</label>
@@ -2259,6 +2291,7 @@ else
             </div>
             <form asp-area="Staff" asp-controller="Schedule" asp-action="UpsertSchedule" method="post">
                 @Html.AntiForgeryToken()
+                <input type="hidden" name="returnTab" value="@tab" />
                 <input type="hidden" name="scheduleId" id="scheduleModalScheduleId" value="" />
                 <input type="hidden" name="slotDurationMinutes" id="scheduleModalSlotDuration" value="15" />
                 <div class="app-modal-body">
@@ -2392,12 +2425,14 @@ else
     <!-- Form ẩn để xóa lịch khám -->
     <form id="deleteScheduleForm" asp-area="Staff" asp-controller="Schedule" asp-action="DeleteSchedule" method="post" style="display:none;">
         @Html.AntiForgeryToken()
+        <input type="hidden" name="returnTab" value="@tab" />
         <input type="hidden" name="scheduleId" id="deleteScheduleIdInput" value="" />
     </form>
 
     <!-- Form ẩn để xóa ca trực đêm -->
     <form id="deleteDutyForm" asp-area="Staff" asp-controller="Schedule" asp-action="DeleteDutyShift" method="post" style="display:none;">
         @Html.AntiForgeryToken()
+        <input type="hidden" name="returnTab" value="@tab" />
         <input type="hidden" name="id" id="deleteDutyIdInput" value="" />
     </form>
 
