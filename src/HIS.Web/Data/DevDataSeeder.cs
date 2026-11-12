@@ -321,7 +321,9 @@ public static class DevDataSeeder
                     DoctorId = doc1.Id,
                     DepartmentId = deptNoi.Id,
                     RoomId = room1.Id,
-                    StatusId = (int)AppointmentStatusId.ReadyForDoctor,
+                    // CheckedIn: chưa có sinh hiệu, điều dưỡng sẽ đo theo đúng luồng rồi mới chuyển sang ReadyForDoctor.
+                    StatusId = (int)AppointmentStatusId.CheckedIn,
+                    CheckedInAt = todayMorning,
                     BookingChannel = BookingChannel.Web,
                     VisitType = VisitType.Scheduled,
                     QueueNumber = "O01",

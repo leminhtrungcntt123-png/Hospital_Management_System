@@ -16,39 +16,6 @@ public class QueueService : IQueueService
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<string>> CheckInAndIssueQueueNumberAsync(int appointmentId, int staffAccountId, CancellationToken ct = default)
-    {
-        var app = await _context.Appointments.FirstOrDefaultAsync(a => a.Id == appointmentId, ct);
-        if (app == null) return Result.Failure<string>("NOT_FOUND", "Không tìm thấy lượt hẹn.");
-
-        if (!AppointmentStateMachine.CanTransition((AppointmentStatusId)app.StatusId, AppointmentStatusId.CheckedIn))
-        {
-            return Result.Failure<string>("INVALID_STATUS", "Trạng thái lịch hẹn không hợp lệ để tiếp nhận check-in.");
-        }
-
-        var now = _timeProvider.GetLocalNow().DateTime;
-        app.StatusId = (int)AppointmentStatusId.CheckedIn;
-        app.CheckedInAt = now;
-        app.UpdatedAt = now;
-
-        if (string.IsNullOrEmpty(app.QueueNumber))
-        {
-            var startOfDay = now.Date;
-            var endOfDay = startOfDay.AddDays(1);
-            var countToday = await _context.Appointments.CountAsync(a =>
-                a.DepartmentId == app.DepartmentId &&
-                a.Id != app.Id &&
-                a.CheckedInAt.HasValue &&
-                a.CheckedInAt.Value >= startOfDay &&
-                a.CheckedInAt.Value < endOfDay &&
-                !string.IsNullOrEmpty(a.QueueNumber), ct);
-            app.QueueNumber = (countToday + 1).ToString("D3");
-        }
-
-        await _context.SaveChangesAsync(ct);
-        return Result<string>.Success(app.QueueNumber);
-    }
-
     public async Task<Result<int>> CallNextPatientAsync(int roomId, int doctorAccountId, CancellationToken ct = default)
     {
         var doctor = await _context.Doctors.FirstOrDefaultAsync(d => d.AccountId == doctorAccountId, ct);
@@ -56,9 +23,10 @@ public class QueueService : IQueueService
 
         int? departmentId = deptHead?.DepartmentId ?? doctor?.DepartmentId;
 
+        // Truy vấn chọn ứng viên: không tracking để lần đọc lại sau khi lấy khóa luôn lấy dữ liệu mới từ DB.
         var query = _context.Appointments
-            .Include(a => a.Patient)
-            .Where(a => a.StatusId == (int)AppointmentStatusId.ReadyForDoctor);
+            .AsNoTracking()
+            .Where(a => a.StatusId == (int)AppointmentStatusId.ReadyForDoctor && a.VitalSigns != null);
 
         if (doctor != null)
         {
@@ -77,30 +45,63 @@ public class QueueService : IQueueService
             query = query.Where(a => a.RoomId == roomId);
         }
 
-        var nextApp = await query
-            .OrderBy(a => a.PriorityLevel)
-            .ThenBy(a => a.QueueNumber)
-            .ThenBy(a => a.CheckedInAt)
-            .FirstOrDefaultAsync(ct);
-
-        if (nextApp == null)
+        return await _context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
-            return Result.Failure<int>("NO_PATIENT", "Hiện không có bệnh nhân nào đang chờ gọi vào phòng khám.");
-        }
+            await using var tx = await _context.Database.BeginTransactionAsync(ct);
 
-        var now = _timeProvider.GetLocalNow().DateTime;
-        nextApp.StatusId = (int)AppointmentStatusId.InProgress;
-        nextApp.UpdatedAt = now;
+            // Ưu tiên giảm dần: 3 = khẩn cấp nhất.
+            var nextAppId = await query
+                .OrderByDescending(a => a.PriorityLevel)
+                .ThenBy(a => a.QueueNumber)
+                .ThenBy(a => a.CheckedInAt)
+                .Select(a => (int?)a.Id)
+                .FirstOrDefaultAsync(ct);
 
-        await _context.SaveChangesAsync(ct);
+            if (nextAppId == null)
+            {
+                return Result.Failure<int>("NO_PATIENT", "Hiện không có bệnh nhân nào đủ điều kiện sinh hiệu đang chờ gọi vào phòng khám.");
+            }
 
-        int displayNum = nextApp.Id;
-        if (!string.IsNullOrWhiteSpace(nextApp.QueueNumber))
-        {
-            var digits = new string(nextApp.QueueNumber.Where(char.IsDigit).ToArray());
-            if (int.TryParse(digits, out var parsed)) displayNum = parsed;
-        }
+            await _context.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock({nextAppId.Value})", ct);
 
-        return Result<int>.Success(displayNum);
+            // Đọc lại SAU khi có khóa (có tracking) để kiểm tra trạng thái mới nhất.
+            var lockedApp = await _context.Appointments
+                .Include(a => a.VitalSigns)
+                .SingleOrDefaultAsync(a => a.Id == nextAppId.Value, ct);
+
+            if (lockedApp == null ||
+                lockedApp.StatusId != (int)AppointmentStatusId.ReadyForDoctor ||
+                lockedApp.VitalSigns == null)
+            {
+                return Result.Failure<int>("INVALID_STATE", "Lượt khám đã được xử lý bởi yêu cầu khác.");
+            }
+
+            var now = _timeProvider.GetLocalNow().DateTime;
+            lockedApp.StatusId = (int)AppointmentStatusId.InProgress;
+            lockedApp.CalledAt = now;
+            lockedApp.UpdatedAt = now;
+
+            _context.AppointmentStatusHistories.Add(new AppointmentStatusHistory
+            {
+                AppointmentId = lockedApp.Id,
+                OldStatusId = (int)AppointmentStatusId.ReadyForDoctor,
+                NewStatusId = (int)AppointmentStatusId.InProgress,
+                PerformedBy = doctorAccountId,
+                ChangedAt = now
+            });
+
+            await _context.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+
+            int displayNum = lockedApp.Id;
+            if (!string.IsNullOrWhiteSpace(lockedApp.QueueNumber))
+            {
+                var digits = new string(lockedApp.QueueNumber.Where(char.IsDigit).ToArray());
+                if (int.TryParse(digits, out var parsed)) displayNum = parsed;
+            }
+
+            return Result<int>.Success(displayNum);
+        });
     }
 }

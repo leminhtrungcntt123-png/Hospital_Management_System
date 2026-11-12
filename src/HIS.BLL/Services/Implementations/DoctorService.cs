@@ -52,7 +52,7 @@ public class DoctorService : IDoctorService
                         (a.StatusId == (int)AppointmentStatusId.CheckedIn ||
                          a.StatusId == (int)AppointmentStatusId.ReadyForDoctor ||
                          a.StatusId == (int)AppointmentStatusId.InProgress))
-            .OrderBy(a => a.PriorityLevel)
+            .OrderByDescending(a => a.PriorityLevel)
             .ThenBy(a => a.QueueNumber)
             .Select(a => new QueuePatientDto(
                 a.Id,
