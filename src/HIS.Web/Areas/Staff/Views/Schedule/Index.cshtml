@@ -1393,7 +1393,7 @@ else if (tab == "bidding")
                                         {
                                             <button type="button"
                                                     class="btn primary sm"
-                                                    onclick="event.stopPropagation(); openBiddingApprovalModal('@d.ToString("yyyy-MM-dd")', 'Morning')"
+                                                    onclick="event.stopPropagation(); selectBiddingShift('@d.ToString("yyyy-MM-dd")', 'Morning', true)"
                                                     style="padding:3px 10px; font-size:11px; font-weight:700; background:#d97706; border-color:#d97706; color:#fff; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 3px rgba(217,119,6,0.3);">
                                                 <span>⚖️ Duyệt ca này</span>
                                             </button>
@@ -1402,7 +1402,7 @@ else if (tab == "bidding")
                                         {
                                             <button type="button"
                                                     class="btn outline sm"
-                                                    onclick="event.stopPropagation(); openBiddingApprovalModal('@d.ToString("yyyy-MM-dd")', 'Morning')"
+                                                    onclick="event.stopPropagation(); selectBiddingShift('@d.ToString("yyyy-MM-dd")', 'Morning', true)"
                                                     style="padding:3px 8px; font-size:10.5px; font-weight:600; border-color:#16a34a; color:#15803d; background:#f0fdf4; border-radius:6px; cursor:pointer;">
                                                 <span>✓ Xem phân buồng</span>
                                             </button>
@@ -1486,7 +1486,7 @@ else if (tab == "bidding")
                                         {
                                             <button type="button"
                                                     class="btn primary sm"
-                                                    onclick="event.stopPropagation(); openBiddingApprovalModal('@d.ToString("yyyy-MM-dd")', 'Afternoon')"
+                                                    onclick="event.stopPropagation(); selectBiddingShift('@d.ToString("yyyy-MM-dd")', 'Afternoon', true)"
                                                     style="padding:3px 10px; font-size:11px; font-weight:700; background:#d97706; border-color:#d97706; color:#fff; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 3px rgba(217,119,6,0.3);">
                                                 <span>⚖️ Duyệt ca này</span>
                                             </button>
@@ -1495,7 +1495,7 @@ else if (tab == "bidding")
                                         {
                                             <button type="button"
                                                     class="btn outline sm"
-                                                    onclick="event.stopPropagation(); openBiddingApprovalModal('@d.ToString("yyyy-MM-dd")', 'Afternoon')"
+                                                    onclick="event.stopPropagation(); selectBiddingShift('@d.ToString("yyyy-MM-dd")', 'Afternoon', true)"
                                                     style="padding:3px 8px; font-size:10.5px; font-weight:600; border-color:#16a34a; color:#15803d; background:#f0fdf4; border-radius:6px; cursor:pointer;">
                                                 <span>✓ Xem phân buồng</span>
                                             </button>
@@ -1536,10 +1536,6 @@ else if (tab == "bidding")
                     </small>
                 </div>
             </div>
-            <button type="button" class="btn primary sm" onclick="openDecisionMatrixQuick()" style="background:#d97706; border-color:#d97706; color:#fff; font-weight:700; display:inline-flex; align-items:center; gap:6px;">
-                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                <span>Mở cửa sổ duyệt nhanh</span>
-            </button>
         </div>
 
         <div style="padding:16px;">
@@ -2880,125 +2876,129 @@ else
         <input type="hidden" name="returnTab" value="@tab" />
         <input type="hidden" name="id" id="deleteDutyIdInput" value="" />
     </form>
-
-    <!-- Modal: Bảng Chỉ Số Quyết Định & Điều Phối Ca (Decision Matrix) -->
-    <div id="decisionMatrixModal" class="app-modal-backdrop">
-        <div class="app-modal-card" style="max-width:980px; width:95%;">
-            <div class="app-modal-header" style="background:#1e293b;">
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <span style="font-size:18px;">⚖️</span>
-                    <div>
-                        <h5 style="margin:0; font-size:15px; font-weight:700;">Bảng Chỉ Số Quyết Định & Điều Phối Ca (Decision Matrix)</h5>
-                        <small id="dmSubTitle" style="color:#94a3b8; font-size:11px;">Hệ thống sắp xếp bác sĩ tự động theo 4 tiêu chí ưu tiên</small>
-                    </div>
-                </div>
-                <button type="button" class="app-modal-close" onclick="closeDecisionMatrixModal()">✕</button>
-            </div>
-
-            <div class="app-modal-body" style="padding:16px;">
-                <div style="display:flex; gap:12px; align-items:center; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; margin-bottom:14px; flex-wrap:wrap;">
-                    <div style="display:flex; align-items:center; gap:6px;">
-                        <label style="font-size:12px; font-weight:600; color:#334155;">Ngày:</label>
-                        <input type="date" id="dmDateSelect" class="form-control" style="font-size:12px; padding:4px 8px; width:140px;" onchange="onDmDateShiftChanged()" />
-                    </div>
-                    <div style="display:flex; align-items:center; gap:6px;">
-                        <label style="font-size:12px; font-weight:600; color:#334155;">Ca:</label>
-                        <select id="dmShiftSelect" class="form-control" style="font-size:12px; padding:4px 8px; width:130px;" onchange="onDmDateShiftChanged()">
-                            <option value="Morning">🌅 Sáng (07:30–11:30)</option>
-                            <option value="Afternoon">🌇 Chiều (13:00–16:30)</option>
-                        </select>
-                    </div>
-                    <div id="dmShiftSummary" style="font-size:12px; color:#475569; font-weight:600; margin-left:auto;">
-                    </div>
-                </div>
-
-                <div id="dmLoading" style="display:none; text-align:center; padding:30px; color:#64748b;">
-                    <span>⏳ Đang tải dữ liệu và phân tích chỉ số ưu tiên...</span>
-                </div>
-
-                <div id="dmTableContainer" style="overflow-x:auto;">
-                    <table style="width:100%; border-collapse:collapse; font-size:12px; min-width:820px;">
-                        <thead>
-                            <tr style="background:#f1f5f9; border-bottom:2px solid #cbd5e1; text-align:left;">
-                                <th style="padding:8px 10px; width:30px;">#</th>
-                                <th style="padding:8px 10px;">Bác sĩ</th>
-                                <th style="padding:8px 10px; text-align:center;">1. Trực đêm (Fatigue)</th>
-                                <th style="padding:8px 10px; text-align:center;">2. Luân phiên ca Hot</th>
-                                <th style="padding:8px 10px; text-align:center;">3. Định mức tuần</th>
-                                <th style="padding:8px 10px; text-align:center;">4. BN tái khám</th>
-                                <th style="padding:8px 10px;">Trạng thái</th>
-                                <th style="padding:8px 10px; text-align:right;">Duyệt / Điều phối</th>
-                            </tr>
-                        </thead>
-                        <tbody id="dmTableBody">
-                        </tbody>
-                    </table>
-                </div>
-
-                <div id="dmEmpty" style="display:none; text-align:center; padding:30px; color:#94a3b8; font-size:13px;">
-                    Chưa có bác sĩ nào đăng ký vào ca khám này.
-                </div>
-            </div>
-
-            <div class="app-modal-footer">
-                <button type="button" class="btn ghost" onclick="closeDecisionMatrixModal()">Đóng</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Form ẩn để duyệt ca từ Decision Matrix -->
-    <form id="approveShiftForm" asp-area="Staff" asp-controller="Schedule" asp-action="ApproveShift" method="post" style="display:none;">
-        @Html.AntiForgeryToken()
-        <input type="hidden" name="scheduleId" id="approveShiftScheduleId" value="" />
-        <input type="hidden" name="roomId" id="approveShiftRoomId" value="" />
-        <input type="hidden" name="tab" value="@(string.IsNullOrEmpty(tab) ? "schedule" : tab)" />
-    </form>
-
-    <!-- Modal: Điều chuyển bù ca trượt -->
-    <div id="reallocateModal" class="app-modal-backdrop">
-        <div class="app-modal-card" style="max-width:520px; width:95%;">
-            <div class="app-modal-header" style="background:#d97706;">
-                <div>
-                    <h5 style="margin:0; font-size:15px; font-weight:700;">Điều chuyển bù ca khám</h5>
-                    <small style="color:#fef3c7; font-size:11px;">Xếp bù bác sĩ bị trượt sang ca hoặc buồng khám khác</small>
-                </div>
-                <button type="button" class="app-modal-close" onclick="closeReallocateModal()">✕</button>
-            </div>
-            <form asp-area="Staff" asp-controller="Schedule" asp-action="ReallocateShift" method="post">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="oldScheduleId" id="reallocOldScheduleId" value="" />
-                <input type="hidden" name="tab" value="@(string.IsNullOrEmpty(tab) ? "schedule" : tab)" />
-                <div class="app-modal-body" style="padding:16px;">
-                    <div style="margin-bottom:12px; font-size:13px; color:#1e293b;">
-                        Điều chuyển bác sĩ: <strong id="reallocDoctorName"></strong>
-                    </div>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
-                        <div>
-                            <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Ngày chuyển sang *</label>
-                            <input type="date" name="targetDate" id="reallocTargetDate" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" required />
-                        </div>
-                        <div>
-                            <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Ca chuyển sang *</label>
-                            <select name="targetShift" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" required>
-                                <option value="Morning">🌅 Ca Sáng (07:30–11:30)</option>
-                                <option value="Afternoon">🌇 Ca Chiều (13:00–16:30)</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div style="margin-bottom:12px;">
-                        <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Buồng khám *</label>
-                        <select name="targetRoomId" id="reallocTargetRoomId" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" required>
-                        </select>
-                    </div>
-                </div>
-                <div class="app-modal-footer" style="padding:12px 16px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:8px;">
-                    <button type="button" class="btn ghost" onclick="closeReallocateModal()">Hủy bỏ</button>
-                    <button type="submit" class="btn primary" style="background:#d97706; border-color:#d97706;">Xác nhận điều chuyển</button>
-                </div>
-            </form>
-        </div>
-    </div>
 }
+
+<!-- Modal: Bảng Chỉ Số Quyết Định & Điều Phối Ca (Decision Matrix) -->
+<div id="decisionMatrixModal" class="app-modal-backdrop">
+    <div class="app-modal-card" style="max-width:980px; width:95%;">
+        <div class="app-modal-header" style="background:#1e293b;">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:18px;">⚖️</span>
+                <div>
+                    <h5 style="margin:0; font-size:15px; font-weight:700;">Bảng Chỉ Số Quyết Định & Điều Phối Ca (Decision Matrix)</h5>
+                    <small id="dmSubTitle" style="color:#94a3b8; font-size:11px;">Hệ thống sắp xếp bác sĩ tự động theo 4 tiêu chí ưu tiên</small>
+                </div>
+            </div>
+            <button type="button" class="app-modal-close" onclick="closeDecisionMatrixModal()">✕</button>
+        </div>
+
+        <div class="app-modal-body" style="padding:16px;">
+            <div style="display:flex; gap:12px; align-items:center; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; margin-bottom:14px; flex-wrap:wrap;">
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <label style="font-size:12px; font-weight:600; color:#334155;">Ngày:</label>
+                    <input type="date" id="dmDateSelect" class="form-control" style="font-size:12px; padding:4px 8px; width:140px;" onchange="onDmDateShiftChanged()" />
+                </div>
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <label style="font-size:12px; font-weight:600; color:#334155;">Ca:</label>
+                    <select id="dmShiftSelect" class="form-control" style="font-size:12px; padding:4px 8px; width:130px;" onchange="onDmDateShiftChanged()">
+                        <option value="Morning">🌅 Sáng (07:30–11:30)</option>
+                        <option value="Afternoon">🌇 Chiều (13:00–16:30)</option>
+                    </select>
+                </div>
+                <div id="dmShiftSummary" style="font-size:12px; color:#475569; font-weight:600; margin-left:auto;">
+                </div>
+            </div>
+
+            <div id="dmLoading" style="display:none; text-align:center; padding:30px; color:#64748b;">
+                <span>⏳ Đang tải dữ liệu và phân tích chỉ số ưu tiên...</span>
+            </div>
+
+            <div id="dmTableContainer" style="overflow-x:auto;">
+                <table style="width:100%; border-collapse:collapse; font-size:12px; min-width:820px;">
+                    <thead>
+                        <tr style="background:#f1f5f9; border-bottom:2px solid #cbd5e1; text-align:left;">
+                            <th style="padding:8px 10px; width:30px;">#</th>
+                            <th style="padding:8px 10px;">Bác sĩ</th>
+                            <th style="padding:8px 10px; text-align:center;">1. Trực đêm (Fatigue)</th>
+                            <th style="padding:8px 10px; text-align:center;">2. Luân phiên ca Hot</th>
+                            <th style="padding:8px 10px; text-align:center;">3. Định mức tuần</th>
+                            <th style="padding:8px 10px; text-align:center;">4. BN tái khám</th>
+                            <th style="padding:8px 10px;">Trạng thái</th>
+                            <th style="padding:8px 10px; text-align:right;">Duyệt / Điều phối</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dmTableBody">
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="dmEmpty" style="display:none; text-align:center; padding:30px; color:#94a3b8; font-size:13px;">
+                Chưa có bác sĩ nào đăng ký vào ca khám này.
+            </div>
+        </div>
+
+        <div class="app-modal-footer">
+            <button type="button" class="btn ghost" onclick="closeDecisionMatrixModal()">Đóng</button>
+        </div>
+    </div>
+</div>
+
+<!-- Form ẩn để duyệt ca từ Decision Matrix (dùng chung cho cả tab Bidding và tab Schedule) -->
+<form id="approveShiftForm" asp-area="Staff" asp-controller="Schedule" asp-action="ApproveShift" method="post" style="display:none;">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="scheduleId" id="approveShiftScheduleId" value="" />
+    <input type="hidden" name="roomId" id="approveShiftRoomId" value="" />
+    <input type="hidden" name="tab" id="approveShiftTab" value="@(string.IsNullOrEmpty(tab) ? "bidding" : tab)" />
+    <input type="hidden" name="date" id="approveShiftDate" value="" />
+    <input type="hidden" name="shift" id="approveShiftShift" value="" />
+</form>
+
+<!-- Modal: Điều chuyển bù ca trượt (dùng chung cho cả tab Bidding và tab Schedule) -->
+<div id="reallocateModal" class="app-modal-backdrop">
+    <div class="app-modal-card" style="max-width:520px; width:95%;">
+        <div class="app-modal-header" style="background:#d97706;">
+            <div>
+                <h5 style="margin:0; font-size:15px; font-weight:700;">Điều chuyển bù ca khám</h5>
+                <small style="color:#fef3c7; font-size:11px;">Xếp bù bác sĩ bị trượt sang ca hoặc buồng khám khác</small>
+            </div>
+            <button type="button" class="app-modal-close" onclick="closeReallocateModal()">✕</button>
+        </div>
+        <form asp-area="Staff" asp-controller="Schedule" asp-action="ReallocateShift" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="oldScheduleId" id="reallocOldScheduleId" value="" />
+            <input type="hidden" name="tab" id="reallocTab" value="@(string.IsNullOrEmpty(tab) ? "bidding" : tab)" />
+            <input type="hidden" name="date" id="reallocCurrentDate" value="" />
+            <input type="hidden" name="shift" id="reallocCurrentShift" value="" />
+            <div class="app-modal-body" style="padding:16px;">
+                <div style="margin-bottom:12px; font-size:13px; color:#1e293b;">
+                    Điều chuyển bác sĩ: <strong id="reallocDoctorName"></strong>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+                    <div>
+                        <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Ngày chuyển sang *</label>
+                        <input type="date" name="targetDate" id="reallocTargetDate" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" required />
+                    </div>
+                    <div>
+                        <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Ca chuyển sang *</label>
+                        <select name="targetShift" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" required>
+                            <option value="Morning">🌅 Ca Sáng (07:30–11:30)</option>
+                            <option value="Afternoon">🌇 Ca Chiều (13:00–16:30)</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Buồng khám *</label>
+                    <select name="targetRoomId" id="reallocTargetRoomId" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" required>
+                    </select>
+                </div>
+            </div>
+            <div class="app-modal-footer" style="padding:12px 16px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn ghost" onclick="closeReallocateModal()">Hủy bỏ</button>
+                <button type="submit" class="btn primary" style="background:#d97706; border-color:#d97706;">Xác nhận điều chuyển</button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <script>
     // --- Xử lý Lọc Danh Sách Ngoại Lệ (Image 1) ---
@@ -4043,8 +4043,8 @@ else
             if (el && el.value) roomId = el.value;
         }
         if (!roomId) {
-            const fallback = document.getElementById(`dmModalRoomSelect_${scheduleId}`)
-                || document.getElementById(`dmInlineRoomSelect_${scheduleId}`)
+            const fallback = document.getElementById(`dmInlineRoomSelect_${scheduleId}`)
+                || document.getElementById(`dmModalRoomSelect_${scheduleId}`)
                 || document.getElementById(`dmRoomSelect_${scheduleId}`);
             if (fallback && fallback.value) roomId = fallback.value;
         }
@@ -4055,19 +4055,42 @@ else
 
         const sidInput = document.getElementById('approveShiftScheduleId');
         const ridInput = document.getElementById('approveShiftRoomId');
+        const dateInput = document.getElementById('approveShiftDate');
+        const shiftInput = document.getElementById('approveShiftShift');
+        const tabInput = document.getElementById('approveShiftTab');
         const form = document.getElementById('approveShiftForm');
 
-        if (sidInput && ridInput && form) {
-            sidInput.value = scheduleId;
-            ridInput.value = roomId;
-            form.submit();
+        if (!form || !sidInput || !ridInput) {
+            console.error('approveShiftForm elements missing');
+            alert('Lỗi hệ thống: Không tìm thấy biểu mẫu duyệt ca.');
+            return;
         }
+
+        sidInput.value = scheduleId;
+        ridInput.value = roomId;
+
+        const curDate = document.getElementById('dmInlineDateSelect')?.value || document.getElementById('dmDateSelect')?.value || '';
+        const curShift = document.getElementById('dmInlineShiftSelect')?.value || document.getElementById('dmShiftSelect')?.value || '';
+        if (dateInput) dateInput.value = curDate;
+        if (shiftInput) shiftInput.value = curShift;
+        if (tabInput) tabInput.value = '@tab' || 'bidding';
+
+        form.submit();
     }
 
     function openReallocateModal(oldScheduleId, doctorName) {
-        document.getElementById('reallocOldScheduleId').value = oldScheduleId;
-        document.getElementById('reallocDoctorName').textContent = doctorName;
-        
+        const idInput = document.getElementById('reallocOldScheduleId');
+        const nameEl = document.getElementById('reallocDoctorName');
+        if (idInput) idInput.value = oldScheduleId;
+        if (nameEl) nameEl.textContent = doctorName;
+
+        const curDate = document.getElementById('dmInlineDateSelect')?.value || document.getElementById('dmDateSelect')?.value;
+        const curShift = document.getElementById('dmInlineShiftSelect')?.value || document.getElementById('dmShiftSelect')?.value;
+        const reallocDate = document.getElementById('reallocCurrentDate');
+        const reallocShift = document.getElementById('reallocCurrentShift');
+        if (reallocDate && curDate) reallocDate.value = curDate;
+        if (reallocShift && curShift) reallocShift.value = curShift;
+
         // Populate available rooms dropdown
         const roomSelect = document.getElementById('reallocTargetRoomId');
         if (roomSelect) {
@@ -4079,7 +4102,6 @@ else
         }
 
         // Set default target date to current select date
-        const curDate = document.getElementById('dmDateSelect')?.value || document.getElementById('dmInlineDateSelect')?.value;
         const targetDateInput = document.getElementById('reallocTargetDate');
         if (targetDateInput && curDate) {
             targetDateInput.value = curDate;
@@ -4095,8 +4117,7 @@ else
     // INLINE DECISION MATRIX & SHIFT GRID (TAB BIDDING)
     function openBiddingApprovalModal(dateStr, shiftStr) {
         if (!dateStr || !shiftStr) return;
-        selectBiddingShift(dateStr, shiftStr, false);
-        loadDecisionMatrix(dateStr, shiftStr);
+        selectBiddingShift(dateStr, shiftStr, true);
     }
 
     function selectBiddingShift(dateStr, shiftStr, shouldScroll = false) {
@@ -4282,7 +4303,7 @@ else
             const qDate = urlParams.get('date');
             const qShift = urlParams.get('shift');
             if (qDate && qShift) {
-                selectBiddingShift(qDate, qShift, false);
+                selectBiddingShift(qDate, qShift, true);
             } else {
                 const pendingCell = document.querySelector('.bidding-grid-cell[data-has-pending="true"]');
                 if (pendingCell && pendingCell.dataset.date && pendingCell.dataset.shift) {
