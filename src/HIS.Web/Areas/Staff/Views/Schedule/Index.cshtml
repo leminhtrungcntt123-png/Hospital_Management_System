@@ -1387,8 +1387,26 @@ else if (tab == "bidding")
                                         </div>
                                     }
 
-                                    <div style="margin-top:4px; text-align:right;">
-                                        <span style="font-size:11px; color:#0284c7; font-weight:600; text-decoration:underline;">Duyệt ca này →</span>
+                                    <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
+                                        <span style="font-size:11px; color:#0284c7; font-weight:600;">Xem ma trận ↓</span>
+                                        @if (pendingMorning > 0)
+                                        {
+                                            <button type="button"
+                                                    class="btn primary sm"
+                                                    onclick="event.stopPropagation(); openBiddingApprovalModal('@d.ToString("yyyy-MM-dd")', 'Morning')"
+                                                    style="padding:3px 10px; font-size:11px; font-weight:700; background:#d97706; border-color:#d97706; color:#fff; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 3px rgba(217,119,6,0.3);">
+                                                <span>⚖️ Duyệt ca này</span>
+                                            </button>
+                                        }
+                                        else if (approvedMorning > 0)
+                                        {
+                                            <button type="button"
+                                                    class="btn outline sm"
+                                                    onclick="event.stopPropagation(); openBiddingApprovalModal('@d.ToString("yyyy-MM-dd")', 'Morning')"
+                                                    style="padding:3px 8px; font-size:10.5px; font-weight:600; border-color:#16a34a; color:#15803d; background:#f0fdf4; border-radius:6px; cursor:pointer;">
+                                                <span>✓ Xem phân buồng</span>
+                                            </button>
+                                        }
                                     </div>
                                 </div>
                             }
@@ -1462,8 +1480,26 @@ else if (tab == "bidding")
                                         </div>
                                     }
 
-                                    <div style="margin-top:4px; text-align:right;">
-                                        <span style="font-size:11px; color:#0284c7; font-weight:600; text-decoration:underline;">Duyệt ca này →</span>
+                                    <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
+                                        <span style="font-size:11px; color:#0284c7; font-weight:600;">Xem ma trận ↓</span>
+                                        @if (pendingAfternoon > 0)
+                                        {
+                                            <button type="button"
+                                                    class="btn primary sm"
+                                                    onclick="event.stopPropagation(); openBiddingApprovalModal('@d.ToString("yyyy-MM-dd")', 'Afternoon')"
+                                                    style="padding:3px 10px; font-size:11px; font-weight:700; background:#d97706; border-color:#d97706; color:#fff; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 3px rgba(217,119,6,0.3);">
+                                                <span>⚖️ Duyệt ca này</span>
+                                            </button>
+                                        }
+                                        else if (approvedAfternoon > 0)
+                                        {
+                                            <button type="button"
+                                                    class="btn outline sm"
+                                                    onclick="event.stopPropagation(); openBiddingApprovalModal('@d.ToString("yyyy-MM-dd")', 'Afternoon')"
+                                                    style="padding:3px 8px; font-size:10.5px; font-weight:600; border-color:#16a34a; color:#15803d; background:#f0fdf4; border-radius:6px; cursor:pointer;">
+                                                <span>✓ Xem phân buồng</span>
+                                            </button>
+                                        }
                                     </div>
                                 </div>
                             }
@@ -3953,10 +3989,10 @@ else
                             });
                             actionHtml = `
                                 <div style="display:flex; align-items:center; justify-content:flex-end; gap:6px;">
-                                    <select id="dmRoomSelect_${c.scheduleId}" style="padding:5px 8px; font-size:11.5px; border:1px solid #cbd5e1; border-radius:5px; max-width:160px;">
+                                    <select id="dmModalRoomSelect_${c.scheduleId}" style="padding:5px 8px; font-size:11.5px; border:1px solid #cbd5e1; border-radius:5px; max-width:160px;">
                                         ${roomOptions}
                                     </select>
-                                    <button type="button" class="btn primary sm" onclick="submitApproveShift(${c.scheduleId})" style="padding:4px 10px; font-size:11.5px; background:#079bc9; font-weight:600;">
+                                    <button type="button" class="btn primary sm" onclick="submitApproveShift(${c.scheduleId}, 'dmModalRoomSelect_${c.scheduleId}')" style="padding:4px 10px; font-size:11.5px; background:#079bc9; font-weight:600;">
                                         Duyệt
                                     </button>
                                 </div>
@@ -4000,9 +4036,18 @@ else
             });
     }
 
-    function submitApproveShift(scheduleId) {
-        const roomSelect = document.getElementById(`dmRoomSelect_${scheduleId}`);
-        const roomId = roomSelect ? roomSelect.value : null;
+    function submitApproveShift(scheduleId, selectElementId) {
+        let roomId = null;
+        if (selectElementId) {
+            const el = document.getElementById(selectElementId);
+            if (el && el.value) roomId = el.value;
+        }
+        if (!roomId) {
+            const fallback = document.getElementById(`dmModalRoomSelect_${scheduleId}`)
+                || document.getElementById(`dmInlineRoomSelect_${scheduleId}`)
+                || document.getElementById(`dmRoomSelect_${scheduleId}`);
+            if (fallback && fallback.value) roomId = fallback.value;
+        }
         if (!roomId) {
             alert('Vui lòng chọn Buồng khám để duyệt ca cho bác sĩ.');
             return;
@@ -4034,7 +4079,7 @@ else
         }
 
         // Set default target date to current select date
-        const curDate = document.getElementById('dmDateSelect')?.value;
+        const curDate = document.getElementById('dmDateSelect')?.value || document.getElementById('dmInlineDateSelect')?.value;
         const targetDateInput = document.getElementById('reallocTargetDate');
         if (targetDateInput && curDate) {
             targetDateInput.value = curDate;
@@ -4048,7 +4093,13 @@ else
     }
 
     // INLINE DECISION MATRIX & SHIFT GRID (TAB BIDDING)
-    function selectBiddingShift(dateStr, shiftStr) {
+    function openBiddingApprovalModal(dateStr, shiftStr) {
+        if (!dateStr || !shiftStr) return;
+        selectBiddingShift(dateStr, shiftStr, false);
+        loadDecisionMatrix(dateStr, shiftStr);
+    }
+
+    function selectBiddingShift(dateStr, shiftStr, shouldScroll = false) {
         if (!dateStr || !shiftStr) return;
 
         // 1. Reset cell styles and highlight target cell
@@ -4079,15 +4130,23 @@ else
         if (dInput && dInput.value !== dateStr) dInput.value = dateStr;
         if (sInput && sInput.value !== shiftStr) sInput.value = shiftStr;
 
-        // 4. Load Decision Matrix
+        // 4. Load Decision Matrix inline
         loadDecisionMatrixInline(dateStr, shiftStr);
+
+        // 5. Scroll smoothly to decision matrix workspace if requested
+        if (shouldScroll) {
+            const ws = document.getElementById('decisionMatrixWorkspace');
+            if (ws) {
+                ws.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
     }
 
     function onDmInlineChange() {
         const d = document.getElementById('dmInlineDateSelect')?.value;
         const s = document.getElementById('dmInlineShiftSelect')?.value;
         if (d && s) {
-            selectBiddingShift(d, s);
+            selectBiddingShift(d, s, true);
         }
     }
 
@@ -4170,10 +4229,10 @@ else
                             });
                             actionHtml = `
                                 <div style="display:flex; align-items:center; justify-content:flex-end; gap:6px;">
-                                    <select id="dmRoomSelect_${c.scheduleId}" style="padding:5px 8px; font-size:11.5px; border:1px solid #cbd5e1; border-radius:5px; max-width:160px;">
+                                    <select id="dmInlineRoomSelect_${c.scheduleId}" style="padding:5px 8px; font-size:11.5px; border:1px solid #cbd5e1; border-radius:5px; max-width:160px;">
                                         ${roomOptions}
                                     </select>
-                                    <button type="button" class="btn primary sm" onclick="submitApproveShift(${c.scheduleId})" style="padding:4px 10px; font-size:11.5px; background:#079bc9; font-weight:600;">
+                                    <button type="button" class="btn primary sm" onclick="submitApproveShift(${c.scheduleId}, 'dmInlineRoomSelect_${c.scheduleId}')" style="padding:4px 10px; font-size:11.5px; background:#079bc9; font-weight:600;">
                                         Duyệt
                                     </button>
                                 </div>
@@ -4223,15 +4282,15 @@ else
             const qDate = urlParams.get('date');
             const qShift = urlParams.get('shift');
             if (qDate && qShift) {
-                selectBiddingShift(qDate, qShift);
+                selectBiddingShift(qDate, qShift, false);
             } else {
                 const pendingCell = document.querySelector('.bidding-grid-cell[data-has-pending="true"]');
                 if (pendingCell && pendingCell.dataset.date && pendingCell.dataset.shift) {
-                    selectBiddingShift(pendingCell.dataset.date, pendingCell.dataset.shift);
+                    selectBiddingShift(pendingCell.dataset.date, pendingCell.dataset.shift, false);
                 } else {
                     const firstCell = document.querySelector('.bidding-grid-cell');
                     if (firstCell && firstCell.dataset.date && firstCell.dataset.shift) {
-                        selectBiddingShift(firstCell.dataset.date, firstCell.dataset.shift);
+                        selectBiddingShift(firstCell.dataset.date, firstCell.dataset.shift, false);
                     } else {
                         onDmInlineChange();
                     }
@@ -4239,5 +4298,4 @@ else
             }
         }
     });
-</script>
 </script>
