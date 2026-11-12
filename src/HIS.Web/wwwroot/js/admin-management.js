@@ -28,14 +28,20 @@
         ],
         requests: ['Nghỉ / đổi ca', 'Duyệt đề nghị và sắp xếp lại lịch khám trong khoa.'],
         departments: ['Phòng ban', 'Danh sách khoa và đơn vị chuyên môn trong bệnh viện.'],
+        rooms: ['Phòng khám', 'Quản lý buồng / phòng khám thuộc từng khoa chuyên môn.'],
+        services: ['Dịch vụ & bảng giá', 'Thiết lập danh mục dịch vụ kỹ thuật, xét nghiệm và giá niêm yết.'],
+        medications: ['Danh mục thuốc', 'Quản lý danh mục thuốc, hoạt chất, hàm lượng và đơn giá.'],
         staff: ['Quản lý nhân sự', 'Danh sách bác sĩ, y tá và trưởng khoa theo phòng ban.'],
         doctors: ['Danh sách bác sĩ', 'Theo dõi chuyên môn và đơn vị công tác.'],
         accounts: ['Quản lý tài khoản', 'Tạo tài khoản, kích hoạt và ngừng hoạt động truy cập.'],
+        audit: ['Nhật ký truy vết', 'Theo dõi lịch sử truy cập hồ sơ bệnh án và phân quyền y tế.'],
     };
 
     let directory = null;
+    let catalog = null;
     let busy = false;
     let reportVersion = 0;
+    let auditVersion = 0;
 
     function notify(message, error = false) {
         const target = find('#admin-message');
@@ -77,6 +83,8 @@
     }
 
     function table(id, headers, rows) {
+        const target = find(id);
+        if (!target) return;
         const heading = headers
             .map((heading) => /* HTML */ `<th scope="col">${escape(heading)}</th>`)
             .join('');
@@ -92,7 +100,7 @@
             : /* HTML */ `<tr>
                   <td class="empty" colspan="${headers.length}">Chưa có dữ liệu phù hợp.</td>
               </tr>`;
-        find(id).innerHTML = /* HTML */ `<table>
+        target.innerHTML = /* HTML */ `<table>
             <thead>
                 <tr>
                     ${heading}
@@ -130,6 +138,23 @@
         ]);
     }
 
+    function renderDepartmentsTable(filterDeptId = '') {
+        if (!directory?.departments) return;
+        const filtered = filterDeptId
+            ? directory.departments.filter((d) => String(d.id) === String(filterDeptId))
+            : directory.departments;
+
+        table(
+            '#departments-table',
+            ['Mã', 'Tên phòng ban', 'Mô tả'],
+            filtered.map((row) => [
+                escape(row.id),
+                /* HTML */ `<strong>${escape(row.name)}</strong>`,
+                escape(row.description || '—'),
+            ]),
+        );
+    }
+
     async function loadDirectory() {
         directory = await request('Directory');
         const headings = [
@@ -141,15 +166,19 @@
         ];
         table('#accounts-table', [...headings, 'Thao tác'], accountRows(directory.accounts, true));
         table('#staff-table', headings, accountRows(directory.staff, false));
-        table(
-            '#departments-table',
-            ['Mã', 'Tên phòng ban', 'Mô tả'],
-            directory.departments.map((row) => [
-                escape(row.id),
-                /* HTML */ `<strong>${escape(row.name)}</strong>`,
-                escape(row.description || '—'),
-            ]),
-        );
+        const filterDept = find('#filter-department');
+        if (filterDept) {
+            const currentVal = filterDept.value;
+            filterDept.innerHTML =
+                '<option value="">Tất cả phòng ban</option>' +
+                directory.departments
+                    .map((d) => /* HTML */ `<option value="${d.id}">${escape(d.name)}</option>`)
+                    .join('');
+            filterDept.value = currentVal;
+            renderDepartmentsTable(filterDept.value);
+        } else {
+            renderDepartmentsTable('');
+        }
         table(
             '#doctors-table',
             ['Họ tên', 'Chuyên môn', 'Phòng ban', 'Chứng chỉ hành nghề'],
@@ -212,6 +241,178 @@
                 ),
             ]),
         );
+
+        try {
+            const deptStats = await request('DepartmentStats' + query);
+            table(
+                '#department-stats-table',
+                ['Khoa chuyên môn', 'Lượt tiếp nhận', 'Doanh thu thực thu'],
+                deptStats.map((row) => [
+                    /* HTML */ `<strong>${escape(row.departmentName)}</strong>`,
+                    /* HTML */ `<span class="number">${escape(money(row.visits))} lượt</span>`,
+                    /* HTML */ `<span class="number">${escape(money(row.revenue))} ₫</span>`,
+                ]),
+            );
+        } catch {
+            table('#department-stats-table', ['Khoa chuyên môn', 'Lượt tiếp nhận', 'Doanh thu thực thu'], []);
+            notify('Chưa tải được thống kê doanh thu theo khoa.', true);
+        }
+    }
+
+    function renderRoomsTable(filterDeptId = '') {
+        if (!catalog?.rooms) return;
+        const filtered = filterDeptId
+            ? catalog.rooms.filter((r) => String(r.departmentId) === String(filterDeptId))
+            : catalog.rooms;
+
+        table(
+            '#rooms-table',
+            ['Khoa / Phòng ban', 'Số phòng', 'Tên phòng khám', 'Lịch trực liên kết', 'Thao tác'],
+            filtered.map((row) => [
+                escape(row.departmentName),
+                /* HTML */ `<strong>${escape(row.roomNumber)}</strong>`,
+                escape(row.roomName),
+                /* HTML */ `<span class="status ${row.activeSchedulesCount > 0 ? '' : 'inactive'}">${row.activeSchedulesCount} lịch phân công</span>`,
+                row.activeSchedulesCount === 0
+                    ? /* HTML */ `<button type="button" class="btn button sm small-button danger" data-delete-room="${row.id}">Xóa</button>`
+                    : '<span>Đang sử dụng</span>',
+            ]),
+        );
+    }
+
+    async function loadCatalog() {
+        catalog = await request('CatalogDirectory');
+
+        const filterRoomDept = find('#filter-room-department');
+        if (filterRoomDept) {
+            const currentVal = filterRoomDept.value;
+            filterRoomDept.innerHTML =
+                '<option value="">Tất cả khoa chuyên môn</option>' +
+                catalog.departments
+                    .map((d) => {
+                        const count = catalog.rooms.filter((r) => r.departmentId === d.id).length;
+                        return /* HTML */ `<option value="${d.id}">${escape(d.name)} (${count} phòng)</option>`;
+                    })
+                    .join('');
+            filterRoomDept.value = currentVal;
+            renderRoomsTable(filterRoomDept.value);
+        } else {
+            renderRoomsTable('');
+        }
+
+        table(
+            '#services-table',
+            ['Mã', 'Loại dịch vụ', 'Tên dịch vụ kỹ thuật', 'Đơn giá niêm yết', 'Trạng thái', 'Thao tác'],
+            catalog.services.map((row) => [
+                escape(row.id),
+                /* HTML */ `<span class="status">${escape(row.serviceTypeName)}</span>`,
+                /* HTML */ `<strong>${escape(row.name)}</strong>`,
+                /* HTML */ `<span class="number">${escape(money(row.price))} ₫</span>`,
+                /* HTML */ `<span class="status ${row.isActive ? '' : 'inactive'}">${row.isActive ? 'Áp dụng' : 'Tạm ngưng'}</span>`,
+                /* HTML */ `<button type="button" class="btn button sm small-button secondary" data-edit-service="${row.id}">Sửa</button>`,
+            ]),
+        );
+
+        table(
+            '#medications-table',
+            ['Mã', 'Tên thuốc', 'Hoạt chất', 'Hàm lượng', 'Đơn vị', 'Đơn giá', 'Trạng thái', 'Thao tác'],
+            catalog.medications.map((row) => [
+                escape(row.id),
+                /* HTML */ `<strong>${escape(row.name)}</strong>`,
+                escape(row.activeIngredient || '—'),
+                escape(row.strength || '—'),
+                escape(row.unit),
+                /* HTML */ `<span class="number">${escape(money(row.price))} ₫</span>`,
+                /* HTML */ `<span class="status ${row.isActive ? '' : 'inactive'}">${row.isActive ? 'Kê đơn' : 'Tạm ngưng'}</span>`,
+                /* HTML */ `<button type="button" class="btn button sm small-button secondary" data-edit-medication="${row.id}">Sửa</button>`,
+            ]),
+        );
+
+        const roomDeptSelect = find('#room-form [name="departmentId"]');
+        if (roomDeptSelect) {
+            roomDeptSelect.innerHTML = '<option value="">Chọn khoa chuyên môn</option>' +
+                catalog.departments.map((d) => /* HTML */ `<option value="${d.id}">${escape(d.name)}</option>`).join('');
+        }
+
+        const serviceTypeSelect = find('#service-form [name="serviceTypeId"]');
+        if (serviceTypeSelect) {
+            serviceTypeSelect.innerHTML = '<option value="">Chọn loại dịch vụ</option>' +
+                catalog.serviceTypes.map((st) => /* HTML */ `<option value="${st.id}">${escape(st.name)}</option>`).join('');
+        }
+    }
+
+    async function loadAudit(withFilter = null) {
+        const filter = find('#audit-filter');
+        let query = '';
+        let searchKeyword = '';
+        const shouldFilter = withFilter !== null
+            ? withFilter
+            : Boolean(filter && (filter.elements.from?.value || filter.elements.to?.value || filter.elements.action?.value || filter.elements.search?.value));
+
+        if (filter && shouldFilter) {
+            const formData = new FormData(filter);
+            const params = new URLSearchParams();
+            if (formData.get('from')) params.set('from', formData.get('from'));
+            if (formData.get('to')) params.set('to', formData.get('to'));
+            if (formData.get('action')) params.set('action', formData.get('action'));
+            if (formData.get('search')) {
+                searchKeyword = (formData.get('search') || '').trim().toLowerCase();
+                params.set('search', (formData.get('search') || '').trim());
+            }
+            const qs = params.toString();
+            if (qs) query = '?' + qs;
+        }
+
+        const currentVersion = ++auditVersion;
+        let rows = await request('AuditLogs' + query);
+        if (currentVersion !== auditVersion) return;
+
+        const actionMap = {
+            VIEW_RECORD: { label: 'Xem bệnh án', cls: 'info' },
+            CREATE_RECORD: { label: 'Lưu bệnh án', cls: '' },
+            CHECK_IN_WEB: { label: 'Tiếp nhận hẹn', cls: 'info' },
+            REGISTER_WALK_IN: { label: 'Tiếp nhận quầy', cls: 'info' },
+            ADMIN_CREATE_ACCOUNT: { label: 'Tạo tài khoản', cls: '' },
+            ADMIN_ACTIVATE_ACCOUNT: { label: 'Kích hoạt TK', cls: '' },
+            ADMIN_DEACTIVATE_ACCOUNT: { label: 'Khóa tài khoản', cls: 'danger' },
+            ADMIN_APPROVE_SCHEDULE: { label: 'Duyệt lịch trực', cls: '' },
+            ADMIN_REJECT_SCHEDULE: { label: 'Từ chối ca', cls: 'danger' },
+            AdminLogin: { label: 'Đăng nhập', cls: 'warning' },
+            ViewDepartmentCatalog: { label: 'Xem danh mục', cls: 'neutral' },
+        };
+
+        if (searchKeyword) {
+            rows = rows.filter((r) => {
+                const actionLabel = (actionMap[r.action]?.label || '').toLowerCase();
+                return (r.fullName && r.fullName.toLowerCase().includes(searchKeyword)) ||
+                    (r.username && r.username.toLowerCase().includes(searchKeyword)) ||
+                    (r.patientName && r.patientName.toLowerCase().includes(searchKeyword)) ||
+                    (r.ipAddress && r.ipAddress.toLowerCase().includes(searchKeyword)) ||
+                    (r.action && r.action.toLowerCase().includes(searchKeyword)) ||
+                    actionLabel.includes(searchKeyword);
+            });
+        }
+
+        const countEl = find('#audit-count');
+        if (countEl) {
+            countEl.textContent = `${rows.length} sự kiện`;
+        }
+
+        table(
+            '#audit-table',
+            ['Thời gian', 'Tài khoản / Nhân sự', 'Hành động', 'Bệnh nhân', 'Bệnh án', 'Địa chỉ IP'],
+            rows.map((row) => {
+                const act = actionMap[row.action] || { label: row.action, cls: 'neutral' };
+                return [
+                    /* HTML */ `<span style="white-space:nowrap; font-size:12px; color:#475569;">${escape(new Date(row.occurredAt).toLocaleString('vi-VN'))}</span>`,
+                    /* HTML */ `<strong>${escape(row.fullName)}</strong><br /><small style="color:#64748b;">${escape(row.username)}</small>`,
+                    /* HTML */ `<span class="status ${act.cls}" title="${escape(row.action)}">${escape(act.label)}</span>`,
+                    row.patientName ? /* HTML */ `<strong>${escape(row.patientName)}</strong>` : '<span style="color:#94a3b8;">—</span>',
+                    row.medicalRecordId ? /* HTML */ `<strong style="color:#0f766e;">#BA-${escape(row.medicalRecordId)}</strong>` : '<span style="color:#94a3b8;">—</span>',
+                    /* HTML */ `<code style="font-size:12px; font-weight:600; color:#0369a1;">${escape(row.ipAddress || 'nội bộ')}</code>`,
+                ];
+            }),
+        );
     }
 
     async function loadRequests() {
@@ -265,15 +466,22 @@
     });
     find('.admin-sidebar-scrim').addEventListener('click', closeNavigation);
     find('#admin-sidebar nav').addEventListener('click', (event) => {
-        if (event.target.closest('[data-section]')) closeNavigation();
+        const link = event.target.closest('[data-section]');
+        if (link) {
+            closeNavigation();
+            const section = link.dataset.section;
+            if (section && titles[section]) {
+                selectSection(section);
+            }
+        }
     });
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') closeNavigation();
     });
 
-    function selectSection() {
+    function selectSection(explicitSection) {
         closeNavigation();
-        const selected = location.hash.slice(1) || workspace.dataset.section;
+        const selected = explicitSection || location.hash.slice(1) || workspace.dataset.section;
         const section = titles[selected] ? selected : 'dashboard';
         document
             .querySelectorAll('[data-panel]')
@@ -346,7 +554,7 @@
             form?.reset();
             notify(result.message);
             try {
-                await Promise.all([loadDirectory(), loadRequests()]);
+                await Promise.all([loadDirectory(), loadRequests(), loadCatalog(), loadAudit()]);
             } catch {
                 notify(result.message + ' Danh sách chưa tải lại được; hãy bấm Làm mới.', true);
             }
@@ -375,6 +583,34 @@
         );
     });
 
+    find('#room-form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const data = Object.fromEntries(new FormData(event.currentTarget));
+        data.departmentId = Number(data.departmentId);
+        mutate('Rooms', data, event.currentTarget);
+    });
+
+    find('#service-form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const data = Object.fromEntries(new FormData(form));
+        data.id = data.id ? Number(data.id) : null;
+        data.serviceTypeId = Number(data.serviceTypeId);
+        data.price = Number(data.price);
+        data.isActive = form.elements.isActive.checked;
+        mutate('Services', data, form);
+    });
+
+    find('#medication-form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const data = Object.fromEntries(new FormData(form));
+        data.id = data.id ? Number(data.id) : null;
+        data.price = Number(data.price);
+        data.isActive = form.elements.isActive.checked;
+        mutate('Medications', data, form);
+    });
+
     find('#account-form').addEventListener('submit', (event) => {
         event.preventDefault();
         const data = Object.fromEntries(new FormData(event.currentTarget));
@@ -385,6 +621,23 @@
     });
 
     find('#account-form [name="roleId"]').addEventListener('change', updateRoleFields);
+    find('#audit-filter')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        loadAudit(true).catch((err) => notify(err.message, true));
+    });
+    find('#reset-audit')?.addEventListener('click', () => {
+        const filter = find('#audit-filter');
+        if (filter) {
+            filter.reset();
+            loadAudit(false).catch((err) => notify(err.message, true));
+        }
+    });
+    find('#filter-room-department')?.addEventListener('change', (e) => {
+        renderRoomsTable(e.target.value);
+    });
+    find('#filter-department')?.addEventListener('change', (e) => {
+        renderDepartmentsTable(e.target.value);
+    });
     find('#new-staff').addEventListener('click', () => openAccount(true));
     find('#new-account').addEventListener('click', () => openAccount(false));
     find('#refresh-data').addEventListener('click', () =>
@@ -398,6 +651,20 @@
             const dialog = document.getElementById(open.dataset.open);
             dialog.querySelector('form').reset();
             dialog.querySelector('.form-error').textContent = '';
+            if (open.id === 'new-service') {
+                dialog.querySelector('#service-title').textContent = 'Thêm dịch vụ y tế & Bảng giá';
+                dialog.querySelector('form').elements.id.value = '';
+            }
+            if (open.id === 'new-medication') {
+                dialog.querySelector('#medication-title').textContent = 'Thêm thuốc & Biệt dược';
+                dialog.querySelector('form').elements.id.value = '';
+            }
+            if (open.dataset.open === 'room-dialog') {
+                const currentFilter = find('#filter-room-department')?.value;
+                if (currentFilter) {
+                    dialog.querySelector('form').elements.departmentId.value = currentFilter;
+                }
+            }
             dialog.showModal();
         }
         if (event.target.closest('[data-close]')) event.target.closest('dialog').close();
@@ -407,6 +674,44 @@
                 accountId: Number(account.dataset.account),
                 isActive: account.dataset.active === 'true',
             });
+        }
+        const deleteRoom = event.target.closest('[data-delete-room]');
+        if (deleteRoom && confirm('Xác nhận xóa phòng khám này khỏi khoa?')) {
+            mutate('Rooms/Delete', { roomId: Number(deleteRoom.dataset.deleteRoom) });
+        }
+        const editService = event.target.closest('[data-edit-service]');
+        if (editService) {
+            const item = catalog?.services.find((s) => s.id === Number(editService.dataset.editService));
+            if (item) {
+                const dialog = document.getElementById('service-dialog');
+                const form = dialog.querySelector('form');
+                form.reset();
+                form.elements.id.value = item.id;
+                form.elements.serviceTypeId.value = item.serviceTypeId;
+                form.elements.name.value = item.name;
+                form.elements.price.value = item.price;
+                form.elements.isActive.checked = item.isActive;
+                dialog.querySelector('#service-title').textContent = 'Cập nhật dịch vụ y tế';
+                dialog.showModal();
+            }
+        }
+        const editMedication = event.target.closest('[data-edit-medication]');
+        if (editMedication) {
+            const item = catalog?.medications.find((m) => m.id === Number(editMedication.dataset.editMedication));
+            if (item) {
+                const dialog = document.getElementById('medication-dialog');
+                const form = dialog.querySelector('form');
+                form.reset();
+                form.elements.id.value = item.id;
+                form.elements.name.value = item.name;
+                form.elements.activeIngredient.value = item.activeIngredient || '';
+                form.elements.strength.value = item.strength || '';
+                form.elements.unit.value = item.unit;
+                form.elements.price.value = item.price;
+                form.elements.isActive.checked = item.isActive;
+                dialog.querySelector('#medication-title').textContent = 'Cập nhật thuốc & biệt dược';
+                dialog.showModal();
+            }
         }
         const decision = event.target.closest('[data-decision]');
         if (
@@ -462,6 +767,8 @@
             loadDirectory(),
             loadRequests(),
             loadReport(!!find('#report-filter').elements.from.value),
+            loadCatalog(),
+            loadAudit(),
         ]);
     }
 

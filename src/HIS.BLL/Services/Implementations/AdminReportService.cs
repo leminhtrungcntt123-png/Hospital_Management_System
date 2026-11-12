@@ -79,5 +79,106 @@ public sealed class AdminReportService(AppDbContext db) : IAdminReportService
         return Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(csv.ToString())).ToArray();
     }
 
+    public async Task<IReadOnlyList<DepartmentVisitStat>> GetDepartmentStatsAsync(
+        int actorId, DateOnly from, DateOnly to, CancellationToken ct = default)
+    {
+        await AdminRules.RequireAdminAsync(db, actorId, ct);
+        var start = from.ToDateTime(TimeOnly.MinValue);
+        var end = to.AddDays(1).ToDateTime(TimeOnly.MinValue);
+
+        var departments = await db.Departments.AsNoTracking().ToListAsync(ct);
+
+        var visitsByDept = await db.Appointments.AsNoTracking()
+            .Where(a => a.CheckedInAt >= start && a.CheckedInAt < end)
+            .GroupBy(a => a.DepartmentId ?? (a.Doctor != null ? a.Doctor.DepartmentId : 0))
+            .Select(g => new { DepartmentId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.DepartmentId, x => x.Count, ct);
+
+        var paymentsByDept = await db.Payments.AsNoTracking()
+            .Include(p => p.Invoice)
+                .ThenInclude(i => i.Appointment)
+                    .ThenInclude(a => a.Doctor)
+            .Where(p => p.PaidAt >= start && p.PaidAt < end && p.Invoice != null && p.Invoice.Appointment != null)
+            .GroupBy(p => p.Invoice.Appointment!.DepartmentId ?? (p.Invoice.Appointment.Doctor != null ? p.Invoice.Appointment.Doctor.DepartmentId : 0))
+            .Select(g => new
+            {
+                DepartmentId = g.Key,
+                Revenue = g.Sum(p => p.PaymentType == PaymentType.Refund ? -p.Amount : p.Amount)
+            })
+            .ToDictionaryAsync(x => x.DepartmentId, x => x.Revenue, ct);
+
+        return departments.Select(d => new DepartmentVisitStat(
+            d.Id,
+            d.Name,
+            visitsByDept.GetValueOrDefault(d.Id),
+            paymentsByDept.GetValueOrDefault(d.Id)
+        )).OrderByDescending(s => s.Visits).ThenByDescending(s => s.Revenue).ToList();
+    }
+
+    public async Task<IReadOnlyList<AdminAuditLogRow>> GetAuditLogsAsync(
+        int actorId, DateOnly? from = null, DateOnly? to = null, string? action = null, string? search = null, int limit = 200, CancellationToken ct = default)
+    {
+        await AdminRules.RequireAdminAsync(db, actorId, ct);
+        var query = db.AccessLogs.AsNoTracking()
+            .Include(a => a.Account!)
+                .ThenInclude(acc => acc.Doctor)
+            .Include(a => a.Account!)
+                .ThenInclude(acc => acc.Nurse)
+            .Include(a => a.Account!)
+                .ThenInclude(acc => acc.DepartmentHead)
+            .Include(a => a.Patient)
+            .AsQueryable();
+
+        if (from.HasValue)
+        {
+            var start = from.Value.ToDateTime(TimeOnly.MinValue);
+            query = query.Where(a => a.OccurredAt >= start);
+        }
+
+        if (to.HasValue)
+        {
+            var end = to.Value.AddDays(1).ToDateTime(TimeOnly.MinValue);
+            query = query.Where(a => a.OccurredAt < end);
+        }
+
+        if (!string.IsNullOrWhiteSpace(action))
+        {
+            query = query.Where(a => a.Action == action);
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(a =>
+                (a.Account != null && a.Account.Username.Contains(term)) ||
+                (a.Account != null && a.Account.Doctor != null && a.Account.Doctor.FullName.Contains(term)) ||
+                (a.Account != null && a.Account.Nurse != null && a.Account.Nurse.FullName.Contains(term)) ||
+                (a.Account != null && a.Account.DepartmentHead != null && a.Account.DepartmentHead.FullName.Contains(term)) ||
+                (a.Patient != null && a.Patient.FullName.Contains(term)) ||
+                (a.IpAddress != null && a.IpAddress.Contains(term)) ||
+                a.Action.Contains(term));
+        }
+
+        var maxRows = limit > 0 ? Math.Min(limit, 1000) : 200;
+
+        return await query
+            .OrderByDescending(a => a.OccurredAt)
+            .Take(maxRows)
+            .Select(a => new AdminAuditLogRow(
+                a.Id,
+                a.AccountId,
+                a.Account != null ? a.Account.Username : "—",
+                a.Account != null && a.Account.Doctor != null ? a.Account.Doctor.FullName :
+                a.Account != null && a.Account.Nurse != null ? a.Account.Nurse.FullName :
+                a.Account != null && a.Account.DepartmentHead != null ? a.Account.DepartmentHead.FullName :
+                (a.Account != null ? a.Account.Username : "—"),
+                a.Action,
+                a.Patient != null ? a.Patient.FullName : null,
+                a.MedicalRecordId,
+                a.OccurredAt,
+                a.IpAddress))
+            .ToListAsync(ct);
+    }
+
     private static string Number(decimal value) => value.ToString("0.00", CultureInfo.InvariantCulture);
 }

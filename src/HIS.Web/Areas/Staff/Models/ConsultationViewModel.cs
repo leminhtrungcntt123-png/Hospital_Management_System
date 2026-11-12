@@ -1,4 +1,5 @@
 using HIS.Domain;
+using HIS.BLL.DTOs;
 
 namespace HIS.Web.Areas.Staff.Models;
 
@@ -51,14 +52,18 @@ public record ConsultationRecordItemDto(
 );
 
 public record DoctorScheduleItemDto(
-    DayOfWeek DayOfWeek,
+    int Id,
+    DateOnly WorkDate,
     ExamShift Shift,
     TimeOnly StartTime,
     TimeOnly EndTime,
     string DoctorName,
-    string RoomNumber,
+    string? RoomNumber,
     string Specialty,
-    int? DoctorId = null
+    int? DoctorId = null,
+    DoctorScheduleStatus Status = DoctorScheduleStatus.Approved,
+    bool IsHotShift = false,
+    string? DoctorNote = null
 );
 
 public record DutyShiftItemDto(
@@ -75,6 +80,9 @@ public record DoctorSelectItemDto(
     string Specialty,
     string? RoomNumber = null
 );
+
+public record ClinicalServiceOptionDto(int Id, string Name, decimal Price);
+public record MedicationOptionDto(int Id, string Name, string? Strength, string Unit, decimal Price);
 
 public record ScheduleExceptionItemDto(
     int Id,
@@ -111,4 +119,11 @@ public class ConsultationViewModel
     public IReadOnlyList<DutyShiftItemDto> DutyShifts { get; set; } = [];
     public IReadOnlyList<ScheduleExceptionItemDto> Exceptions { get; set; } = [];
     public IReadOnlyList<DoctorSelectItemDto> AvailableDoctors { get; set; } = [];
+    public IReadOnlyList<ClinicalServiceOptionDto> AvailableServices { get; set; } = [];
+    public IReadOnlyList<MedicationOptionDto> AvailableMedications { get; set; } = [];
+    public SchedulingPeriodDto? ActivePeriod { get; set; }
+    public DepartmentDemandGridDto? DemandGrid { get; set; }
+    public int CurrentDoctorId { get; set; }
+    public int MinShiftsPerWeek { get; set; } = 6;
+    public int MaxShiftsPerWeek { get; set; } = 10;
 }

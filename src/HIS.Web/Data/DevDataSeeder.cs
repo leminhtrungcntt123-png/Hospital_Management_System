@@ -107,7 +107,23 @@ public static class DevDataSeeder
             var doc1 = await db.Doctors.FirstOrDefaultAsync(d => d.AccountId == docAcc1.Id);
             if (doc1 == null)
             {
-                doc1 = new Doctor { AccountId = docAcc1.Id, DepartmentId = deptNoi.Id, FullName = "BS. Nguyễn Hoàng Nam", Specialty = "Nội tổng quát", LicenseNumber = "CCHN-001" };
+                doc1 = new Doctor
+                {
+                    AccountId = docAcc1.Id,
+                    DepartmentId = deptNoi.Id,
+                    FullName = "BS. Nguyễn Hoàng Nam",
+                    Specialty = "Nội tổng quát",
+                    AcademicTitle = "ThS.BS",
+                    LicenseNumber = "CCHN-001",
+                    YearsOfExperience = 10,
+                    IsFeatured = true,
+                    IsPublic = true,
+                    DisplayOrder = 1,
+                    ShortBio = "Bác sĩ chuyên khoa Nội tổng quát, giàu kinh nghiệm trong chẩn đoán và điều trị bệnh lý người lớn.",
+                    EmploymentType = EmploymentType.FullTime,
+                    MinShiftsPerWeek = 6,
+                    MaxShiftsPerWeek = 10
+                };
                 db.Doctors.Add(doc1);
                 await db.SaveChangesAsync();
             }
@@ -123,7 +139,23 @@ public static class DevDataSeeder
             var doc2 = await db.Doctors.FirstOrDefaultAsync(d => d.AccountId == docAcc2.Id);
             if (doc2 == null)
             {
-                doc2 = new Doctor { AccountId = docAcc2.Id, DepartmentId = deptNoi.Id, FullName = "BS. Lê Quang Huy", Specialty = "Nội tim mạch", LicenseNumber = "CCHN-002" };
+                doc2 = new Doctor
+                {
+                    AccountId = docAcc2.Id,
+                    DepartmentId = deptNoi.Id,
+                    FullName = "BS. Lê Quang Huy",
+                    Specialty = "Nội tim mạch",
+                    AcademicTitle = "BS.CKII",
+                    LicenseNumber = "CCHN-002",
+                    YearsOfExperience = 15,
+                    IsFeatured = true,
+                    IsPublic = true,
+                    DisplayOrder = 2,
+                    ShortBio = "Chuyên gia tim mạch can thiệp, tư vấn và điều trị tăng huyết áp, bệnh mạch vành.",
+                    EmploymentType = EmploymentType.FullTime,
+                    MinShiftsPerWeek = 6,
+                    MaxShiftsPerWeek = 10
+                };
                 db.Doctors.Add(doc2);
                 await db.SaveChangesAsync();
             }
@@ -139,7 +171,23 @@ public static class DevDataSeeder
             var doc3 = await db.Doctors.FirstOrDefaultAsync(d => d.AccountId == docAcc3.Id);
             if (doc3 == null)
             {
-                doc3 = new Doctor { AccountId = docAcc3.Id, DepartmentId = deptNoi.Id, FullName = "BS. Trần Minh Thư", Specialty = "Tim mạch", LicenseNumber = "CCHN-003" };
+                doc3 = new Doctor
+                {
+                    AccountId = docAcc3.Id,
+                    DepartmentId = deptNoi.Id,
+                    FullName = "BS. Trần Minh Thư",
+                    Specialty = "Tim mạch",
+                    AcademicTitle = "TS.BS",
+                    LicenseNumber = "CCHN-003",
+                    YearsOfExperience = 12,
+                    IsFeatured = true,
+                    IsPublic = true,
+                    DisplayOrder = 3,
+                    ShortBio = "Tiến sĩ Y khoa, nghiên cứu và điều trị chuyên sâu bệnh lý mạch máu và rối loạn nhịp.",
+                    EmploymentType = EmploymentType.FullTime,
+                    MinShiftsPerWeek = 6,
+                    MaxShiftsPerWeek = 10
+                };
                 db.Doctors.Add(doc3);
                 await db.SaveChangesAsync();
             }
@@ -204,105 +252,172 @@ public static class DevDataSeeder
             }
             await db.SaveChangesAsync();
 
-            // 5. CẤU HÌNH LỊCH KHÁM TUẦN (DoctorSchedule)
-            var scheduleStartDate = new DateOnly(2026, 1, 1);
-            if (!await db.DoctorSchedules.AnyAsync(s => s.DoctorId == doc1.Id))
+            // 5. CẤU HÌNH KỲ ĐĂNG KÝ (SchedulingPeriod) & LỊCH KHÁM (DoctorSchedule)
+            var currentDay = DateOnly.FromDateTime(DateTime.Today);
+            var daysFromMonday = ((int)currentDay.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+            var periodMonday = currentDay.AddDays(-daysFromMonday);
+            var periodSunday = periodMonday.AddDays(6);
+
+            var period = await db.SchedulingPeriods.FirstOrDefaultAsync(p => p.StartDate <= currentDay && p.EndDate >= currentDay);
+            if (period == null)
             {
-                for (int day = 1; day <= 5; day++)
+                period = new SchedulingPeriod
                 {
+                    Name = $"Kỳ làm việc tuần {periodMonday:dd/MM} - {periodSunday:dd/MM/yyyy}",
+                    StartDate = periodMonday,
+                    EndDate = periodSunday,
+                    BiddingOpensAt = DateTime.UtcNow.AddDays(-2),
+                    BiddingClosesAt = DateTime.UtcNow.AddDays(5),
+                    Status = SchedulingPeriodStatus.Open,
+                    CreatedBy = headAcc1.Id,
+                    CreatedAt = DateTime.UtcNow
+                };
+                db.SchedulingPeriods.Add(period);
+                await db.SaveChangesAsync();
+            }
+
+            if (!await db.DoctorSchedules.AnyAsync(s => s.DoctorId == doc1.Id && s.WorkDate >= periodMonday && s.WorkDate <= periodSunday))
+            {
+                for (int i = 0; i < 5; i++)
+                {
+                    var wDate = periodMonday.AddDays(i);
                     db.DoctorSchedules.Add(new DoctorSchedule
                     {
                         DoctorId = doc1.Id,
+                        PeriodId = period.Id,
+                        DepartmentId = deptNoi.Id,
                         RoomId = room1.Id,
-                        DayOfWeek = (DayOfWeek)day,
+                        WorkDate = wDate,
                         Shift = ExamShift.Morning,
                         StartTime = new TimeOnly(7, 30),
                         EndTime = new TimeOnly(11, 30),
-                        SlotDurationMinutes = 15,
+                        SlotDurationMinutes = 30,
                         MaxPatients = 40,
                         OnlineSlots = 28,
-                        EffectiveFrom = scheduleStartDate
+                        Status = DoctorScheduleStatus.Approved,
+                        ReviewedBy = headAcc1.Id,
+                        ReviewedAt = DateTime.UtcNow
                     });
                     db.DoctorSchedules.Add(new DoctorSchedule
                     {
                         DoctorId = doc1.Id,
+                        PeriodId = period.Id,
+                        DepartmentId = deptNoi.Id,
                         RoomId = room1.Id,
-                        DayOfWeek = (DayOfWeek)day,
+                        WorkDate = wDate,
                         Shift = ExamShift.Afternoon,
                         StartTime = new TimeOnly(13, 0),
                         EndTime = new TimeOnly(16, 30),
-                        SlotDurationMinutes = 15,
+                        SlotDurationMinutes = 30,
                         MaxPatients = 40,
                         OnlineSlots = 28,
-                        EffectiveFrom = scheduleStartDate
+                        Status = DoctorScheduleStatus.Approved,
+                        ReviewedBy = headAcc1.Id,
+                        ReviewedAt = DateTime.UtcNow
                     });
                 }
                 await db.SaveChangesAsync();
             }
 
-            if (!await db.DoctorSchedules.AnyAsync(s => s.DoctorId == doc2.Id))
+            if (!await db.DoctorSchedules.AnyAsync(s => s.DoctorId == doc2.Id && s.WorkDate >= periodMonday && s.WorkDate <= periodSunday))
             {
-                for (int day = 1; day <= 5; day++)
+                for (int i = 0; i < 4; i++)
                 {
+                    var wDate = periodMonday.AddDays(i);
                     db.DoctorSchedules.Add(new DoctorSchedule
                     {
                         DoctorId = doc2.Id,
+                        PeriodId = period.Id,
+                        DepartmentId = deptNoi.Id,
                         RoomId = room102.Id,
-                        DayOfWeek = (DayOfWeek)day,
+                        WorkDate = wDate,
                         Shift = ExamShift.Morning,
                         StartTime = new TimeOnly(7, 30),
                         EndTime = new TimeOnly(11, 30),
-                        SlotDurationMinutes = 15,
+                        SlotDurationMinutes = 30,
                         MaxPatients = 35,
                         OnlineSlots = 25,
-                        EffectiveFrom = scheduleStartDate
+                        Status = DoctorScheduleStatus.Approved,
+                        ReviewedBy = headAcc1.Id,
+                        ReviewedAt = DateTime.UtcNow
                     });
                     db.DoctorSchedules.Add(new DoctorSchedule
                     {
                         DoctorId = doc2.Id,
+                        PeriodId = period.Id,
+                        DepartmentId = deptNoi.Id,
                         RoomId = room102.Id,
-                        DayOfWeek = (DayOfWeek)day,
+                        WorkDate = wDate,
                         Shift = ExamShift.Afternoon,
                         StartTime = new TimeOnly(13, 0),
                         EndTime = new TimeOnly(16, 30),
-                        SlotDurationMinutes = 15,
+                        SlotDurationMinutes = 30,
                         MaxPatients = 35,
                         OnlineSlots = 25,
-                        EffectiveFrom = scheduleStartDate
+                        Status = DoctorScheduleStatus.Approved,
+                        ReviewedBy = headAcc1.Id,
+                        ReviewedAt = DateTime.UtcNow
                     });
                 }
+                // Thứ 6: Đăng ký Bidding ca Sáng (để test Shift Bidding)
+                var friday = periodMonday.AddDays(4);
+                db.DoctorSchedules.Add(new DoctorSchedule
+                {
+                    DoctorId = doc2.Id,
+                    PeriodId = period.Id,
+                    DepartmentId = deptNoi.Id,
+                    RoomId = null,
+                    WorkDate = friday,
+                    Shift = ExamShift.Morning,
+                    StartTime = new TimeOnly(7, 30),
+                    EndTime = new TimeOnly(11, 30),
+                    SlotDurationMinutes = 30,
+                    MaxPatients = 35,
+                    OnlineSlots = 25,
+                    Status = DoctorScheduleStatus.Bidding,
+                    DoctorNote = "Đăng ký ca sáng thứ 6"
+                });
                 await db.SaveChangesAsync();
             }
 
-            if (doc3 != null && !await db.DoctorSchedules.AnyAsync(s => s.DoctorId == doc3.Id))
+            if (doc3 != null && !await db.DoctorSchedules.AnyAsync(s => s.DoctorId == doc3.Id && s.WorkDate >= periodMonday && s.WorkDate <= periodSunday))
             {
-                for (int day = 1; day <= 5; day++)
+                for (int i = 0; i < 5; i++)
                 {
+                    var wDate = periodMonday.AddDays(i);
                     db.DoctorSchedules.Add(new DoctorSchedule
                     {
                         DoctorId = doc3.Id,
+                        PeriodId = period.Id,
+                        DepartmentId = deptNgoai.Id,
                         RoomId = room201.Id,
-                        DayOfWeek = (DayOfWeek)day,
+                        WorkDate = wDate,
                         Shift = ExamShift.Morning,
                         StartTime = new TimeOnly(7, 30),
                         EndTime = new TimeOnly(11, 30),
-                        SlotDurationMinutes = 15,
+                        SlotDurationMinutes = 30,
                         MaxPatients = 30,
                         OnlineSlots = 20,
-                        EffectiveFrom = scheduleStartDate
+                        Status = DoctorScheduleStatus.Approved,
+                        ReviewedBy = headAcc1.Id,
+                        ReviewedAt = DateTime.UtcNow
                     });
                     db.DoctorSchedules.Add(new DoctorSchedule
                     {
                         DoctorId = doc3.Id,
+                        PeriodId = period.Id,
+                        DepartmentId = deptNgoai.Id,
                         RoomId = room201.Id,
-                        DayOfWeek = (DayOfWeek)day,
+                        WorkDate = wDate,
                         Shift = ExamShift.Afternoon,
                         StartTime = new TimeOnly(13, 0),
                         EndTime = new TimeOnly(16, 30),
-                        SlotDurationMinutes = 15,
+                        SlotDurationMinutes = 30,
                         MaxPatients = 30,
                         OnlineSlots = 20,
-                        EffectiveFrom = scheduleStartDate
+                        Status = DoctorScheduleStatus.Approved,
+                        ReviewedBy = headAcc1.Id,
+                        ReviewedAt = DateTime.UtcNow
                     });
                 }
                 await db.SaveChangesAsync();
@@ -394,6 +509,7 @@ public static class DevDataSeeder
                         PrimaryDiagnosisCode = "I10",
                         PrimaryDiagnosisDesc = "Tăng huyết áp nguyên phát",
                         Conclusion = "Đã hoàn tất khám theo yêu cầu",
+                        FollowUpDate = currentDay.AddDays(2),
                         CreatedAt = DateTime.UtcNow.AddDays(-2)
                     },
                     new MedicalRecord
@@ -464,6 +580,45 @@ public static class DevDataSeeder
                     });
                     await db.SaveChangesAsync();
                 }
+            }
+
+            // 11. DỊCH VỤ Y TẾ & BẢNG GIÁ (Services)
+            if (!await db.Services.AnyAsync())
+            {
+                db.Services.AddRange(
+                    new Service { ServiceTypeId = (int)ServiceTypeId.Examination, Name = "Khám bệnh chuyên khoa Nội", Price = 150000, IsActive = true },
+                    new Service { ServiceTypeId = (int)ServiceTypeId.Examination, Name = "Khám bệnh chuyên khoa Ngoại", Price = 150000, IsActive = true },
+                    new Service { ServiceTypeId = (int)ServiceTypeId.LabTest, Name = "Tổng phân tích tế bào máu ngoại vi", Price = 85000, IsActive = true },
+                    new Service { ServiceTypeId = (int)ServiceTypeId.LabTest, Name = "Sinh hóa máu (Glucose, Ure, Creatinin)", Price = 120000, IsActive = true },
+                    new Service { ServiceTypeId = (int)ServiceTypeId.Imaging, Name = "Chụp X-Quang ngực thẳng kỹ thuật số", Price = 180000, IsActive = true },
+                    new Service { ServiceTypeId = (int)ServiceTypeId.Imaging, Name = "Siêu âm Doppler tim màu", Price = 350000, IsActive = true },
+                    new Service { ServiceTypeId = (int)ServiceTypeId.Imaging, Name = "Siêu âm ổ bụng tổng quát", Price = 200000, IsActive = true }
+                );
+                await db.SaveChangesAsync();
+            }
+
+            // 12. DANH MỤC THUỐC MẪU (Medications)
+            if (!await db.Medications.AnyAsync())
+            {
+                db.Medications.AddRange(
+                    new Medication { Name = "Panadol Extra", ActiveIngredient = "Paracetamol, Caffeine", Strength = "500mg/65mg", Unit = "Viên", Price = 2500, IsActive = true },
+                    new Medication { Name = "Amoxicillin 500mg", ActiveIngredient = "Amoxicillin", Strength = "500mg", Unit = "Viên", Price = 3000, IsActive = true },
+                    new Medication { Name = "Augmentin 1g", ActiveIngredient = "Amoxicillin, Clavulanic", Strength = "1000mg", Unit = "Gói", Price = 18500, IsActive = true },
+                    new Medication { Name = "Nexium 40mg", ActiveIngredient = "Esomeprazole", Strength = "40mg", Unit = "Viên", Price = 24000, IsActive = true },
+                    new Medication { Name = "Amlor 5mg", ActiveIngredient = "Amlodipine", Strength = "5mg", Unit = "Viên", Price = 8200, IsActive = true },
+                    new Medication { Name = "Glucophage 850mg", ActiveIngredient = "Metformin", Strength = "850mg", Unit = "Viên", Price = 4500, IsActive = true }
+                );
+                await db.SaveChangesAsync();
+            }
+
+            // 13. NHẬT KÝ TRUY VẾT MẪU (AccessLogs)
+            if (!await db.AccessLogs.AnyAsync() && adminAcc != null)
+            {
+                db.AccessLogs.AddRange(
+                    new AccessLog { AccountId = adminAcc.Id, Action = "AdminLogin", OccurredAt = DateTime.UtcNow.AddHours(-3), IpAddress = "127.0.0.1" },
+                    new AccessLog { AccountId = adminAcc.Id, Action = "ViewDepartmentCatalog", OccurredAt = DateTime.UtcNow.AddHours(-2), IpAddress = "127.0.0.1" }
+                );
+                await db.SaveChangesAsync();
             }
 
             logger.LogInformation("DevDataSeeder: Đã nạp đầy đủ dữ liệu mẫu thực tế cho Bác sĩ, Bệnh nhân, Hàng chờ, Bệnh án và Chỉ định xét nghiệm.");

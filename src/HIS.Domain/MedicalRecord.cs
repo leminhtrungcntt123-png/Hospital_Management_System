@@ -11,6 +11,7 @@ public class MedicalRecord
     public string? PrimaryDiagnosisDesc { get; set; }
     public string? SecondaryDiagnosis { get; set; }
     public string? Conclusion { get; set; }
+    public DateOnly? FollowUpDate { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 

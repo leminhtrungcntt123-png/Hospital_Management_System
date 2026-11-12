@@ -24,6 +24,7 @@ public class PatientConfiguration : IEntityTypeConfiguration<Patient>
 
         builder.Property(e => e.PhoneNumber).HasMaxLength(15).IsRequired();
         builder.Property(e => e.Address).HasMaxLength(255);
+        builder.Property(e => e.Allergies).HasMaxLength(500);
         builder.Property(e => e.CreatedAt).HasColumnType("timestamp without time zone").HasDefaultValueSql("now()");
     }
 }

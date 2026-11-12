@@ -148,8 +148,7 @@ public partial class ScheduleChangeService
                             && exception.Status == ScheduleExceptionStatus.Approved
                             && (exception.Shift == null || exception.Shift == (slot.StartTime.Hour < 12 ? ExamShift.Morning : ExamShift.Afternoon)))
                         && db.DoctorSchedules.Any(schedule => schedule.DoctorId == slot.DoctorId && schedule.RoomId == slot.RoomId
-                            && schedule.IsActive && schedule.DayOfWeek == change.Date.DayOfWeek
-                            && schedule.EffectiveFrom <= change.Date && (schedule.EffectiveTo == null || schedule.EffectiveTo >= change.Date)
+                            && schedule.Status == DoctorScheduleStatus.Approved && schedule.WorkDate == change.Date
                             && schedule.StartTime <= TimeOnly.FromDateTime(slot.StartTime) && schedule.EndTime >= TimeOnly.FromDateTime(slot.EndTime)
                             && db.Appointments.Count(existing => existing.DoctorId == slot.DoctorId && existing.StatusId >= 1 && existing.StatusId <= 6
                                 && ((existing.Slot != null && existing.Slot.StartTime >= (slot.StartTime.Hour < 12 ? day : afternoon)

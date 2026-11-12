@@ -91,11 +91,9 @@ public sealed class ReceptionService(
             .Include(s => s.Room)
             .Where(s => s.Doctor.DepartmentId == nurse.DepartmentId
                 && s.Doctor.Account.IsActive
-                && s.IsActive
-                && s.DayOfWeek == Today.DayOfWeek
-                && s.EffectiveFrom <= Today
-                && (s.EffectiveTo == null
-                    || s.EffectiveTo >= Today)
+                && s.Status == DoctorScheduleStatus.Approved
+                && s.WorkDate == Today
+                && s.RoomId != null
                 && !db.ScheduleExceptions
                     .Any(e => e.DoctorId == s.DoctorId
                         && e.Date == Today
@@ -111,7 +109,7 @@ public sealed class ReceptionService(
                 && Today.ToDateTime(s.EndTime) >= Now)
             .Select(s => new ReceptionSchedule(
                 s.Id,
-                $"{s.Doctor.FullName} · Phòng {s.Room.RoomNumber} · {s.StartTime:HH:mm}–{s.EndTime:HH:mm}"))
+                $"{s.Doctor.FullName} · Phòng {(s.Room != null ? s.Room.RoomNumber : "")} · {s.StartTime:HH:mm}–{s.EndTime:HH:mm}"))
             .ToList();
 
         var patients = !string.IsNullOrEmpty(search)
@@ -175,14 +173,11 @@ public sealed class ReceptionService(
                     && s.RoomId == a.RoomId
                     && s.Doctor.Account.IsActive
                     && s.Doctor.DepartmentId == nurse.DepartmentId
+                    && s.Room != null
                     && s.Room.DepartmentId == nurse.DepartmentId
-                    && s.DayOfWeek == Today.DayOfWeek
-                    && s.IsActive
-                    && s.EffectiveFrom <= Today
-                    && (s.EffectiveTo == null
-                        || s.EffectiveTo >= Today)
+                    && s.WorkDate == Today
+                    && s.Status == DoctorScheduleStatus.Approved
                     && s.Shift == (a.Slot.StartTime.Hour < 12 ? ExamShift.Morning : ExamShift.Afternoon))
-                .OrderByDescending(s => s.EffectiveFrom)
                 .FirstOrDefaultAsync(ct);
             Require(
                 schedule != null
@@ -241,16 +236,14 @@ public sealed class ReceptionService(
                 .SingleOrDefaultAsync(
                 s => s.Id == request.ScheduleId
                     && s.Doctor.DepartmentId == nurse.DepartmentId
+                    && s.Room != null
                     && s.Room.DepartmentId == nurse.DepartmentId
                     && s.Doctor.Account.IsActive
-                    && s.IsActive,
+                    && s.Status == DoctorScheduleStatus.Approved
+                    && s.WorkDate == Today,
                 ct);
             Require(
                 schedule != null
-                    && schedule.DayOfWeek == Today.DayOfWeek
-                    && schedule.EffectiveFrom <= Today
-                    && (schedule.EffectiveTo == null
-                        || schedule.EffectiveTo >= Today)
                     && Now >= Today.ToDateTime(schedule.StartTime)
                     && Now <= Today.ToDateTime(schedule.EndTime),
                 "Ca khám không còn tiếp nhận trong khoa này.");
@@ -290,6 +283,10 @@ public sealed class ReceptionService(
                 patient = await db.Patients
                     .SingleOrDefaultAsync(p => p.Id == request.PatientId, ct);
                 Require(patient != null, "Hồ sơ người khám không tồn tại.");
+                if (!string.IsNullOrWhiteSpace(request.Allergies))
+                {
+                    patient!.Allergies = request.Allergies.Trim();
+                }
             }
             else
             {
@@ -331,6 +328,7 @@ public sealed class ReceptionService(
                     NationalId = nationalId,
                     Address = request.Address?.Trim(),
                     Gender = request.Gender,
+                    Allergies = string.IsNullOrWhiteSpace(request.Allergies) ? null : request.Allergies.Trim(),
                     CreatedAt = Now
                 };
                 db.Patients.Add(patient);
@@ -366,7 +364,7 @@ public sealed class ReceptionService(
                 VisitType = VisitType.WalkIn,
                 StatusId = 3,
                 CheckedInAt = Now,
-                QueueNumber = await IssueNumberAsync(schedule.RoomId, schedule.Shift, BookingChannel.OnSite, ct),
+                QueueNumber = await IssueNumberAsync(schedule.RoomId!.Value, schedule.Shift, BookingChannel.OnSite, ct),
                 PriorityLevel = request.PriorityLevel,
                 Reason = request.Reason?.Trim(),
                 CreatedAt = Now,

@@ -140,6 +140,10 @@
                     <input asp-for="WalkIn.Address" class="form-control" />
                 </div>
                 <div class="reception-field">
+                    <label asp-for="WalkIn.Allergies">Dị ứng / Lưu ý y khoa</label>
+                    <input asp-for="WalkIn.Allergies" class="form-control" placeholder="Dị ứng thuốc, thực phẩm (nếu có)..." />
+                </div>
+                <div class="reception-field">
                     <label asp-for="WalkIn.ScheduleId">Bác sĩ / phòng / ca đang tiếp nhận *</label>
                     <select asp-for="WalkIn.ScheduleId" class="form-select" required>
                         <option value="">Chọn ca khám</option>
