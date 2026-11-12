@@ -1,0 +1,82 @@
+.mvc-auth.his-auth-bg {
+    background: #edf6fa url('../../images/login-bg.jpg') center / cover fixed no-repeat !important;
+}
+
+.his-auth-bg::before {
+    display: block;
+    background: linear-gradient(120deg, #102a4652, #e7f5fa29);
+}
+
+.mvc-auth-header {
+    display: flex !important;
+    position: relative;
+    z-index: 6;
+    width: 100%;
+    padding: 18px max(24px, calc((100vw - 1160px) / 2));
+    background: #fff;
+    border-bottom: 1px solid #d3e4ed;
+}
+
+.mvc-auth-header .brand {
+    color: #15334d;
+    font-size: 27px;
+}
+.mvc-auth-header .text-link {
+    color: #007895;
+    font-size: 13px;
+}
+.his-back-home {
+    display: none;
+}
+.his-auth-main {
+    min-height: 0;
+    padding: 36px 20px;
+    flex: 1;
+}
+.his-slider-container {
+    border-radius: 18px;
+    border: 1px solid #d1e3ec;
+    box-shadow: 0 16px 45px #163b5312;
+}
+.his-form-title {
+    color: #15334d;
+}
+.his-input-field {
+    border-color: #b6cdda;
+    color: #17384f;
+}
+.his-input-field:focus {
+    border-color: #098aa9;
+    box-shadow: 0 0 0 3px #098aa91a;
+}
+.his-btn-solid {
+    background: #007d9f;
+}
+.his-btn-solid:hover {
+    background: #006583;
+}
+.his-field-error {
+    color: #a12c38;
+}
+.mvc-auth-footer {
+    background: transparent;
+    font-size: 11px;
+}
+
+@media (max-width: 600px) {
+    .mvc-auth-header {
+        padding: 15px 18px;
+    }
+    .mvc-auth-header .brand {
+        font-size: 23px;
+    }
+    .mvc-auth-header .text-link {
+        font-size: 11px;
+    }
+    .his-auth-main {
+        padding: 24px 16px;
+    }
+    .his-slider-container {
+        min-height: 520px;
+    }
+}

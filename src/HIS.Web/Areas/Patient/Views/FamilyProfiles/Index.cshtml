@@ -1,6 +1,7 @@
 @{
     Layout = "_MediCareLayout";
-    ViewData["Title"] = "Hồ sơ gia đình";
-    ViewData["MediCareRoute"] = "patient/family";
+    var tab = Context.Request.Query["tab"].ToString();
+    ViewData["Title"] = tab == "personal" ? "Thông tin cá nhân" : "Thông tin người thân";
+    ViewData["MediCareRoute"] = tab == "personal" ? "patient/profile" : "patient/family";
 }
 <div id="app"></div>

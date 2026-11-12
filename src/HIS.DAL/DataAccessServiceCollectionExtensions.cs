@@ -6,8 +6,14 @@ namespace HIS.DAL;
 
 public static class DataAccessServiceCollectionExtensions
 {
+    static DataAccessServiceCollectionExtensions()
+    {
+        AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+    }
+
     public static IServiceCollection AddHisDataAccess(this IServiceCollection services, IConfiguration configuration)
     {
+        AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
         var connectionString = configuration.GetConnectionString("HisDb");
 
         services.AddDbContext<AppDbContext>(options =>

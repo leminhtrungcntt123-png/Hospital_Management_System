@@ -21,6 +21,9 @@ public sealed class WalkInReceptionRequest
     [StringLength(255)]
     public string? Address { get; set; }
 
+    [StringLength(500)]
+    public string? Allergies { get; set; }
+
     [Range(1, int.MaxValue)]
     public int ScheduleId { get; set; }
 

@@ -15,7 +15,8 @@ public record DepartmentExceptionItemDto(
     string Reason,
     DateTime CreatedAt,
     string? ApprovedByName,
-    DateTime? ApprovedAt
+    DateTime? ApprovedAt,
+    int AffectedAppointmentsCount = 0
 );
 
 public record ApproveExceptionRequest(
@@ -33,33 +34,50 @@ public record RejectExceptionRequest(
 
 public record DepartmentScheduleItemDto(
     int Id,
+    int? PeriodId,
     int DoctorId,
     string DoctorName,
-    int RoomId,
-    string RoomNumber,
-    DayOfWeek DayOfWeek,
+    int? RoomId,
+    string? RoomNumber,
+    DateOnly WorkDate,
     ExamShift Shift,
     TimeOnly StartTime,
     TimeOnly EndTime,
     int SlotDurationMinutes,
     int MaxPatients,
     int OnlineSlots,
-    bool IsActive
+    bool IsHotShift,
+    DoctorScheduleStatus Status,
+    string? DoctorNote = null,
+    int? ReallocatedFromId = null,
+    string? ReviewedByName = null,
+    DateTime? ReviewedAt = null,
+    int BookedAppointmentsCount = 0,
+    int ReceivedPatientsCount = 0
+);
+
+public record ScheduleCancelImpactDto(
+    bool CanCancel,
+    int AffectedAppointmentsCount,
+    int OngoingAppointmentsCount,
+    string? Message = null
 );
 
 public record UpsertDoctorScheduleRequest(
     int? ScheduleId,
+    int? PeriodId,
     int DoctorId,
-    int RoomId,
-    DayOfWeek DayOfWeek,
+    int DepartmentId,
+    int? RoomId,
+    DateOnly WorkDate,
     ExamShift Shift,
     TimeOnly StartTime,
     TimeOnly EndTime,
     int SlotDurationMinutes,
     int MaxPatients,
     int OnlineSlots,
-    DateOnly EffectiveFrom,
-    DateOnly? EffectiveTo
+    DoctorScheduleStatus Status = DoctorScheduleStatus.Approved,
+    string? DoctorNote = null
 );
 
 public record DepartmentDutyShiftDto(
@@ -124,6 +142,19 @@ public record DepartmentMedicalRecordDto(
     DateTime CreatedAt,
     string DiagnosisCode,
     string DiagnosisDesc,
-    string Conclusion
+    string Conclusion,
+    string? ClinicalExamination = null,
+    string? Symptoms = null
+);
+
+public record DepartmentPatientListItemDto(
+    int Id,
+    string PatientCode,
+    string FullName,
+    string Gender,
+    DateOnly DateOfBirth,
+    int Age,
+    string PhoneNumber,
+    string? Address
 );
 

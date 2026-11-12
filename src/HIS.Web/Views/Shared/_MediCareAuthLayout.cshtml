@@ -8,8 +8,10 @@
     <title>@ViewData["Title"] — MediCare HIS</title>
     <partial name="MediCare/_Styles" />
     @await RenderSectionAsync("Styles", required: false)
+    <link rel="stylesheet" href="~/css/auth/portal.css" asp-append-version="true" />
 </head>
 <body class="mvc-auth his-auth-bg">
+    <partial name="MediCare/_AuthHeader" />
     <main class="mvc-auth-main his-auth-main">
         @RenderBody()
     </main>

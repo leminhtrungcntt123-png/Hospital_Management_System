@@ -1,92 +1,15 @@
 @model HIS.Web.Models.ReceptionViewModel
 @{
-    var displayName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? "Nhân viên";
-    var initials = string.Concat(displayName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-        .TakeLast(2).Select(part => part[..1])).ToUpperInvariant();
+    Layout = "_StaffLayout";
+    ViewData["StaffDepartment"] = Model.Desk.Department;
 }
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#079bc9" />
-    <title>@ViewData["Title"] — MediCare HIS</title>
-    <partial name="MediCare/_Styles" />
-    <link rel="stylesheet" href="~/css/reception.css" asp-append-version="true" />
-</head>
-<body>
-    <div class="staff-app reception-workspace">
-        <aside class="sidebar" id="reception-sidebar" aria-label="Điều hướng y tá và lễ tân">
-            <div>
-                <a class="brand-link" asp-area="" asp-controller="Home" asp-action="Index" aria-label="MediCare, về trang chủ">
-                    <span class="brand">
-                        <span class="brand-mark">+</span>
-                        <span>MediCare<sup>+</sup></span>
-                    </span>
-                </a>
-                <div class="workspace">
-                    @await Html.PartialAsync("_AdminIcon", "building")
-                    <span><strong>@Model.Desk.Department</strong><small>Y tá / Lễ tân</small></span>
-                </div>
-            </div>
-            <nav class="staff-nav" aria-label="Chức năng y tá và lễ tân">
-                <div class="nav-group">
-                    <span>CÔNG VIỆC HÔM NAY</span>
-                    <a href="@Url.Content("~/Workspace/staff/dashboard")">
-                        @await Html.PartialAsync("_AdminIcon", "grid")<span>Bàn làm việc</span>
-                    </a>
-                    <a class="active" asp-area="Staff" asp-controller="Reception" asp-action="Index" aria-current="page">
-                        @await Html.PartialAsync("_AdminIcon", "users")<span>Tiếp nhận &amp; gọi số</span>
-                    </a>
-                    <a href="@Url.Content("~/Workspace/staff/vitals")">
-                        @await Html.PartialAsync("_AdminIcon", "pulse")<span>Sinh hiệu</span>
-                    </a>
-                    <a asp-area="Staff" asp-controller="Cashier" asp-action="Index">
-                        @await Html.PartialAsync("_AdminIcon", "wallet")<span>Thu phí &amp; BHYT</span>
-                    </a>
-                </div>
-                <div class="nav-group">
-                    <span>HỒ SƠ &amp; LỊCH</span>
-                    <a href="@Url.Content("~/Workspace/staff/patients")">
-                        @await Html.PartialAsync("_AdminIcon", "clipboard")<span>Người khám</span>
-                    </a>
-                    <a asp-area="Staff" asp-controller="Schedule" asp-action="Index">
-                        @await Html.PartialAsync("_AdminIcon", "calendar")<span>Lịch làm việc</span>
-                    </a>
-                </div>
-            </nav>
-            <div class="sidebar-bottom">
-                <a class="portal-link" asp-area="" asp-controller="Home" asp-action="Index">
-                    @await Html.PartialAsync("_AdminIcon", "external") Cổng bệnh nhân
-                </a>
-                <div><span><i></i>MediCare HIS</span></div>
-            </div>
-        </aside>
-        <button class="sidebar-scrim" id="reception-scrim" type="button" aria-label="Đóng điều hướng" hidden></button>
-        <div class="staff-shell">
-            <header class="staff-topbar">
-                <button class="icon-btn mobile-only" id="reception-menu" type="button" aria-controls="reception-sidebar" aria-expanded="false" aria-label="Mở điều hướng">@await Html.PartialAsync("_AdminIcon", "menu")</button>
-                <div class="staff-breadcrumb"><span>Y tá / Lễ tân</span><i>/</i><strong>Tiếp nhận &amp; gọi số</strong></div>
-                <div class="topbar-right">
-                    <span class="demo-clock">@Model.Desk.Date.ToString("dd/MM/yyyy")</span>
-                    <details class="reception-account">
-                        <summary class="staff-profile" aria-label="Tài khoản của @displayName">
-                            <span class="avatar">@initials</span>
-                            <span><strong>@displayName</strong><small>Y tá / Lễ tân</small></span>
-                            @await Html.PartialAsync("_AdminIcon", "down")
-                        </summary>
-                        <div class="reception-account-menu">
-                            <a asp-area="" asp-controller="Account" asp-action="ChangePassword">Đổi mật khẩu</a>
-                            <form asp-area="" asp-controller="Account" asp-action="Logout" method="post">
-                                <button type="submit">Đăng xuất</button>
-                            </form>
-                        </div>
-                    </details>
-                </div>
-            </header>
-            <main class="staff-main">@RenderBody()</main>
-        </div>
-    </div>
-    <script src="~/js/reception-layout.js" asp-append-version="true"></script>
-</body>
-</html>
+
+@RenderBody()
+
+@section Styles {
+    @await RenderSectionAsync("Styles", required: false)
+}
+
+@section Scripts {
+    @await RenderSectionAsync("Scripts", required: false)
+}

@@ -1,13 +1,24 @@
 const mvcEntries = {
-    'patient/booking': '/Patient/Booking',
+    'patient/booking': '/Booking',
     'patient/appointments': '/Patient/MyAppointments',
-    'patient/family': '/Patient/FamilyProfiles',
+    'patient/profile': '/Patient/FamilyProfiles?tab=personal',
+    'patient/family': '/Patient/FamilyProfiles?tab=family',
     'patient/records': '/Patient/MedicalRecords',
     'patient/notifications': '/Patient/Notifications',
     'staff/reception': '/Staff/Reception',
     'staff/cashier': '/Staff/Cashier',
     'staff/consultation': '/Staff/Consultation',
-    'staff/schedule': '/Staff/Schedule',
+    'staff/schedule':
+        config.role === 'DOCTOR' ? '/Staff/Consultation?tab=schedule' : '/Staff/Schedule',
+    'staff/labs': '/Staff/Consultation?tab=labs',
+    'staff/records':
+        config.role === 'DOCTOR'
+            ? '/Staff/Consultation?tab=records'
+            : '/Staff/Schedule?tab=records',
+    'staff/exceptions':
+        config.role === 'DOCTOR'
+            ? '/Staff/Consultation?tab=exceptions'
+            : '/Staff/Schedule?tab=exceptions',
     'admin/dashboard': '/Admin/Management',
     'admin/accounts': '/Admin/Accounts',
     'admin/catalog': '/Admin/Catalog',
@@ -17,24 +28,44 @@ const mvcEntries = {
 };
 
 function routeUrl(route) {
-    return route.startsWith('public/')
-        ? config.pathBase + '/#/' + route
-        : config.pathBase + (mvcEntries[route] || '/Workspace/' + route);
+    const publicHome = config.publicHome || config.pathBase + '/';
+    if (route === 'public/booking' || route.startsWith('public/booking?'))
+        return (
+            (config.bookingUrl || config.pathBase + '/Booking') +
+            (route.includes('?') ? '?' + route.split('?')[1] : '')
+        );
+    if (route === 'public/home') return publicHome;
+    if (config.role === 'DEPARTMENT_HEAD' && route === 'staff/dashboard')
+        return config.pathBase + '/Staff/Schedule?tab=overview';
+    if (config.role === 'DEPARTMENT_HEAD' && route === 'staff/patients')
+        return config.pathBase + '/Staff/Schedule?tab=patients';
+    if (route.startsWith('public/')) return publicHome + '#/' + route;
+    const [page, query = ''] = route.split('?', 2);
+    const entry = mvcEntries[page] || '/Workspace/' + page;
+    return config.pathBase + entry + (query ? (entry.includes('?') ? '&' : '?') + query : '');
 }
 
 function go(route) {
-    if (!route.startsWith('public/') || config.initialRoute !== 'public/home') {
+    if (
+        route.startsWith('public/booking') ||
+        !route.startsWith('public/') ||
+        config.initialRoute !== 'public/home'
+    ) {
         location.assign(routeUrl(route));
         return;
     }
     closeModal();
-    ui.route = route;
-    ui.query = '';
-    ui.department = '';
+    const [page, query = ''] = route.split('?', 2);
+    const filters = new URLSearchParams(query);
+    ui.route = page;
+    ui.address = route;
+    ui.query = filters.get('q') || '';
+    ui.department = filters.get('department') || '';
     ui.mobileMenu = false;
     location.hash = '#/' + route;
     render();
     window.scrollTo(0, 0);
+    document.querySelector('main h1')?.focus({ preventScroll: true });
     if (catalog.status === 'idle') loadCatalog();
 }
 

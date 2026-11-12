@@ -33,6 +33,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddScoped<IPatientProfileService, PatientProfileService>();
         services.AddScoped<IPatientAccessService, PatientAccessService>();
         services.AddScoped<IBookingService, BookingService>();
+        services.AddScoped<IGuestBookingService, GuestBookingService>();
         services.AddScoped<ISlotGenerationService, SlotGenerationService>();
         services.AddScoped<IScheduleChangeService, ScheduleChangeService>();
         services.AddScoped<IQueueService, QueueService>();

@@ -1,0 +1,848 @@
+.guest-booking-steps {
+    display: flex;
+    gap: 25px;
+    padding: 0;
+    margin: 0 0 28px;
+    list-style: none;
+    color: #61798b;
+}
+.guest-booking-steps li {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-weight: 600;
+}
+.guest-booking-steps li > span,
+.booking-section-title > span {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: #e7f1f7;
+    color: #526f83;
+}
+.guest-booking-steps .active {
+    color: #007c9c;
+}
+.guest-booking-steps .active > span {
+    background: #007d9f;
+    color: #fff;
+}
+.guest-booking-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    align-items: start;
+    gap: 24px;
+    margin-bottom: 45px;
+}
+.guest-booking-panels {
+    display: grid;
+    gap: 24px;
+    min-width: 0;
+    border: 0;
+    padding: 0;
+    margin: 0;
+}
+.guest-booking-panel {
+    padding: 26px;
+}
+.booking-section-title {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 23px;
+}
+.booking-section-title h2 {
+    font-size: 20px;
+    margin-bottom: 5px;
+}
+.booking-section-title p,
+.guest-booking-summary > p {
+    color: #516e83;
+    font-size: 13px;
+}
+.guest-booking-panel label > span,
+.guest-slot-picker legend > span {
+    color: #ad3247;
+}
+.guest-slot-picker {
+    border: 0;
+    padding: 0;
+    margin: 24px 0 0;
+    min-width: 0;
+}
+.guest-slot-picker legend {
+    margin-bottom: 12px;
+    font-weight: 600;
+}
+.guest-slot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 10px;
+}
+.guest-slot {
+    position: relative;
+    display: grid;
+    gap: 4px;
+    padding: 12px 7px;
+    text-align: center;
+    border: 1px solid #bdd6e2;
+    border-radius: 9px;
+    background: #fff;
+    cursor: pointer;
+    color: #173950;
+}
+.guest-slot input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+}
+.guest-slot small {
+    font-size: 11px;
+    color: #53758a;
+}
+.guest-slot.selected {
+    border: 2px solid #007d9f;
+    padding: 11px 6px;
+    background: #eaf7fb;
+    color: #006581;
+}
+.guest-slot:has(input:focus-visible) {
+    outline: 3px solid #098aa96b;
+    outline-offset: 3px;
+}
+.slot-empty {
+    padding: 18px;
+    border-radius: 9px;
+    border: 1px dashed #bdd5e2;
+    background: #f5f9fc;
+    color: #506c7f;
+    font-size: 13px;
+}
+.guest-booking-summary {
+    position: sticky;
+    top: 130px;
+    padding: 24px;
+}
+.guest-booking-summary h2 {
+    font-size: 20px;
+    margin: 15px 0 6px;
+}
+.guest-booking-summary .doctor-photo {
+    margin: 16px 0 0;
+    height: 170px;
+    width: 100%;
+    border-radius: 9px;
+    overflow: hidden;
+}
+.guest-booking-summary dl,
+.booking-receipt dl {
+    margin: 23px 0;
+}
+.guest-booking-summary dl > div,
+.booking-receipt dl > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 12px 0;
+    border-bottom: 1px solid #e1ebf2;
+}
+.guest-booking-summary dt,
+.booking-receipt dt {
+    color: #567185;
+}
+.guest-booking-summary dd,
+.booking-receipt dd {
+    margin: 0;
+    font-weight: 600;
+    text-align: right;
+}
+.booking-hint {
+    display: flex;
+    align-items: start;
+    gap: 8px;
+    font-size: 12px;
+    line-height: 1.7;
+    color: #4b6d82;
+    padding: 13px;
+    border-radius: 8px;
+    background: #edf7fc;
+}
+.booking-hint .icon {
+    flex-shrink: 0;
+    margin-top: 3px;
+}
+.booking-confirm-check {
+    display: flex;
+    align-items: start;
+    gap: 10px;
+    font-size: 12px;
+    margin: 20px 0;
+}
+.booking-confirm-check input {
+    margin-top: 4px;
+    flex-shrink: 0;
+    accent-color: #007d9f;
+}
+.guest-booking-summary > small {
+    display: block;
+    text-align: center;
+    font-size: 11px;
+    color: #607b8d;
+    margin-top: 12px;
+}
+.booking-error {
+    color: #9d243c;
+    background: #fff0f2;
+    border: 1px solid #ebc2cb;
+    padding: 12px;
+    border-radius: 8px;
+    margin: 15px 0;
+    font-size: 13px;
+}
+.booking-receipt {
+    max-width: 700px;
+    margin: 35px auto 55px;
+    padding: 35px;
+    text-align: center;
+}
+.booking-receipt h1 {
+    font-size: 30px;
+    margin: 12px 0;
+}
+.receipt-check {
+    display: grid;
+    place-items: center;
+    width: 60px;
+    height: 60px;
+    margin: 0 auto 20px;
+    color: #16806a;
+    background: #e6f5ef;
+    border-radius: 50%;
+}
+.receipt-code {
+    display: block;
+    padding: 18px;
+    margin-top: 25px;
+    font-size: 24px;
+    letter-spacing: 1px;
+    background: #eaf7fc;
+    color: #00728f;
+    border: 1px dashed #58a9bf;
+    border-radius: 10px;
+    overflow-wrap: anywhere;
+}
+.receipt-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 25px;
+}
+@media (max-width: 950px) {
+    .guest-booking-layout {
+        grid-template-columns: minmax(0, 1fr) 300px;
+        gap: 18px;
+    }
+    .guest-booking-panel,
+    .guest-booking-summary {
+        padding: 20px;
+    }
+}
+@media (max-width: 760px) {
+    .guest-booking-layout {
+        grid-template-columns: 1fr;
+    }
+    .guest-booking-summary {
+        position: static;
+    }
+    .guest-booking-summary .doctor-photo {
+        max-width: 300px;
+    }
+    .guest-booking-steps {
+        gap: 12px;
+        font-size: 11px;
+    }
+    .guest-booking-steps li {
+        flex: 1;
+        align-items: start;
+    }
+    .guest-booking-steps li > span {
+        width: 26px;
+        height: 26px;
+    }
+}
+@media (max-width: 420px) {
+    .guest-booking-panel .form-grid {
+        grid-template-columns: 1fr;
+    }
+    .guest-booking-steps {
+        gap: 9px;
+    }
+    .guest-booking-steps li {
+        display: grid;
+        gap: 8px;
+    }
+    .booking-receipt {
+        padding: 22px 18px;
+    }
+    .receipt-actions {
+        flex-direction: column;
+    }
+    .receipt-code {
+        font-size: 19px;
+    }
+}
+.hospital-portal .public-main:has(.guest-booking-steps) {
+    padding-top: 30px;
+}
+
+/* ============================================================
+   MEDICARE ONE-STEP & 2-STEP BOOKING CARD (Màu xanh MediCare)
+============================================================ */
+.medicare-booking-wrapper {
+    max-width: 900px;
+    margin: 30px auto 60px;
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0, 125, 159, 0.08);
+    border: 1px solid #dce8ef;
+    overflow: hidden;
+}
+
+.medicare-booking-header {
+    background: linear-gradient(135deg, #d8f1fa 0%, #bce6f6 100%);
+    padding: 30px 24px;
+    text-align: center;
+    border-bottom: 1px solid #c8e4f1;
+}
+
+.medicare-booking-header h1 {
+    font-size: 26px;
+    font-weight: 700;
+    color: #004c66;
+    margin-bottom: 6px;
+}
+
+.medicare-booking-header p {
+    font-size: 14px;
+    color: #17607a;
+    margin-bottom: 0;
+}
+
+.medicare-booking-body {
+    padding: 32px 40px;
+}
+
+.booking-section-box {
+    margin-bottom: 32px;
+    border-bottom: 1px solid #edf2f7;
+    padding-bottom: 28px;
+}
+
+.booking-section-box:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.booking-section-box .section-title {
+    font-size: 19px;
+    font-weight: 700;
+    color: #15334d;
+    margin-bottom: 4px;
+}
+
+.booking-section-box .section-subtitle {
+    font-size: 13px;
+    color: #557185;
+    margin-bottom: 22px;
+}
+
+.form-label-title {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #334d5e;
+    margin-bottom: 10px;
+}
+
+.method-cards-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 22px;
+}
+
+.method-card {
+    border: 2px solid #dce8ef;
+    border-radius: 12px;
+    padding: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    transition: all 0.2s ease;
+    background: #ffffff;
+}
+
+.method-card:hover {
+    border-color: #007d9f;
+}
+
+.method-card.active {
+    border-color: #007d9f;
+    background: #f0f9fd;
+}
+
+.method-card input[type="radio"] {
+    margin-top: 3px;
+    accent-color: #007d9f;
+    transform: scale(1.15);
+}
+
+.method-card-content strong {
+    display: block;
+    font-size: 14px;
+    color: #15334d;
+    margin-bottom: 4px;
+}
+
+.method-card-content span {
+    font-size: 12px;
+    color: #557185;
+    line-height: 1.45;
+}
+
+.form-row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.gender-radio-group {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    padding-top: 10px;
+}
+
+.gender-radio-group label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.gender-radio-group input {
+    accent-color: #007d9f;
+}
+
+.medicare-fee-bar {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 10px;
+    padding: 14px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+}
+
+.medicare-fee-bar span {
+    font-size: 14px;
+    color: #166534;
+    font-weight: 500;
+}
+
+.medicare-fee-bar strong {
+    font-size: 18px;
+    color: #15803d;
+    font-weight: 700;
+}
+
+.btn-next-step {
+    width: 100%;
+    padding: 14px 28px;
+    font-size: 16px;
+    font-weight: 700;
+    border-radius: 10px;
+    box-shadow: 0 4px 14px rgba(0, 125, 159, 0.25);
+}
+
+/* ============================================================
+   MÀN HÌNH 2: XÁC NHẬN ĐẶT LỊCH (2 CỘT TÓM TẮT)
+============================================================ */
+.confirm-summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    background: #f8fafc;
+    padding: 24px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+}
+
+.confirm-summary-col {
+    display: flex;
+    flex-direction: column;
+}
+
+.confirm-col-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #007d9f;
+    border-bottom: 2px solid #007d9f;
+    padding-bottom: 8px;
+    margin-bottom: 14px;
+}
+
+.confirm-dl {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+}
+
+.confirm-dl > div {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    padding: 6px 0;
+    border-bottom: 1px dashed #e2e8f0;
+}
+
+.confirm-dl dt {
+    color: #64748b;
+}
+
+.confirm-dl dd {
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0;
+    text-align: right;
+}
+
+.confirm-policy-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #475569;
+    padding: 14px;
+    border-radius: 8px;
+    background: #f1f5f9;
+}
+
+.confirm-policy-check input {
+    margin-top: 3px;
+    accent-color: #007d9f;
+    transform: scale(1.1);
+}
+
+.confirm-actions-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.confirm-actions-row .btn {
+    flex: 1;
+    min-height: 48px;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+/* ============================================================
+   ACCOUNT & FAMILY PROFILES (Trang Thông tin cá nhân & Người thân)
+============================================================ */
+.patient-account-page {
+    max-width: 1100px;
+    margin: 20px auto 60px;
+    padding: 0 16px;
+}
+
+.account-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #64748b;
+    margin-bottom: 20px;
+}
+
+.account-breadcrumb a {
+    color: #007d9f;
+}
+
+.account-breadcrumb .sep {
+    color: #cbd5e1;
+}
+
+.account-page-header {
+    margin-bottom: 24px;
+}
+
+.account-page-header h1 {
+    font-size: 26px;
+    font-weight: 700;
+    color: #15334d;
+    margin-bottom: 4px;
+}
+
+.account-page-header p {
+    font-size: 14px;
+    color: #557185;
+    margin: 0;
+}
+
+.account-page-layout {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+}
+
+.account-sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.account-nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    border-radius: 10px;
+    color: #334d5e;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    transition: all 0.2s ease;
+}
+
+.account-nav-btn:hover {
+    background: #f0f8fd;
+    color: #007d9f;
+    border-color: #007d9f;
+}
+
+.account-nav-btn.active {
+    background: #007d9f;
+    color: #ffffff;
+    border-color: #007d9f;
+    box-shadow: 0 4px 12px rgba(0, 125, 159, 0.2);
+}
+
+.account-content {
+    padding: 28px 32px;
+    background: #ffffff;
+    border-radius: 12px;
+}
+
+.account-content-header {
+    margin-bottom: 24px;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 16px;
+}
+
+.account-content-header.has-action {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.account-content-header h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: #15334d;
+    margin: 0;
+}
+
+.personal-profile-form {
+    display: grid;
+    grid-template-columns: 180px minmax(0, 1fr);
+    gap: 36px;
+}
+
+.avatar-uploader {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 12px;
+}
+
+.avatar-circle {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: #e2f4fb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border: 2px solid #bce6f6;
+}
+
+.avatar-circle img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.personal-form-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.account-alert {
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 20px;
+}
+
+.account-alert.success {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+}
+
+.account-alert.error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+}
+
+/* Relatives Grid */
+.relatives-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+}
+
+.relative-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 18px;
+    background: #f8fafc;
+    position: relative;
+}
+
+.relative-card-badge {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    background: #e0f2fe;
+    color: #0369a1;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 6px;
+}
+
+.relative-card-name {
+    font-size: 16px;
+    color: #0f172a;
+    display: block;
+    margin-bottom: 12px;
+    padding-right: 60px;
+}
+
+.relative-card-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+    color: #475569;
+}
+
+.empty-relatives {
+    text-align: center;
+    padding: 40px 20px;
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+    border-radius: 10px;
+}
+
+/* Dropdown popover */
+.account-menu-popover {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.account-popover-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.account-popover-meta {
+    display: flex;
+    flex-direction: column;
+}
+
+.account-popover-meta strong {
+    font-size: 15px;
+    color: #0f172a;
+}
+
+.account-popover-meta span {
+    font-size: 12px;
+    color: #64748b;
+}
+
+.account-popover-links {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.account-popover-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    color: #1e293b;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    background: #f8fafc;
+}
+
+.account-popover-item:hover {
+    background: #f0f8fd;
+    color: #007d9f;
+}
+
+@media (max-width: 768px) {
+    .medicare-booking-body {
+        padding: 20px;
+    }
+    .method-cards-grid {
+        grid-template-columns: 1fr;
+    }
+    .form-row-2 {
+        grid-template-columns: 1fr;
+    }
+    .confirm-summary-grid {
+        grid-template-columns: 1fr;
+    }
+    .account-page-layout {
+        grid-template-columns: 1fr;
+    }
+    .personal-profile-form {
+        grid-template-columns: 1fr;
+    }
+}

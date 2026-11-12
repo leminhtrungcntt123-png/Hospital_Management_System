@@ -1,8 +1,9 @@
 @using HIS.BLL.DTOs
 @model IReadOnlyList<DepartmentListItemDto>
-
 @{
+    Layout = "_MediCareLayout";
     ViewData["Title"] = "Chăm sóc sức khỏe";
+    ViewData["MediCareRoute"] = "public/home";
 }
 
 <!-- HERO BANNER MEDICARE NGUYÊN BẢN -->
@@ -114,3 +115,63 @@
         }
     </div>
 </section>
+
+<!-- ĐỘI NGŨ BÁC SĨ CHUYÊN GIA NỔI BẬT (PUBLIC SHOWCASE) -->
+@{
+    var featuredDoctors = ViewBag.FeaturedDoctors as IReadOnlyList<DoctorPublicDto>;
+}
+@if (featuredDoctors != null && featuredDoctors.Count > 0)
+{
+    <section id="doctors" style="max-width:1280px; margin:auto; padding:20px 32px 80px;">
+        <div style="margin-bottom:28px;">
+            <span style="font-size:10px; color:#079bc9; font-weight:700; letter-spacing:1px; text-transform:uppercase;">CHUYÊN GIA ĐẦU NGÀNH</span>
+            <h2 style="font-size:26px; font-weight:750; color:#142d4a; margin:4px 0 8px;">Đội ngũ Bác sĩ Tiêu biểu</h2>
+            <p style="font-size:13px; color:#596a7c; margin:0;">Bác sĩ giàu kinh nghiệm, tận tâm, cam kết mang đến giải pháp điều trị tối ưu nhất.</p>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:24px;">
+            @foreach (var doc in featuredDoctors)
+            {
+                <div style="background:#fff; border:1px solid #e2ebf3; border-radius:14px; overflow:hidden; box-shadow:0 4px 15px rgba(0,0,0,0.03); display:flex; flex-direction:column; transition:transform 0.2s;">
+                    <div style="background:linear-gradient(135deg, #e0f2fe 0%, #f0fdf4 100%); padding:24px; text-align:center; position:relative;">
+                        @if (!string.IsNullOrEmpty(doc.AvatarUrl))
+                        {
+                            <img src="@doc.AvatarUrl" alt="@doc.FullName" style="width:96px; height:96px; border-radius:50%; object-fit:cover; border:3px solid #fff; box-shadow:0 4px 12px rgba(0,0,0,0.08); margin:0 auto;" />
+                        }
+                        else
+                        {
+                            <div style="width:96px; height:96px; border-radius:50%; background:#079bc9; color:#fff; display:flex; align-items:center; justify-content:center; font-size:32px; font-weight:700; margin:0 auto; border:3px solid #fff; box-shadow:0 4px 12px rgba(0,0,0,0.08);">
+                                👨‍⚕️
+                            </div>
+                        }
+                        @if (doc.YearsOfExperience > 0)
+                        {
+                            <span style="position:absolute; bottom:12px; right:12px; background:#0284c7; color:#fff; font-size:10px; font-weight:700; padding:3px 8px; border-radius:20px; box-shadow:0 2px 6px rgba(0,0,0,0.1);">
+                                @doc.YearsOfExperience+ năm KN
+                            </span>
+                        }
+                    </div>
+                    <div style="padding:20px; flex:1; display:flex; flex-direction:column; justify-content:space-between;">
+                        <div>
+                            <div style="font-size:11px; color:#079bc9; font-weight:700; text-transform:uppercase; margin-bottom:4px;">
+                                @(string.IsNullOrWhiteSpace(doc.AcademicTitle) ? "Bác sĩ" : doc.AcademicTitle) · @doc.DepartmentName
+                            </div>
+                            <h3 style="font-size:16px; font-weight:700; color:#142d4a; margin:0 0 6px;">@doc.FullName</h3>
+                            <div style="font-size:12px; color:#475569; font-weight:600; margin-bottom:10px;">
+                                🩺 Chuyên khoa: @(string.IsNullOrWhiteSpace(doc.Specialty) ? "Nội tổng quát" : doc.Specialty)
+                            </div>
+                            <p style="font-size:12px; color:#64748b; line-height:1.6; margin:0 0 16px;">
+                                @(string.IsNullOrWhiteSpace(doc.ShortBio) ? "Bác sĩ tận tâm với người bệnh, có nhiều năm kinh nghiệm trong chẩn đoán và điều trị." : doc.ShortBio)
+                            </p>
+                        </div>
+                        <div style="border-top:1px solid #f1f5f9; padding-top:14px;">
+                            <a href="@bookingUrl" class="btn" style="display:block; text-align:center; background:#f0f9ff; color:#0369a1; border:1px solid #bae6fd; font-size:12px; font-weight:600; padding:8px 12px; border-radius:6px; text-decoration:none;">
+                                Đặt lịch với bác sĩ &rarr;
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </section>
+}

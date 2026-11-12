@@ -16,6 +16,7 @@ public class ConsultationController : Controller
 {
     private readonly IDoctorService _doctorService;
     private readonly IQueueService _queueService;
+    private readonly IDepartmentHeadService _departmentHeadService;
     private readonly AppDbContext _context;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<ConsultationController> _logger;
@@ -23,12 +24,14 @@ public class ConsultationController : Controller
     public ConsultationController(
         IDoctorService doctorService,
         IQueueService queueService,
+        IDepartmentHeadService departmentHeadService,
         AppDbContext context,
         TimeProvider timeProvider,
         ILogger<ConsultationController> logger)
     {
         _doctorService = doctorService;
         _queueService = queueService;
+        _departmentHeadService = departmentHeadService;
         _context = context;
         _timeProvider = timeProvider;
         _logger = logger;
@@ -93,7 +96,7 @@ public class ConsultationController : Controller
                     departmentId = doc.DepartmentId;
                     departmentName = doc.Department.Name;
                     currentDoctorName = doc.FullName;
-                    currentDoctorRoom = doc.Schedules.FirstOrDefault()?.Room?.RoomNumber ?? doc.LicenseNumber ?? "P.201";
+                    currentDoctorRoom = doc.Schedules.FirstOrDefault()?.Room?.RoomNumber ?? "Chưa phân phòng";
                 }
                 else
                 {
@@ -104,7 +107,7 @@ public class ConsultationController : Controller
                     departmentId = fallbackDoc?.DepartmentId ?? 0;
                     departmentName = fallbackDoc?.Department?.Name ?? "";
                     currentDoctorName = fallbackDoc?.FullName ?? "Bác sĩ";
-                    currentDoctorRoom = fallbackDoc?.LicenseNumber ?? "";
+                    currentDoctorRoom = "Chưa phân phòng";
                 }
             }
 
@@ -153,7 +156,7 @@ public class ConsultationController : Controller
                     a.PriorityLevel,
                     a.CheckedInAt,
                     a.Reason ?? "Khám bệnh theo lịch hẹn",
-                    (string?)null,
+                    a.Patient.Allergies,
                     a.VitalSigns != null ? a.VitalSigns.Pulse : null,
                     a.VitalSigns != null && a.VitalSigns.SystolicBp.HasValue && a.VitalSigns.DiastolicBp.HasValue
                         ? $"{a.VitalSigns.SystolicBp}/{a.VitalSigns.DiastolicBp}"
@@ -248,15 +251,21 @@ public class ConsultationController : Controller
                 .Include(s => s.Doctor)
                 .Include(s => s.Room)
                 .Where(s => isDeptHead ? s.Doctor.DepartmentId == departmentId : s.DoctorId == currentDoctorId)
+                .OrderBy(s => s.WorkDate)
+                .ThenBy(s => s.Shift)
                 .Select(s => new DoctorScheduleItemDto(
-                    s.DayOfWeek,
+                    s.Id,
+                    s.WorkDate,
                     s.Shift,
                     s.StartTime,
                     s.EndTime,
                     s.Doctor.FullName,
-                    s.Room.RoomNumber,
+                    s.Room != null ? s.Room.RoomNumber : null,
                     s.Doctor.Specialty ?? "Chuyên khoa",
-                    s.DoctorId
+                    s.DoctorId,
+                    s.Status,
+                    s.IsHotShift,
+                    s.DoctorNote
                 ))
                 .ToListAsync(ct);
 
@@ -316,6 +325,49 @@ public class ConsultationController : Controller
                 .Select(d => new DoctorSelectItemDto(d.Id, d.FullName, d.Specialty ?? "Chuyên khoa", d.LicenseNumber))
                 .ToListAsync(ct);
 
+            var availableServices = await _context.Services
+                .AsNoTracking()
+                .Where(s => s.IsActive)
+                .OrderBy(s => s.Name)
+                .Select(s => new ClinicalServiceOptionDto(s.Id, s.Name, s.Price))
+                .ToListAsync(ct);
+
+            var availableMedications = await _context.Medications
+                .AsNoTracking()
+                .Where(m => m.IsActive)
+                .OrderBy(m => m.Name)
+                .Select(m => new MedicationOptionDto(m.Id, m.Name, m.Strength, m.Unit, m.Price))
+                .ToListAsync(ct);
+
+            // Tải thông tin kỳ đăng ký ca khám & bảng độ cạnh tranh
+            var activePeriod = await _departmentHeadService.GetActiveSchedulingPeriodAsync(departmentId, ct);
+            DepartmentDemandGridDto? demandGrid = null;
+            if (activePeriod != null)
+            {
+                demandGrid = await _departmentHeadService.GetDepartmentDemandGridAsync(departmentId, activePeriod.Id, ct);
+            }
+
+            int minShifts = 2; // Tối thiểu 2 ca
+            int maxShifts = 10; // Tối đa toàn bộ ca trong tuần
+            if (activePeriod != null)
+            {
+                int totalDays = (activePeriod.EndDate.DayNumber - activePeriod.StartDate.DayNumber) + 1;
+                maxShifts = Math.Max(10, totalDays * 2);
+            }
+            if (currentDoctorId > 0)
+            {
+                var docQuota = await _context.Doctors
+                    .AsNoTracking()
+                    .Where(d => d.Id == currentDoctorId)
+                    .Select(d => new { d.MinShiftsPerWeek, d.MaxShiftsPerWeek })
+                    .FirstOrDefaultAsync(ct);
+                if (docQuota != null)
+                {
+                    minShifts = docQuota.MinShiftsPerWeek <= 2 ? docQuota.MinShiftsPerWeek : 2;
+                    maxShifts = Math.Max(maxShifts, docQuota.MaxShiftsPerWeek);
+                }
+            }
+
             var vm = new ConsultationViewModel
             {
                 ActiveTab = activeTab,
@@ -328,6 +380,9 @@ public class ConsultationController : Controller
                 DepartmentName = departmentName,
                 CurrentDoctorName = currentDoctorName,
                 CurrentDoctorRoom = currentDoctorRoom,
+                CurrentDoctorId = currentDoctorId,
+                MinShiftsPerWeek = minShifts,
+                MaxShiftsPerWeek = maxShifts,
                 QueuePatients = queue,
                 ActivePatient = queue.FirstOrDefault(),
                 LabOrders = labs,
@@ -335,7 +390,11 @@ public class ConsultationController : Controller
                 DoctorSchedules = schedules,
                 DutyShifts = dutyShifts,
                 Exceptions = exceptions,
-                AvailableDoctors = availableDoctors
+                AvailableDoctors = availableDoctors,
+                AvailableServices = availableServices,
+                AvailableMedications = availableMedications,
+                ActivePeriod = activePeriod,
+                DemandGrid = demandGrid
             };
 
             return View(vm);
@@ -486,6 +545,66 @@ public class ConsultationController : Controller
         }
 
         return RedirectToAction(nameof(Index), new { tab = "exceptions" });
+    }
+
+    // 5. Bác sĩ tự đăng ký ca khám (Shift Bidding)
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RegisterShiftBid(int periodId, DateOnly workDate, ExamShift shift, string? doctorNote, CancellationToken ct)
+    {
+        var doctorId = await ResolveDoctorIdAsync(ct);
+        if (doctorId <= 0)
+        {
+            TempData["ErrorMessage"] = "Không tìm thấy hồ sơ bác sĩ của bạn.";
+            return RedirectToAction(nameof(Index), new { tab = "schedule" });
+        }
+
+        if (periodId <= 0)
+        {
+            var doctor = await _context.Doctors.FirstOrDefaultAsync(d => d.Id == doctorId, ct);
+            if (doctor != null)
+            {
+                var activePeriod = await _departmentHeadService.GetActiveSchedulingPeriodAsync(doctor.DepartmentId, ct);
+                if (activePeriod != null)
+                {
+                    periodId = activePeriod.Id;
+                }
+            }
+        }
+
+        var request = new RegisterShiftBidRequest(doctorId, periodId, workDate, shift, doctorNote);
+        var result = await _departmentHeadService.RegisterShiftBidAsync(request, ct);
+
+        if (!result.IsSuccess)
+        {
+            TempData["ErrorMessage"] = result.Error.Message;
+        }
+        else
+        {
+            TempData["SuccessMessage"] = $"Đã đăng ký ca khám ngày {workDate:dd/MM/yyyy} ({shift}) thành công!";
+        }
+
+        return RedirectToAction(nameof(Index), new { tab = "schedule" });
+    }
+
+    // 6. Bác sĩ hủy ca đăng ký (khi còn ở trạng thái BIDDING)
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CancelShiftBid(int scheduleId, CancellationToken ct)
+    {
+        var doctorId = await ResolveDoctorIdAsync(ct);
+        var result = await _departmentHeadService.CancelShiftBidAsync(doctorId, scheduleId, ct);
+
+        if (!result.IsSuccess)
+        {
+            TempData["ErrorMessage"] = result.Error.Message;
+        }
+        else
+        {
+            TempData["SuccessMessage"] = "Đã hủy ca đăng ký thành công.";
+        }
+
+        return RedirectToAction(nameof(Index), new { tab = "schedule" });
     }
 
     private int GetCurrentAccountId()

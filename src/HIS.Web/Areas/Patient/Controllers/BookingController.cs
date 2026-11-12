@@ -4,8 +4,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace HIS.Web.Areas.Patient.Controllers;
 
 [Area("Patient")]
-[Authorize(Policy = "PatientOnly")]
+[AllowAnonymous]
 public class BookingController : Controller
 {
-    public IActionResult Index() => View();
+    public IActionResult Index(int? doctorId) => RedirectToAction("Index", "Booking", new { area = "", doctorId });
 }

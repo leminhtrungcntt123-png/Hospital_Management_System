@@ -16,4 +16,8 @@ public interface IPatientProfileService
     Task<Result> RequestLinkAsync(int accountId, RequestLinkRequest request, CancellationToken ct = default);
     Task<Result> VerifyLinkAsync(int linkId, bool grantRecordAccess, int verifiedByAccountId, CancellationToken ct = default);
     Task<Result> RevokeLinkAsync(int linkId, int revokedByAccountId, CancellationToken ct = default);
+
+    Task<Result<AccountProfilesOverviewDto>> GetAccountProfilesAsync(int accountId, CancellationToken ct = default);
+    Task<Result> SavePersonalProfileAsync(int accountId, SavePersonalProfileRequest request, CancellationToken ct = default);
+    Task<Result<int>> AddRelativeProfileAsync(int accountId, AddRelativeProfileRequest request, CancellationToken ct = default);
 }

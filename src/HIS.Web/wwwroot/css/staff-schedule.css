@@ -1,0 +1,105 @@
+/* Styling đồng bộ chuẩn MediCare UI */
+.medicare-tabs {
+    display: flex;
+    gap: 8px;
+    padding: 12px 16px;
+    border-bottom: 1px solid #eef3f7;
+    background: #fbfcfe;
+}
+.medicare-tab-btn {
+    background: none;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 50px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #596a7c;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.medicare-tab-btn:hover {
+    background: #e2ebf3;
+    color: #0f172a;
+}
+.medicare-tab-btn.active {
+    background: #079bc9;
+    color: #ffffff;
+}
+.app-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(17, 38, 56, 0.55);
+    backdrop-filter: blur(2px);
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+.app-modal-backdrop.show {
+    display: flex !important;
+}
+.app-modal-card {
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.25);
+    width: 100%;
+    max-width: 540px;
+    max-height: 90vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    animation: appModalIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.app-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: #111f38;
+    color: #fff;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+}
+.app-modal-close {
+    background: rgba(255, 255, 255, 0.12);
+    border: none;
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 700;
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+.app-modal-close:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+.app-modal-body {
+    padding: 20px;
+    font-size: 13px;
+    color: #334155;
+}
+.app-modal-footer {
+    padding: 12px 20px;
+    border-top: 1px solid #f1f5f9;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    background: #fbfcfe;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+}
+@keyframes appModalIn {
+    from {
+        transform: translateY(-12px) scale(0.98);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}

@@ -19,7 +19,7 @@ function specialtiesPage() {
                             (department) => `
                 <article class="specialty-detail"><span class="specialty-icon">${icon('building')}</span>
                     <div><h2>${esc(department.name)}</h2><p>${esc(department.description)}</p>
-                        ${link('Xem đội ngũ bác sĩ', 'public/doctors', 'arrow', 'text-link')}
+                        ${link('Xem đội ngũ bác sĩ', 'public/doctors?department=' + encodeURIComponent(department.name), 'arrow', 'text-link')}
                     </div>
                 </article>`,
                         )
@@ -46,10 +46,7 @@ function doctorsPage() {
                 ? catalogStatus()
                 : doctors.length
                   ? `<div class="doctor-grid">${doctors.map(doctorCard).join('')}</div>`
-                  : empty(
-                        'Không tìm thấy bác sĩ',
-                        'Thử đổi khoa hoặc từ khóa tìm kiếm.',
-                    )
+                  : empty('Không tìm thấy bác sĩ', 'Thử đổi khoa hoặc từ khóa tìm kiếm.')
         }
         </section>`;
 }
@@ -60,12 +57,12 @@ function doctorDetail(id) {
     if (!doctor) return empty('Không tìm thấy thông tin bác sĩ');
     return `${pageIntro(doctor.specialty, doctor.name, doctor.department)}
         <section class="detail-layout"><article class="card doctor-bio">
-            <div class="doctor-bio-top"><div class="doctor-portrait cyan"><span class="doctor-avatar">${esc(initials(doctor.name))}</span>${icon('stethoscope')}</div>
+            <div class="doctor-bio-top">${doctorPhoto()}
                 <div><h2>${esc(doctor.name)}</h2><p>${esc(doctor.specialty)}</p><p>${esc(doctor.department)}</p></div>
             </div>
             <h2>Chuẩn bị trước buổi khám</h2><ul class="content-list"><li>Mang giấy tờ của người khám.</li><li>Chuẩn bị kết quả khám trước đây nếu có.</li></ul>
         </article><aside class="card sticky-card"><h2>Lịch khám</h2><p>Tra cứu lịch trong mục đặt lịch khám.</p>
-            ${link('Đến trang đặt lịch', 'patient/booking', 'calendar', 'btn primary full')}
+            ${!config.authenticated || config.role === 'PATIENT' ? link('Chọn bác sĩ này', 'public/booking?doctorId=' + encodeURIComponent(doctor.id), 'calendar', 'btn primary full') : `<a class="btn primary full" href="${esc(config.home)}">Về bàn làm việc</a>`}
         </aside></section>`;
 }
 
@@ -92,11 +89,7 @@ function guidePage() {
                 'Đến quầy tiếp nhận',
                 'Nhân viên xác minh thông tin và hướng dẫn phòng khám, số thứ tự.',
             ],
-            [
-                '4',
-                'Chuẩn bị hồ sơ và BHYT',
-                'Mang theo thẻ BHYT và kết quả khám trước đây nếu có.',
-            ],
+            ['4', 'Chuẩn bị hồ sơ và BHYT', 'Mang theo thẻ BHYT và kết quả khám trước đây nếu có.'],
         ]
             .map(
                 ([number, title, detail]) =>
@@ -105,6 +98,6 @@ function guidePage() {
             .join('')}
         </div><aside class="card guide-aside"><span class="section-icon">${icon('clipboard')}</span><h2>Thông tin lịch hẹn</h2>
             <p>Thời gian khám, điều kiện đổi/hủy và quyền xem hồ sơ được xác định bởi hệ thống bệnh viện.</p>
-            ${link('Lịch hẹn của tôi', 'patient/appointments', 'calendar', 'btn outline full')}
+            ${!config.authenticated || config.role === 'PATIENT' ? link('Lịch hẹn của tôi', 'patient/appointments', 'calendar', 'btn outline full') : `<a class="btn outline full" href="${esc(config.home)}">Về bàn làm việc</a>`}
         </aside></section>`;
 }

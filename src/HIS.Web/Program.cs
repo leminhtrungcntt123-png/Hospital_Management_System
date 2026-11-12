@@ -10,11 +10,14 @@ using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add DAL & BLL
 builder.Services.AddHisDataAccess(builder.Configuration);
 builder.Services.AddHisBusiness(builder.Configuration);
+builder.Services.AddMemoryCache();
 builder.Services.ConfigureOptions<HIS.Web.Common.AccountStatusCookieOptions>();
 
 // Cookie Authentication
@@ -61,7 +64,7 @@ builder.Services.AddRateLimiter(options =>
     {
         context.HttpContext.Response.Headers.RetryAfter = "60";
         var policy = context.HttpContext.GetEndpoint()?.Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName;
-        if (policy is "register" or "password-reset-request" or "password-reset-confirm")
+        if (policy is "register" or "password-reset-request" or "password-reset-confirm" or "guest-booking")
         {
             await context.HttpContext.Response.WriteAsJsonAsync(new
             {
@@ -84,7 +87,7 @@ builder.Services.AddRateLimiter(options =>
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));
-    foreach (var (name, limit) in new[] { ("register", 3), ("password-reset-request", 3), ("password-reset-confirm", 10) })
+    foreach (var (name, limit) in new[] { ("register", 3), ("password-reset-request", 3), ("password-reset-confirm", 10), ("guest-booking", 5) })
     {
         options.AddPolicy(name, context => RateLimitPartition.GetFixedWindowLimiter(
             context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
@@ -120,6 +123,30 @@ else
 {
     app.UseDeveloperExceptionPage();
 }
+
+app.UseStatusCodePages(async statusCodeContext =>
+{
+    var httpContext = statusCodeContext.HttpContext;
+    if (httpContext.Response.StatusCode == StatusCodes.Status404NotFound
+        && HttpMethods.IsGet(httpContext.Request.Method)
+        && !httpContext.Request.Path.StartsWithSegments("/api"))
+    {
+        var originalPath = httpContext.Request.Path;
+        var originalQueryString = httpContext.Request.QueryString;
+
+        httpContext.Request.Path = "/Home/NotFound";
+        httpContext.Request.QueryString = QueryString.Empty;
+        try
+        {
+            await statusCodeContext.Next(httpContext);
+        }
+        finally
+        {
+            httpContext.Request.Path = originalPath;
+            httpContext.Request.QueryString = originalQueryString;
+        }
+    }
+});
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();

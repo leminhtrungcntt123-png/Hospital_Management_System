@@ -3,6 +3,7 @@ namespace HIS.Domain;
 public class ScheduleException
 {
     public int Id { get; set; }
+    public int? ScheduleId { get; set; }
     public int DoctorId { get; set; }
     public DateOnly Date { get; set; }
     public ExamShift? Shift { get; set; }
@@ -14,6 +15,7 @@ public class ScheduleException
     public DateTime? ApprovedAt { get; set; }
     public DateTime CreatedAt { get; set; }
 
+    public DoctorSchedule? Schedule { get; set; }
     public Doctor Doctor { get; set; } = null!;
     public Doctor? ReplacementDoctor { get; set; }
     public Account? ApprovedByAccount { get; set; }

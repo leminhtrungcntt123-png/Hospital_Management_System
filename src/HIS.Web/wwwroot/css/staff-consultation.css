@@ -1,0 +1,83 @@
+/* Dialog nổi độc lập - không bị xung đột CSS modal hay che trắng màn hình */
+.app-dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(17, 38, 56, 0.55);
+    backdrop-filter: blur(2px);
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+.app-dialog-backdrop.show {
+    display: flex !important;
+}
+.app-dialog-card {
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.25);
+    width: 100%;
+    max-width: 580px;
+    max-height: 90vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    animation: appDialogSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.app-dialog-card.lg {
+    max-width: 760px;
+}
+.app-dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: #111f38;
+    color: #fff;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+}
+.app-dialog-close {
+    background: rgba(255, 255, 255, 0.12);
+    border: none;
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 700;
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.app-dialog-close:hover {
+    background: rgba(255, 255, 255, 0.28);
+}
+.app-dialog-body {
+    padding: 20px;
+    font-size: 13px;
+    color: #334155;
+}
+.app-dialog-footer {
+    padding: 12px 20px;
+    border-top: 1px solid #f1f5f9;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    background: #fbfcfe;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+}
+@keyframes appDialogSlideIn {
+    from {
+        transform: translateY(-14px) scale(0.98);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}

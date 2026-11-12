@@ -6,6 +6,7 @@ public class ClinicRoom
     public int DepartmentId { get; set; }
     public string RoomName { get; set; } = string.Empty;
     public string RoomNumber { get; set; } = string.Empty;
+    public bool IsActive { get; set; } = true;
 
     public Department Department { get; set; } = null!;
     public ICollection<DoctorSchedule> Schedules { get; set; } = [];

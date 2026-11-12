@@ -1,3 +1,4 @@
+using HIS.BLL.Common;
 using HIS.BLL.DTOs;
 using HIS.DAL;
 using HIS.Domain;
@@ -28,6 +29,29 @@ public class DoctorService : IDoctorService
                 d.Specialty ?? "",
                 d.Department.Name,
                 d.LicenseNumber ?? ""))
+            .ToListAsync(cancellationToken);
+    }
+
+    // Lấy danh sách bác sĩ hiển thị trang chủ (Public Showcase)
+    public async Task<IReadOnlyList<DoctorPublicDto>> GetPublicFeaturedDoctorsAsync(int count = 8, CancellationToken cancellationToken = default)
+    {
+        return await _context.Doctors
+            .AsNoTracking()
+            .Where(d => d.IsPublic)
+            .OrderByDescending(d => d.IsFeatured)
+            .ThenBy(d => d.DisplayOrder)
+            .Take(count)
+            .Select(d => new DoctorPublicDto(
+                d.Id,
+                d.FullName,
+                d.Specialty,
+                d.AcademicTitle,
+                d.AvatarUrl,
+                d.ShortBio,
+                d.Biography,
+                d.YearsOfExperience,
+                d.DisplayOrder,
+                d.Department.Name))
             .ToListAsync(cancellationToken);
     }
 
@@ -116,9 +140,77 @@ public class DoctorService : IDoctorService
             IpAddress = request.IpAddress
         });
 
-        // Chuyển trạng thái lượt khám sang Completed nếu đang InProgress hoặc ReadyForDoctor
-        appointment.StatusId = (int)AppointmentStatusId.Completed;
-        appointment.UpdatedAt = now;
+        // Cập nhật thông tin Dị ứng của bệnh nhân nếu bác sĩ có nhập
+        if (!string.IsNullOrWhiteSpace(request.Allergies))
+        {
+            var patient = await _context.Patients.FirstOrDefaultAsync(p => p.Id == appointment.PatientId, cancellationToken);
+            if (patient != null)
+            {
+                patient.Allergies = request.Allergies.Trim();
+            }
+        }
+
+        // Tạo các chỉ định cận lâm sàng nếu có
+        if (request.LabOrders != null && request.LabOrders.Count > 0)
+        {
+            foreach (var lab in request.LabOrders.Where(l => l.ServiceId > 0))
+            {
+                _context.LabOrders.Add(new LabOrder
+                {
+                    MedicalRecord = record,
+                    ServiceId = lab.ServiceId,
+                    Note = string.IsNullOrWhiteSpace(lab.Note) ? null : lab.Note.Trim(),
+                    Status = LabOrderStatus.Pending,
+                    CreatedAt = now
+                });
+            }
+        }
+
+        // Tạo đơn thuốc và các chi tiết thuốc nếu có
+        if (request.PrescriptionItems != null && request.PrescriptionItems.Count > 0)
+        {
+            var validMeds = request.PrescriptionItems.Where(p => p.MedicationId > 0 && p.Quantity > 0).ToList();
+            if (validMeds.Count > 0)
+            {
+                var prescription = new Prescription
+                {
+                    MedicalRecord = record,
+                    PrescribedDate = DateOnly.FromDateTime(now),
+                    Note = string.IsNullOrWhiteSpace(request.PrescriptionNote) ? null : request.PrescriptionNote.Trim()
+                };
+                _context.Prescriptions.Add(prescription);
+
+                foreach (var med in validMeds)
+                {
+                    _context.PrescriptionItems.Add(new PrescriptionItem
+                    {
+                        Prescription = prescription,
+                        MedicationId = med.MedicationId,
+                        Quantity = med.Quantity,
+                        Dosage = string.IsNullOrWhiteSpace(med.Dosage) ? null : med.Dosage.Trim(),
+                        DurationDays = med.DurationDays,
+                        UsageInstructions = string.IsNullOrWhiteSpace(med.UsageInstructions) ? null : med.UsageInstructions.Trim()
+                    });
+                }
+            }
+        }
+
+        // Chuyển trạng thái lượt khám sang Completed và ghi nhận lịch sử trạng thái
+        var oldStatus = (AppointmentStatusId)appointment.StatusId;
+        if (oldStatus != AppointmentStatusId.Completed && AppointmentStateMachine.CanTransition(oldStatus, AppointmentStatusId.Completed))
+        {
+            appointment.StatusId = (int)AppointmentStatusId.Completed;
+            appointment.UpdatedAt = now;
+
+            _context.AppointmentStatusHistories.Add(new AppointmentStatusHistory
+            {
+                AppointmentId = appointment.Id,
+                OldStatusId = (int)oldStatus,
+                NewStatusId = (int)AppointmentStatusId.Completed,
+                PerformedBy = doctor.AccountId,
+                ChangedAt = now
+            });
+        }
 
         await _context.SaveChangesAsync(cancellationToken);
         return record.Id;

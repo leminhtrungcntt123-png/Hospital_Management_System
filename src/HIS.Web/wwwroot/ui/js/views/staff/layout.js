@@ -69,15 +69,12 @@ function staffShell() {
     return `<div class="staff-app">
         <aside class="sidebar ${ui.mobileMenu ? 'open' : ''}">
             <div>${link(brand(), 'public/home', '', 'brand-link')}
-                <div class="workspace">${icon('building')}<span><strong>Không gian nhân viên</strong><small>${esc(activeRole().name)}</small></span></div>
+                <div class="workspace">${icon('building')}<span><strong>${esc(config.departmentName || 'Không gian nhân viên')}</strong><small>${esc(activeRole().name)}</small></span></div>
             </div>
             <nav class="staff-nav" aria-label="Chức năng theo vai trò">
                 ${(staffMenus[config.role] || [])
                     .map(
-                        ([
-                            group,
-                            items,
-                        ]) => `<div class="nav-group"><span>${group}</span>
+                        ([group, items]) => `<div class="nav-group"><span>${group}</span>
                     ${items.map(([route, name, title]) => link(`<span>${title}</span>`, route, name, ui.route === route ? 'active' : '')).join('')}
                 </div>`,
                     )

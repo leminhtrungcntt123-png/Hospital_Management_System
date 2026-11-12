@@ -32,10 +32,23 @@
         role,
         authenticated = isAuthenticated,
         displayName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? (isAuthenticated ? "Thành viên" : "Khách"),
+        departmentName = User.FindFirst("DepartmentName")?.Value,
+        selectedDoctorId = Context.Request.Query["doctorId"].ToString(),
         initialRoute = ViewData["MediCareRoute"]?.ToString() ?? (isAuthenticated ? defaultRoute : "public/home"),
         pathBase = Context.Request.PathBase.ToString(),
         assetBase = Url.Content("~/ui/assets/"),
         catalogUrl = Url.Action("Catalog", "Home", new { area = "" }),
+        bookingUrl = Url.Action("Index", "Booking", new { area = "" }),
+        bookingSlotsUrl = Url.Action("Slots", "Booking", new { area = "" }),
+        bookingConfirmUrl = Url.Action("Confirm", "Booking", new { area = "" }),
+        bookingSendOtpUrl = Url.Action("SendOtp", "Booking", new { area = "" }),
+        profilesUrl = Url.Action("Profiles", "FamilyProfiles", new { area = "Patient" }),
+        savePersonalUrl = Url.Action("SavePersonal", "FamilyProfiles", new { area = "Patient" }),
+        addRelativeUrl = Url.Action("AddRelative", "FamilyProfiles", new { area = "Patient" }),
+        userEmail = User.FindFirst(ClaimTypes.Email)?.Value ?? "",
+        bookingMinDate = ViewData["BookingMinDate"]?.ToString(),
+        bookingMaxDate = ViewData["BookingMaxDate"]?.ToString(),
+        publicHome = Url.Action("Index", "Home", new { area = "" }),
         home = Url.Content("~" + home),
         login = Url.Action("Login", "Account", new { area = "" }),
         changePassword = Url.Action("ChangePassword", "Account", new { area = "" })
@@ -49,6 +62,10 @@
     <meta name="theme-color" content="#079bc9" />
     <title>@ViewData["Title"] — MediCare HIS</title>
     <partial name="MediCare/_Styles" />
+    <link rel="stylesheet" href="~/css/portal/layout.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/portal/home.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/portal/responsive.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/portal/booking.css" asp-append-version="true" />
 </head>
 <body>
     @RenderBody()
