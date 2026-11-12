@@ -110,7 +110,10 @@ public class ConsultationController : Controller
             var today = DateOnly.FromDateTime(localNow);
             var todayStart = today.ToDateTime(TimeOnly.MinValue);
             var todayEnd = todayStart.AddDays(1);
+            // Dùng để tính tuổi đúng (trừ 1 nếu chưa tới sinh nhật trong năm)
             var todayYear = today.Year;
+            var todayMonth = today.Month;
+            var todayDay = today.Day;
 
             var selectedDate = date ?? today;
             var selectedShift = shift ?? (localNow.Hour < 12 ? ExamShift.Morning : ExamShift.Afternoon);
@@ -148,13 +151,17 @@ public class ConsultationController : Controller
             }
 
             var queue = await queueQuery
+                // Ưu tiên giảm dần; cùng mức ưu tiên thì ai đến trước xếp trước (không sắp theo chuỗi số thứ tự)
                 .OrderByDescending(a => a.PriorityLevel)
-                .ThenBy(a => a.QueueNumber)
+                .ThenBy(a => a.CheckedInAt ?? a.CreatedAt)
+                .ThenBy(a => a.Id)
                 .Select(a => new ConsultationQueueItemDto(
                     a.Id,
                     a.AppointmentCode,
                     a.Patient.FullName,
-                    todayYear - a.Patient.DateOfBirth.Year,
+                    todayYear - a.Patient.DateOfBirth.Year
+                        - ((a.Patient.DateOfBirth.Month > todayMonth
+                            || (a.Patient.DateOfBirth.Month == todayMonth && a.Patient.DateOfBirth.Day > todayDay)) ? 1 : 0),
                     a.Patient.Gender == Gender.Male ? "Nam" : "Nữ",
                     a.QueueNumber ?? "—",
                     a.PriorityLevel,
@@ -203,7 +210,10 @@ public class ConsultationController : Controller
                     l.Id,
                     l.MedicalRecord.Appointment.Patient.FullName,
                     l.MedicalRecord.Appointment.AppointmentCode,
-                    todayYear - l.MedicalRecord.Appointment.Patient.DateOfBirth.Year,
+                    todayYear - l.MedicalRecord.Appointment.Patient.DateOfBirth.Year
+                        - ((l.MedicalRecord.Appointment.Patient.DateOfBirth.Month > todayMonth
+                            || (l.MedicalRecord.Appointment.Patient.DateOfBirth.Month == todayMonth
+                                && l.MedicalRecord.Appointment.Patient.DateOfBirth.Day > todayDay)) ? 1 : 0),
                     l.Service.Name,
                     l.Note ?? "Chỉ định chuyên khoa",
                     l.CreatedAt,
@@ -238,7 +248,10 @@ public class ConsultationController : Controller
                     r.Id,
                     r.Appointment.Patient.FullName,
                     r.Appointment.AppointmentCode,
-                    todayYear - r.Appointment.Patient.DateOfBirth.Year,
+                    todayYear - r.Appointment.Patient.DateOfBirth.Year
+                        - ((r.Appointment.Patient.DateOfBirth.Month > todayMonth
+                            || (r.Appointment.Patient.DateOfBirth.Month == todayMonth
+                                && r.Appointment.Patient.DateOfBirth.Day > todayDay)) ? 1 : 0),
                     r.Appointment.Patient.Gender == Gender.Male ? "Nam" : "Nữ",
                     r.CreatedAt,
                     r.Doctor.FullName,
@@ -338,7 +351,8 @@ public class ConsultationController : Controller
                 CurrentDoctorName = currentDoctorName,
                 CurrentDoctorRoom = currentDoctorRoom,
                 QueuePatients = queue,
-                ActivePatient = queue.FirstOrDefault(),
+                // Ưu tiên mở lại ca bác sĩ đang khám dở; nếu không có thì mở ca đầu hàng
+                ActivePatient = queue.FirstOrDefault(q => q.StatusId == (int)AppointmentStatusId.InProgress) ?? queue.FirstOrDefault(),
                 LabOrders = labs,
                 MedicalRecords = records,
                 DoctorSchedules = schedules,
