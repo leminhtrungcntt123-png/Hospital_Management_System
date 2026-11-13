@@ -136,7 +136,7 @@ public class DepositRefundTests
             "Tạm ứng xét nghiệm",
             null,
             null,
-            1));
+            cashierId));
 
         Assert.True(createRes.IsSuccess);
         var dep = createRes.Value!;
@@ -173,7 +173,7 @@ public class DepositRefundTests
             "Tạm ứng khám chuyên sâu",
             null,
             null,
-            1));
+            cashierId));
 
         Assert.True(createRes.IsSuccess);
         var dep = createRes.Value!;
