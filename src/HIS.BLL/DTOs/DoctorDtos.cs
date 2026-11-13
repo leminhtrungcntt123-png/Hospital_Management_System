@@ -27,6 +27,7 @@ public record CreateMedicalRecordRequest
     public string? ClinicalExamination { get; set; }
     public string? PrimaryDiagnosisCode { get; set; }
     public string? PrimaryDiagnosisDesc { get; set; }
+    public string? SecondaryDiagnosis { get; set; }
     public string? Conclusion { get; set; }
     public string? Allergies { get; set; }
     public string? PrescriptionNote { get; set; }

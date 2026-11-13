@@ -210,6 +210,7 @@ public class DoctorService : IDoctorService
             ClinicalExamination = request.ClinicalExamination,
             PrimaryDiagnosisCode = request.PrimaryDiagnosisCode,
             PrimaryDiagnosisDesc = request.PrimaryDiagnosisDesc,
+            SecondaryDiagnosis = string.IsNullOrWhiteSpace(request.SecondaryDiagnosis) ? null : request.SecondaryDiagnosis.Trim(),
             Conclusion = request.Conclusion,
             CreatedAt = now,
             UpdatedAt = now
