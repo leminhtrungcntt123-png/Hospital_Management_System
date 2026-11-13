@@ -1,7 +1,28 @@
 using HIS.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace HIS.DAL;
+
+public class UtcToUnspecifiedDateTimeConverter : ValueConverter<DateTime, DateTime>
+{
+    public UtcToUnspecifiedDateTimeConverter()
+        : base(
+            v => v.Kind == DateTimeKind.Utc ? DateTime.SpecifyKind(v, DateTimeKind.Unspecified) : v,
+            v => DateTime.SpecifyKind(v, DateTimeKind.Utc))
+    {
+    }
+}
+
+public class UtcToUnspecifiedNullableDateTimeConverter : ValueConverter<DateTime?, DateTime?>
+{
+    public UtcToUnspecifiedNullableDateTimeConverter()
+        : base(
+            v => v.HasValue && v.Value.Kind == DateTimeKind.Utc ? DateTime.SpecifyKind(v.Value, DateTimeKind.Unspecified) : v,
+            v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v)
+    {
+    }
+}
 
 public class AppDbContext : DbContext
 {
@@ -11,6 +32,17 @@ public class AppDbContext : DbContext
         : base(options)
     {
         _timeProvider = timeProvider;
+    }
+
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        base.ConfigureConventions(configurationBuilder);
+
+        configurationBuilder.Properties<DateTime>()
+            .HaveConversion<UtcToUnspecifiedDateTimeConverter>();
+
+        configurationBuilder.Properties<DateTime?>()
+            .HaveConversion<UtcToUnspecifiedNullableDateTimeConverter>();
     }
 
     public DbSet<Role> Roles => Set<Role>();
@@ -29,6 +61,7 @@ public class AppDbContext : DbContext
     public DbSet<Service> Services => Set<Service>();
     public DbSet<InsurancePlan> InsurancePlans => Set<InsurancePlan>();
     public DbSet<InsuranceCard> InsuranceCards => Set<InsuranceCard>();
+    public DbSet<SchedulingPeriod> SchedulingPeriods => Set<SchedulingPeriod>();
     public DbSet<DoctorSchedule> DoctorSchedules => Set<DoctorSchedule>();
     public DbSet<ScheduleException> ScheduleExceptions => Set<ScheduleException>();
     public DbSet<AppointmentSlot> AppointmentSlots => Set<AppointmentSlot>();

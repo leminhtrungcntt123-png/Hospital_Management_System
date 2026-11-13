@@ -9,6 +9,7 @@ public class Patient
     public string? NationalId { get; set; }
     public string PhoneNumber { get; set; } = string.Empty;
     public string? Address { get; set; }
+    public string? Allergies { get; set; }
     public DateTime CreatedAt { get; set; }
 
     public ICollection<AccountPatientProfile> AccountLinks { get; set; } = [];

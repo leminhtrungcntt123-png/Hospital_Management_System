@@ -25,15 +25,22 @@ public sealed class AccountStatusCookieOptions : IPostConfigureOptions<CookieAut
                 return;
             }
 
-            var staff = context.HttpContext.RequestServices.GetRequiredService<IStaffService>();
-            var valid = int.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var accountId)
-                && await staff.IsSessionActiveAsync(accountId, principal.FindFirstValue(ClaimTypes.Role) ?? "",
-                    context.HttpContext.RequestAborted);
-
-            if (!valid)
+            try
             {
-                context.RejectPrincipal();
-                await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                var staff = context.HttpContext.RequestServices.GetRequiredService<IStaffService>();
+                var valid = int.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var accountId)
+                    && await staff.IsSessionActiveAsync(accountId, principal.FindFirstValue(ClaimTypes.Role) ?? "",
+                        context.HttpContext.RequestAborted);
+
+                if (!valid)
+                {
+                    context.RejectPrincipal();
+                    await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Bỏ qua khi client/trình duyệt hủy request (reload/refresh)
             }
         };
     }

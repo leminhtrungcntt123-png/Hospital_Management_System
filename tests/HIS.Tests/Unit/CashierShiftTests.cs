@@ -120,7 +120,7 @@ public class CashierShiftTests
         Assert.Equal("SHIFT_REQUIRED", depRes.Error.Code);
 
         // 2. Thử thanh toán viện phí khi chưa mở ca -> phải trả về SHIFT_REQUIRED
-        var app = await db.Appointments.FirstOrDefaultAsync();
+        var app = await db.Appointments.FirstOrDefaultAsync(a => a.Invoice == null || a.Invoice.Status != InvoiceStatus.Paid);
         if (app != null)
         {
             var checkoutRes = await billingService.CheckoutInvoiceAsync(new CheckoutInvoiceRequest(

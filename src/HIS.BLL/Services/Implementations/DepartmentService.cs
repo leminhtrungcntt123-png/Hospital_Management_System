@@ -30,9 +30,16 @@ public class DepartmentService : IDepartmentService
     // Lấy danh sách phòng khám theo chuyên khoa
     public async Task<IReadOnlyList<ClinicRoomDto>> GetRoomsByDepartmentAsync(int departmentId, CancellationToken cancellationToken = default)
     {
-        return await _context.ClinicRooms
+        var query = _context.ClinicRooms
             .AsNoTracking()
-            .Where(r => r.DepartmentId == departmentId)
+            .Where(r => r.IsActive);
+
+        if (departmentId > 0)
+        {
+            query = query.Where(r => r.DepartmentId == departmentId);
+        }
+
+        return await query
             .OrderBy(r => r.RoomNumber)
             .Select(r => new ClinicRoomDto(
                 r.Id,

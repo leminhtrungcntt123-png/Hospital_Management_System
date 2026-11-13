@@ -46,12 +46,13 @@ public static class ReceptionWorkflowScenario
         var schedule = new DoctorSchedule
         {
             Doctor = doctor,
+            Department = dept,
             Room = room,
-            DayOfWeek = DayOfWeek.Thursday,
+            WorkDate = new DateOnly(2026, 11, 5),
             Shift = ExamShift.Morning,
             StartTime = new TimeOnly(7, 30),
             EndTime = new TimeOnly(11, 30),
-            EffectiveFrom = new DateOnly(2026, 11, 1),
+            Status = DoctorScheduleStatus.Approved,
             MaxPatients = 4,
             OnlineSlots = 2
         };
