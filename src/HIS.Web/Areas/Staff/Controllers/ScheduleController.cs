@@ -485,9 +485,9 @@ public class ScheduleController : Controller
         });
     }
 
-    // Trưởng khoa xuất bản toàn bộ lịch kỳ (PUBLISHED -> Sinh appointment_slots hàng loạt)
+    // Trưởng khoa (hoặc Admin đối với kỳ toàn viện) xuất bản lịch kỳ (PUBLISHED -> Sinh appointment_slots hàng loạt)
     [HttpPost]
-    [Authorize(Policy = "DepartmentHeadOnly")]
+    [Authorize(Roles = "ADMIN,DEPARTMENT_HEAD")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> PublishPeriod(int periodId, string? tab, CancellationToken ct)
     {

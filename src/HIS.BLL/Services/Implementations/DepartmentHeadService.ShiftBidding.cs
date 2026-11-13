@@ -576,6 +576,12 @@ public partial class DepartmentHeadService
         if (callerDeptId <= 0 || oldRecord.DepartmentId != callerDeptId)
             return Result.Failure<int>("FORBIDDEN", "Bạn không có quyền điều chuyển ca khám của khoa khác.");
 
+        if (oldRecord.Status == DoctorScheduleStatus.Approved)
+            return Result.Failure<int>("CANNOT_REALLOCATE_ACTIVE", "Không thể điều chuyển ca khám đã được duyệt. Vui lòng hủy ca theo quy trình hủy lịch trước khi sắp xếp lại.");
+
+        if (oldRecord.Status != DoctorScheduleStatus.Bidding && oldRecord.Status != DoctorScheduleStatus.Rejected)
+            return Result.Failure<int>("INVALID_STATUS", "Chỉ có thể điều chuyển ca đang đăng ký hoặc đã bị từ chối.");
+
         var room = await _context.ClinicRooms.FirstOrDefaultAsync(r => r.Id == request.TargetRoomId && r.DepartmentId == oldRecord.DepartmentId && r.IsActive, ct);
         if (room == null)
             return Result.Failure<int>("INVALID_ROOM", "Phòng khám điều chuyển không hợp lệ hoặc đã đóng.");
@@ -672,9 +678,22 @@ public partial class DepartmentHeadService
         if (period == null)
             return Result.Failure<int>("NOT_FOUND", "Không tìm thấy kỳ đăng ký.");
 
-        var callerDeptId = await ResolveDepartmentIdByAccountIdAsync(reviewedByAccountId, ct);
-        if (callerDeptId <= 0 || (period.DepartmentId.HasValue && period.DepartmentId.Value != callerDeptId))
-            return Result.Failure<int>("FORBIDDEN", "Bạn không có quyền xuất bản kỳ đăng ký của khoa khác.");
+        var callerAccount = await _context.Accounts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(a => a.Id == reviewedByAccountId && a.IsActive, ct);
+        bool isHospitalAdmin = callerAccount?.RoleId == (int)RoleId.Admin;
+
+        if (!period.DepartmentId.HasValue)
+        {
+            if (!isHospitalAdmin)
+                return Result.Failure<int>("FORBIDDEN", "Chỉ quản trị viên toàn viện mới có quyền xuất bản kỳ đăng ký dùng chung toàn viện.");
+        }
+        else if (!isHospitalAdmin)
+        {
+            var callerDeptId = await ResolveDepartmentIdByAccountIdAsync(reviewedByAccountId, ct);
+            if (callerDeptId <= 0 || period.DepartmentId.Value != callerDeptId)
+                return Result.Failure<int>("FORBIDDEN", "Bạn không có quyền xuất bản kỳ đăng ký của khoa khác.");
+        }
 
         period.Status = SchedulingPeriodStatus.Published;
 
@@ -729,7 +748,7 @@ public partial class DepartmentHeadService
             {
                 _context.AppointmentSlots.Add(new AppointmentSlot
                 {
-                    ScheduleId = s.Id > 0 ? s.Id : null,
+                    Schedule = s,
                     DoctorId = s.DoctorId,
                     RoomId = s.RoomId.Value,
                     StartTime = current,

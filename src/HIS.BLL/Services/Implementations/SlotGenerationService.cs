@@ -218,8 +218,16 @@ public class SlotGenerationService : ISlotGenerationService
     public async Task<Result<int>> ExpirePendingHoldsAsync(CancellationToken ct = default)
     {
         var strategy = _context.Database.CreateExecutionStrategy();
+        bool isRetry = false;
         return await strategy.ExecuteAsync(async () =>
         {
+            if (isRetry)
+            {
+                // Discard accepted/stale tracked entities before replaying after a failed commit.
+                _context.ChangeTracker.Clear();
+            }
+            isRetry = true;
+
             await using var tx = await _context.Database.BeginTransactionAsync(ct);
             if (_context.Database.IsNpgsql())
             {
