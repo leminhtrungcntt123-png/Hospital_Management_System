@@ -15,7 +15,6 @@ public class ServiceConfiguration : IEntityTypeConfiguration<Service>
         builder.HasIndex(e => e.Name).IsUnique();
         builder.Property(e => e.Price).HasPrecision(12, 2).HasDefaultValue(0m);
         builder.Property(e => e.IsActive).HasDefaultValue(true);
-        builder.Property(e => e.IsInsuranceCovered).HasDefaultValue(true);
 
         builder.HasOne(e => e.ServiceType)
             .WithMany(st => st.Services)

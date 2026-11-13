@@ -91,7 +91,7 @@ public static class CashierTestDatabase
             Username = "ketoan",
             Email = "ketoan@his.local",
             PasswordHash = "hash",
-            RoleId = (int)RoleId.Accountant,
+            RoleId = (int)RoleId.Nurse,
             IsActive = true
         };
         var docAcc = new Account
@@ -122,7 +122,6 @@ public static class CashierTestDatabase
             Name = "Khám lâm sàng tổng quát",
             ServiceTypeId = 1,
             Price = 150000m,
-            IsInsuranceCovered = true,
             IsActive = true
         };
         var plan = new InsurancePlan

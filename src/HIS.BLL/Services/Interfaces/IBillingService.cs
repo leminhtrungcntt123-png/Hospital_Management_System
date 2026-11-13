@@ -6,6 +6,9 @@ namespace HIS.BLL.Services;
 
 public interface IBillingService
 {
+    Task<Result<int>> GenerateInvoiceAsync(int appointmentId, int? insuranceCardId, CancellationToken ct = default);
+    Task<Result<int>> ProcessPaymentAsync(int invoiceId, decimal amount, string paymentMethod, string? receiptEmail, int? cashierId, CancellationToken ct = default);
+
     /// <summary>
     /// Lấy danh sách các lượt khám đang tiếp nhận hoặc đã hoàn tất cần thu ngân xử lý viện phí.
     /// </summary>

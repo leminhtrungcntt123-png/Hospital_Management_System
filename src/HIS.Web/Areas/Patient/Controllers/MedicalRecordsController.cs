@@ -12,11 +12,16 @@ namespace HIS.Web.Areas.Patient.Controllers;
 public class MedicalRecordsController : Controller
 {
     private readonly IBillingService _billingService;
+    private readonly IPatientAccessService _patientAccessService;
     private readonly AppDbContext _context;
 
-    public MedicalRecordsController(IBillingService billingService, AppDbContext context)
+    public MedicalRecordsController(
+        IBillingService billingService,
+        IPatientAccessService patientAccessService,
+        AppDbContext context)
     {
         _billingService = billingService;
+        _patientAccessService = patientAccessService;
         _context = context;
     }
 
@@ -30,15 +35,21 @@ public class MedicalRecordsController : Controller
         int targetPatientId = 0;
         if (patientId.HasValue && patientId.Value > 0)
         {
-            bool hasAccess = await _context.AccountPatientProfiles
-                .AnyAsync(l => l.AccountId == CurrentAccountId && l.PatientId == patientId.Value && l.Status == Domain.LinkStatus.Active, ct);
-            if (!hasAccess) return Forbid();
+            if (!await _patientAccessService.CanViewRecordsAsync(CurrentAccountId, patientId.Value, ct))
+            {
+                return Forbid();
+            }
+
             targetPatientId = patientId.Value;
         }
         else
         {
             var primaryLink = await _context.AccountPatientProfiles
-                .FirstOrDefaultAsync(l => l.AccountId == CurrentAccountId && l.Status == Domain.LinkStatus.Active, ct);
+                .AsNoTracking()
+                .Where(l => l.AccountId == CurrentAccountId && l.Status == Domain.LinkStatus.Active && l.CanViewRecords)
+                .OrderByDescending(l => l.Relationship == Domain.PatientRelationship.Self)
+                .ThenBy(l => l.PatientId)
+                .FirstOrDefaultAsync(ct);
             if (primaryLink != null)
             {
                 targetPatientId = primaryLink.PatientId;

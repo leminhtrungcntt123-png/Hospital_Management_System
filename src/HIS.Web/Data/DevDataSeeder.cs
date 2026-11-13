@@ -26,15 +26,6 @@ public static class DevDataSeeder
 
         try
         {
-            await db.Database.ExecuteSqlRawAsync(@"
-                ALTER TABLE deposits ADD COLUMN IF NOT EXISTS approved_by character varying(150);
-                ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS service_id integer REFERENCES services(id);
-                ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS medication_id integer REFERENCES medications(id);
-                CREATE SEQUENCE IF NOT EXISTS seq_invoice_number START WITH 100 INCREMENT BY 1;
-                CREATE SEQUENCE IF NOT EXISTS seq_transaction_code START WITH 200 INCREMENT BY 1;
-                CREATE SEQUENCE IF NOT EXISTS seq_deposit_code START WITH 100 INCREMENT BY 1;
-                CREATE UNIQUE INDEX IF NOT EXISTS uq_cashier_shifts_one_open_per_cashier ON cashier_shifts(cashier_id) WHERE status = 'OPEN';
-            ");
             var passwordHash = BCrypt.Net.BCrypt.HashPassword(defaultPassword);
 
             // 1. TÀI KHOẢN ADMIN
@@ -591,7 +582,7 @@ public static class DevDataSeeder
                 }
             }
 
-            // 11. TÀI KHOẢN KẾ TOÁN / THU NGÂN (Role ACCOUNTANT = 6)
+            // 11. TÀI KHOẢN KẾ TOÁN / THU NGÂN (Role Nurse = 4 để giữ nguyên schema develop)
             var cashierAcc = await db.Accounts.FirstOrDefaultAsync(a => a.Username == "ketoan");
             if (cashierAcc == null)
             {
@@ -600,7 +591,7 @@ public static class DevDataSeeder
                     Username = "ketoan",
                     Email = "ketoan@his.local",
                     PasswordHash = passwordHash,
-                    RoleId = (int)RoleId.Accountant,
+                    RoleId = (int)RoleId.Nurse,
                     IsActive = true
                 };
                 db.Accounts.Add(cashierAcc);
@@ -613,13 +604,13 @@ public static class DevDataSeeder
                 var sExam = await db.Services.FirstOrDefaultAsync(s => s.ServiceTypeId == (int)ServiceTypeId.Examination);
                 if (sExam == null)
                 {
-                    sExam = new Service { Name = "Khám bệnh chuyên khoa Nội", ServiceTypeId = (int)ServiceTypeId.Examination, Price = 150000m, IsInsuranceCovered = true, IsActive = true };
+                    sExam = new Service { Name = "Khám bệnh chuyên khoa Nội", ServiceTypeId = (int)ServiceTypeId.Examination, Price = 150000m, IsActive = true };
                     db.Services.Add(sExam);
                 }
-                var sBlood = new Service { Name = "Tổng phân tích tế bào máu ngoại vi", ServiceTypeId = (int)ServiceTypeId.LabTest, Price = 120000m, IsInsuranceCovered = true, IsActive = true };
-                var sXray = new Service { Name = "Chụp X-quang ngực thẳng kỹ thuật số", ServiceTypeId = (int)ServiceTypeId.Imaging, Price = 180000m, IsInsuranceCovered = true, IsActive = true };
-                var sUltra = new Service { Name = "Siêu âm ổ bụng tổng quát", ServiceTypeId = (int)ServiceTypeId.Imaging, Price = 220000m, IsInsuranceCovered = true, IsActive = true };
-                var sVip = new Service { Name = "Khám chuyên gia theo yêu cầu (Tự túc)", ServiceTypeId = (int)ServiceTypeId.Examination, Price = 300000m, IsInsuranceCovered = false, IsActive = true };
+                var sBlood = new Service { Name = "Tổng phân tích tế bào máu ngoại vi", ServiceTypeId = (int)ServiceTypeId.LabTest, Price = 120000m, IsActive = true };
+                var sXray = new Service { Name = "Chụp X-quang ngực thẳng kỹ thuật số", ServiceTypeId = (int)ServiceTypeId.Imaging, Price = 180000m, IsActive = true };
+                var sUltra = new Service { Name = "Siêu âm ổ bụng tổng quát", ServiceTypeId = (int)ServiceTypeId.Imaging, Price = 220000m, IsActive = true };
+                var sVip = new Service { Name = "Khám chuyên gia theo yêu cầu (Tự túc)", ServiceTypeId = (int)ServiceTypeId.Examination, Price = 300000m, IsActive = true };
 
                 db.Services.AddRange(sBlood, sXray, sUltra, sVip);
                 await db.SaveChangesAsync();
@@ -629,11 +620,11 @@ public static class DevDataSeeder
             if (!await db.Medications.AnyAsync())
             {
                 db.Medications.AddRange(
-                    new Medication { Name = "Paracetamol 500mg", ActiveIngredient = "Paracetamol", Strength = "500mg", Unit = "Viên", Price = 1500m, IsInsuranceCovered = true, IsActive = true },
-                    new Medication { Name = "Amoxicillin 500mg", ActiveIngredient = "Amoxicillin", Strength = "500mg", Unit = "Viên", Price = 3500m, IsInsuranceCovered = true, IsActive = true },
-                    new Medication { Name = "Amlodipine 5mg", ActiveIngredient = "Amlodipine", Strength = "5mg", Unit = "Viên", Price = 4000m, IsInsuranceCovered = true, IsActive = true },
-                    new Medication { Name = "Vitamin C 500mg", ActiveIngredient = "Acid Ascorbic", Strength = "500mg", Unit = "Viên", Price = 1000m, IsInsuranceCovered = true, IsActive = true },
-                    new Medication { Name = "Viên bổ gan thảo dược (Tự túc)", ActiveIngredient = "Cao Actiso", Strength = "200mg", Unit = "Viên", Price = 25000m, IsInsuranceCovered = false, IsActive = true }
+                    new Medication { Name = "Paracetamol 500mg", ActiveIngredient = "Paracetamol", Strength = "500mg", Unit = "Viên", Price = 1500m, IsActive = true },
+                    new Medication { Name = "Amoxicillin 500mg", ActiveIngredient = "Amoxicillin", Strength = "500mg", Unit = "Viên", Price = 3500m, IsActive = true },
+                    new Medication { Name = "Amlodipine 5mg", ActiveIngredient = "Amlodipine", Strength = "5mg", Unit = "Viên", Price = 4000m, IsActive = true },
+                    new Medication { Name = "Vitamin C 500mg", ActiveIngredient = "Acid Ascorbic", Strength = "500mg", Unit = "Viên", Price = 1000m, IsActive = true },
+                    new Medication { Name = "Viên bổ gan thảo dược (Tự túc)", ActiveIngredient = "Cao Actiso", Strength = "200mg", Unit = "Viên", Price = 25000m, IsActive = true }
                 );
                 await db.SaveChangesAsync();
             }
@@ -710,133 +701,144 @@ public static class DevDataSeeder
                 await db.SaveChangesAsync();
             }
 
-            // Đảm bảo có ca thu ngân đang mở
+            // Đảm bảo có ca thu ngân đang mở (lưu trong access_logs theo schema develop)
             int cashierId = cashierAcc?.Id ?? 1;
-            var currentOpenShift = await db.CashierShifts.FirstOrDefaultAsync(s => s.CashierId == cashierId && s.Status == ShiftStatus.Open);
-            if (currentOpenShift == null)
+            var hasOpenShift = await db.AccessLogs.AnyAsync(l => l.EntityName == "cashier_shifts" && l.AccountId == cashierId && l.Action == "SHIFT_OPEN");
+            if (!hasOpenShift)
             {
-                currentOpenShift = new CashierShift
+                var shiftLog = new AccessLog
                 {
-                    CashierId = cashierId,
-                    OpeningCash = 1000000m,
-                    Status = ShiftStatus.Open,
-                    OpenedAt = DateTime.Now.AddHours(-2),
-                    Note = "Ca làm việc thu ngân mẫu"
+                    AccountId = cashierId,
+                    Action = "SHIFT_OPEN",
+                    EntityName = "cashier_shifts",
+                    IsSuccess = true,
+                    Severity = "INFO",
+                    OccurredAt = DateTime.Now.AddHours(-2),
+                    Details = "{\"OpeningCash\":1000000,\"Note\":\"Ca làm việc thu ngân mẫu\"}"
                 };
-                db.CashierShifts.Add(currentOpenShift);
+                db.AccessLogs.Add(shiftLog);
+                await db.SaveChangesAsync();
+                shiftLog.EntityId = checked((int)shiftLog.Id);
                 await db.SaveChangesAsync();
             }
 
-            if (!await db.Deposits.AnyAsync() && pChi != null)
+            if (db.Database.IsRelational())
             {
+                await db.Payments
+                    .Where(p => p.ReceiptEmail != null && p.ReceiptEmail.StartsWith("#U=") && p.PaymentType != PaymentType.Deposit)
+                    .ExecuteUpdateAsync(s => s.SetProperty(p => p.PaymentType, PaymentType.Deposit));
+            }
+
+            if (!await db.Payments.AnyAsync(p => p.PaymentType == PaymentType.Deposit) && pChi != null)
+            {
+                async Task<Invoice?> EnsureSeedInvoiceAsync(int patId, DateTime at)
+                {
+                    var app = await db.Appointments
+                        .Include(a => a.Invoice)
+                        .Where(a => a.PatientId == patId && (a.Invoice == null || a.Invoice.Status != InvoiceStatus.Paid))
+                        .OrderByDescending(a => a.CreatedAt)
+                        .FirstOrDefaultAsync();
+                    if (app == null)
+                    {
+                        var anyDoc = await db.Doctors.AsNoTracking().FirstOrDefaultAsync();
+                        var anyDept = await db.Departments.AsNoTracking().FirstOrDefaultAsync();
+                        if (anyDoc == null || anyDept == null) return null;
+                        app = new Appointment
+                        {
+                            PatientId = patId,
+                            DoctorId = anyDoc.Id,
+                            DepartmentId = anyDept.Id,
+                            AppointmentCode = $"DEP-SEED-{patId}",
+                            StatusId = (int)AppointmentStatusId.CheckedIn,
+                            CreatedAt = at
+                        };
+                        db.Appointments.Add(app);
+                        await db.SaveChangesAsync();
+                    }
+
+                    if (app.Invoice == null)
+                    {
+                        var inv = new Invoice
+                        {
+                            AppointmentId = app.Id,
+                            PatientId = patId,
+                            TotalAmount = 0m,
+                            InsuranceCoveredAmount = 0m,
+                            PatientAmount = 0m,
+                            Status = InvoiceStatus.Unpaid,
+                            CreatedAt = at
+                        };
+                        db.Invoices.Add(inv);
+                        await db.SaveChangesAsync();
+                        return inv;
+                    }
+
+                    return app.Invoice;
+                }
+
                 await using var depositTx = await db.Database.BeginTransactionAsync();
-                // Phiếu 1: Lê Minh Chí - 2.000.000 đ Tiền mặt
-                var dep1 = new Deposit
-                {
-                    DepositCode = "TU-000001",
-                    PatientId = pChi.Id,
-                    Amount = 2000000m,
-                    UsedAmount = 0m,
-                    RefundedAmount = 0m,
-                    Status = DepositStatus.Active,
-                    PaymentMethod = PaymentMethod.Cash,
-                    Purpose = "Tạm ứng nhập viện Ngoại khoa",
-                    ApprovedBy = "BS.CKII Phạm Thu Hằng",
-                    CashierId = cashierId,
-                    ShiftId = currentOpenShift.Id,
-                    CreatedAt = DateTime.Now.AddMinutes(-90)
-                };
-                db.Deposits.Add(dep1);
-                await db.SaveChangesAsync();
 
-                db.Payments.Add(new Payment
+                var invChi = await EnsureSeedInvoiceAsync(pChi.Id, DateTime.Now.AddMinutes(-90));
+                if (invChi != null)
                 {
-                    DepositId = dep1.Id,
-                    TransactionCode = "PT-00000101",
-                    Amount = 2000000m,
-                    PaymentType = PaymentType.Deposit,
-                    PaymentMethod = PaymentMethod.Cash,
-                    Status = PaymentStatus.Confirmed,
-                    CashierId = cashierId,
-                    ShiftId = currentOpenShift.Id,
-                    Note = "Thu tạm ứng TU-000001",
-                    PaidAt = DateTime.Now.AddMinutes(-90)
-                });
+                    db.Payments.Add(new Payment
+                    {
+                        InvoiceId = invChi.Id,
+                        Amount = 2000000m,
+                        PaymentType = PaymentType.Deposit,
+                        PaymentMethod = PaymentMethod.Cash,
+                        CashierId = cashierId,
+                        ReceiptEmail = "#U=0;R=0#",
+                        Note = "#BY=BS.CKII Phạm Thu Hằng;PUR=Tạm ứng nhập viện Ngoại khoa#Thu tạm ứng mẫu",
+                        PaidAt = DateTime.Now.AddMinutes(-90)
+                    });
+                }
 
-                // Phiếu 2: Trần Quốc Bảo - 300.000 đ Chuyển khoản VietQR
                 if (pBao != null)
                 {
-                    var dep2 = new Deposit
+                    var invBao = await EnsureSeedInvoiceAsync(pBao.Id, DateTime.Now.AddMinutes(-60));
+                    if (invBao != null)
                     {
-                        DepositCode = "TU-000002",
-                        PatientId = pBao.Id,
-                        Amount = 300000m,
-                        UsedAmount = 0m,
-                        RefundedAmount = 0m,
-                        Status = DepositStatus.Active,
-                        PaymentMethod = PaymentMethod.BankTransfer,
-                        ReferenceCode = "FT2431889210",
-                        Purpose = "Tạm ứng xét nghiệm cận lâm sàng",
-                        ApprovedBy = "BS.CKII Phạm Thu Hằng",
-                        CashierId = cashierId,
-                        ShiftId = currentOpenShift.Id,
-                        CreatedAt = DateTime.Now.AddMinutes(-60)
-                    };
-                    db.Deposits.Add(dep2);
-                    await db.SaveChangesAsync();
-
-                    db.Payments.Add(new Payment
-                    {
-                        DepositId = dep2.Id,
-                        TransactionCode = "PT-00000102",
-                        ReferenceCode = "FT2431889210",
-                        Amount = 300000m,
-                        PaymentType = PaymentType.Deposit,
-                        PaymentMethod = PaymentMethod.BankTransfer,
-                        Status = PaymentStatus.Confirmed,
-                        CashierId = cashierId,
-                        ShiftId = currentOpenShift.Id,
-                        Note = "Thu tạm ứng TU-000002 qua VietQR",
-                        PaidAt = DateTime.Now.AddMinutes(-60)
-                    });
+                        db.Payments.Add(new Payment
+                        {
+                            InvoiceId = invBao.Id,
+                            Amount = 300000m,
+                            PaymentType = PaymentType.Deposit,
+                            PaymentMethod = PaymentMethod.BankTransfer,
+                            CashierId = cashierId,
+                            ReceiptEmail = "#U=0;R=0;REF=FT2431889210#",
+                            Note = "#BY=BS.CKII Phạm Thu Hằng;PUR=Tạm ứng xét nghiệm cận lâm sàng#Thu tạm ứng qua VietQR",
+                            PaidAt = DateTime.Now.AddMinutes(-60)
+                        });
+                    }
                 }
 
-                // Phiếu 3: Lê Thị Ngọc - 1.200.000 đ Tiền mặt
                 if (pNgoc != null)
                 {
-                    var dep3 = new Deposit
+                    var invNgoc = await EnsureSeedInvoiceAsync(pNgoc.Id, DateTime.Now.AddMinutes(-45));
+                    if (invNgoc != null)
                     {
-                        DepositCode = "TU-000003",
-                        PatientId = pNgoc.Id,
-                        Amount = 1200000m,
-                        UsedAmount = 0m,
-                        RefundedAmount = 0m,
-                        Status = DepositStatus.Active,
-                        PaymentMethod = PaymentMethod.Cash,
-                        Purpose = "Tạm ứng phẫu thuật nội soi",
-                        ApprovedBy = "TS.BS Lê Hoàng Nam",
-                        CashierId = cashierId,
-                        ShiftId = currentOpenShift.Id,
-                        CreatedAt = DateTime.Now.AddMinutes(-45)
-                    };
-                    db.Deposits.Add(dep3);
-                    await db.SaveChangesAsync();
-
-                    db.Payments.Add(new Payment
-                    {
-                        DepositId = dep3.Id,
-                        TransactionCode = "PT-00000103",
-                        Amount = 1200000m,
-                        PaymentType = PaymentType.Deposit,
-                        PaymentMethod = PaymentMethod.Cash,
-                        Status = PaymentStatus.Confirmed,
-                        CashierId = cashierId,
-                        ShiftId = currentOpenShift.Id,
-                        Note = "Thu tạm ứng TU-000003",
-                        PaidAt = DateTime.Now.AddMinutes(-45)
-                    });
+                        db.Payments.Add(new Payment
+                        {
+                            InvoiceId = invNgoc.Id,
+                            Amount = 1200000m,
+                            PaymentType = PaymentType.Deposit,
+                            PaymentMethod = PaymentMethod.Cash,
+                            CashierId = cashierId,
+                            ReceiptEmail = "#U=0;R=0#",
+                            Note = "#BY=TS.BS Lê Hoàng Nam;PUR=Tạm ứng phẫu thuật nội soi#Thu tạm ứng mẫu",
+                            PaidAt = DateTime.Now.AddMinutes(-45)
+                        });
+                    }
                 }
+
                 await db.SaveChangesAsync();
+                if (db.Database.IsRelational())
+                {
+                    await db.Payments
+                        .Where(p => p.ReceiptEmail != null && p.ReceiptEmail.StartsWith("#U=") && p.PaymentType != PaymentType.Deposit)
+                        .ExecuteUpdateAsync(s => s.SetProperty(p => p.PaymentType, PaymentType.Deposit));
+                }
                 await depositTx.CommitAsync();
             }
 

@@ -5,10 +5,7 @@ DROP TABLE IF EXISTS
     access_logs,
     invoice_items,
     payments,
-    deposit_usages,
-    deposits,
     invoices,
-    cashier_shifts,
     prescription_items,
     prescriptions,
     lab_results,
@@ -40,8 +37,6 @@ DROP TABLE IF EXISTS
     service_types,
     roles 
 CASCADE;
-
-DROP SEQUENCE IF EXISTS seq_invoice_number, seq_transaction_code, seq_deposit_code;
 
 -- ==============================================================================
 -- 1. LOOKUP TABLES
@@ -108,7 +103,6 @@ CREATE TABLE patients (
     national_id     VARCHAR(20) UNIQUE,             -- NULL với trẻ chưa có CCCD
     phone_number    VARCHAR(15) NOT NULL,
     address         VARCHAR(255),
-    allergies       VARCHAR(500),
     created_at      TIMESTAMP NOT NULL DEFAULT now()
 );
 
@@ -180,23 +174,21 @@ CREATE TABLE department_heads (
 -- 3. CATALOGS (ADMIN-MANAGED)
 -- ==============================================================================
 CREATE TABLE medications (
-    id                   INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    name                 VARCHAR(150) NOT NULL,
-    active_ingredient    VARCHAR(150),
-    strength             VARCHAR(50),
-    unit                 VARCHAR(20) NOT NULL,       -- viên, chai, ống...
-    price                NUMERIC(12,2) NOT NULL DEFAULT 0,
-    is_insurance_covered BOOLEAN NOT NULL DEFAULT TRUE,
-    is_active            BOOLEAN NOT NULL DEFAULT TRUE
+    id                  INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name                VARCHAR(150) NOT NULL,
+    active_ingredient   VARCHAR(150),
+    strength            VARCHAR(50),
+    unit                VARCHAR(20) NOT NULL,       -- viên, chai, ống...
+    price               NUMERIC(12,2) NOT NULL DEFAULT 0,
+    is_active           BOOLEAN NOT NULL DEFAULT TRUE
 );
 
 CREATE TABLE services (
-    id                   INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    name                 VARCHAR(150) NOT NULL,
-    service_type_id      INTEGER NOT NULL REFERENCES service_types(id),
-    price                NUMERIC(12,2) NOT NULL DEFAULT 0,
-    is_insurance_covered BOOLEAN NOT NULL DEFAULT TRUE,
-    is_active            BOOLEAN NOT NULL DEFAULT TRUE
+    id              INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name            VARCHAR(150) NOT NULL,
+    service_type_id INTEGER NOT NULL REFERENCES service_types(id),
+    price           NUMERIC(12,2) NOT NULL DEFAULT 0,
+    is_active       BOOLEAN NOT NULL DEFAULT TRUE
 );
 
 CREATE TABLE insurance_plans (
@@ -458,111 +450,42 @@ CREATE TABLE prescription_items (
 );
 
 -- ==============================================================================
--- 6. BILLING, DEPOSITS & CASHIER SHIFT (BHYT chỉ áp dụng ở bước này)
+-- 6. BILLING (BHYT chỉ áp dụng ở bước này)
 -- ==============================================================================
-CREATE TABLE cashier_shifts (
-    id              INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    cashier_id      INTEGER NOT NULL REFERENCES accounts(id),
-    opened_at       TIMESTAMP NOT NULL DEFAULT now(),
-    closed_at       TIMESTAMP,
-    opening_cash    NUMERIC(18,0) NOT NULL DEFAULT 0,
-    expected_cash   NUMERIC(18,0),
-    counted_cash    NUMERIC(18,0),
-    difference      NUMERIC(18,0),
-    status          VARCHAR(20) NOT NULL DEFAULT 'OPEN'
-                    CHECK (status IN ('OPEN','CLOSED')),
-    note            VARCHAR(255)
-);
-
-CREATE UNIQUE INDEX uq_cashier_shifts_one_open_per_cashier ON cashier_shifts(cashier_id) WHERE status = 'OPEN';
-
 CREATE TABLE invoices (
     id                          INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    invoice_number              VARCHAR(20) NOT NULL UNIQUE,
     appointment_id              INTEGER NOT NULL UNIQUE REFERENCES appointments(id),
     patient_id                  INTEGER NOT NULL REFERENCES patients(id),
-    exam_date                   DATE NOT NULL DEFAULT CURRENT_DATE,
     insurance_plan_id           INTEGER REFERENCES insurance_plans(id),
     insurance_card_id           INTEGER REFERENCES insurance_cards(id),   -- phải là thẻ của chính patient_id (kiểm ở BLL)
     coverage_pct_applied        NUMERIC(5,2) CHECK (coverage_pct_applied BETWEEN 0 AND 100),  -- bản chụp tỉ lệ lúc tính
-    total_amount                NUMERIC(18,0) NOT NULL DEFAULT 0,
-    insurance_covered_amount    NUMERIC(18,0) NOT NULL DEFAULT 0,
-    patient_amount              NUMERIC(18,0) NOT NULL DEFAULT 0,         -- tiền bệnh nhân phải trả sau BHYT
+    total_amount                NUMERIC(12,2) NOT NULL DEFAULT 0,
+    insurance_covered_amount    NUMERIC(12,2) NOT NULL DEFAULT 0,
+    patient_amount              NUMERIC(12,2) NOT NULL DEFAULT 0,         -- tiền bệnh nhân phải trả sau BHYT
     status                      VARCHAR(20) NOT NULL DEFAULT 'UNPAID'
                                 CHECK (status IN ('UNPAID','PARTIALLY_PAID','PAID')),
     created_at                  TIMESTAMP NOT NULL DEFAULT now()
 );
 
-CREATE TABLE deposits (
-    id              INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    deposit_code    VARCHAR(32) NOT NULL UNIQUE,
-    patient_id      INTEGER NOT NULL REFERENCES patients(id),
-    appointment_id  INTEGER REFERENCES appointments(id),
-    amount          NUMERIC(18,0) NOT NULL CHECK (amount > 0),
-    used_amount     NUMERIC(18,0) NOT NULL DEFAULT 0 CHECK (used_amount >= 0),
-    refunded_amount NUMERIC(18,0) NOT NULL DEFAULT 0 CHECK (refunded_amount >= 0),
-    status          VARCHAR(20) NOT NULL DEFAULT 'ACTIVE'
-                    CHECK (status IN ('ACTIVE','DEPLETED','REFUNDED')),
-    payment_method  VARCHAR(20) NOT NULL CHECK (payment_method IN ('CASH','BANK_TRANSFER')),
-    reference_code  VARCHAR(100),
-    purpose         VARCHAR(255),
-    approved_by     VARCHAR(150),
-    note            VARCHAR(500),
-    cashier_id      INTEGER REFERENCES accounts(id),
-    shift_id        INTEGER REFERENCES cashier_shifts(id),
-    created_at      TIMESTAMP NOT NULL DEFAULT now()
-);
-
 CREATE TABLE payments (
-    id                  INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    transaction_code    VARCHAR(30) NOT NULL UNIQUE,
-    invoice_id          INTEGER REFERENCES invoices(id),
-    deposit_id          INTEGER REFERENCES deposits(id),
-    original_payment_id INTEGER REFERENCES payments(id),
-    amount              NUMERIC(18,0) NOT NULL CHECK (amount > 0),
-    payment_type        VARCHAR(15) NOT NULL DEFAULT 'PAYMENT'
-                        CHECK (payment_type IN ('DEPOSIT','PAYMENT','REFUND')),
-    payment_method      VARCHAR(25) NOT NULL
-                        CHECK (payment_method IN ('CASH','BANK_TRANSFER','DEPOSIT_DEDUCTION')),
-    reference_code      VARCHAR(100),
-    status              VARCHAR(20) NOT NULL DEFAULT 'CONFIRMED'
-                        CHECK (status IN ('PENDING','CONFIRMED')),
-    idempotency_key     VARCHAR(100),
-    cashier_id          INTEGER REFERENCES accounts(id),
-    shift_id            INTEGER REFERENCES cashier_shifts(id),
-    receipt_email       VARCHAR(100),                     -- Email nhận biên lai điện tử
-    note                VARCHAR(255),
-    refund_reason       VARCHAR(500),
-    paid_at             TIMESTAMP NOT NULL DEFAULT now()
+    id              INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    invoice_id      INTEGER NOT NULL REFERENCES invoices(id),
+    amount          NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+    payment_type    VARCHAR(15) NOT NULL DEFAULT 'PAYMENT'
+                    CHECK (payment_type IN ('DEPOSIT','PAYMENT','REFUND')),
+    payment_method  VARCHAR(20) NOT NULL CHECK (payment_method IN ('CASH','BANK_TRANSFER')),
+    cashier_id      INTEGER REFERENCES accounts(id),
+    receipt_email   VARCHAR(100),                     -- Email nhận biên lai điện tử
+    note            VARCHAR(255),
+    paid_at         TIMESTAMP NOT NULL DEFAULT now()
 );
-
-CREATE SEQUENCE IF NOT EXISTS seq_invoice_number START WITH 100 INCREMENT BY 1;
-CREATE SEQUENCE IF NOT EXISTS seq_transaction_code START WITH 200 INCREMENT BY 1;
-CREATE SEQUENCE IF NOT EXISTS seq_deposit_code START WITH 100 INCREMENT BY 1;
 
 CREATE TABLE invoice_items (
-    id                   INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    invoice_id           INTEGER NOT NULL REFERENCES invoices(id),
-    category             VARCHAR(20) NOT NULL CHECK (category IN ('EXAMINATION','MEDICATION','SERVICE')),
-    description          VARCHAR(255) NOT NULL,
-    service_id           INTEGER REFERENCES services(id),
-    medication_id        INTEGER REFERENCES medications(id),
-    unit_price           NUMERIC(18,0) NOT NULL DEFAULT 0,
-    quantity             INTEGER NOT NULL DEFAULT 1,
-    amount               NUMERIC(18,0) NOT NULL,
-    is_insurance_covered BOOLEAN NOT NULL DEFAULT TRUE,
-    coverage_pct_applied NUMERIC(5,2) NOT NULL DEFAULT 0,
-    covered_amount       NUMERIC(18,0) NOT NULL DEFAULT 0,
-    patient_amount       NUMERIC(18,0) NOT NULL DEFAULT 0
-);
-
-CREATE TABLE deposit_usages (
     id          INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    deposit_id  INTEGER NOT NULL REFERENCES deposits(id),
     invoice_id  INTEGER NOT NULL REFERENCES invoices(id),
-    amount      NUMERIC(18,0) NOT NULL CHECK (amount > 0),
-    used_at     TIMESTAMP NOT NULL DEFAULT now(),
-    cashier_id  INTEGER REFERENCES accounts(id)
+    category    VARCHAR(20) NOT NULL CHECK (category IN ('EXAMINATION','MEDICATION','SERVICE')),
+    description VARCHAR(255) NOT NULL,
+    amount      NUMERIC(12,2) NOT NULL
 );
 
 -- ==============================================================================
@@ -646,8 +569,7 @@ INSERT INTO roles (id, code, name) VALUES
  (2,'DEPARTMENT_HEAD','Trưởng khoa'),
  (3,'DOCTOR','Bác sĩ'),
  (4,'NURSE','Y tá / Lễ tân'),
- (5,'PATIENT','Bệnh nhân'),
- (6,'ACCOUNTANT','Kế toán / Thu ngân');
+ (5,'PATIENT','Bệnh nhân');
 
 INSERT INTO service_types (id, code, name) VALUES
  (1,'EXAMINATION','Khám bệnh'),

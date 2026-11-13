@@ -95,11 +95,11 @@ public sealed class AdminReportService(AppDbContext db) : IAdminReportService
             .ToDictionaryAsync(x => x.DepartmentId, x => x.Count, ct);
 
         var paymentsByDept = await db.Payments.AsNoTracking()
-            .Include(p => p.Invoice!)
-                .ThenInclude(i => i.Appointment!)
+            .Include(p => p.Invoice)
+                .ThenInclude(i => i.Appointment)
                     .ThenInclude(a => a.Doctor)
             .Where(p => p.PaidAt >= start && p.PaidAt < end && p.Invoice != null && p.Invoice.Appointment != null)
-            .GroupBy(p => p.Invoice!.Appointment!.DepartmentId ?? (p.Invoice.Appointment.Doctor != null ? p.Invoice.Appointment.Doctor.DepartmentId : 0))
+            .GroupBy(p => p.Invoice.Appointment!.DepartmentId ?? (p.Invoice.Appointment.Doctor != null ? p.Invoice.Appointment.Doctor.DepartmentId : 0))
             .Select(g => new
             {
                 DepartmentId = g.Key,

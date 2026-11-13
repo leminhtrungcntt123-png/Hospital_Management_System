@@ -10,8 +10,8 @@
     // Tiền chuyển khoản thực nhận = CK thu viện phí + CK thu tạm ứng
     decimal totalTransfer = Model.Where(p => p.PaymentMethod == HIS.Domain.PaymentMethod.BankTransfer && (p.PaymentType == HIS.Domain.PaymentType.Payment || p.PaymentType == HIS.Domain.PaymentType.Deposit)).Sum(p => p.Amount);
 
-    // Viện phí đã cấn trừ từ tạm ứng (đối trừ nội bộ không phát sinh dòng tiền mặt/CK mới tại quầy)
-    decimal totalDepositDeduct = Model.Where(p => p.PaymentMethod == HIS.Domain.PaymentMethod.DepositDeduction).Sum(p => p.Amount);
+    // Viện phí đã cấn trừ từ tạm ứng (lưu tại nhật ký quyết toán hóa đơn)
+    decimal totalDepositDeduct = 0m;
 
     // Tiền hoàn trả cho người bệnh (hoàn số dư tạm ứng thừa hoặc hoàn viện phí)
     decimal totalRefund = Model.Where(p => p.PaymentType == HIS.Domain.PaymentType.Refund).Sum(p => p.Amount);
@@ -91,7 +91,6 @@
                 <option value="">-- Tất cả hình thức --</option>
                 <option value="Cash" selected="@(filter.Method == HIS.Domain.PaymentMethod.Cash)">Tiền mặt</option>
                 <option value="BankTransfer" selected="@(filter.Method == HIS.Domain.PaymentMethod.BankTransfer)">Chuyển khoản (VietQR)</option>
-                <option value="DepositDeduction" selected="@(filter.Method == HIS.Domain.PaymentMethod.DepositDeduction)">Cấn trừ tạm ứng</option>
             </select>
         </div>
 
@@ -146,7 +145,7 @@
                                 <span style="font-weight: 700; color: #0f172a;">@item.PatientName</span><br />
                                 <small style="color: #64748b;">Mã: @item.AppointmentCode</small>
                             </td>
-                            <td style="padding: 12px 14px; text-align: right; font-weight: 800; font-family: monospace; color: @(item.PaymentType == HIS.Domain.PaymentType.Refund ? "#b91c1c" : (item.PaymentMethod == HIS.Domain.PaymentMethod.DepositDeduction ? "#0284c7" : "#0f172a"));">
+                            <td style="padding: 12px 14px; text-align: right; font-weight: 800; font-family: monospace; color: @(item.PaymentType == HIS.Domain.PaymentType.Refund ? "#b91c1c" : "#0f172a");">
                                 @(item.PaymentType == HIS.Domain.PaymentType.Refund ? "-" : "")@item.Amount.ToString("N0") đ
                             </td>
                             <td style="padding: 12px 14px; text-align: center;">
@@ -168,13 +167,9 @@
                                 {
                                     <span style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 2px 6px; border-radius: 4px; font-size: 11.5px; font-weight: 600;">💵 Tiền mặt</span>
                                 }
-                                else if (item.PaymentMethod == HIS.Domain.PaymentMethod.BankTransfer)
-                                {
-                                    <span style="background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; padding: 2px 6px; border-radius: 4px; font-size: 11.5px; font-weight: 600;">📱 Chuyển khoản (VietQR)</span>
-                                }
                                 else
                                 {
-                                    <span style="background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; padding: 2px 6px; border-radius: 4px; font-size: 11.5px; font-weight: 700;">🔄 Cấn trừ tạm ứng</span>
+                                    <span style="background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; padding: 2px 6px; border-radius: 4px; font-size: 11.5px; font-weight: 600;">📱 Chuyển khoản (VietQR)</span>
                                 }
                             </td>
                             <td style="padding: 12px 14px; color: #64748b; font-family: monospace;">@(item.ReferenceCode ?? "—")</td>

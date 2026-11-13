@@ -13,7 +13,7 @@ using QRCoder;
 namespace HIS.Web.Areas.Staff.Controllers;
 
 [Area("Staff")]
-[Authorize(Policy = "CashierAccess")]
+[Authorize(Policy = "StaffAny")]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public class CashierController : Controller
 {
@@ -207,7 +207,7 @@ public class CashierController : Controller
         foreach (var item in ledger)
         {
             var pType = item.PaymentType == Domain.PaymentType.Payment ? "Thanh toán" : (item.PaymentType == Domain.PaymentType.Deposit ? "Tạm ứng" : "Hoàn tiền");
-            var pMethod = item.PaymentMethod == Domain.PaymentMethod.Cash ? "Tiền mặt" : (item.PaymentMethod == Domain.PaymentMethod.BankTransfer ? "Chuyển khoản" : "Cấn trừ tạm ứng");
+            var pMethod = item.PaymentMethod == Domain.PaymentMethod.Cash ? "Tiền mặt" : "Chuyển khoản";
             sb.AppendLine($"{CsvEscape(item.TransactionCode)},\"{item.PaidAt:dd/MM/yyyy HH:mm:ss}\",{CsvEscape(item.InvoiceNumber)},{CsvEscape(item.AppointmentCode)},{CsvEscape(item.PatientName)},{item.Amount},{CsvEscape(pType)},{CsvEscape(pMethod)},{CsvEscape(item.ReferenceCode)},{CsvEscape(item.CashierName)}");
         }
 

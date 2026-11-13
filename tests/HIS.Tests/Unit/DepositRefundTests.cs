@@ -30,17 +30,11 @@ public class DepositRefundTests
 
     private static async Task EnsureOpenShiftAsync(AppDbContext db, int cashierId)
     {
-        var hasShift = await db.CashierShifts.AnyAsync(s => s.CashierId == cashierId && s.Status == ShiftStatus.Open);
-        if (!hasShift)
+        var shiftService = new CashierShiftService(db, new VietnamTimeProvider());
+        var existing = await shiftService.GetCurrentShiftAsync(cashierId);
+        if (existing == null)
         {
-            db.CashierShifts.Add(new CashierShift
-            {
-                CashierId = cashierId,
-                OpenedAt = DateTime.Now,
-                OpeningCash = 1000000m,
-                Status = ShiftStatus.Open
-            });
-            await db.SaveChangesAsync();
+            await shiftService.OpenShiftAsync(new OpenShiftRequest(cashierId, 1000000m, "Test shift"));
         }
     }
 
@@ -104,7 +98,7 @@ public class DepositRefundTests
         Assert.Equal(DepositStatus.Active, dep.Status);
 
         // Kiểm tra bút toán trong sổ thu ngân
-        var payment = await db.Payments.FirstOrDefaultAsync(p => p.DepositId == dep.Id && p.PaymentType == PaymentType.Deposit);
+        var payment = await db.Payments.FirstOrDefaultAsync(p => p.Id == dep.Id && p.PaymentType == PaymentType.Deposit);
         Assert.NotNull(payment);
         Assert.Equal(2000000m, payment.Amount);
         Assert.Equal(PaymentMethod.Cash, payment.PaymentMethod);
@@ -182,7 +176,8 @@ public class DepositRefundTests
         var refundRes = await billingService.RefundDepositAsync(refundReq);
         Assert.True(refundRes.IsSuccess);
 
-        var updatedDep = await db.Deposits.FindAsync(dep.Id);
+        var summaryAfterPartial = await billingService.GetPatientDepositSummaryAsync(patient.Id);
+        var updatedDep = summaryAfterPartial.ActiveDeposits.FirstOrDefault(d => d.Id == dep.Id);
         Assert.NotNull(updatedDep);
         Assert.Equal(400000m, updatedDep.RefundedAmount);
         Assert.Equal(600000m, updatedDep.Balance);
@@ -200,7 +195,8 @@ public class DepositRefundTests
         var refundAllRes = await billingService.RefundDepositAsync(refundAllReq);
         Assert.True(refundAllRes.IsSuccess);
 
-        var finalDep = await db.Deposits.FindAsync(dep.Id);
+        var summaryAfterAll = await billingService.GetPatientDepositSummaryAsync(patient.Id);
+        var finalDep = summaryAfterAll.ActiveDeposits.FirstOrDefault(d => d.Id == dep.Id);
         Assert.NotNull(finalDep);
         Assert.Equal(1000000m, finalDep.RefundedAmount);
         Assert.Equal(0m, finalDep.Balance);
@@ -232,8 +228,6 @@ public class DepositRefundTests
         {
             AppointmentId = app.Id,
             PatientId = patient.Id,
-            InvoiceNumber = $"HD-T-{unique}",
-            ExamDate = DateOnly.FromDateTime(DateTime.Today),
             TotalAmount = patientAmount,
             InsuranceCoveredAmount = 0m,
             PatientAmount = patientAmount,
@@ -241,6 +235,18 @@ public class DepositRefundTests
             CreatedAt = DateTime.Now
         };
         db.Invoices.Add(invoice);
+        await db.SaveChangesAsync();
+
+        db.Payments.Add(new Payment
+        {
+            InvoiceId = invoice.Id,
+            Amount = patientAmount,
+            PaymentType = PaymentType.Payment,
+            PaymentMethod = PaymentMethod.Cash,
+            CashierId = 1,
+            Note = "Thanh toán hóa đơn test",
+            PaidAt = DateTime.Now
+        });
         await db.SaveChangesAsync();
         return invoice;
     }
@@ -293,7 +299,7 @@ public class DepositRefundTests
         var refundPayment = await db.Payments
             .FirstOrDefaultAsync(p => p.InvoiceId == invoice.Id && p.PaymentType == PaymentType.Refund && p.Amount == refundAmount);
         Assert.NotNull(refundPayment);
-        Assert.Equal("Hủy dịch vụ xét nghiệm theo yêu cầu bác sĩ", refundPayment.RefundReason);
+        Assert.Contains("Hủy dịch vụ xét nghiệm theo yêu cầu bác sĩ", refundPayment.Note);
     }
 
     [Fact]
@@ -352,11 +358,12 @@ public class DepositRefundTests
         Assert.Equal(2, resDto.TransactionCodes.Count);
 
         // 5. Kiểm tra trạng thái trong DB: cả 2 phiếu phải chuyển sang Refunded và balance = 0
-        var updatedDeposits = await db.Deposits.Where(d => d.PatientId == patient.Id).ToListAsync();
-        Assert.All(updatedDeposits, d =>
+        var updatedSummary = await billingService.GetPatientDepositSummaryAsync(patient.Id);
+        Assert.Equal(2, updatedSummary.ActiveDeposits.Count);
+        Assert.All(updatedSummary.ActiveDeposits, d =>
         {
             Assert.Equal(DepositStatus.Refunded, d.Status);
-            Assert.Equal(0m, d.Amount - d.UsedAmount - d.RefundedAmount);
+            Assert.Equal(0m, d.Balance);
         });
     }
 
@@ -420,21 +427,12 @@ public class DepositRefundTests
             CreatedAt = DateTime.Now
         };
         db.Appointments.Add(app);
-
-        var dep = new Deposit
-        {
-            PatientId = patient.Id,
-            DepositCode = $"TU-{Guid.NewGuid().ToString("N")[..6]}",
-            Amount = 1000000m,
-            UsedAmount = 0m,
-            RefundedAmount = 0m,
-            Status = DepositStatus.Active,
-            PaymentMethod = PaymentMethod.BankTransfer,
-            Purpose = "Tạm ứng khám",
-            CreatedAt = DateTime.Now
-        };
-        db.Deposits.Add(dep);
         await db.SaveChangesAsync();
+
+        var depRes = await billingService.CreateDepositAsync(new CreateDepositRequest(
+            patient.Id, null, 1000000m, PaymentMethod.BankTransfer, "Tạm ứng khám", "REF_INIT_SET", null, 1));
+        Assert.True(depRes.IsSuccess, depRes.Error?.Message);
+        var dep = depRes.Value!;
 
         var req = new SettleDischargeRequest(
             app.Id,
@@ -452,7 +450,8 @@ public class DepositRefundTests
         Assert.Equal(0m, res.AdditionalPaid);
         Assert.Equal(850000m, res.RefundedToPatient);
 
-        var updatedDep = await db.Deposits.FindAsync(dep.Id);
+        var updatedSummary = await billingService.GetPatientDepositSummaryAsync(patient.Id);
+        var updatedDep = updatedSummary.ActiveDeposits.FirstOrDefault(d => d.Id == dep.Id);
         Assert.NotNull(updatedDep);
         Assert.Equal(DepositStatus.Refunded, updatedDep.Status);
         Assert.Equal(150000m, updatedDep.UsedAmount);
@@ -482,22 +481,13 @@ public class DepositRefundTests
             CreatedAt = DateTime.Now
         };
         db.Appointments.Add(app);
+        await db.SaveChangesAsync();
 
         // Tạm ứng 50.000 đ < Viện phí 150.000 đ
-        var dep = new Deposit
-        {
-            PatientId = patient.Id,
-            DepositCode = $"TU-{Guid.NewGuid().ToString("N")[..6]}",
-            Amount = 50000m,
-            UsedAmount = 0m,
-            RefundedAmount = 0m,
-            Status = DepositStatus.Active,
-            PaymentMethod = PaymentMethod.Cash,
-            Purpose = "Tạm ứng ít",
-            CreatedAt = DateTime.Now
-        };
-        db.Deposits.Add(dep);
-        await db.SaveChangesAsync();
+        var depRes = await billingService.CreateDepositAsync(new CreateDepositRequest(
+            patient.Id, null, 50000m, PaymentMethod.Cash, "Tạm ứng ít", null, null, 1));
+        Assert.True(depRes.IsSuccess, depRes.Error?.Message);
+        var dep = depRes.Value!;
 
         var req = new SettleDischargeRequest(
             app.Id,
@@ -515,7 +505,8 @@ public class DepositRefundTests
         Assert.Equal(100000m, res.AdditionalPaid);
         Assert.Equal(0m, res.RefundedToPatient);
 
-        var updatedDep = await db.Deposits.FindAsync(dep.Id);
+        var updatedSummary = await billingService.GetPatientDepositSummaryAsync(patient.Id);
+        var updatedDep = updatedSummary.ActiveDeposits.FirstOrDefault(d => d.Id == dep.Id);
         Assert.NotNull(updatedDep);
         Assert.Equal(DepositStatus.Depleted, updatedDep.Status);
         Assert.Equal(50000m, updatedDep.UsedAmount);

@@ -24,7 +24,7 @@ public class CashierShiftTests
             Username = $"ketoan_{unique}",
             Email = $"shift_{unique}@his.local",
             PasswordHash = "hash",
-            RoleId = (int)RoleId.Accountant,
+            RoleId = (int)RoleId.Nurse,
             IsActive = true
         };
         db.Accounts.Add(cashier);
@@ -74,7 +74,7 @@ public class CashierShiftTests
             Username = $"cashier_no_shift_{unique}",
             Email = $"noshift_{unique}@his.local",
             PasswordHash = "hash",
-            RoleId = (int)RoleId.Accountant,
+            RoleId = (int)RoleId.Nurse,
             IsActive = true
         };
         db.Accounts.Add(cashier);

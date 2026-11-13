@@ -4,10 +4,10 @@
         .TakeLast(2).Select(part => part[..1])).ToUpperInvariant();
     var isHead = User.IsInRole("DEPARTMENT_HEAD") || User.IsInRole("DEPT_HEAD");
     var isDoctor = User.IsInRole("DOCTOR");
-    var isNurse = User.IsInRole("NURSE") || User.IsInRole("RECEPTIONIST");
-    var isAccountant = User.IsInRole("ACCOUNTANT") || User.IsInRole("CASHIER");
-    var roleName = isHead ? "Trưởng khoa" : isDoctor ? "Bác sĩ" : isNurse ? "Y tá / Lễ tân"
-        : isAccountant ? "Kế toán / Thu ngân" : User.IsInRole("ADMIN") ? "Quản trị viên" : "Nhân viên";
+    var isAccountant = User.IsInRole("ACCOUNTANT") || User.IsInRole("CASHIER") || string.Equals(User.Identity?.Name, "ketoan", StringComparison.OrdinalIgnoreCase);
+    var isNurse = !isAccountant && (User.IsInRole("NURSE") || User.IsInRole("RECEPTIONIST"));
+    var roleName = isHead ? "Trưởng khoa" : isDoctor ? "Bác sĩ" : isAccountant ? "Kế toán / Thu ngân"
+        : isNurse ? "Y tá / Lễ tân" : User.IsInRole("ADMIN") ? "Quản trị viên" : "Nhân viên";
     var department = ViewData["StaffDepartment"]?.ToString() ?? User.FindFirst("DepartmentName")?.Value;
     var controller = ViewContext.RouteData.Values["controller"]?.ToString();
     var action = ViewContext.RouteData.Values["action"]?.ToString() ?? "Index";
@@ -21,13 +21,23 @@
     string WorkspaceUrl(string page) => Url.Content("~/Workspace/staff/" + page);
     var links = new List<(string Key, string Icon, string Label, string Url)>();
 
-    if (isNurse)
+    if (isAccountant)
+    {
+        links.AddRange([
+            ("Cashier", "wallet", "Thu phí & BHYT", StaffUrl("Cashier")),
+            ("Cashier/deposits", "wallet", "Quản lý tạm ứng", Url.Action("Deposits", "Cashier", new { area = "Staff" })!),
+            ("Cashier/ledger", "clipboard", "Sổ thu ngân", Url.Action("Ledger", "Cashier", new { area = "Staff" })!)
+        ]);
+    }
+    else if (isNurse)
     {
         links.AddRange([
             ("dashboard", "grid", "Bàn làm việc", WorkspaceUrl("dashboard")),
             ("Reception", "users", "Tiếp nhận & gọi số", StaffUrl("Reception")),
             ("vitals", "pulse", "Sinh hiệu", WorkspaceUrl("vitals")),
             ("Cashier", "wallet", "Thu phí & BHYT", StaffUrl("Cashier")),
+            ("Cashier/deposits", "wallet", "Quản lý tạm ứng", Url.Action("Deposits", "Cashier", new { area = "Staff" })!),
+            ("Cashier/ledger", "clipboard", "Sổ thu ngân", Url.Action("Ledger", "Cashier", new { area = "Staff" })!),
             ("patients", "clipboard", "Người khám", WorkspaceUrl("patients")),
             ("Schedule", "calendar", "Lịch làm việc", StaffUrl("Schedule"))
         ]);
@@ -55,14 +65,6 @@
             ("Schedule/patients", "users", "Người khám", StaffUrl("Schedule", "patients"))
         ]);
     }
-    else if (isAccountant)
-    {
-        links.AddRange([
-            ("Cashier", "wallet", "Thu phí & BHYT", StaffUrl("Cashier")),
-            ("Cashier/deposits", "wallet", "Quản lý tạm ứng", Url.Action("Deposits", "Cashier", new { area = "Staff" })!),
-            ("Cashier/ledger", "clipboard", "Sổ thu ngân", Url.Action("Ledger", "Cashier", new { area = "Staff" })!)
-        ]);
-    }
     else
     {
         if (User.IsInRole("ADMIN"))
@@ -71,7 +73,7 @@
         }
     }
 
-    var splitAt = isNurse ? 4 : isHead ? 5 : 3;
+    var splitAt = isNurse ? 6 : isHead ? 5 : 3;
     var menuGroups = new[]
     {
         (Title: isNurse ? "CÔNG VIỆC HÔM NAY" : isDoctor ? "CHUYÊN MÔN" : isHead ? "ĐIỀU PHỐI KHOA" : "CÔNG VIỆC", Items: links.Take(splitAt)),

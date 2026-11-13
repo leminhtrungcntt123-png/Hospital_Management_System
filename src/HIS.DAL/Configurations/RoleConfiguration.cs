@@ -23,8 +23,7 @@ public class RoleConfiguration : IEntityTypeConfiguration<Role>
             new Role { Id = 2, Code = "DEPARTMENT_HEAD", Name = "Trưởng khoa" },
             new Role { Id = 3, Code = "DOCTOR", Name = "Bác sĩ" },
             new Role { Id = 4, Code = "NURSE", Name = "Y tá / Lễ tân" },
-            new Role { Id = 5, Code = "PATIENT", Name = "Bệnh nhân" },
-            new Role { Id = 6, Code = "ACCOUNTANT", Name = "Kế toán / Thu ngân" }
+            new Role { Id = 5, Code = "PATIENT", Name = "Bệnh nhân" }
         );
     }
 }

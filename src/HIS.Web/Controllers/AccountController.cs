@@ -175,13 +175,18 @@ public class AccountController : Controller
         }
         else if (targetRole == "ACCOUNTANT")
         {
-            var accountantAcc = await db.Accounts.FirstOrDefaultAsync(a => a.Username == "ketoan" || a.RoleId == (int)RoleId.Accountant);
-            if (accountantAcc != null)
+            var accountantAcc = await db.Accounts
+                .Where(a => a.Username == "ketoan" || (a.RoleId == (int)RoleId.Nurse && a.Username != "nurse_lan"))
+                .OrderByDescending(a => a.Username == "ketoan")
+                .FirstOrDefaultAsync();
+            if (accountantAcc == null)
             {
-                accountId = accountantAcc.Id;
-                username = accountantAcc.Username;
-                fullName = "Thu ngân / Kế toán";
+                return NotFound("Không tìm thấy tài khoản thu ngân / kế toán (ketoan).");
             }
+
+            accountId = accountantAcc.Id;
+            username = accountantAcc.Username;
+            fullName = "Thu ngân / Kế toán";
         }
         else if (targetRole == "PATIENT")
         {
@@ -201,6 +206,11 @@ public class AccountController : Controller
             new(ClaimTypes.Role, targetRole),
             new("FullName", fullName)
         };
+
+        if (targetRole == "ACCOUNTANT")
+        {
+            claims.Add(new Claim(ClaimTypes.Role, "NURSE"));
+        }
 
         if (!string.IsNullOrEmpty(doctorId))
         {
