@@ -61,11 +61,22 @@ function go(route) {
     ui.address = route;
     ui.query = filters.get('q') || '';
     ui.department = filters.get('department') || '';
+    const requestedPage = Number(filters.get('page'));
+    ui.doctorPage = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
     ui.mobileMenu = false;
     location.hash = '#/' + route;
     render();
-    window.scrollTo(0, 0);
-    document.querySelector('main h1')?.focus({ preventScroll: true });
+    const homeDoctorHeading =
+        page === 'public/home' && filters.has('page')
+            ? document.querySelector('#home-doctors-title')
+            : null;
+    if (homeDoctorHeading) {
+        homeDoctorHeading.scrollIntoView({ block: 'start', behavior: 'instant' });
+        homeDoctorHeading.focus({ preventScroll: true });
+    } else {
+        window.scrollTo(0, 0);
+        document.querySelector('main h1')?.focus({ preventScroll: true });
+    }
     if (catalog.status === 'idle') loadCatalog();
 }
 

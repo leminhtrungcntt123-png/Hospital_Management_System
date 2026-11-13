@@ -6,6 +6,7 @@ const ui = {
     address: config.initialRoute || 'public/home',
     query: '',
     department: '',
+    doctorPage: 1,
     mobileMenu: false,
 };
 
