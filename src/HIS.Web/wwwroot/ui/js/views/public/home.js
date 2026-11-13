@@ -70,8 +70,9 @@ function homePage() {
     <section class="home-section" aria-labelledby="home-specialties-title"><div class="section-heading"><div><span class="eyebrow">KHÁM PHÁ THEO CHUYÊN KHOA</span><h2 id="home-specialties-title">Chăm sóc phù hợp với bạn</h2><p>Tìm thông tin khoa phòng và đội ngũ bác sĩ phụ trách.</p></div>${link('Tất cả chuyên khoa', 'public/specialties', 'arrow', 'text-link')}</div>
         ${catalog.status !== 'ready' ? catalogStatus() : catalog.departments.length ? `<div class="portal-specialties">${catalog.departments.map((department) => link(`<span class="specialty-symbol">${icon('building')}</span><h3>${esc(department.name)}</h3><p>${esc(department.description || 'Xem thông tin khoa và đội ngũ bác sĩ.')}</p><span class="text-link">Xem bác sĩ ${icon('arrow')}</span>`, 'public/doctors?department=' + encodeURIComponent(department.name), '', 'portal-specialty')).join('')}</div>` : empty('Chưa có thông tin chuyên khoa', 'Danh mục sẽ hiển thị khi bệnh viện cập nhật.')}
     </section>
-    <section class="home-section" aria-labelledby="home-doctors-title"><div class="section-heading"><div><span class="eyebrow">ĐỘI NGŨ CHUYÊN MÔN</span><h2 id="home-doctors-title">Gặp bác sĩ của bạn</h2><p>Tra cứu thông tin chuyên môn trước khi đến khám.</p></div>${link('Xem tất cả bác sĩ', 'public/doctors', 'arrow', 'text-link')}</div>
-        ${catalog.status !== 'ready' ? catalogStatus() : catalog.doctors.length ? `<div class="doctor-grid">${catalog.doctors.slice(0, 3).map(doctorCard).join('')}</div>` : empty('Chưa có thông tin bác sĩ')}
+    ${specialtyIntroductionSection()}
+    <section class="home-section" aria-labelledby="home-doctors-title"><div class="section-heading"><div><span class="eyebrow">ĐỘI NGŨ CHUYÊN MÔN</span><h2 id="home-doctors-title" tabindex="-1">Danh sách Bác sĩ - Chuyên gia</h2><p>Chọn số trang bên dưới để xem thêm bác sĩ, hoặc mở hồ sơ để tìm hiểu chuyên môn.</p></div>${link('Tìm và lọc bác sĩ', 'public/doctors', 'search', 'text-link')}</div>
+        ${doctorList('public/home')}
     </section>
     <section class="portal-journey"><div><span class="eyebrow">TRƯỚC, TRONG VÀ SAU BUỔI KHÁM</span><h2>Mỗi bước đều rõ ràng.</h2><p>Từ lựa chọn chuyên khoa đến theo dõi hồ sơ, luôn có đường dẫn đến tác vụ bạn cần.</p>${link('Xem hướng dẫn khám', 'public/guide', 'arrow', 'btn outline')}</div>
         <ol>${[
@@ -100,12 +101,22 @@ function homePage() {
 }
 
 function doctorCard(doctor) {
-    return `<article class="doctor-card">${doctorPhoto()}
-        <div class="doctor-card-body"><span class="mini-label">${esc(doctor.department)}</span><h3>${esc(doctor.name)}</h3><p>${esc(doctor.specialty || 'Thông tin chuyên môn đang được cập nhật.')}</p>
-            ${link('Xem thông tin bác sĩ', 'public/doctor/' + encodeURIComponent(doctor.id), 'arrow', 'text-link')}
+    const illustrative = doctor.kind === 'illustration';
+    const canBook = !illustrative && (!config.authenticated || config.role === 'PATIENT');
+    return `<article class="doctor-card">${doctorPhoto(doctor)}
+        <div class="doctor-card-body"><span class="catalog-badge ${illustrative ? 'illustration' : ''}">${illustrative ? 'Hồ sơ minh hoạ' : 'Bác sĩ trong hệ thống'}</span><h3>${esc(doctor.name)}</h3>
+            <ul class="doctor-card-meta"><li>${icon('stethoscope')}<span>${esc(doctor.specialty || 'Thông tin chuyên môn đang được cập nhật.')}</span></li><li>${icon('building')}<span>${esc(doctor.department)}</span></li>${doctorCareerSummary(doctor)}</ul>
+            <div class="doctor-card-actions">${canBook ? link('Xem lịch khám', 'public/booking?doctorId=' + encodeURIComponent(doctor.id), 'calendar', 'btn primary') : ''}
+                ${link(illustrative ? 'Xem hồ sơ minh hoạ' : 'Xem hồ sơ', 'public/doctor/' + encodeURIComponent(doctor.id), 'arrow', 'text-link')}
+            </div>
         </div></article>`;
 }
 
-function doctorPhoto() {
-    return `<figure class="doctor-portrait doctor-photo"><img src="${esc(config.assetBase)}doctors-illustration.jpg" alt="Ảnh minh họa đội ngũ bác sĩ" loading="lazy" /><figcaption>Ảnh minh hoạ</figcaption></figure>`;
+function doctorPhoto(doctor = {}) {
+    const portrait = doctor.illustration || doctorIllustrations[doctor.name];
+    return `<figure class="doctor-portrait doctor-photo">${
+        portrait
+            ? `<img src="${esc(config.assetBase + portrait)}" alt="Ảnh chân dung minh hoạ cho ${esc(doctor.name)}" width="640" height="800" loading="lazy" decoding="async" />`
+            : `<span class="doctor-initials" aria-hidden="true">${esc(initials(doctor.name)) || icon('stethoscope')}</span>`
+    }<figcaption>Ảnh minh hoạ</figcaption></figure>`;
 }

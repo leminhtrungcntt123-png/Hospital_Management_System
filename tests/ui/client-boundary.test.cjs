@@ -316,7 +316,10 @@ test('guest booking renders only available times returned by the server', async 
             bookingMinDate: '2026-11-12',
         },
     );
-    await client.run("catalog.status='ready'; guestBooking.doctorId='17'; loadGuestSlots();");
+    await client.run(`
+        Date.now = () => new Date('2026-11-11T00:00:00Z').getTime();
+        catalog.status='ready'; guestBooking.doctorId='17'; loadGuestSlots();
+    `);
     assert.equal(client.run('guestBooking.slots.length'), 1);
     assert.match(client.app.innerHTML, /Không cần đăng nhập/);
     assert.match(client.app.innerHTML, /08:00/);
@@ -392,8 +395,216 @@ test('carousel exposes three images and respects reduced motion', () => {
     assert.match(client.run('doctorPhoto()'), /Ảnh minh hoạ/);
 });
 
+test('doctor portraits are distinct local assets across system and illustrative profiles', () => {
+    const client = createClient();
+    const portraits = client.run(`[
+        ...Object.keys(doctorIllustrations).map(name => doctorPhoto({ name })),
+        ...doctorIntroductions.map(doctorPhoto),
+    ].map(markup => markup.match(/src="([^"]+)"/)[1])`);
+    assert.equal(portraits.length, 16);
+    assert.equal(new Set(portraits).size, 16);
+    const imageContents = portraits.map((url) =>
+        readFileSync(resolve(root, 'src/HIS.Web/wwwroot/ui/assets', url.split('/').pop())).toString(
+            'base64',
+        ),
+    );
+    assert.equal(new Set(imageContents).size, 16);
+});
+
+test('doctor pagination shows four profiles per page and clamps the last page', () => {
+    const client = createClient(undefined, { authenticated: false });
+    client.run(`catalog = { status: 'ready', departments: [], doctors:
+        [1, 2, 3, 4].map(id => ({ id, name: 'Server doctor ' + id, department: 'Nội' }))
+    };`);
+    const first = client.run('doctorsPage()');
+    assert.equal((first.match(/class="doctor-card"/g) || []).length, 4);
+    assert.match(first, /Server doctor 1/);
+    assert.doesNotMatch(first, /Nguyễn Minh Khánh/);
+    assert.match(first, /aria-label="Trang trước" aria-disabled="true"/);
+    client.run('ui.doctorPage = 2;');
+    const second = client.run('doctorsPage()');
+    assert.equal((second.match(/class="doctor-card"/g) || []).length, 4);
+    assert.match(second, /Nguyễn Minh Khánh/);
+    assert.doesNotMatch(second, /Server doctor 1/);
+    client.run('ui.doctorPage = 999;');
+    const last = client.run('doctorsPage()');
+    assert.match(last, /13–16/);
+    assert.match(last, /Đinh Mỹ Hạnh/);
+    assert.match(last, /aria-label="Trang sau" aria-disabled="true"/);
+    client.run("ui.query = 'no-matching-doctor';");
+    assert.match(client.run('doctorsPage()'), /Không tìm thấy bác sĩ/);
+    assert.doesNotMatch(client.run('doctorsPage()'), /class="catalog-pagination"/);
+    client.run("catalog.status = 'loading'; ui.query = '';");
+    assert.match(client.run('doctorsPage()'), /Đang tải thông tin/);
+    assert.doesNotMatch(
+        client.run('doctorsPage()'),
+        /class="doctor-card"|class="catalog-pagination"/,
+    );
+});
+
+test('numbered doctor routes preserve filters and reject invalid page numbers', () => {
+    const client = createClient(undefined, { initialRoute: 'public/home', authenticated: false });
+    client.run("catalog.status = 'ready'; go('public/doctors?page=3');");
+    assert.equal(client.run('ui.doctorPage'), 3);
+    client.run("ui.query = 'Nam & Hoa'; ui.department = 'Nội tổng quát';");
+    const pagination = client.run('doctorPagination(2, 4)');
+    assert.match(pagination, /q=Nam\+%26\+Hoa/);
+    assert.match(pagination, /department=N%E1%BB%99i\+t%E1%BB%95ng\+qu%C3%A1t/);
+    assert.match(pagination, /aria-label="Trang 2" aria-current="page"/);
+    for (const page of ['0', '-1', 'NaN', 'Infinity', '1.5']) {
+        client.run(`go('public/doctors?page=${page}');`);
+        assert.equal(client.run('ui.doctorPage'), 1);
+    }
+});
+
+test('doctor search and department changes return to page one', () => {
+    const client = createClient(undefined, { initialRoute: 'public/home', authenticated: false });
+    client.run(
+        "catalog.status = 'ready'; ui.route = 'public/doctors'; bindEvents(); ui.doctorPage = 3;",
+    );
+    client.listeners.input({
+        target: {
+            matches: (selector) => selector === '[data-search]',
+            value: 'Khánh',
+            selectionStart: 5,
+        },
+    });
+    assert.equal(client.run('ui.doctorPage'), 1);
+    assert.match(client.app.innerHTML, /Nguyễn Minh Khánh/);
+    client.run('ui.doctorPage = 4;');
+    client.listeners.change({
+        target: {
+            matches: (selector) => selector === '[data-department]',
+            value: 'Nhi khoa',
+        },
+    });
+    assert.equal(client.run('ui.doctorPage'), 1);
+    assert.equal(client.run('ui.department'), 'Nhi khoa');
+});
+
+test('home doctor numbers sit below the list and change pages without leaving home', () => {
+    const client = createClient(undefined, { initialRoute: 'public/home', authenticated: false });
+    client.run(`catalog = { status: 'ready', departments: [], doctors:
+        [1, 2, 3, 4].map(id => ({ id, name: 'Server doctor ' + id, department: 'Nội' }))
+    };`);
+    const first = client.run('homePage()');
+    assert.equal((first.match(/class="doctor-card"/g) || []).length, 4);
+    assert.ok(
+        first.indexOf('class="catalog-pagination"') > first.lastIndexOf('class="doctor-card"'),
+    );
+    assert.match(first, /data-route="public\/home\?[^\"]*page=2"/);
+    client.run("go('public/home?page=3');");
+    assert.equal(client.run('ui.route'), 'public/home');
+    assert.match(client.app.innerHTML, /Đặng Anh Tuấn/);
+    assert.doesNotMatch(client.app.innerHTML, /Server doctor 1/);
+    assert.equal(client.navigations.length, 0);
+});
+
+test('all existing illustrated doctors display distinct labelled biographies and publications', () => {
+    const client = createClient(undefined, { authenticated: false });
+    const profiles = client.run(`[
+        ...Object.keys(doctorIllustrations).map(name => ({ name })),
+        ...doctorIntroductions,
+    ].map(doctor => ({
+        career: doctorCareer(doctor),
+        card: doctorCard(doctor),
+        profile: doctorProfile(doctor, doctor.kind === 'illustration'),
+    }))`);
+    assert.equal(profiles.length, 16);
+    assert.equal(new Set(profiles.map(({ career }) => career.introduction)).size, 16);
+    assert.equal(new Set(profiles.flatMap(({ career }) => career.publications)).size, 48);
+    for (const { career, card, profile } of profiles) {
+        assert.ok(career.degree.length > 0);
+        assert.ok(career.years > 0);
+        assert.ok(career.introduction.length > 0);
+        assert.equal(career.publications.length, 3);
+        assert.ok(profile.includes(career.introduction));
+        for (const title of career.publications) {
+            assert.ok(profile.includes(title));
+        }
+        assert.match(card, /Học vấn/);
+        assert.match(card, /Kinh nghiệm/);
+        assert.match(card, /\(minh hoạ\)/);
+        assert.match(profile, /Quá trình đào tạo/);
+        assert.match(profile, /Kinh nghiệm làm việc/);
+        assert.equal(
+            (profile.match(/<details class="doctor-career-section" open>/g) || []).length,
+            4,
+        );
+        assert.match(profile, /chưa phải thông tin đã xác minh/);
+        assert.match(profile, /Nội dung minh hoạ/);
+        assert.match(profile, /không phải tài liệu y khoa đã công bố/);
+    }
+});
+
+test('unmapped server doctors show pending career fields instead of invented qualifications', () => {
+    const client = createClient(undefined, { authenticated: false });
+    assert.equal(client.run("doctorCareer({ id: 99, name: 'New server doctor' })"), null);
+    const profile = client.run("doctorProfile({ id: 99, name: 'New server doctor' }, false)");
+    assert.match(profile, /Chưa cập nhật/);
+    assert.match(profile, /sẽ hiển thị khi bệnh viện cung cấp thông tin/);
+    assert.doesNotMatch(profile, /năm kinh nghiệm chuyên môn|Đào tạo chuyên sâu/);
+    assert.match(profile, /Danh sách công bố và đề tài nghiên cứu sẽ được bổ sung/);
+    assert.doesNotMatch(profile, /Sổ tay thực hành|Đề tài nghiên cứu:/);
+    assert.match(profile, /doctorId=99/);
+});
+
+test('doctor profile labels fictional research and leaves awards pending', () => {
+    const client = createClient(undefined, { authenticated: false });
+    const profile = client.run('doctorProfile(doctorIntroductions[0], true)');
+    assert.match(profile, /class="doctor-profile-breadcrumb"/);
+    assert.match(profile, /class="doctor-profile-identity"/);
+    assert.match(profile, /<h1 tabindex="-1">BS\. Nguyễn Minh Khánh<\/h1>/);
+    assert.match(profile, /Chức vụ/);
+    assert.match(profile, /Nơi làm việc/);
+    assert.match(profile, /Số năm kinh nghiệm/);
+    assert.match(profile, /Sách, báo, công trình nghiên cứu/);
+    assert.match(profile, /Giải thưởng và ghi nhận/);
+    assert.match(profile, /các tên sách, bài viết và đề tài dưới đây là giả định/);
+    assert.match(profile, /Thông tin giải thưởng và ghi nhận đang được cập nhật/);
+    assert.doesNotMatch(profile, /public\/booking/);
+});
+
+test('illustrative profiles never enter booking choices or expose a booking action', () => {
+    const client = createClient(undefined, { authenticated: false });
+    client.run(`catalog = { status: 'ready', departments: [], doctors: [
+        { id: 17, name: 'Server doctor', specialty: 'Nội', department: 'Server department' }
+    ] };`);
+    const catalogBefore = client.run('JSON.stringify(catalog)');
+    const introduction = client.run("doctorDetail('intro-khanh')");
+    assert.match(introduction, /Hồ sơ minh hoạ/);
+    assert.doesNotMatch(introduction, /public\/booking/);
+    assert.match(client.run('doctorCard(catalog.doctors[0])'), /doctorId=17/);
+    const booking = client.run('guestBookingPage()');
+    assert.match(booking, /Server doctor/);
+    assert.doesNotMatch(booking, /intro-khanh|Nguyễn Minh Khánh|Lê Phương Linh/);
+    assert.equal(client.run('JSON.stringify(catalog)'), catalogBefore);
+});
+
+test('specialty introduction links and illustrative doctor filters work without server data', () => {
+    const client = createClient(undefined, { authenticated: false });
+    client.run("catalog.status='ready'; ui.department='Nhi khoa'; ui.query='Khánh';");
+    const filtered = client.run('doctorsPage()');
+    assert.match(filtered, /Nguyễn Minh Khánh/);
+    assert.doesNotMatch(filtered, /Lê Phương Linh/);
+    assert.doesNotMatch(filtered, /Không tìm thấy bác sĩ/);
+    for (const id of client.run('specialtyIntroductions.map(specialty => specialty.id)')) {
+        client.run(`ui.route='public/specialty/${id}';`);
+        assert.match(client.run('publicContent()'), /Nội dung giới thiệu minh hoạ/);
+        assert.doesNotMatch(client.run('publicContent()'), /Không tìm thấy chuyên khoa/);
+    }
+    assert.match(
+        client.run("specialtyIntroductionDetail('unknown')"),
+        /Không tìm thấy chuyên khoa/,
+    );
+});
+
 test('patient profile screen renders personal form and family navigation', () => {
-    const client = createClient(undefined, { role: 'PATIENT', authenticated: true, displayName: 'Bùi Gia Phúc' });
+    const client = createClient(undefined, {
+        role: 'PATIENT',
+        authenticated: true,
+        displayName: 'Bùi Gia Phúc',
+    });
     client.run("ui.route = 'patient/profile'; render();");
     assert.match(client.app.innerHTML, /Thông tin cá nhân/);
     assert.match(client.app.innerHTML, /Thông tin người thân/);
@@ -401,7 +612,10 @@ test('patient profile screen renders personal form and family navigation', () =>
 });
 
 test('booking confirmation step displays two-column summary and policy checkbox', () => {
-    const client = createClient(undefined, { initialRoute: 'public/booking', authenticated: false });
+    const client = createClient(undefined, {
+        initialRoute: 'public/booking',
+        authenticated: false,
+    });
     client.run(`
         Date.now = () => new Date('2026-11-11T00:00:00Z').getTime();
         catalog = { status: 'ready', departments: [], doctors: [{ id: 17, name: 'BS. Lê Minh', department: 'Nội' }] };
@@ -420,7 +634,10 @@ test('booking confirmation step displays two-column summary and policy checkbox'
 });
 
 test('booking form requires valid email and blocks progression to confirm step without it', () => {
-    const client = createClient(undefined, { initialRoute: 'public/booking', authenticated: false });
+    const client = createClient(undefined, {
+        initialRoute: 'public/booking',
+        authenticated: false,
+    });
     client.run(`
         Date.now = () => new Date('2026-11-11T00:00:00Z').getTime();
         catalog = { status: 'ready', departments: [], doctors: [{ id: 17, name: 'BS. Lê Minh', department: 'Nội' }] };
@@ -437,7 +654,10 @@ test('booking form requires valid email and blocks progression to confirm step w
 });
 
 test('guest booking submit event navigates to confirmation step instead of immediately calling submitGuestBooking', () => {
-    const client = createClient(undefined, { initialRoute: 'public/booking', authenticated: false });
+    const client = createClient(undefined, {
+        initialRoute: 'public/booking',
+        authenticated: false,
+    });
     client.run(`
         Date.now = () => new Date('2026-11-11T00:00:00Z').getTime();
         bindEvents();
@@ -452,7 +672,9 @@ test('guest booking submit event navigates to confirmation step instead of immed
     let prevented = false;
     client.listeners.submit({
         target: { matches: (sel) => sel === '[data-guest-booking]' },
-        preventDefault: () => { prevented = true; },
+        preventDefault: () => {
+            prevented = true;
+        },
     });
     assert.equal(prevented, true);
     assert.equal(client.run('guestBooking.step'), 'confirm');

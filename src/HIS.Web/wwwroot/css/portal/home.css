@@ -262,19 +262,20 @@
 }
 .hospital-portal .doctor-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 430px), 1fr));
     gap: 20px;
 }
 .hospital-portal .doctor-card {
     display: grid;
-    grid-template-columns: 112px minmax(0, 1fr);
+    grid-template-columns: 160px minmax(0, 1fr);
     border: 1px solid #d6e5ed;
     border-radius: 12px;
     overflow: hidden;
+    background: #fff;
 }
 .hospital-portal .doctor-card .doctor-portrait {
     height: 100%;
-    min-height: 200px;
+    min-height: 240px;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -300,6 +301,10 @@
 }
 .hospital-portal .doctor-card-body {
     padding: 23px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
 }
 .hospital-portal .doctor-card h3 {
     font-size: 18px;
@@ -423,14 +428,9 @@
     border-radius: 8px;
     background: white;
 }
-.hospital-portal .doctor-card {
-    display: flex;
-    flex-direction: column;
-}
 .hospital-portal .doctor-card .doctor-photo {
-    height: 215px;
-    min-height: 0;
-    flex: none;
+    height: 100%;
+    min-height: 240px;
 }
 .doctor-photo {
     position: relative;
@@ -443,6 +443,14 @@
     object-fit: cover;
     object-position: center 24%;
 }
+.doctor-initials {
+    display: grid;
+    place-items: center;
+    height: 100%;
+    font-size: 36px;
+    font-weight: 700;
+    color: #087b98;
+}
 .doctor-photo figcaption {
     position: absolute;
     right: 8px;
@@ -452,13 +460,6 @@
     color: #30576e;
     background: #fffffff0;
     font-size: 10px;
-}
-.hospital-portal .doctor-bio-top .doctor-photo {
-    flex-shrink: 0;
-    width: 220px;
-    height: 175px;
-    border-radius: 10px;
-    overflow: hidden;
 }
 @media (prefers-reduced-motion: reduce) {
     .hero-carousel .hero-slide {
@@ -476,9 +477,5 @@
     }
     .hero-dots {
         padding: 3px 7px;
-    }
-    .hospital-portal .doctor-bio-top .doctor-photo {
-        width: 100%;
-        height: 220px;
     }
 }
