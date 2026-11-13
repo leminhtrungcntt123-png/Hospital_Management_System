@@ -584,7 +584,7 @@ public class ScheduleController : Controller
 
     [HttpPost]
     [Authorize(Policy = "DepartmentHeadOnly")]
-    public async Task<IActionResult> GenerateSlots([FromBody] SlotGenerationRequest request, CancellationToken ct = default)
+    public async Task<IActionResult> GenerateSlots([FromForm] SlotGenerationRequest request, CancellationToken ct = default)
     {
         if (request == null)
         {
