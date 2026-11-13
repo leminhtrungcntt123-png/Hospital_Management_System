@@ -223,14 +223,17 @@ public static class DevCatalogSeeder
                 doc.ShortBio ??= p.Bio;
                 await db.SaveChangesAsync();
             }
-            var roomId = await db.DoctorSchedules.Where(s => s.DoctorId == doc.Id && s.RoomId != null)
+            // Chỉ dùng lại phòng cùng khoa (seed gốc xếp BS. Thư khoa Nội vào P201 của khoa Ngoại).
+            var roomId = await db.DoctorSchedules
+                .Where(s => s.DoctorId == doc.Id && s.RoomId != null && s.Room!.DepartmentId == doc.DepartmentId)
                 .Select(s => s.RoomId).FirstOrDefaultAsync();
             if (roomId == null)
             {
-                var room = await db.ClinicRooms.FirstOrDefaultAsync(r => r.RoomNumber == "P103");
+                var n = username == "bs_thu" ? 4 : 3;
+                var room = await db.ClinicRooms.FirstOrDefaultAsync(r => r.RoomNumber == $"P10{n}");
                 if (room == null)
                 {
-                    room = new ClinicRoom { DepartmentId = doc.DepartmentId, RoomName = "Phòng khám Nội 3", RoomNumber = "P103" };
+                    room = new ClinicRoom { DepartmentId = doc.DepartmentId, RoomName = $"Phòng khám Nội {n}", RoomNumber = $"P10{n}" };
                     db.ClinicRooms.Add(room);
                     await db.SaveChangesAsync();
                 }
