@@ -15,6 +15,7 @@ public static class DevCatalogSeeder
 
     private static readonly Dept[] Departments =
     [
+        new("Ngoại tổng quát", "Khám ngoại khoa, xử trí chấn thương và tư vấn phẫu thuật.", "P21"),
         new("Tim mạch", "Khám, theo dõi bệnh lý tim và hệ tuần hoàn: tăng huyết áp, rối loạn nhịp, suy tim.", "P3"),
         new("Nhi khoa", "Chăm sóc sức khoẻ trẻ em từ sơ sinh đến 16 tuổi, theo dõi tăng trưởng và tiêm chủng.", "P4"),
         new("Sản phụ khoa", "Khám phụ khoa, quản lý thai kỳ và chăm sóc sức khoẻ phụ nữ qua từng giai đoạn.", "P5"),
@@ -31,6 +32,11 @@ public static class DevCatalogSeeder
 
     private static readonly Doc[] Doctors =
     [
+        // Ngoại tổng quát
+        new("bs_cuong", "BS. Phan Quốc Cường", "Ngoại tổng quát", "Ngoại chấn thương", "BS.CKII", 19, null, false, 100,
+            "Khám ngoại khoa, xử trí chấn thương phần mềm và tư vấn phẫu thuật."),
+        new("bs_dung", "BS. Vương Tiến Dũng", "Ngoại tổng quát", "Ngoại tiêu hoá", "BS.CKI", 9, null, false, 100,
+            "Khám bệnh lý ngoại tiêu hoá và theo dõi sau phẫu thuật."),
         // Tim mạch
         new("bs_tuan", "BS. Đặng Anh Tuấn", "Tim mạch", "Sức khoẻ tim và hệ tuần hoàn", "TS.BS", 28, "doctor-tuan.jpg", true, 10,
             "Chuyên gia tim mạch với gần 30 năm theo dõi người bệnh tăng huyết áp và suy tim.",
@@ -125,8 +131,8 @@ public static class DevCatalogSeeder
             "Trưởng khoa Nội tổng quát. Quan tâm đến việc đồng hành lâu dài cùng người bệnh mạn tính, trình bày thông tin dễ hiểu và lắng nghe những băn khoăn của từng người."),
         ["bs_huy"] = ("doctor-hung.jpg", "BS.CKI", 11, 7,
             "Định hướng chuyên môn vào khám nội tổng quát và theo dõi bệnh lý chuyển hoá. Đề cao việc giải thích từng bước tiếp nhận và duy trì liên hệ giữa các lần tái khám."),
-        ["bs_thu"] = ("doctor-mai.jpg", "ThS.BS", 18, 8,
-            "Tập trung vào lĩnh vực ngoại tổng quát với cách tiếp cận thận trọng và coi trọng trao đổi trước buổi khám. Quan tâm việc hướng dẫn chuẩn bị hồ sơ cho những lần hẹn tiếp theo."),
+        ["bs_thu"] = ("doctor-mai.jpg", "TS.BS", 12, 8,
+            "Theo dõi bệnh lý tim mạch trong khoa Nội: tăng huyết áp, rối loạn mỡ máu, bệnh mạch vành ổn định. Chú trọng giải thích kế hoạch điều trị và hướng dẫn người bệnh tự theo dõi tại nhà."),
     };
 
     public static async Task SeedAsync(AppDbContext db, string passwordHash, int reviewerAccountId)
@@ -208,8 +214,8 @@ public static class DevCatalogSeeder
             if (doc.AvatarUrl == null)
             {
                 doc.AvatarUrl = p.Avatar;
-                doc.AcademicTitle = p.Title;
-                doc.YearsOfExperience = p.Years;
+                doc.AcademicTitle ??= p.Title;
+                if (doc.YearsOfExperience == 0) doc.YearsOfExperience = p.Years;
                 doc.IsPublic = true;
                 doc.IsFeatured = true;
                 doc.DisplayOrder = p.Order;
