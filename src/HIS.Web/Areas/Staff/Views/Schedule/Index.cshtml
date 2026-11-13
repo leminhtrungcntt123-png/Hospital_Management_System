@@ -3738,14 +3738,14 @@ else
             btn.textContent = 'Đang tra cứu...';
         }
 
-        fetch('/Staff/Schedule/SearchSlotsJson?' + params.toString())
+        fetch('/Staff/Schedule/SearchSlots?' + params.toString())
         .then(res => res.json())
         .then(slots => {
             if (btn) {
                 btn.disabled = false;
                 btn.textContent = 'Tra cứu';
             }
-            renderSlotsTable(slots);
+            renderSlotsTable(slots && slots.data);
         })
         .catch(err => {
             if (btn) {
@@ -3853,12 +3853,12 @@ else
             totalBooked += (s.bookedCount || 0);
             totalAvail += (s.remainingCount || 0);
 
-            const isAvailable = s.isAvailable && s.remainingCount > 0;
+            const isAvailable = s.status === 'AVAILABLE' && s.remainingCount > 0;
             const statusBadge = isAvailable
                 ? '<span style="background:#ecfdf5; color:#059669; padding:4px 8px; border-radius:4px; font-weight:700; font-size:11px;">Còn trống</span>'
                 : '<span style="background:#fef2f2; color:#dc2626; padding:4px 8px; border-radius:4px; font-weight:700; font-size:11px;">Đã kín</span>';
 
-            const formattedDate = s.date ? s.date.split('-').reverse().join('/') : '';
+            const formattedDate = s.workDate ? s.workDate.split('-').reverse().join('/') : '';
             const startTimeStr = s.startTime ? s.startTime.substring(0, 5) : '';
             const endTimeStr = s.endTime ? s.endTime.substring(0, 5) : '';
 
@@ -3870,7 +3870,7 @@ else
                     <td style="padding:10px 14px; font-weight:600; color:#0284c7;">${escapeHtml(s.roomNumber || '')} - ${escapeHtml(s.roomName || '')}</td>
                     <td style="padding:10px 14px; color:#334155;">${formattedDate}</td>
                     <td style="padding:10px 14px; font-weight:700; color:#0f172a;">${startTimeStr} - ${endTimeStr}</td>
-                    <td style="padding:10px 14px; text-align:center; font-weight:600;">${s.maxPatients}</td>
+                    <td style="padding:10px 14px; text-align:center; font-weight:600;">${s.capacity}</td>
                     <td style="padding:10px 14px; text-align:center; font-weight:700; color:${s.bookedCount > 0 ? '#0284c7' : '#64748b'};">${s.bookedCount}</td>
                     <td style="padding:10px 14px; text-align:center; font-weight:700; color:${isAvailable ? '#059669' : '#dc2626'};">${s.remainingCount}</td>
                     <td style="padding:10px 14px; text-align:center;">${statusBadge}</td>
