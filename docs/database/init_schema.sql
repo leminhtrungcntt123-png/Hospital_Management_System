@@ -103,6 +103,7 @@ CREATE TABLE patients (
     national_id     VARCHAR(20) UNIQUE,             -- NULL với trẻ chưa có CCCD
     phone_number    VARCHAR(15) NOT NULL,
     address         VARCHAR(255),
+    allergies       VARCHAR(500),                   -- Tiền sử dị ứng / Lưu ý y khoa (VD: "Dị ứng Penicillin, Ibuprofen")
     created_at      TIMESTAMP NOT NULL DEFAULT now()
 );
 
@@ -587,4 +588,3 @@ INSERT INTO appointment_statuses (id, code, name, sort_order, is_terminal) VALUE
  (8,'NO_SHOW','Không đến',8,true),
  (9,'EXPIRED','Hết hạn giữ chỗ',9,true),
  (10,'RESCHEDULE_REQUIRED','Cần đặt lại lịch',10,false);
-
