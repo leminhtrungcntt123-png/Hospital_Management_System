@@ -776,70 +776,73 @@ public static class DevDataSeeder
                     return app.Invoice;
                 }
 
-                await using var depositTx = await db.Database.BeginTransactionAsync();
-
-                var invChi = await EnsureSeedInvoiceAsync(pChi.Id, DateTime.Now.AddMinutes(-90));
-                if (invChi != null)
+                await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
                 {
-                    db.Payments.Add(new Payment
-                    {
-                        InvoiceId = invChi.Id,
-                        Amount = 2000000m,
-                        PaymentType = PaymentType.Deposit,
-                        PaymentMethod = PaymentMethod.Cash,
-                        CashierId = cashierId,
-                        ReceiptEmail = "#U=0;R=0#",
-                        Note = "#BY=BS.CKII Phạm Thu Hằng;PUR=Tạm ứng nhập viện Ngoại khoa#Thu tạm ứng mẫu",
-                        PaidAt = DateTime.Now.AddMinutes(-90)
-                    });
-                }
+                    await using var depositTx = await db.Database.BeginTransactionAsync();
 
-                if (pBao != null)
-                {
-                    var invBao = await EnsureSeedInvoiceAsync(pBao.Id, DateTime.Now.AddMinutes(-60));
-                    if (invBao != null)
+                    var invChi = await EnsureSeedInvoiceAsync(pChi.Id, DateTime.Now.AddMinutes(-90));
+                    if (invChi != null)
                     {
                         db.Payments.Add(new Payment
                         {
-                            InvoiceId = invBao.Id,
-                            Amount = 300000m,
-                            PaymentType = PaymentType.Deposit,
-                            PaymentMethod = PaymentMethod.BankTransfer,
-                            CashierId = cashierId,
-                            ReceiptEmail = "#U=0;R=0;REF=FT2431889210#",
-                            Note = "#BY=BS.CKII Phạm Thu Hằng;PUR=Tạm ứng xét nghiệm cận lâm sàng#Thu tạm ứng qua VietQR",
-                            PaidAt = DateTime.Now.AddMinutes(-60)
-                        });
-                    }
-                }
-
-                if (pNgoc != null)
-                {
-                    var invNgoc = await EnsureSeedInvoiceAsync(pNgoc.Id, DateTime.Now.AddMinutes(-45));
-                    if (invNgoc != null)
-                    {
-                        db.Payments.Add(new Payment
-                        {
-                            InvoiceId = invNgoc.Id,
-                            Amount = 1200000m,
+                            InvoiceId = invChi.Id,
+                            Amount = 2000000m,
                             PaymentType = PaymentType.Deposit,
                             PaymentMethod = PaymentMethod.Cash,
                             CashierId = cashierId,
                             ReceiptEmail = "#U=0;R=0#",
-                            Note = "#BY=TS.BS Lê Hoàng Nam;PUR=Tạm ứng phẫu thuật nội soi#Thu tạm ứng mẫu",
-                            PaidAt = DateTime.Now.AddMinutes(-45)
+                            Note = "#BY=BS.CKII Phạm Thu Hằng;PUR=Tạm ứng nhập viện Ngoại khoa#Thu tạm ứng mẫu",
+                            PaidAt = DateTime.Now.AddMinutes(-90)
                         });
                     }
-                }
 
-                await db.SaveChangesAsync();
-                if (db.Database.IsRelational())
-                {
-                    await db.Payments
-                        .Where(p => p.ReceiptEmail != null && p.ReceiptEmail.StartsWith("#U=") && p.PaymentType != PaymentType.Deposit)
-                        .ExecuteUpdateAsync(s => s.SetProperty(p => p.PaymentType, PaymentType.Deposit));
-                }
-                await depositTx.CommitAsync();
+                    if (pBao != null)
+                    {
+                        var invBao = await EnsureSeedInvoiceAsync(pBao.Id, DateTime.Now.AddMinutes(-60));
+                        if (invBao != null)
+                        {
+                            db.Payments.Add(new Payment
+                            {
+                                InvoiceId = invBao.Id,
+                                Amount = 300000m,
+                                PaymentType = PaymentType.Deposit,
+                                PaymentMethod = PaymentMethod.BankTransfer,
+                                CashierId = cashierId,
+                                ReceiptEmail = "#U=0;R=0;REF=FT2431889210#",
+                                Note = "#BY=BS.CKII Phạm Thu Hằng;PUR=Tạm ứng xét nghiệm cận lâm sàng#Thu tạm ứng qua VietQR",
+                                PaidAt = DateTime.Now.AddMinutes(-60)
+                            });
+                        }
+                    }
+
+                    if (pNgoc != null)
+                    {
+                        var invNgoc = await EnsureSeedInvoiceAsync(pNgoc.Id, DateTime.Now.AddMinutes(-45));
+                        if (invNgoc != null)
+                        {
+                            db.Payments.Add(new Payment
+                            {
+                                InvoiceId = invNgoc.Id,
+                                Amount = 1200000m,
+                                PaymentType = PaymentType.Deposit,
+                                PaymentMethod = PaymentMethod.Cash,
+                                CashierId = cashierId,
+                                ReceiptEmail = "#U=0;R=0#",
+                                Note = "#BY=TS.BS Lê Hoàng Nam;PUR=Tạm ứng phẫu thuật nội soi#Thu tạm ứng mẫu",
+                                PaidAt = DateTime.Now.AddMinutes(-45)
+                            });
+                        }
+                    }
+
+                    await db.SaveChangesAsync();
+                    if (db.Database.IsRelational())
+                    {
+                        await db.Payments
+                            .Where(p => p.ReceiptEmail != null && p.ReceiptEmail.StartsWith("#U=") && p.PaymentType != PaymentType.Deposit)
+                            .ExecuteUpdateAsync(s => s.SetProperty(p => p.PaymentType, PaymentType.Deposit));
+                    }
+                    await depositTx.CommitAsync();
+                });
             }
 
             // 17. NHẬT KÝ TRUY VẾT MẪU (AccessLogs)
