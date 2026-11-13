@@ -59,3 +59,30 @@ public class AppointmentStateMachineTests
         Assert.Equal(expected, actual);
     }
 }
+
+public class ConnectionStringParserTests
+{
+    [Fact]
+    public void Should_Normalize_Postgresql_Uri_Correctly()
+    {
+        var uri = "postgresql://neondb_owner:mySecretPass123@ep-sparkling-wind-azs5uilk.c-3.ap-southeast-1.aws.neon.tech/hms_database?sslmode=require&channel_binding=require";
+        var normalized = HIS.DAL.DataAccessServiceCollectionExtensions.NormalizeConnectionString(uri);
+
+        var builder = new Npgsql.NpgsqlConnectionStringBuilder(normalized);
+        Assert.Equal("ep-sparkling-wind-azs5uilk.c-3.ap-southeast-1.aws.neon.tech", builder.Host);
+        Assert.Equal(5432, builder.Port);
+        Assert.Equal("hms_database", builder.Database);
+        Assert.Equal("neondb_owner", builder.Username);
+        Assert.Equal("mySecretPass123", builder.Password);
+        Assert.Equal(Npgsql.SslMode.Require, builder.SslMode);
+    }
+
+    [Fact]
+    public void Should_Keep_Standard_Key_Value_ConnectionString()
+    {
+        var standard = "Host=localhost;Port=5432;Database=his_db;Username=postgres;Password=CHANGE_ME";
+        var normalized = HIS.DAL.DataAccessServiceCollectionExtensions.NormalizeConnectionString(standard);
+
+        Assert.Equal(standard, normalized);
+    }
+}
