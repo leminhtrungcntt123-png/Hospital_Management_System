@@ -75,6 +75,20 @@ public class ConnectionStringParserTests
         Assert.Equal("neondb_owner", builder.Username);
         Assert.Equal("mySecretPass123", builder.Password);
         Assert.Equal(Npgsql.SslMode.Require, builder.SslMode);
+        Assert.Equal(Npgsql.ChannelBinding.Require, builder.ChannelBinding);
+    }
+
+    [Fact]
+    public void Should_Normalize_Postgresql_Uri_With_VerifyFull_And_Encoded_Db()
+    {
+        var uri = "postgresql://user:pass@localhost:5433/my%20test%20db?sslmode=verify-full";
+        var normalized = HIS.DAL.DataAccessServiceCollectionExtensions.NormalizeConnectionString(uri);
+
+        var builder = new Npgsql.NpgsqlConnectionStringBuilder(normalized);
+        Assert.Equal("localhost", builder.Host);
+        Assert.Equal(5433, builder.Port);
+        Assert.Equal("my test db", builder.Database);
+        Assert.Equal(Npgsql.SslMode.VerifyFull, builder.SslMode);
     }
 
     [Fact]

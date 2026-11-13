@@ -45,7 +45,7 @@ public static class DataAccessServiceCollectionExtensions
             var password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "";
             var host = uri.Host;
             var port = uri.Port > 0 ? uri.Port : 5432;
-            var database = uri.AbsolutePath.TrimStart('/');
+            var database = Uri.UnescapeDataString(uri.AbsolutePath.TrimStart('/'));
 
             var builder = new NpgsqlConnectionStringBuilder
             {
@@ -64,11 +64,25 @@ public static class DataAccessServiceCollectionExtensions
                 foreach (var pair in pairs)
                 {
                     var kv = pair.Split('=', 2);
-                    if (kv.Length == 2 && kv[0].Equals("sslmode", StringComparison.OrdinalIgnoreCase))
+                    if (kv.Length == 2)
                     {
-                        if (Enum.TryParse<SslMode>(kv[1], true, out var parsedMode))
+                        if (kv[0].Equals("sslmode", StringComparison.OrdinalIgnoreCase))
                         {
-                            builder.SslMode = parsedMode;
+                            builder.SslMode = kv[1].ToLowerInvariant() switch
+                            {
+                                "verify-ca" => SslMode.VerifyCA,
+                                "verify-full" => SslMode.VerifyFull,
+                                _ => Enum.TryParse<SslMode>(kv[1], true, out var parsedMode)
+                                    ? parsedMode
+                                    : SslMode.Require
+                            };
+                        }
+                        else if (kv[0].Equals("channel_binding", StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (Enum.TryParse<ChannelBinding>(kv[1], true, out var cb))
+                            {
+                                builder.ChannelBinding = cb;
+                            }
                         }
                     }
                 }
