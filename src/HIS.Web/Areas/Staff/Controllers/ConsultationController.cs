@@ -162,20 +162,22 @@ public class ConsultationController : Controller
                     a.VitalSigns != null ? a.VitalSigns.Spo2 : null,
                     a.VitalSigns != null ? a.VitalSigns.Weight : null,
                     a.Doctor != null ? a.Doctor.FullName : "Chuyên khoa",
-                    a.Slot != null && a.Slot.Room != null ? a.Slot.Room.RoomNumber : (a.Doctor != null ? (a.Doctor.LicenseNumber ?? "") : "")
+                    a.Slot != null && a.Slot.Room != null ? a.Slot.Room.RoomNumber : (a.Doctor != null ? (a.Doctor.LicenseNumber ?? "") : ""),
+                    a.StatusId
                 ));
 
             var activePatient = await ProjectQueueItems(
                     baseQueueQuery
-                        .Where(a => a.StatusId == (int)AppointmentStatusId.InProgress)
+                        .Where(a => a.StatusId == (int)AppointmentStatusId.InProgress && a.MedicalRecord == null)
                         .OrderByDescending(a => a.UpdatedAt)
                         .ThenBy(a => a.QueueNumber))
                 .FirstOrDefaultAsync(ct);
 
             var queue = await ProjectQueueItems(
                     baseQueueQuery
-                        .Where(a => a.StatusId == (int)AppointmentStatusId.ReadyForDoctor ||
-                                    a.StatusId == (int)AppointmentStatusId.CheckedIn)
+                        .Where(a => (a.StatusId == (int)AppointmentStatusId.ReadyForDoctor ||
+                                     a.StatusId == (int)AppointmentStatusId.CheckedIn) &&
+                                    a.MedicalRecord == null)
                         .OrderByDescending(a => a.PriorityLevel)
                         .ThenBy(a => a.QueueNumber))
                 .ToListAsync(ct);

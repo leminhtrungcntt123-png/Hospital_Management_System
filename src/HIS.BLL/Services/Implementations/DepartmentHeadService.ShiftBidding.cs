@@ -470,9 +470,12 @@ public partial class DepartmentHeadService
         if (schedule == null)
             return Result.Failure("NOT_FOUND", "Không tìm thấy ca đăng ký.");
 
-        var callerDeptId = await ResolveDepartmentIdByAccountIdAsync(request.ReviewedByAccountId, ct);
-        if (callerDeptId <= 0 || schedule.DepartmentId != callerDeptId)
-            return Result.Failure("FORBIDDEN", "Bạn không có quyền duyệt ca khám của khoa khác.");
+        if (!await IsActiveHospitalAdminAsync(request.ReviewedByAccountId, ct))
+        {
+            var callerDeptId = await ResolveDepartmentIdByAccountIdAsync(request.ReviewedByAccountId, ct);
+            if (callerDeptId <= 0 || schedule.DepartmentId != callerDeptId)
+                return Result.Failure("FORBIDDEN", "Bạn không có quyền duyệt ca khám của khoa khác.");
+        }
 
         var room = await _context.ClinicRooms.FirstOrDefaultAsync(r => r.Id == request.RoomId && r.DepartmentId == schedule.DepartmentId && r.IsActive, ct);
         if (room == null)
@@ -572,9 +575,12 @@ public partial class DepartmentHeadService
         if (oldRecord == null)
             return Result.Failure<int>("NOT_FOUND", "Không tìm thấy bản ghi ca khám gốc.");
 
-        var callerDeptId = await ResolveDepartmentIdByAccountIdAsync(request.ReviewedByAccountId, ct);
-        if (callerDeptId <= 0 || oldRecord.DepartmentId != callerDeptId)
-            return Result.Failure<int>("FORBIDDEN", "Bạn không có quyền điều chuyển ca khám của khoa khác.");
+        if (!await IsActiveHospitalAdminAsync(request.ReviewedByAccountId, ct))
+        {
+            var callerDeptId = await ResolveDepartmentIdByAccountIdAsync(request.ReviewedByAccountId, ct);
+            if (callerDeptId <= 0 || oldRecord.DepartmentId != callerDeptId)
+                return Result.Failure<int>("FORBIDDEN", "Bạn không có quyền điều chuyển ca khám của khoa khác.");
+        }
 
         if (oldRecord.Status == DoctorScheduleStatus.Approved)
             return Result.Failure<int>("CANNOT_REALLOCATE_ACTIVE", "Không thể điều chuyển ca khám đã được duyệt. Vui lòng hủy ca theo quy trình hủy lịch trước khi sắp xếp lại.");
@@ -678,10 +684,7 @@ public partial class DepartmentHeadService
         if (period == null)
             return Result.Failure<int>("NOT_FOUND", "Không tìm thấy kỳ đăng ký.");
 
-        var callerAccount = await _context.Accounts
-            .AsNoTracking()
-            .FirstOrDefaultAsync(a => a.Id == reviewedByAccountId && a.IsActive, ct);
-        bool isHospitalAdmin = callerAccount?.RoleId == (int)RoleId.Admin;
+        bool isHospitalAdmin = await IsActiveHospitalAdminAsync(reviewedByAccountId, ct);
 
         if (!period.DepartmentId.HasValue)
         {
@@ -764,5 +767,8 @@ public partial class DepartmentHeadService
         }
         return count;
     }
+
+    private Task<bool> IsActiveHospitalAdminAsync(int accountId, CancellationToken ct) =>
+        _context.Accounts.AsNoTracking().AnyAsync(a => a.Id == accountId && a.IsActive && a.RoleId == (int)RoleId.Admin, ct);
 }
 

@@ -33,6 +33,10 @@
                     @await Html.PartialAsync("_AdminIcon", "calendar")
                     <span>Nghỉ / đổi ca</span>
                 </a>
+                <a href="#scheduling" data-section="scheduling">
+                    @await Html.PartialAsync("_AdminIcon", "calendar")
+                    <span>Phân &amp; duyệt ca</span>
+                </a>
                 <a href="#audit" data-section="audit">
                     @await Html.PartialAsync("_AdminIcon", "clipboard")
                     <span>Nhật ký truy vết</span>
@@ -149,6 +153,7 @@
                         <span id="report-period"></span>
                     </div>
                     <div class="table-scroll" id="report-table"></div>
+                    <div id="report-pagination" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; border-top:1px solid var(--border, #e2e8f0);" hidden></div>
                 </div>
                 <div class="card">
                     <div class="card-heading">
@@ -166,11 +171,89 @@
                     để giữ lịch sử.
                 </p>
                 <div class="card">
-                    <div class="card-heading">
-                        <h2>Đề nghị nghỉ / đổi ca</h2>
+                    <div class="card-heading" style="flex-wrap:wrap; gap:10px;">
+                        <div style="display:flex; gap:8px; flex-wrap:wrap;" id="requests-status-tabs">
+                            <button type="button" class="btn button primary sm" data-req-filter="all">Tất cả</button>
+                            <button type="button" class="btn button secondary sm" data-req-filter="Pending">Chờ duyệt</button>
+                            <button type="button" class="btn button secondary sm" data-req-filter="Approved">Đã duyệt</button>
+                            <button type="button" class="btn button secondary sm" data-req-filter="Rejected">Từ chối</button>
+                        </div>
                         <span>Hiển thị tối đa 200 đề nghị gần nhất</span>
                     </div>
                     <div class="table-scroll" id="requests-table"></div>
+                </div>
+            </section>
+
+            <section data-panel="scheduling" aria-label="Phân và duyệt ca khám" hidden>
+                <div class="section-actions">
+                    <div class="section-filter-group">
+                        <label class="filter-dropdown-label" for="scheduling-dept">
+                            Khoa chuyên môn:
+                            <select id="scheduling-dept"></select>
+                        </label>
+                    </div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <button class="btn button secondary" id="open-create-period" type="button">+ Tạo kỳ đăng ký</button>
+                        <button class="btn button primary" id="publish-period-btn" type="button" hidden>Xuất bản kỳ &amp; Sinh Slot</button>
+                        <button class="btn button primary" id="open-upsert-schedule" type="button">+ Xếp lịch trực tiếp</button>
+                    </div>
+                </div>
+                <div class="card" id="active-period-card" style="padding:14px 18px; margin-bottom:14px;">
+                    <div id="active-period-info">Đang tải thông tin kỳ đăng ký...</div>
+                </div>
+                <div class="card" style="padding:16px; margin-bottom:14px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+                        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; font-size:13px;">
+                            <strong>Lưới ca trực đợt đăng ký:</strong>
+                            <span>⚪ Đang trống (0 phòng)</span>
+                            <span>🟢 Còn chỗ</span>
+                            <span>🔴 Cạnh tranh cao</span>
+                            <span class="badge reject">🔥 Ca Hot</span>
+                        </div>
+                        <small style="color:#64748b;">Nhấp vào bất kỳ ca nào trên lưới để tải Bảng Ma trận quyết định bên dưới</small>
+                    </div>
+                    <div id="demand-grid-board" style="display:grid; grid-template-columns:repeat(7, minmax(175px, 1fr)); gap:10px; overflow-x:auto; padding-bottom:6px;"></div>
+                </div>
+                <div class="card" id="inline-decision-matrix" style="padding:16px; margin-bottom:14px;">
+                    <div class="card-heading" style="padding:0 0 12px 0; border-bottom:1px solid #e2e8f0; margin-bottom:12px;">
+                        <div>
+                            <h2 style="margin:0;">Bảng xếp hạng ưu tiên xét duyệt ca (Decision Matrix)</h2>
+                            <small id="dm-selected-label" style="color:#0284c7; font-weight:600;">Chọn một ô ca trên lưới để xem chi tiết</small>
+                        </div>
+                        <span id="dm-rooms-count" style="font-size:13px; font-weight:600; color:#334155;"></span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
+                        <label style="display:flex; align-items:center; gap:6px; font-size:13px;">
+                            Ngày:
+                            <input type="date" id="dm-date" />
+                        </label>
+                        <label style="display:flex; align-items:center; gap:6px; font-size:13px;">
+                            Ca:
+                            <select id="dm-shift">
+                                <option value="0">Sáng (07:30 - 11:30)</option>
+                                <option value="1">Chiều (13:00 - 16:30)</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="table-scroll" id="dm-table"></div>
+                </div>
+                <div class="card">
+                    <div class="card-heading" style="flex-wrap:wrap; gap:10px;">
+                        <div>
+                            <h2 style="margin:0;">Lịch khám trong tuần</h2>
+                            <small style="color:#64748b;">Nhấp vào ca khám để xem hoặc chỉnh sửa Quota tiếp nhận (Tổng chỉ tiêu / Đặt online / Khám tại quầy)</small>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                            <button type="button" class="btn button secondary sm" id="sched-prev-week">← Tuần trước</button>
+                            <button type="button" class="btn button secondary sm" id="sched-this-week">Tuần hiện tại</button>
+                            <button type="button" class="btn button secondary sm" id="sched-next-week">Tuần sau →</button>
+                            <button type="button" class="btn button secondary sm" id="sched-generate-slots">⚡ Sinh slot tuần này</button>
+                            <span style="font-size:12px; color:#64748b; background:#f8fafc; padding:4px 10px; border-radius:6px; border:1px solid #e2e8f0;">
+                                Sáng: 07:30-11:30 · Chiều: 13:00-16:30 · Tối: 18:00-07:00
+                            </span>
+                        </div>
+                    </div>
+                    <div class="table-scroll" id="dept-schedules-grid"></div>
                 </div>
             </section>
 
@@ -513,6 +596,116 @@
         <div class="dialog-actions">
             <button type="button" class="btn button secondary" data-close>Hủy</button>
             <button class="btn button primary" type="submit">Lưu thuốc</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="create-period-dialog" aria-labelledby="create-period-title">
+    <form id="create-period-form">
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">KỲ ĐĂNG KÝ CA KHÁM</p>
+                <h2 id="create-period-title">Tạo kỳ đăng ký mới</h2>
+            </div>
+            <button type="button" data-close aria-label="Đóng">×</button>
+        </div>
+        <div class="form-grid">
+            <label>
+                Tên kỳ đăng ký *
+                <input name="name" placeholder="VD: Tuần 16/11 - 22/11/2026" maxlength="120" required />
+            </label>
+            <label>
+                Phạm vi áp dụng
+                <select name="departmentId" id="period-scope-dept">
+                    <option value="">Toàn bệnh viện (dùng chung)</option>
+                </select>
+            </label>
+            <label>
+                Từ ngày *
+                <input name="startDate" type="date" required />
+            </label>
+            <label>
+                Đến ngày *
+                <input name="endDate" type="date" required />
+            </label>
+            <label>
+                Mở cổng đăng ký *
+                <input name="biddingOpensAt" type="datetime-local" required />
+            </label>
+            <label>
+                Đóng cổng đăng ký *
+                <input name="biddingClosesAt" type="datetime-local" required />
+            </label>
+        </div>
+        <p class="form-error" role="alert"></p>
+        <div class="dialog-actions">
+            <button type="button" class="btn button secondary" data-close>Hủy</button>
+            <button class="btn button primary" type="submit">Tạo kỳ đăng ký</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="decision-matrix-dialog" aria-labelledby="decision-matrix-title" style="max-width:860px; width:95vw;">
+    <div class="dialog-heading">
+        <div>
+            <p class="eyebrow">MA TRẬN QUYẾT ĐỊNH DUYỆT CA</p>
+            <h2 id="decision-matrix-title">Xét duyệt bác sĩ &amp; gán phòng</h2>
+        </div>
+        <button type="button" data-close aria-label="Đóng">×</button>
+    </div>
+    <div id="decision-matrix-body" style="max-height:65vh; overflow:auto;"></div>
+    <div class="dialog-actions" style="margin-top:14px;">
+        <button type="button" class="btn button secondary" data-close>Đóng</button>
+    </div>
+</dialog>
+
+<dialog id="upsert-schedule-dialog" aria-labelledby="upsert-schedule-title">
+    <form id="upsert-schedule-form">
+        <input type="hidden" name="id" value="" />
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">PHÂN CÔNG LỊCH KHÁM</p>
+                <h2 id="upsert-schedule-title">Xếp lịch trực tiếp</h2>
+            </div>
+            <button type="button" data-close aria-label="Đóng">×</button>
+        </div>
+        <div class="form-grid">
+            <label>
+                Bác sĩ *
+                <select name="doctorId" required></select>
+            </label>
+            <label>
+                Phòng khám *
+                <select name="roomId" required></select>
+            </label>
+            <label>
+                Ngày làm việc *
+                <input name="workDate" type="date" required />
+            </label>
+            <label>
+                Ca làm việc *
+                <select name="shift" required>
+                    <option value="0">Ca Sáng (07:30 - 11:30)</option>
+                    <option value="1">Ca Chiều (13:00 - 16:30)</option>
+                </select>
+            </label>
+            <label>
+                Số BN tối đa
+                <input name="maxPatients" type="number" min="1" max="100" value="40" />
+            </label>
+            <label>
+                Số slot online
+                <input name="onlineSlots" type="number" min="0" max="100" value="28" />
+            </label>
+            <label style="grid-column:1 / -1;">
+                Ghi chú
+                <input name="doctorNote" maxlength="200" placeholder="Ghi chú phân công (nếu có)" />
+            </label>
+        </div>
+        <p class="form-error" role="alert"></p>
+        <div class="dialog-actions">
+            <button type="button" class="btn button secondary" data-close>Hủy</button>
+            <button class="btn button primary" type="submit">Lưu lịch khám</button>
         </div>
     </form>
 </dialog>

@@ -31,7 +31,8 @@ public partial class ScheduleChangeService
             request.Status == ScheduleExceptionStatus.Pending && StartOfChange(request) > Now,
             request.Status == ScheduleExceptionStatus.Pending,
             doctors.Where(doctor => doctor.Id != request.DoctorId && doctor.DepartmentId == request.Doctor.DepartmentId)
-                .Select(doctor => new AdminOption(doctor.Id, doctor.FullName)).ToList())).ToList();
+                .Select(doctor => new AdminOption(doctor.Id, doctor.FullName)).ToList(),
+            request.ApprovedAt)).ToList();
     }
 
     public async Task<ScheduleDecisionResult> ReviewAsync(
