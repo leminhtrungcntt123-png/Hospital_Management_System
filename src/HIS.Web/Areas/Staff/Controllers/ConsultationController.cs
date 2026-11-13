@@ -111,8 +111,9 @@ public class ConsultationController : Controller
                 }
             }
 
-            var selectedDate = date ?? DateOnly.FromDateTime(DateTime.Today);
-            var selectedShift = shift ?? (DateTime.Now.Hour < 12 ? ExamShift.Morning : ExamShift.Afternoon);
+            var localNow = _timeProvider.GetLocalNow().DateTime;
+            var selectedDate = date ?? DateOnly.FromDateTime(localNow);
+            var selectedShift = shift ?? (localNow.Hour < 12 ? ExamShift.Morning : ExamShift.Afternoon);
             var activeTab = string.IsNullOrWhiteSpace(tab) ? "consultation" : tab.ToLowerInvariant();
 
             // 1. Hàng đợi bệnh nhân đang chờ khám từ Database
@@ -144,13 +145,13 @@ public class ConsultationController : Controller
             }
 
             var queue = await queueQuery
-                .OrderBy(a => a.PriorityLevel)
+                .OrderByDescending(a => a.PriorityLevel)
                 .ThenBy(a => a.QueueNumber)
                 .Select(a => new ConsultationQueueItemDto(
                     a.Id,
                     a.AppointmentCode,
                     a.Patient.FullName,
-                    DateTime.Today.Year - a.Patient.DateOfBirth.Year,
+                    localNow.Year - a.Patient.DateOfBirth.Year,
                     a.Patient.Gender == Gender.Male ? "Nam" : "Nữ",
                     a.QueueNumber ?? "—",
                     a.PriorityLevel,

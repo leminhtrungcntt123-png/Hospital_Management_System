@@ -217,37 +217,53 @@ public class SlotGenerationService : ISlotGenerationService
 
     public async Task<Result<int>> ExpirePendingHoldsAsync(CancellationToken ct = default)
     {
-        var now = DateTime.SpecifyKind(_timeProvider.GetLocalNow().DateTime, DateTimeKind.Unspecified);
-        var expiredAppointments = await _context.Appointments
-            .Include(a => a.Slot)
-            .Where(a => a.StatusId == (int)AppointmentStatusId.Pending && a.HoldUntil.HasValue && a.HoldUntil.Value < now)
-            .ToListAsync(ct);
-
-        if (expiredAppointments.Count == 0) return Result<int>.Success(0);
-
-        foreach (var app in expiredAppointments)
+        var strategy = _context.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            app.StatusId = (int)AppointmentStatusId.Expired;
-            app.UpdatedAt = now;
-            if (app.Slot != null && app.Slot.BookedCount > 0)
+            await using var tx = await _context.Database.BeginTransactionAsync(ct);
+            if (_context.Database.IsNpgsql())
             {
-                app.Slot.BookedCount--;
-                if (app.Slot.Status == SlotStatus.Full)
-                {
-                    app.Slot.Status = SlotStatus.Available;
-                }
+                // Serialize hold expiration across worker instances so BookedCount cannot be double-decremented.
+                await _context.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(77019, 1)", ct);
             }
 
-            _context.AppointmentStatusHistories.Add(new AppointmentStatusHistory
-            {
-                AppointmentId = app.Id,
-                OldStatusId = (int)AppointmentStatusId.Pending,
-                NewStatusId = (int)AppointmentStatusId.Expired,
-                ChangedAt = now
-            });
-        }
+            var now = DateTime.SpecifyKind(_timeProvider.GetLocalNow().DateTime, DateTimeKind.Unspecified);
+            var expiredAppointments = await _context.Appointments
+                .Include(a => a.Slot)
+                .Where(a => a.StatusId == (int)AppointmentStatusId.Pending && a.HoldUntil.HasValue && a.HoldUntil.Value < now)
+                .ToListAsync(ct);
 
-        await _context.SaveChangesAsync(ct);
-        return Result<int>.Success(expiredAppointments.Count);
+            if (expiredAppointments.Count == 0)
+            {
+                await tx.RollbackAsync(ct);
+                return Result<int>.Success(0);
+            }
+
+            foreach (var app in expiredAppointments)
+            {
+                app.StatusId = (int)AppointmentStatusId.Expired;
+                app.UpdatedAt = now;
+                if (app.Slot != null && app.Slot.BookedCount > 0)
+                {
+                    app.Slot.BookedCount--;
+                    if (app.Slot.Status == SlotStatus.Full)
+                    {
+                        app.Slot.Status = SlotStatus.Available;
+                    }
+                }
+
+                _context.AppointmentStatusHistories.Add(new AppointmentStatusHistory
+                {
+                    AppointmentId = app.Id,
+                    OldStatusId = (int)AppointmentStatusId.Pending,
+                    NewStatusId = (int)AppointmentStatusId.Expired,
+                    ChangedAt = now
+                });
+            }
+
+            await _context.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+            return Result<int>.Success(expiredAppointments.Count);
+        });
     }
 }
