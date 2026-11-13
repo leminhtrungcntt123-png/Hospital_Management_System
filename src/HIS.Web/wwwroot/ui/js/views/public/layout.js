@@ -66,6 +66,8 @@ function publicShell() {
 
 function publicContent() {
     if (ui.route.startsWith('public/doctor/')) return doctorDetail(ui.route.split('/')[2]);
+    if (ui.route.startsWith('public/specialty/'))
+        return specialtyIntroductionDetail(ui.route.split('/')[2]);
     switch (ui.route) {
         case 'public/booking':
         case 'patient/booking':

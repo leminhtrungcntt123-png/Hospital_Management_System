@@ -111,46 +111,43 @@ public class ConsultationController : Controller
                 }
             }
 
-            var selectedDate = date ?? DateOnly.FromDateTime(DateTime.Today);
-            var selectedShift = shift ?? (DateTime.Now.Hour < 12 ? ExamShift.Morning : ExamShift.Afternoon);
+            var localNow = _timeProvider.GetLocalNow().DateTime;
+            var selectedDate = date ?? DateOnly.FromDateTime(localNow);
+            var selectedShift = shift ?? (localNow.Hour < 12 ? ExamShift.Morning : ExamShift.Afternoon);
             var activeTab = string.IsNullOrWhiteSpace(tab) ? "consultation" : tab.ToLowerInvariant();
 
             // 1. Hàng đợi bệnh nhân đang chờ khám từ Database
-            var queueQuery = _context.Appointments
+            var baseQueueQuery = _context.Appointments
                 .AsNoTracking()
                 .Include(a => a.Patient)
                 .Include(a => a.VitalSigns)
                 .Include(a => a.Doctor)
                 .Include(a => a.Slot)
-                .Where(a => a.StatusId == (int)AppointmentStatusId.ReadyForDoctor ||
-                            a.StatusId == (int)AppointmentStatusId.CheckedIn ||
-                            a.StatusId == (int)AppointmentStatusId.InProgress);
+                .AsQueryable();
 
             if (isDeptHead)
             {
                 // Trưởng khoa: Xem bệnh nhân thuộc khoa mình
-                queueQuery = queueQuery.Where(a => (a.Doctor != null && a.Doctor.DepartmentId == departmentId) || a.DepartmentId == departmentId);
+                baseQueueQuery = baseQueueQuery.Where(a => (a.Doctor != null && a.Doctor.DepartmentId == departmentId) || a.DepartmentId == departmentId);
 
                 // Nếu trưởng khoa chọn lọc theo 1 bác sĩ cụ thể trong khoa:
                 if (doctorId.HasValue && doctorId.Value > 0)
                 {
-                    queueQuery = queueQuery.Where(a => a.DoctorId == doctorId.Value);
+                    baseQueueQuery = baseQueueQuery.Where(a => a.DoctorId == doctorId.Value);
                 }
             }
             else
             {
                 // Bác sĩ thường: CHỈ THẤY BỆNH NHÂN THEO PHÒNG / BÁC SĨ CỦA MÌNH
-                queueQuery = queueQuery.Where(a => a.DoctorId == currentDoctorId);
+                baseQueueQuery = baseQueueQuery.Where(a => a.DoctorId == currentDoctorId);
             }
 
-            var queue = await queueQuery
-                .OrderBy(a => a.PriorityLevel)
-                .ThenBy(a => a.QueueNumber)
-                .Select(a => new ConsultationQueueItemDto(
+            IQueryable<ConsultationQueueItemDto> ProjectQueueItems(IQueryable<Appointment> query) =>
+                query.Select(a => new ConsultationQueueItemDto(
                     a.Id,
                     a.AppointmentCode,
                     a.Patient.FullName,
-                    DateTime.Today.Year - a.Patient.DateOfBirth.Year,
+                    localNow.Year - a.Patient.DateOfBirth.Year,
                     a.Patient.Gender == Gender.Male ? "Nam" : "Nữ",
                     a.QueueNumber ?? "—",
                     a.PriorityLevel,
@@ -166,7 +163,21 @@ public class ConsultationController : Controller
                     a.VitalSigns != null ? a.VitalSigns.Weight : null,
                     a.Doctor != null ? a.Doctor.FullName : "Chuyên khoa",
                     a.Slot != null && a.Slot.Room != null ? a.Slot.Room.RoomNumber : (a.Doctor != null ? (a.Doctor.LicenseNumber ?? "") : "")
-                ))
+                ));
+
+            var activePatient = await ProjectQueueItems(
+                    baseQueueQuery
+                        .Where(a => a.StatusId == (int)AppointmentStatusId.InProgress)
+                        .OrderByDescending(a => a.UpdatedAt)
+                        .ThenBy(a => a.QueueNumber))
+                .FirstOrDefaultAsync(ct);
+
+            var queue = await ProjectQueueItems(
+                    baseQueueQuery
+                        .Where(a => a.StatusId == (int)AppointmentStatusId.ReadyForDoctor ||
+                                    a.StatusId == (int)AppointmentStatusId.CheckedIn)
+                        .OrderByDescending(a => a.PriorityLevel)
+                        .ThenBy(a => a.QueueNumber))
                 .ToListAsync(ct);
 
             // 2. Danh sách Chỉ định & kết quả từ Database
@@ -384,7 +395,7 @@ public class ConsultationController : Controller
                 MinShiftsPerWeek = minShifts,
                 MaxShiftsPerWeek = maxShifts,
                 QueuePatients = queue,
-                ActivePatient = queue.FirstOrDefault(),
+                ActivePatient = activePatient ?? queue.FirstOrDefault(),
                 LabOrders = labs,
                 MedicalRecords = records,
                 DoctorSchedules = schedules,

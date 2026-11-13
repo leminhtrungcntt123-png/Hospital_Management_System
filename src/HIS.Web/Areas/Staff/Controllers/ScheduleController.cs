@@ -15,15 +15,18 @@ public class ScheduleController : Controller
     private readonly IDepartmentHeadService _departmentHeadService;
     private readonly ISlotGenerationService _slotGenerationService;
     private readonly IDepartmentService _departmentService;
+    private readonly TimeProvider _timeProvider;
 
     public ScheduleController(
         IDepartmentHeadService departmentHeadService,
         ISlotGenerationService slotGenerationService,
-        IDepartmentService departmentService)
+        IDepartmentService departmentService,
+        TimeProvider timeProvider)
     {
         _departmentHeadService = departmentHeadService;
         _slotGenerationService = slotGenerationService;
         _departmentService = departmentService;
+        _timeProvider = timeProvider;
     }
 
     [HttpGet]
@@ -249,7 +252,7 @@ public class ScheduleController : Controller
             return RedirectToAction(nameof(Index), new { tab = targetTab });
         }
 
-        if (startTime < DateTime.Now)
+        if (startTime < _timeProvider.GetLocalNow().DateTime)
         {
             TempData["ErrorMessage"] = "Không thể phân công ca trực trong quá khứ. Vui lòng chọn thời gian từ hiện tại hoặc tương lai.";
             return RedirectToAction(nameof(Index), new { tab = targetTab });
@@ -482,9 +485,9 @@ public class ScheduleController : Controller
         });
     }
 
-    // Trưởng khoa xuất bản toàn bộ lịch kỳ (PUBLISHED -> Sinh appointment_slots hàng loạt)
+    // Trưởng khoa (hoặc Admin đối với kỳ toàn viện) xuất bản lịch kỳ (PUBLISHED -> Sinh appointment_slots hàng loạt)
     [HttpPost]
-    [Authorize(Policy = "DepartmentHeadOnly")]
+    [Authorize(Roles = "ADMIN,DEPARTMENT_HEAD")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> PublishPeriod(int periodId, string? tab, CancellationToken ct)
     {
@@ -580,7 +583,7 @@ public class ScheduleController : Controller
     // ========================================================
 
     [HttpPost]
-    [Authorize(Roles = "ADMIN,DEPARTMENT_HEAD,NURSE")]
+    [Authorize(Policy = "DepartmentHeadOnly")]
     public async Task<IActionResult> GenerateSlots([FromBody] SlotGenerationRequest request, CancellationToken ct = default)
     {
         if (request == null)
@@ -593,7 +596,13 @@ public class ScheduleController : Controller
             return Json(new { success = false, message = "Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu." });
         }
 
-        var result = await _slotGenerationService.GenerateSlotsAsync(request.StartDate, request.EndDate, request.DepartmentId, ct);
+        var callerDepartmentId = await _departmentHeadService.ResolveDepartmentIdByAccountIdAsync(GetCurrentAccountId(), ct);
+        if (callerDepartmentId <= 0)
+        {
+            return Json(new { success = false, message = "Không xác định được khoa quản lý của bạn." });
+        }
+
+        var result = await _slotGenerationService.GenerateSlotsAsync(request.StartDate, request.EndDate, callerDepartmentId, ct);
         if (!result.IsSuccess)
         {
             return Json(new { success = false, message = result.Error.Message });

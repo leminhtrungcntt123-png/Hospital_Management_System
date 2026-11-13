@@ -44,7 +44,10 @@ public class QueueService : IQueueService
                 var roomId = app.RoomId
                     ?? (app.DoctorId.HasValue
                         ? await _context.DoctorSchedules
-                            .Where(s => s.DoctorId == app.DoctorId.Value && s.RoomId.HasValue)
+                            .Where(s => s.DoctorId == app.DoctorId.Value
+                                && s.WorkDate == today
+                                && s.Status == DoctorScheduleStatus.Approved
+                                && s.RoomId.HasValue)
                             .Select(s => s.RoomId!.Value)
                             .FirstOrDefaultAsync(ct)
                         : 0);
@@ -138,7 +141,7 @@ public class QueueService : IQueueService
             }
 
             var nextApp = await query
-                .OrderBy(a => a.PriorityLevel)
+                .OrderByDescending(a => a.PriorityLevel)
                 .ThenBy(a => a.QueueNumber)
                 .ThenBy(a => a.CheckedInAt)
                 .FirstOrDefaultAsync(ct);

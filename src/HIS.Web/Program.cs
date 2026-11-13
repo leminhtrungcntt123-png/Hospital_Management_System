@@ -105,9 +105,7 @@ builder.Services.AddHealthChecks()
     .AddDbContextCheck<AppDbContext>();
 
 // Background workers
-builder.Services.AddHostedService<SlotGenerationWorker>();
 builder.Services.AddHostedService<HoldExpirationWorker>();
-builder.Services.AddHostedService<NoShowWorker>();
 builder.Services.AddSingleton<PasswordResetQueue>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<PasswordResetQueue>());
 

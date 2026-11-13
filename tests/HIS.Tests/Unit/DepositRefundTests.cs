@@ -28,14 +28,28 @@ public class DepositRefundTests
         return new BillingService(db, new VietnamTimeProvider(), options);
     }
 
-    private static async Task EnsureOpenShiftAsync(AppDbContext db, int cashierId)
+    /// <summary>
+    /// Tạo tài khoản thu ngân riêng cho từng test và mở ca cho tài khoản đó,
+    /// để test không đụng tới ca đang mở của tài khoản thật (vd. ketoan) trong DB dùng chung.
+    /// </summary>
+    private static async Task<int> CreateCashierWithOpenShiftAsync(AppDbContext db)
     {
-        var shiftService = new CashierShiftService(db, new VietnamTimeProvider());
-        var existing = await shiftService.GetCurrentShiftAsync(cashierId);
-        if (existing == null)
+        var unique = Guid.NewGuid().ToString("N")[..8];
+        var cashier = new Account
         {
-            await shiftService.OpenShiftAsync(new OpenShiftRequest(cashierId, 1000000m, "Test shift"));
-        }
+            Username = $"test_cashier_{unique}",
+            Email = $"test_cashier_{unique}@his.local",
+            PasswordHash = "hash",
+            RoleId = (int)RoleId.Nurse,
+            IsActive = true
+        };
+        db.Accounts.Add(cashier);
+        await db.SaveChangesAsync();
+
+        var shiftService = new CashierShiftService(db, new VietnamTimeProvider());
+        var openRes = await shiftService.OpenShiftAsync(new OpenShiftRequest(cashier.Id, 1000000m, "Test shift"));
+        Assert.True(openRes.IsSuccess, openRes.Error?.Message);
+        return cashier.Id;
     }
 
     private static async Task<Patient> CreateIsolatedPatientAsync(AppDbContext db)
@@ -72,7 +86,7 @@ public class DepositRefundTests
     public async Task CreateDeposit_ValidRequest_CreatesDepositAndPaymentRecord()
     {
         await using var db = CreateDb();
-        await EnsureOpenShiftAsync(db, 1);
+        var cashierId = await CreateCashierWithOpenShiftAsync(db);
         var billingService = CreateBillingService(db);
 
         var patient = await CreateIsolatedPatientAsync(db);
@@ -86,7 +100,7 @@ public class DepositRefundTests
             "Tạm ứng nhập viện Ngoại khoa",
             null,
             "Thu tiền mặt đầu đợt",
-            1);
+            cashierId);
 
         var res = await billingService.CreateDepositAsync(req);
         Assert.True(res.IsSuccess);
@@ -108,7 +122,7 @@ public class DepositRefundTests
     public async Task RefundDeposit_ExceedsBalance_ReturnsError()
     {
         await using var db = CreateDb();
-        await EnsureOpenShiftAsync(db, 1);
+        var cashierId = await CreateCashierWithOpenShiftAsync(db);
         var billingService = CreateBillingService(db);
 
         var patient = await CreateIsolatedPatientAsync(db);
@@ -134,7 +148,7 @@ public class DepositRefundTests
             "Bệnh nhân không làm xét nghiệm",
             PaymentMethod.Cash,
             null,
-            1);
+            cashierId);
 
         var refundRes = await billingService.RefundDepositAsync(refundReq);
         Assert.False(refundRes.IsSuccess);
@@ -145,7 +159,7 @@ public class DepositRefundTests
     public async Task RefundDeposit_ValidAmount_UpdatesBalanceAndCreatesRefundPayment()
     {
         await using var db = CreateDb();
-        await EnsureOpenShiftAsync(db, 1);
+        var cashierId = await CreateCashierWithOpenShiftAsync(db);
         var billingService = CreateBillingService(db);
 
         var patient = await CreateIsolatedPatientAsync(db);
@@ -171,7 +185,7 @@ public class DepositRefundTests
             "Bệnh nhân yêu cầu hoàn lại tiền thừa",
             PaymentMethod.Cash,
             null,
-            1);
+            cashierId);
 
         var refundRes = await billingService.RefundDepositAsync(refundReq);
         Assert.True(refundRes.IsSuccess);
@@ -190,7 +204,7 @@ public class DepositRefundTests
             "Quyết toán toàn bộ xuất viện",
             PaymentMethod.Cash,
             null,
-            1);
+            cashierId);
 
         var refundAllRes = await billingService.RefundDepositAsync(refundAllReq);
         Assert.True(refundAllRes.IsSuccess);
@@ -243,7 +257,7 @@ public class DepositRefundTests
             Amount = patientAmount,
             PaymentType = PaymentType.Payment,
             PaymentMethod = PaymentMethod.Cash,
-            CashierId = 1,
+            CashierId = null,
             Note = "Thanh toán hóa đơn test",
             PaidAt = DateTime.Now
         });
@@ -255,7 +269,7 @@ public class DepositRefundTests
     public async Task RefundInvoice_ExceedsPatientAmount_ReturnsError()
     {
         await using var db = CreateDb();
-        await EnsureOpenShiftAsync(db, 1);
+        var cashierId = await CreateCashierWithOpenShiftAsync(db);
         var billingService = CreateBillingService(db);
 
         var invoice = await CreatePaidInvoiceAsync(db);
@@ -267,7 +281,7 @@ public class DepositRefundTests
             "Hoàn tiền quá mức",
             PaymentMethod.Cash,
             null,
-            1);
+            cashierId);
 
         var res = await billingService.RefundInvoiceAsync(req);
         Assert.False(res.IsSuccess);
@@ -278,7 +292,7 @@ public class DepositRefundTests
     public async Task RefundInvoice_ValidAmount_CreatesRefundPayment()
     {
         await using var db = CreateDb();
-        await EnsureOpenShiftAsync(db, 1);
+        var cashierId = await CreateCashierWithOpenShiftAsync(db);
         var billingService = CreateBillingService(db);
 
         var invoice = await CreatePaidInvoiceAsync(db);
@@ -291,7 +305,7 @@ public class DepositRefundTests
             "Hủy dịch vụ xét nghiệm theo yêu cầu bác sĩ",
             PaymentMethod.Cash,
             null,
-            1);
+            cashierId);
 
         var res = await billingService.RefundInvoiceAsync(req);
         Assert.True(res.IsSuccess);
@@ -306,7 +320,7 @@ public class DepositRefundTests
     public async Task RefundAllPatientDeposits_MultipleSlips_SettlesAllInOneGo()
     {
         await using var db = CreateDb();
-        await EnsureOpenShiftAsync(db, 1);
+        var cashierId = await CreateCashierWithOpenShiftAsync(db);
         var billingService = CreateBillingService(db);
 
         // Tạo 1 bệnh nhân test riêng
@@ -323,12 +337,12 @@ public class DepositRefundTests
 
         // 1. Nộp tạm ứng lần 1 (Tiền mặt 300.000đ)
         var dep1 = await billingService.CreateDepositAsync(new CreateDepositRequest(
-            patient.Id, null, 300000m, PaymentMethod.Cash, "Tạm ứng khám ban đầu", null, null, 1));
+            patient.Id, null, 300000m, PaymentMethod.Cash, "Tạm ứng khám ban đầu", null, null, cashierId));
         Assert.True(dep1.IsSuccess);
 
         // 2. Nộp tạm ứng lần 2 (Chuyển khoản 700.000đ)
         var dep2 = await billingService.CreateDepositAsync(new CreateDepositRequest(
-            patient.Id, null, 700000m, PaymentMethod.BankTransfer, "Tạm ứng phẫu thuật", "REF_INIT_001", null, 1));
+            patient.Id, null, 700000m, PaymentMethod.BankTransfer, "Tạm ứng phẫu thuật", "REF_INIT_001", null, cashierId));
         Assert.True(dep2.IsSuccess);
 
         // 3. Tra cứu nhanh số dư bệnh nhân
@@ -345,7 +359,7 @@ public class DepositRefundTests
         var refundAllReq = new RefundAllPatientDepositsRequest(
             patient.Id,
             "Tất toán xuất viện và hoàn tiền toàn bộ",
-            1,
+            cashierId,
             "REF_REFUND_999");
 
         var batchRes = await billingService.RefundAllPatientDepositsAsync(refundAllReq);
@@ -409,7 +423,7 @@ public class DepositRefundTests
     {
         await using var db = CreateDb();
         var billingService = CreateBillingService(db);
-        await EnsureOpenShiftAsync(db, 1);
+        var cashierId = await CreateCashierWithOpenShiftAsync(db);
 
         var patient = await CreateIsolatedPatientAsync(db);
         var doctor = await db.Doctors.FirstAsync();
@@ -430,7 +444,7 @@ public class DepositRefundTests
         await db.SaveChangesAsync();
 
         var depRes = await billingService.CreateDepositAsync(new CreateDepositRequest(
-            patient.Id, null, 1000000m, PaymentMethod.BankTransfer, "Tạm ứng khám", "REF_INIT_SET", null, 1));
+            patient.Id, null, 1000000m, PaymentMethod.BankTransfer, "Tạm ứng khám", "REF_INIT_SET", null, cashierId));
         Assert.True(depRes.IsSuccess, depRes.Error?.Message);
         var dep = depRes.Value!;
 
@@ -439,7 +453,7 @@ public class DepositRefundTests
             PaymentMethod.BankTransfer,
             "REF_BANK_123456",
             "Tất toán xuất viện và hoàn tiền",
-            1);
+            cashierId);
 
         var result = await billingService.SettleDischargeAsync(req);
         Assert.True(result.IsSuccess, result.Error?.Message);
@@ -463,7 +477,7 @@ public class DepositRefundTests
     {
         await using var db = CreateDb();
         var billingService = CreateBillingService(db);
-        await EnsureOpenShiftAsync(db, 1);
+        var cashierId = await CreateCashierWithOpenShiftAsync(db);
 
         var patient = await CreateIsolatedPatientAsync(db);
         var doctor = await db.Doctors.FirstAsync();
@@ -485,7 +499,7 @@ public class DepositRefundTests
 
         // Tạm ứng 50.000 đ < Viện phí 150.000 đ
         var depRes = await billingService.CreateDepositAsync(new CreateDepositRequest(
-            patient.Id, null, 50000m, PaymentMethod.Cash, "Tạm ứng ít", null, null, 1));
+            patient.Id, null, 50000m, PaymentMethod.Cash, "Tạm ứng ít", null, null, cashierId));
         Assert.True(depRes.IsSuccess, depRes.Error?.Message);
         var dep = depRes.Value!;
 
@@ -494,7 +508,7 @@ public class DepositRefundTests
             PaymentMethod.Cash,
             null,
             "Thu thêm tiền mặt khi quyết toán",
-            1);
+            cashierId);
 
         var result = await billingService.SettleDischargeAsync(req);
         Assert.True(result.IsSuccess, result.Error?.Message);

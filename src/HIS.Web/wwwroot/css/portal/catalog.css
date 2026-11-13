@@ -1,0 +1,224 @@
+.catalog-badge {
+    display: inline-flex;
+    max-width: 100%;
+    padding: 4px 9px;
+    border-radius: 6px;
+    background: #eaf7f4;
+    color: #236b5a;
+    font-size: 11px;
+    line-height: 1.5;
+    font-weight: 650;
+}
+
+.catalog-badge.illustration {
+    background: #edf3fa;
+    color: #45617c;
+}
+
+.doctor-card-meta {
+    display: grid;
+    gap: 10px;
+    padding: 0;
+    margin: 6px 0 22px;
+    list-style: none;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #4a6479;
+}
+
+.doctor-card-meta li {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+}
+
+.doctor-card-meta .icon {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    margin-top: 2px;
+    color: #0083a0;
+}
+
+.doctor-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+    margin-top: auto;
+}
+
+.catalog-results-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    color: #496479;
+}
+
+.catalog-results-meta p {
+    margin: 0;
+}
+
+.catalog-results-meta > span {
+    font-size: 12px;
+    color: #61798b;
+}
+
+.catalog-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 32px;
+}
+
+.catalog-page-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid transparent;
+    border-radius: 50%;
+    color: #496479;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.catalog-page-link:hover {
+    border-color: #b7d7e4;
+    background: #eef8fc;
+    color: #006c88;
+}
+
+.catalog-page-link[aria-current='page'] {
+    background: #007d9f;
+    color: #fff;
+}
+
+.catalog-page-link[aria-disabled='true'] {
+    color: #b3c2cc;
+    pointer-events: none;
+}
+
+.catalog-page-link.previous .icon {
+    transform: rotate(180deg);
+}
+
+.introduction-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 13px 16px;
+    margin-bottom: 20px;
+    border: 1px solid #d6e7ef;
+    border-radius: 9px;
+    background: #f1f8fc;
+    color: #42667e;
+    font-size: 12px;
+    line-height: 1.75;
+}
+
+.introduction-notice .icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.specialty-introductions .portal-specialty {
+    display: flex;
+    flex-direction: column;
+}
+
+.specialty-introductions .text-link {
+    margin-top: auto;
+}
+
+.specialty-overview {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 24px;
+    padding: 28px;
+    margin-bottom: 36px;
+}
+
+.specialty-overview h2,
+.specialty-next-step h2 {
+    margin-bottom: 8px;
+    font-size: 21px;
+}
+
+.specialty-overview p,
+.specialty-next-step p {
+    color: #536e81;
+    font-size: 13px;
+}
+
+.specialty-topics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 20px;
+    margin: 18px 0 0;
+    padding: 0;
+    list-style: none;
+    color: #285f71;
+    font-size: 13px;
+}
+
+.specialty-topics li {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.specialty-next-step {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 24px;
+    margin-bottom: 42px;
+    padding: 28px;
+    border: 1px solid #c9e4ee;
+    border-radius: 12px;
+    background: #eef8fc;
+}
+
+@media (max-width: 600px) {
+    .catalog-pagination {
+        gap: 4px;
+    }
+    .hospital-portal .doctor-card {
+        grid-template-columns: 108px minmax(0, 1fr);
+    }
+    .hospital-portal .doctor-card .doctor-photo {
+        width: 96px;
+        height: 180px;
+        min-height: 0;
+        align-self: start;
+        margin: 18px 0 0 12px;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .hospital-portal .doctor-card-body {
+        padding: 18px 14px;
+    }
+    .doctor-card-actions {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .doctor-card-meta {
+        font-size: 12px;
+    }
+    .specialty-overview {
+        grid-template-columns: 1fr;
+        gap: 12px;
+        padding: 22px;
+    }
+}
