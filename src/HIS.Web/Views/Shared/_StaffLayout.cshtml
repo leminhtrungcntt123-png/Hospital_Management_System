@@ -5,13 +5,18 @@
     var isHead = User.IsInRole("DEPARTMENT_HEAD") || User.IsInRole("DEPT_HEAD");
     var isDoctor = User.IsInRole("DOCTOR");
     var isNurse = User.IsInRole("NURSE") || User.IsInRole("RECEPTIONIST");
+    var isAccountant = User.IsInRole("ACCOUNTANT") || User.IsInRole("CASHIER");
     var roleName = isHead ? "Trưởng khoa" : isDoctor ? "Bác sĩ" : isNurse ? "Y tá / Lễ tân"
-        : User.IsInRole("ADMIN") ? "Quản trị viên" : "Thu ngân / BHYT";
+        : isAccountant ? "Kế toán / Thu ngân" : User.IsInRole("ADMIN") ? "Quản trị viên" : "Nhân viên";
     var department = ViewData["StaffDepartment"]?.ToString() ?? User.FindFirst("DepartmentName")?.Value;
     var controller = ViewContext.RouteData.Values["controller"]?.ToString();
+    var action = ViewContext.RouteData.Values["action"]?.ToString() ?? "Index";
     var tab = Context.Request.Query["tab"].FirstOrDefault() ?? "";
     var activePage = controller is "Schedule" or "Consultation" && !string.IsNullOrEmpty(tab)
-        ? controller + "/" + tab : controller;
+        ? controller + "/" + tab 
+        : (controller == "Cashier" && !string.Equals(action, "Index", StringComparison.OrdinalIgnoreCase)
+            ? $"Cashier/{action.ToLowerInvariant()}" 
+            : controller);
     string StaffUrl(string name, string? page = null) => Url.Action("Index", name, new { area = "Staff", tab = page })!;
     string WorkspaceUrl(string page) => Url.Content("~/Workspace/staff/" + page);
     var links = new List<(string Key, string Icon, string Label, string Url)>();
@@ -45,6 +50,14 @@
             ("Schedule/overview", "grid", "Tổng quan khoa", StaffUrl("Schedule", "overview")),
             ("Schedule/records", "clipboard", "Bệnh án trong khoa", StaffUrl("Schedule", "records")),
             ("Schedule/patients", "users", "Người khám", StaffUrl("Schedule", "patients"))
+        ]);
+    }
+    else if (isAccountant)
+    {
+        links.AddRange([
+            ("Cashier", "wallet", "Thu phí & BHYT", StaffUrl("Cashier")),
+            ("Cashier/deposits", "wallet", "Quản lý tạm ứng", Url.Action("Deposits", "Cashier", new { area = "Staff" })!),
+            ("Cashier/ledger", "clipboard", "Sổ thu ngân", Url.Action("Ledger", "Cashier", new { area = "Staff" })!)
         ]);
     }
     else

@@ -40,8 +40,9 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("DepartmentHeadOnly", policy => policy.RequireClaim(ClaimTypes.Role, "DEPARTMENT_HEAD"));
     options.AddPolicy("DoctorOnly", policy => policy.RequireClaim(ClaimTypes.Role, "DOCTOR", "DEPARTMENT_HEAD"));
     options.AddPolicy("NurseOnly", policy => policy.RequireClaim(ClaimTypes.Role, "NURSE"));
+    options.AddPolicy("CashierAccess", policy => policy.RequireClaim(ClaimTypes.Role, "ACCOUNTANT", "NURSE", "ADMIN"));
     options.AddPolicy("PatientOnly", policy => policy.RequireClaim(ClaimTypes.Role, "PATIENT"));
-    options.AddPolicy("StaffAny", policy => policy.RequireClaim(ClaimTypes.Role, "ADMIN", "DEPARTMENT_HEAD", "DOCTOR", "NURSE"));
+    options.AddPolicy("StaffAny", policy => policy.RequireClaim(ClaimTypes.Role, "ADMIN", "DEPARTMENT_HEAD", "DOCTOR", "NURSE", "ACCOUNTANT"));
 });
 
 // MVC & Antiforgery

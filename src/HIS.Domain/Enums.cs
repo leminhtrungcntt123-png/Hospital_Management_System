@@ -73,10 +73,30 @@ public enum PaymentType
     Refund
 }
 
+public enum PaymentStatus
+{
+    Pending,
+    Confirmed
+}
+
+public enum ShiftStatus
+{
+    Open,
+    Closed
+}
+
+public enum DepositStatus
+{
+    Active,
+    Depleted,
+    Refunded
+}
+
 public enum PaymentMethod
 {
     Cash,
-    BankTransfer
+    BankTransfer,
+    DepositDeduction
 }
 
 public enum InvoiceCategory
@@ -109,7 +129,8 @@ public enum RoleId
     DepartmentHead = 2,
     Doctor = 3,
     Nurse = 4,
-    Patient = 5
+    Patient = 5,
+    Accountant = 6
 }
 
 public enum ServiceTypeId

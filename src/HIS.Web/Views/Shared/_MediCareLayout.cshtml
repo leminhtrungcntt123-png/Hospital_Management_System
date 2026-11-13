@@ -10,7 +10,7 @@
         "DEPARTMENT_HEAD" or "DEPT_HEAD" => "staff/schedule",
         "DOCTOR" => "staff/consultation",
         "NURSE" => "staff/reception",
-        "CASHIER" => "staff/cashier",
+        "CASHIER" or "ACCOUNTANT" => "staff/cashier",
         "PATIENT" => "patient/booking",
         _ => "public/home"
     };
@@ -20,7 +20,7 @@
         "DEPARTMENT_HEAD" or "DEPT_HEAD" => "/Staff/Schedule",
         "DOCTOR" => "/Staff/Consultation",
         "NURSE" => "/Staff/Reception",
-        "CASHIER" => "/Staff/Cashier",
+        "CASHIER" or "ACCOUNTANT" => "/Staff/Cashier",
         "PATIENT" => "/Patient/Booking",
         _ => "/Admin/Accounts"
     };

@@ -11,6 +11,10 @@ public class Invoice
     public decimal TotalAmount { get; set; }
     public decimal InsuranceCoveredAmount { get; set; }
     public decimal PatientAmount { get; set; }
+    /// <summary>Số hóa đơn dạng HD-000001, sinh bằng sequence DB.</summary>
+    public string InvoiceNumber { get; set; } = null!;
+    /// <summary>Ngày khám - mốc kiểm tra hạn thẻ BHYT (không dùng ngày thanh toán).</summary>
+    public DateOnly? ExamDate { get; set; }
     public InvoiceStatus Status { get; set; } = InvoiceStatus.Unpaid;
     public DateTime CreatedAt { get; set; }
 

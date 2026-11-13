@@ -17,10 +17,14 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
 
         builder.HasKey(e => e.Id);
 
+        builder.Property(e => e.InvoiceNumber).HasMaxLength(20).IsRequired();
+        builder.HasIndex(e => e.InvoiceNumber).IsUnique();
+        builder.Property(e => e.ExamDate);
+
         builder.Property(e => e.CoveragePctApplied).HasPrecision(5, 2);
-        builder.Property(e => e.TotalAmount).HasPrecision(12, 2).HasDefaultValue(0m);
-        builder.Property(e => e.InsuranceCoveredAmount).HasPrecision(12, 2).HasDefaultValue(0m);
-        builder.Property(e => e.PatientAmount).HasPrecision(12, 2).HasDefaultValue(0m);
+        builder.Property(e => e.TotalAmount).HasPrecision(18, 0).HasDefaultValue(0m);
+        builder.Property(e => e.InsuranceCoveredAmount).HasPrecision(18, 0).HasDefaultValue(0m);
+        builder.Property(e => e.PatientAmount).HasPrecision(18, 0).HasDefaultValue(0m);
         builder.Property(e => e.Status).HasConversion<UpperSnakeCaseEnumConverter<InvoiceStatus>>().HasMaxLength(20).HasDefaultValue(InvoiceStatus.Unpaid);
         builder.Property(e => e.CreatedAt).HasColumnType("timestamp without time zone").HasDefaultValueSql("now()");
 

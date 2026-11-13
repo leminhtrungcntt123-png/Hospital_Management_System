@@ -26,6 +26,7 @@ public static class DevDataSeeder
 
         try
         {
+            await db.Database.ExecuteSqlRawAsync("ALTER TABLE deposits ADD COLUMN IF NOT EXISTS approved_by character varying(150);");
             var passwordHash = BCrypt.Net.BCrypt.HashPassword(defaultPassword);
 
             // 1. TÀI KHOẢN ADMIN
@@ -363,7 +364,7 @@ public static class DevDataSeeder
                     VisitType = VisitType.Scheduled,
                     QueueNumber = "O05",
                     Reason = "Tái khám huyết áp",
-                    CreatedAt = DateTime.UtcNow.AddDays(-2)
+                    CreatedAt = DateTime.Now.AddDays(-2)
                 };
 
                 var oldApp2 = new Appointment
@@ -378,7 +379,7 @@ public static class DevDataSeeder
                     VisitType = VisitType.Scheduled,
                     QueueNumber = "O03",
                     Reason = "Khám sức khỏe",
-                    CreatedAt = DateTime.UtcNow.AddDays(-10)
+                    CreatedAt = DateTime.Now.AddDays(-10)
                 };
 
                 db.Appointments.AddRange(oldApp1, oldApp2);
@@ -394,7 +395,7 @@ public static class DevDataSeeder
                         PrimaryDiagnosisCode = "I10",
                         PrimaryDiagnosisDesc = "Tăng huyết áp nguyên phát",
                         Conclusion = "Đã hoàn tất khám theo yêu cầu",
-                        CreatedAt = DateTime.UtcNow.AddDays(-2)
+                        CreatedAt = DateTime.Now.AddDays(-2)
                     },
                     new MedicalRecord
                     {
@@ -405,7 +406,7 @@ public static class DevDataSeeder
                         PrimaryDiagnosisCode = "Z00.0",
                         PrimaryDiagnosisDesc = "Khám sức khỏe tổng quát",
                         Conclusion = "Khám sức khỏe định kỳ",
-                        CreatedAt = DateTime.UtcNow.AddDays(-10)
+                        CreatedAt = DateTime.Now.AddDays(-10)
                     }
                 );
                 await db.SaveChangesAsync();
@@ -422,7 +423,7 @@ public static class DevDataSeeder
                     EndTime = today.AddDays(1).ToDateTime(new TimeOnly(7, 0)),
                     Note = "Trực cấp cứu nội khoa sảnh B",
                     AssignedBy = headAcc1.Id,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now
                 });
 
                 db.DutyShifts.Add(new DutyShift
@@ -433,7 +434,7 @@ public static class DevDataSeeder
                     EndTime = today.AddDays(1).ToDateTime(new TimeOnly(7, 0)),
                     Note = "Trực điều dưỡng theo dõi bệnh phòng",
                     AssignedBy = headAcc1.Id,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now
                 });
 
                 await db.SaveChangesAsync();
@@ -460,13 +461,260 @@ public static class DevDataSeeder
                         Status = ScheduleExceptionStatus.Pending,
                         Reason = "Tham gia đào tạo chuyên môn",
                         ReplacementDoctorId = doc1.Id,
-                        CreatedAt = DateTime.UtcNow
+                        CreatedAt = DateTime.Now
                     });
                     await db.SaveChangesAsync();
                 }
             }
 
-            logger.LogInformation("DevDataSeeder: Đã nạp đầy đủ dữ liệu mẫu thực tế cho Bác sĩ, Bệnh nhân, Hàng chờ, Bệnh án và Chỉ định xét nghiệm.");
+            // 11. TÀI KHOẢN KẾ TOÁN / THU NGÂN (Role ACCOUNTANT = 6)
+            var cashierAcc = await db.Accounts.FirstOrDefaultAsync(a => a.Username == "ketoan");
+            if (cashierAcc == null)
+            {
+                cashierAcc = new Account
+                {
+                    Username = "ketoan",
+                    Email = "ketoan@his.local",
+                    PasswordHash = passwordHash,
+                    RoleId = (int)RoleId.Accountant,
+                    IsActive = true
+                };
+                db.Accounts.Add(cashierAcc);
+                await db.SaveChangesAsync();
+            }
+
+            // 12. DANH MỤC DỊCH VỤ KỸ THUẬT & CÔNG KHÁM (Services)
+            if (!await db.Services.AnyAsync(s => s.Name == "Tổng phân tích tế bào máu ngoại vi"))
+            {
+                var sExam = await db.Services.FirstOrDefaultAsync(s => s.ServiceTypeId == (int)ServiceTypeId.Examination);
+                if (sExam == null)
+                {
+                    sExam = new Service { Name = "Khám bệnh chuyên khoa Nội", ServiceTypeId = (int)ServiceTypeId.Examination, Price = 150000m, IsInsuranceCovered = true, IsActive = true };
+                    db.Services.Add(sExam);
+                }
+                var sBlood = new Service { Name = "Tổng phân tích tế bào máu ngoại vi", ServiceTypeId = (int)ServiceTypeId.LabTest, Price = 120000m, IsInsuranceCovered = true, IsActive = true };
+                var sXray = new Service { Name = "Chụp X-quang ngực thẳng kỹ thuật số", ServiceTypeId = (int)ServiceTypeId.Imaging, Price = 180000m, IsInsuranceCovered = true, IsActive = true };
+                var sUltra = new Service { Name = "Siêu âm ổ bụng tổng quát", ServiceTypeId = (int)ServiceTypeId.Imaging, Price = 220000m, IsInsuranceCovered = true, IsActive = true };
+                var sVip = new Service { Name = "Khám chuyên gia theo yêu cầu (Tự túc)", ServiceTypeId = (int)ServiceTypeId.Examination, Price = 300000m, IsInsuranceCovered = false, IsActive = true };
+
+                db.Services.AddRange(sBlood, sXray, sUltra, sVip);
+                await db.SaveChangesAsync();
+            }
+
+            // 13. DANH MỤC THUỐC (Medications)
+            if (!await db.Medications.AnyAsync())
+            {
+                db.Medications.AddRange(
+                    new Medication { Name = "Paracetamol 500mg", ActiveIngredient = "Paracetamol", Strength = "500mg", Unit = "Viên", Price = 1500m, IsInsuranceCovered = true, IsActive = true },
+                    new Medication { Name = "Amoxicillin 500mg", ActiveIngredient = "Amoxicillin", Strength = "500mg", Unit = "Viên", Price = 3500m, IsInsuranceCovered = true, IsActive = true },
+                    new Medication { Name = "Amlodipine 5mg", ActiveIngredient = "Amlodipine", Strength = "5mg", Unit = "Viên", Price = 4000m, IsInsuranceCovered = true, IsActive = true },
+                    new Medication { Name = "Vitamin C 500mg", ActiveIngredient = "Acid Ascorbic", Strength = "500mg", Unit = "Viên", Price = 1000m, IsInsuranceCovered = true, IsActive = true },
+                    new Medication { Name = "Viên bổ gan thảo dược (Tự túc)", ActiveIngredient = "Cao Actiso", Strength = "200mg", Unit = "Viên", Price = 25000m, IsInsuranceCovered = false, IsActive = true }
+                );
+                await db.SaveChangesAsync();
+            }
+
+            // 14. DANH MỤC GÓI BHYT (InsurancePlans)
+            var plan80 = await db.InsurancePlans.FirstOrDefaultAsync(p => p.CoveragePct == 80m);
+            if (plan80 == null)
+            {
+                plan80 = new InsurancePlan { Name = "BHYT Đúng tuyến - Hưởng 80%", CoveragePct = 80m, ReferralType = ReferralType.InNetwork };
+                var plan100 = new InsurancePlan { Name = "BHYT Đúng tuyến đặc biệt - Hưởng 100%", CoveragePct = 100m, ReferralType = ReferralType.InNetwork };
+                var plan0 = new InsurancePlan { Name = "BHYT Trái tuyến ngoại trú - 0%", CoveragePct = 0m, ReferralType = ReferralType.OutOfNetwork };
+                db.InsurancePlans.AddRange(plan80, plan100, plan0);
+                await db.SaveChangesAsync();
+            }
+
+            // 15. THẺ BHYT MẪU (InsuranceCards)
+            if (!await db.InsuranceCards.AnyAsync())
+            {
+                if (pBao != null && plan80 != null)
+                {
+                    db.InsuranceCards.Add(new InsuranceCard
+                    {
+                        PatientId = pBao.Id,
+                        CardNumber = "DN4797938328123",
+                        InsurancePlanId = plan80.Id,
+                        RegisteredFacility = "Bệnh viện Đa khoa MediCare",
+                        IsRegisteredHere = true,
+                        ValidFrom = new DateOnly(2024, 1, 1),
+                        ValidTo = new DateOnly(2028, 12, 31),
+                        IsActive = true
+                    });
+                }
+                if (pMinh != null && plan80 != null)
+                {
+                    var plan100 = await db.InsurancePlans.FirstOrDefaultAsync(p => p.CoveragePct == 100m) ?? plan80;
+                    db.InsuranceCards.Add(new InsuranceCard
+                    {
+                        PatientId = pMinh.Id,
+                        CardNumber = "HT2797911223344",
+                        InsurancePlanId = plan100.Id,
+                        RegisteredFacility = "Bệnh viện Đa khoa MediCare",
+                        IsRegisteredHere = true,
+                        ValidFrom = new DateOnly(2024, 1, 1),
+                        ValidTo = new DateOnly(2028, 12, 31),
+                        IsActive = true
+                    });
+                }
+                await db.SaveChangesAsync();
+            }
+
+            // 16. DỮ LIỆU ĐỒNG BỘ CHO THU VIỆN PHÍ, TẠM ỨNG & SỔ THU NGÂN
+            var pChi = await db.Patients.FirstOrDefaultAsync(p => p.FullName == "Lê Minh Chí");
+            if (pChi == null)
+            {
+                pChi = new Patient { FullName = "Lê Minh Chí", DateOfBirth = new DateOnly(1995, 2, 14), Gender = Gender.Male, PhoneNumber = "0890201234", NationalId = "079085001234", Address = "Quận 1, TP. Hồ Chí Minh" };
+                db.Patients.Add(pChi);
+                await db.SaveChangesAsync();
+            }
+
+            // Thẻ BHYT cho Lê Minh Chí
+            if (pChi != null && plan80 != null && !await db.InsuranceCards.AnyAsync(c => c.PatientId == pChi.Id))
+            {
+                db.InsuranceCards.Add(new InsuranceCard
+                {
+                    PatientId = pChi.Id,
+                    CardNumber = "DN4797938328001",
+                    InsurancePlanId = plan80.Id,
+                    RegisteredFacility = "Bệnh viện Đa khoa MediCare",
+                    IsRegisteredHere = true,
+                    ValidFrom = new DateOnly(2024, 1, 1),
+                    ValidTo = new DateOnly(2028, 12, 31),
+                    IsActive = true
+                });
+                await db.SaveChangesAsync();
+            }
+
+            // Đảm bảo có ca thu ngân đang mở
+            int cashierId = cashierAcc?.Id ?? 1;
+            var currentOpenShift = await db.CashierShifts.FirstOrDefaultAsync(s => s.CashierId == cashierId && s.Status == ShiftStatus.Open);
+            if (currentOpenShift == null)
+            {
+                currentOpenShift = new CashierShift
+                {
+                    CashierId = cashierId,
+                    OpeningCash = 1000000m,
+                    Status = ShiftStatus.Open,
+                    OpenedAt = DateTime.Now.AddHours(-2),
+                    Note = "Ca làm việc thu ngân mẫu"
+                };
+                db.CashierShifts.Add(currentOpenShift);
+                await db.SaveChangesAsync();
+            }
+
+            if (!await db.Deposits.AnyAsync() && pChi != null)
+            {
+                // Phiếu 1: Lê Minh Chí - 2.000.000 đ Tiền mặt
+                var dep1 = new Deposit
+                {
+                    DepositCode = "TU-000001",
+                    PatientId = pChi.Id,
+                    Amount = 2000000m,
+                    UsedAmount = 0m,
+                    RefundedAmount = 0m,
+                    Status = DepositStatus.Active,
+                    PaymentMethod = PaymentMethod.Cash,
+                    Purpose = "Tạm ứng nhập viện Ngoại khoa",
+                    ApprovedBy = "BS.CKII Phạm Thu Hằng",
+                    CashierId = cashierId,
+                    ShiftId = currentOpenShift.Id,
+                    CreatedAt = DateTime.Now.AddMinutes(-90)
+                };
+                db.Deposits.Add(dep1);
+                await db.SaveChangesAsync();
+
+                db.Payments.Add(new Payment
+                {
+                    DepositId = dep1.Id,
+                    TransactionCode = "PT-00000101",
+                    Amount = 2000000m,
+                    PaymentType = PaymentType.Deposit,
+                    PaymentMethod = PaymentMethod.Cash,
+                    Status = PaymentStatus.Confirmed,
+                    CashierId = cashierId,
+                    ShiftId = currentOpenShift.Id,
+                    Note = "Thu tạm ứng TU-000001",
+                    PaidAt = DateTime.Now.AddMinutes(-90)
+                });
+
+                // Phiếu 2: Trần Quốc Bảo - 300.000 đ Chuyển khoản VietQR
+                if (pBao != null)
+                {
+                    var dep2 = new Deposit
+                    {
+                        DepositCode = "TU-000002",
+                        PatientId = pBao.Id,
+                        Amount = 300000m,
+                        UsedAmount = 0m,
+                        RefundedAmount = 0m,
+                        Status = DepositStatus.Active,
+                        PaymentMethod = PaymentMethod.BankTransfer,
+                        ReferenceCode = "FT2431889210",
+                        Purpose = "Tạm ứng xét nghiệm cận lâm sàng",
+                        ApprovedBy = "BS.CKII Phạm Thu Hằng",
+                        CashierId = cashierId,
+                        ShiftId = currentOpenShift.Id,
+                        CreatedAt = DateTime.Now.AddMinutes(-60)
+                    };
+                    db.Deposits.Add(dep2);
+                    await db.SaveChangesAsync();
+
+                    db.Payments.Add(new Payment
+                    {
+                        DepositId = dep2.Id,
+                        TransactionCode = "PT-00000102",
+                        ReferenceCode = "FT2431889210",
+                        Amount = 300000m,
+                        PaymentType = PaymentType.Deposit,
+                        PaymentMethod = PaymentMethod.BankTransfer,
+                        Status = PaymentStatus.Confirmed,
+                        CashierId = cashierId,
+                        ShiftId = currentOpenShift.Id,
+                        Note = "Thu tạm ứng TU-000002 qua VietQR",
+                        PaidAt = DateTime.Now.AddMinutes(-60)
+                    });
+                }
+
+                // Phiếu 3: Lê Thị Ngọc - 1.200.000 đ Tiền mặt
+                if (pNgoc != null)
+                {
+                    var dep3 = new Deposit
+                    {
+                        DepositCode = "TU-000003",
+                        PatientId = pNgoc.Id,
+                        Amount = 1200000m,
+                        UsedAmount = 0m,
+                        RefundedAmount = 0m,
+                        Status = DepositStatus.Active,
+                        PaymentMethod = PaymentMethod.Cash,
+                        Purpose = "Tạm ứng phẫu thuật nội soi",
+                        ApprovedBy = "TS.BS Lê Hoàng Nam",
+                        CashierId = cashierId,
+                        ShiftId = currentOpenShift.Id,
+                        CreatedAt = DateTime.Now.AddMinutes(-45)
+                    };
+                    db.Deposits.Add(dep3);
+                    await db.SaveChangesAsync();
+
+                    db.Payments.Add(new Payment
+                    {
+                        DepositId = dep3.Id,
+                        TransactionCode = "PT-00000103",
+                        Amount = 1200000m,
+                        PaymentType = PaymentType.Deposit,
+                        PaymentMethod = PaymentMethod.Cash,
+                        Status = PaymentStatus.Confirmed,
+                        CashierId = cashierId,
+                        ShiftId = currentOpenShift.Id,
+                        Note = "Thu tạm ứng TU-000003",
+                        PaidAt = DateTime.Now.AddMinutes(-45)
+                    });
+                }
+                await db.SaveChangesAsync();
+            }
+
+            logger.LogInformation("DevDataSeeder: Đã nạp đầy đủ dữ liệu mẫu thực tế cho Bác sĩ, Bệnh nhân, Hàng chờ, Bệnh án, Thu ngân, Tạm ứng và Thẻ BHYT.");
         }
         catch (Exception ex)
         {

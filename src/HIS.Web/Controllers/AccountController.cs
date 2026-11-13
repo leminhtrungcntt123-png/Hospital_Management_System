@@ -74,6 +74,7 @@ public class AccountController : Controller
         {
             "DOCTOR" or "DOC" => "DOCTOR",
             "NURSE" => "NURSE",
+            "ACCOUNTANT" or "CASHIER" => "ACCOUNTANT",
             "DEPT_HEAD" or "DEPARTMENT_HEAD" => "DEPARTMENT_HEAD",
             "PATIENT" => "PATIENT",
             _ => "ADMIN"
@@ -437,7 +438,7 @@ public class AccountController : Controller
             "DEPARTMENT_HEAD" or "DEPT_HEAD" => RedirectToAction("Index", "Schedule", new { area = "Staff" }),
             "DOCTOR" => RedirectToAction("Index", "Consultation", new { area = "Staff" }),
             "NURSE" => RedirectToAction("Index", "Reception", new { area = "Staff" }),
-            "CASHIER" => RedirectToAction("Index", "Cashier", new { area = "Staff" }),
+            "ACCOUNTANT" or "CASHIER" => RedirectToAction("Index", "Cashier", new { area = "Staff" }),
             "PATIENT" => RedirectToAction("Index", "Booking", new { area = "Patient" }),
             _ => RedirectToAction("Index", "Home")
         };

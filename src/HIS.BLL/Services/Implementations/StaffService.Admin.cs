@@ -72,7 +72,7 @@ public partial class StaffService
 
             var role = await _context.Roles.SingleOrDefaultAsync(role => role.Id == request.RoleId, ct);
             AdminRules.Require(role != null, "Vai trò không tồn tại.");
-            AdminRules.Require(role!.Code is "ADMIN" or "DOCTOR" or "NURSE" or "DEPARTMENT_HEAD" or "PATIENT",
+            AdminRules.Require(role!.Code is "ADMIN" or "DOCTOR" or "NURSE" or "DEPARTMENT_HEAD" or "PATIENT" or "ACCOUNTANT",
                 "Vai trò này chưa được hỗ trợ tại màn quản trị.");
 
             if (role!.Code is "DOCTOR" or "NURSE" or "DEPARTMENT_HEAD")

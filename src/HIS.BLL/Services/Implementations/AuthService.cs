@@ -111,7 +111,7 @@ public class AuthService : IAuthService
                 return InvalidLogin();
             }
 
-            if (account.Role.Code is not ("ADMIN" or "DEPARTMENT_HEAD" or "DOCTOR" or "NURSE" or "PATIENT"))
+            if (account.Role.Code is not ("ADMIN" or "DEPARTMENT_HEAD" or "DOCTOR" or "NURSE" or "PATIENT" or "ACCOUNTANT"))
             {
                 return InvalidLogin();
             }

@@ -1,0 +1,517 @@
+@model HIS.BLL.DTOs.InvoiceDetailDto
+@{
+    var shift = ViewBag.CurrentShift as HIS.BLL.DTOs.CashierShiftDto;
+    string search = (ViewBag.Search as string) ?? "";
+}
+
+@if (Model == null)
+{
+    @if (string.IsNullOrWhiteSpace(search))
+    {
+        <div style="text-align: center; padding: 56px 24px; color: #475569; background: #f8fafc; border: 1.5px dashed #cbd5e1; border-radius: 12px;">
+            <div style="font-size: 42px; margin-bottom: 12px;">🏥</div>
+            <h3 style="font-size: 18px; font-weight: 800; color: #1e293b; margin: 0 0 8px;">Quầy thu viện phí, BHYT &amp; tất toán tạm ứng</h3>
+            <p style="font-size: 14px; color: #64748b; margin: 0 auto 20px; max-width: 580px; line-height: 1.6;">
+                Khi người bệnh đến quầy thanh toán, vui lòng nhập <strong>Mã BN, Số CCCD, Số điện thoại, Họ tên</strong> hoặc <strong>Mã phiếu tạm ứng (TU-...)</strong> vào thanh tra cứu phía trên để mở bảng kê chi phí dịch vụ &amp; thuốc, tính tiền thừa hoặc hoàn trả tiền tạm ứng dư.
+            </p>
+            <div style="display: inline-grid; grid-template-columns: repeat(2, minmax(240px, 300px)); gap: 14px; text-align: left;">
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px;">
+                    <div style="font-weight: 800; color: #0284c7; font-size: 13px; margin-bottom: 4px;">1. Thu tiền dịch vụ &amp; thuốc</div>
+                    <div style="font-size: 12px; color: #64748b; line-height: 1.45;">Tổng hợp công khám, cận lâm sàng, thuốc kê đơn, trừ BHYT &amp; tạm ứng. Hỗ trợ máy tính tiền thừa và quét VietQR.</div>
+                </div>
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px;">
+                    <div style="font-weight: 800; color: #15803d; font-size: 13px; margin-bottom: 4px;">2. Hoàn trả tiền mặt cho người bệnh</div>
+                    <div style="font-size: 12px; color: #64748b; line-height: 1.45;">Tự động khấu trừ viện phí từ các phiếu tạm ứng đã nộp và chi hoàn số tiền thừa bằng tiền mặt tại quầy.</div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div style="text-align: center; padding: 56px 24px; color: #64748b; background: #fff1f2; border: 1.5px dashed #fda4af; border-radius: 12px;">
+            <div style="font-size: 38px; margin-bottom: 10px;">🔍</div>
+            <h3 style="font-size: 16px; font-weight: 700; color: #9f1239; margin-bottom: 6px;">Không tìm thấy hồ sơ bệnh nhân</h3>
+            <p style="font-size: 13.5px; color: #881337; margin: 0 auto; max-width: 460px; line-height: 1.5;">
+                Không tìm thấy lượt khám hoặc hồ sơ bệnh nhân nào khớp với từ khóa <strong>"@search"</strong>. Vui lòng kiểm tra lại Mã BN, CCCD hoặc SĐT.
+            </p>
+        </div>
+    }
+}
+else
+{
+    var patientFee = Model.PatientAmount;
+    var depositBal = (Model.Status == HIS.Domain.InvoiceStatus.Paid && (Model.DepositDeducted + Model.RefundedAmount) > 0)
+        ? (Model.DepositDeducted + Model.RefundedAmount)
+        : Model.AvailableDepositBalance;
+    var netDiff = patientFee - depositBal;
+    var refundAmount = Math.Abs(netDiff);
+
+    <!-- Hidden input lưu trữ dữ liệu lượt khám hiện tại cho JS -->
+    <div id="current-invoice-data-container"
+         data-invoice-id="@Model.InvoiceId"
+         data-appointment-id="@Model.AppointmentId"
+         data-appointment-code="@Model.AppointmentCode"
+         data-patient-name="@Model.PatientName"
+         data-patient-code="@Model.PatientCode"
+         data-patient-phone="@Model.PatientPhone"
+         data-patient-cccd="@(Model.NationalId ?? "")"
+         data-patient-address="@(Model.Address ?? "")"
+         data-diagnosis="@(Model.Diagnosis ?? "Khám chuyên khoa")"
+         data-card-number="@(Model.InsuranceCardNumber ?? "")"
+         data-coverage-pct="@Model.CoveragePct"
+         data-department="@Model.DepartmentName"
+         data-doctor="@Model.DoctorName"
+         data-exam-date="@Model.ExamDate.ToString("dd/MM/yyyy")"
+         data-total-amount="@Model.TotalAmount"
+         data-insurance-covered="@Model.InsuranceCoveredAmount"
+         data-patient-amount="@Model.PatientAmount"
+         data-deposit-balance="@depositBal"
+         data-status="@Model.Status"
+         data-invoice-number="@(Model.InvoiceNumber ?? "")"
+         data-cashier-name="@(Model.CashierName ?? (shift?.CashierName ?? "Thu ngân"))"
+         style="display: none;"></div>
+
+    <!-- 1. THÔNG TIN HÀNH CHÍNH, LÂM SÀNG & THẺ BHYT THỰC TẾ -->
+    <div style="display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1.5px solid #e2e8f0;">
+        <!-- Cột thông tin bệnh nhân & chẩn đoán -->
+        <div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                <span style="background: #e0f2fe; color: #0369a1; font-size: 11.5px; font-weight: 800; padding: 2px 8px; border-radius: 4px; font-family: monospace;">MÃ BN: @Model.PatientCode</span>
+                <span style="background: #f1f5f9; color: #334155; font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 4px; font-family: monospace;">LƯỢT KHÁM: @Model.AppointmentCode</span>
+                @if (Model.Status == HIS.Domain.InvoiceStatus.Paid)
+                {
+                    <span style="background: #dcfce7; color: #15803d; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 4px;">✓ ĐÃ QUYẾT TOÁN</span>
+                }
+                else
+                {
+                    <span style="background: #fef3c7; color: #b45309; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 4px;">⏳ CHỜ QUYẾT TOÁN</span>
+                }
+            </div>
+
+            <h2 style="font-size: 22px; font-weight: 800; color: #0f172a; margin: 4px 0 6px;">@Model.PatientName</h2>
+
+            <div style="display: grid; grid-template-columns: repeat(2, auto); gap: 4px 20px; font-size: 13px; color: #334155;">
+                <div>Giới tính / Tuổi: <strong>@Model.Gender · @Model.Age tuổi</strong> (@Model.DateOfBirth.ToString("dd/MM/yyyy"))</div>
+                <div>Điện thoại: <strong>@Model.PatientPhone</strong></div>
+                <div>Số CCCD/ĐDCN: <strong style="color: #0284c7; font-family: monospace;">@(string.IsNullOrWhiteSpace(Model.NationalId) ? "Chưa cập nhật" : Model.NationalId)</strong></div>
+                <div>Địa chỉ: <strong>@(string.IsNullOrWhiteSpace(Model.Address) ? "TP. Hồ Chí Minh" : Model.Address)</strong></div>
+            </div>
+
+            <div style="margin-top: 10px; background: #f8fafc; border-left: 3.5px solid #0284c7; padding: 8px 12px; border-radius: 4px; font-size: 13px;">
+                <div style="color: #0f172a;">
+                    🩺 <strong>Chẩn đoán lâm sàng:</strong> <span style="color: #1e3a8a; font-weight: 700;">@(Model.Diagnosis ?? "Khám và theo dõi chuyên khoa")</span>
+                </div>
+                <div style="color: #64748b; font-size: 12px; margin-top: 2px;">
+                    Khoa điều trị: <strong>@Model.DepartmentName</strong> · Bác sĩ chỉ định: <strong>BS. @Model.DoctorName</strong> · Ngày khám: <strong>@Model.ExamDate.ToString("dd/MM/yyyy")</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cột thông tin Thẻ BHYT -->
+        <div style="background: @(Model.HasInsurance ? "#f0fdf4" : "#f8fafc"); border: 1.5px solid @(Model.HasInsurance ? "#86efac" : "#cbd5e1"); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; justify-content: space-between;">
+            @if (Model.HasInsurance)
+            {
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <span style="background: #15803d; color: #ffffff; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 4px;">ĐỐI TƯỢNG BHYT ĐÚNG TUYẾN</span>
+                        <span style="font-size: 12px; color: #166534; font-weight: 700;">Mức hưởng: @Model.CoveragePct.ToString("0.##")%</span>
+                    </div>
+                    <div style="font-size: 16px; font-weight: 900; color: #14532d; font-family: monospace; letter-spacing: 0.5px;">
+                        Mã thẻ: @Model.InsuranceCardNumber
+                    </div>
+                    <div style="font-size: 12px; color: #166534; margin-top: 4px;">
+                        Nơi ĐKKCB ban đầu: <strong>@(Model.RegisteredFacility ?? "Bệnh viện Đa khoa MediCare")</strong>
+                    </div>
+                </div>
+                <div style="border-top: 1px dashed #86efac; padding-top: 8px; margin-top: 8px; display: flex; justify-content: space-between; align-items: baseline;">
+                    <span style="font-size: 12px; color: #166534; font-weight: 600;">Quỹ BHYT thanh toán:</span>
+                    <strong style="font-size: 16px; font-weight: 900; color: #15803d;">@Model.InsuranceCoveredAmount.ToString("N0") đ</strong>
+                </div>
+            }
+            else
+            {
+                <div>
+                    <div style="margin-bottom: 6px;">
+                        <span style="background: #64748b; color: #ffffff; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px;">KHÁM DỊCH VỤ / VIỆN PHÍ TỰ TÚC</span>
+                    </div>
+                    <div style="font-size: 13px; color: #475569; margin-top: 6px; line-height: 1.5;">
+                        Người bệnh không sử dụng thẻ BHYT trong đợt khám này (Tự chi trả 100% theo bảng giá dịch vụ).
+                    </div>
+                </div>
+                <div style="border-top: 1px dashed #cbd5e1; padding-top: 8px; margin-top: 8px; display: flex; justify-content: space-between; align-items: baseline;">
+                    <span style="font-size: 12px; color: #64748b; font-weight: 600;">Mức hưởng BHYT:</span>
+                    <strong style="font-size: 14px; font-weight: 700; color: #64748b;">0% (0 đ)</strong>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- 2. BẢNG KÊ CHI TIẾT CHI PHÍ DỊCH VỤ & THUỐC -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <h3 style="font-size: 14px; font-weight: 800; color: #1e293b; margin: 0; text-transform: uppercase;">
+            I. Bảng kê chi tiết chi phí dịch vụ, cận lâm sàng &amp; thuốc
+        </h3>
+        <span style="font-size: 12px; font-weight: 600; color: #475569;">Tổng cộng: @Model.Items.Count khoản mục</span>
+    </div>
+
+    <div style="border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; margin-bottom: 16px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <thead>
+                <tr style="background: #f1f5f9; border-bottom: 1.5px solid #cbd5e1; text-align: left;">
+                    <th style="padding: 10px 12px; font-weight: 700; color: #334155; width: 45px; text-align: center;">STT</th>
+                    <th style="padding: 10px 12px; font-weight: 700; color: #334155;">Nhóm / Tên dịch vụ &amp; thuốc chỉ định</th>
+                    <th style="padding: 10px 12px; font-weight: 700; color: #334155; text-align: center; width: 60px;">SL</th>
+                    <th style="padding: 10px 12px; font-weight: 700; color: #334155; text-align: right; width: 110px;">Đơn giá</th>
+                    <th style="padding: 10px 12px; font-weight: 700; color: #334155; text-align: right; width: 120px;">Thành tiền</th>
+                    <th style="padding: 10px 12px; font-weight: 700; color: #334155; text-align: center; width: 75px;">% BHYT</th>
+                    <th style="padding: 10px 12px; font-weight: 700; color: #15803d; text-align: right; width: 110px;">BHYT trả</th>
+                    <th style="padding: 10px 12px; font-weight: 700; color: #dc2626; text-align: right; width: 120px;">BN tự trả</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model.Items)
+                {
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                        <td style="padding: 10px 12px; color: #64748b; text-align: center; font-weight: 600;">@item.Id</td>
+                        <td style="padding: 10px 12px;">
+                            <span style="font-size: 11px; background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-weight: 700; margin-right: 6px;">@item.Category</span>
+                            <strong style="color: #0f172a;">@item.Description</strong>
+                        </td>
+                        <td style="padding: 10px 12px; text-align: center; font-weight: 600;">@item.Quantity</td>
+                        <td style="padding: 10px 12px; text-align: right; color: #475569;">@item.UnitPrice.ToString("N0")</td>
+                        <td style="padding: 10px 12px; text-align: right; font-weight: 700; color: #0f172a;">@item.Total.ToString("N0")</td>
+                        <td style="padding: 10px 12px; text-align: center;">
+                            @if (item.IsInsuranceCovered && item.CoveragePctApplied > 0)
+                            {
+                                <span style="color: #15803d; font-weight: 700;">@item.CoveragePctApplied.ToString("0.##")%</span>
+                            }
+                            else
+                            {
+                                <span style="color: #94a3b8;">0%</span>
+                            }
+                        </td>
+                        <td style="padding: 10px 12px; text-align: right; color: #15803d; font-weight: 600;">@item.CoveredAmount.ToString("N0")</td>
+                        <td style="padding: 10px 12px; text-align: right; color: #dc2626; font-weight: 800;">@item.PatientAmount.ToString("N0")</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr style="background: #f8fafc; border-top: 1.5px solid #cbd5e1; font-weight: 800;">
+                    <td colspan="4" style="padding: 10px 12px; text-align: right; color: #1e293b;">TỔNG CỘNG CHI PHÍ DỊCH VỤ &amp; THUỐC:</td>
+                    <td style="padding: 10px 12px; text-align: right; color: #0f172a; font-size: 14px;">@Model.TotalAmount.ToString("N0") đ</td>
+                    <td></td>
+                    <td style="padding: 10px 12px; text-align: right; color: #15803d; font-size: 14px;">@Model.InsuranceCoveredAmount.ToString("N0") đ</td>
+                    <td style="padding: 10px 12px; text-align: right; color: #dc2626; font-size: 14.5px;" id="txt-patient-amount" data-total="@Model.PatientAmount">@Model.PatientAmount.ToString("N0") đ</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <!-- 3. THÔNG TIN CÁC PHIẾU TẠM ỨNG ĐÃ NỘP CỦA BỆNH NHÂN (NẾU CÓ) -->
+    @if (Model.PatientDeposits != null && Model.PatientDeposits.Count > 0)
+    {
+        <div style="margin-bottom: 18px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <h3 style="font-size: 13.5px; font-weight: 800; color: #0369a1; margin: 0; text-transform: uppercase;">
+                    II. Các phiếu tạm ứng bệnh nhân đã nộp (@Model.PatientDeposits.Count phiếu)
+                </h3>
+                <span style="font-size: 12px; color: #0284c7; font-weight: 700;">Tổng tạm ứng: @depositBal.ToString("N0") đ</span>
+            </div>
+            <div style="border: 1px solid #bae6fd; border-radius: 8px; overflow: hidden;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 12.5px; background: #f0f9ff;">
+                    <thead>
+                        <tr style="background: #e0f2fe; border-bottom: 1px solid #bae6fd; text-align: left; color: #0c4a6e;">
+                            <th style="padding: 8px 12px; font-weight: 700;">Mã phiếu</th>
+                            <th style="padding: 8px 12px; font-weight: 700;">Thời gian thu</th>
+                            <th style="padding: 8px 12px; font-weight: 700;">Mục đích tạm ứng</th>
+                            <th style="padding: 8px 12px; font-weight: 700;">Người duyệt / Chỉ định</th>
+                            <th style="padding: 8px 12px; font-weight: 700; text-align: center;">Hình thức</th>
+                            <th style="padding: 8px 12px; font-weight: 700; text-align: right;">Số tiền nộp</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var dep in Model.PatientDeposits)
+                        {
+                            <tr style="border-bottom: 1px solid #e0f2fe; background: #ffffff;">
+                                <td style="padding: 8px 12px; font-weight: 800; color: #0369a1; font-family: monospace;">@dep.DepositCode</td>
+                                <td style="padding: 8px 12px; color: #475569;">@dep.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td style="padding: 8px 12px; color: #0f172a; font-weight: 600;">@(dep.Purpose ?? "Tạm ứng viện phí")</td>
+                                <td style="padding: 8px 12px; color: #1e3a8a; font-weight: 600;">@(string.IsNullOrWhiteSpace(dep.ApprovedBy) ? $"BS. {Model.DoctorName}" : dep.ApprovedBy)</td>
+                                <td style="padding: 8px 12px; text-align: center;">
+                                    @(dep.PaymentMethod == HIS.Domain.PaymentMethod.Cash ? "Tiền mặt" : "Chuyển khoản")
+                                </td>
+                                <td style="padding: 8px 12px; text-align: right; font-weight: 800; color: #0284c7;">@dep.Amount.ToString("N0") đ</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    <!-- 4. KHỐI QUYẾT TOÁN: THU TIỀN HOẶC HOÀN TIỀN MẶT CHO BỆNH NHÂN -->
+    @if (Model.Status == HIS.Domain.InvoiceStatus.Paid)
+    {
+        <!-- TRƯỜNG HỢP: ĐÃ HOÀN TẤT QUYẾT TOÁN -->
+        <div style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 10px; padding: 18px 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <div>
+                    <span style="background: #16a34a; color: #ffffff; font-size: 11.5px; font-weight: 800; padding: 3px 10px; border-radius: 4px; text-transform: uppercase;">
+                        ✓ ĐÃ HOÀN TẤT QUYẾT TOÁN
+                    </span>
+                    <strong style="color: #166534; font-size: 16px; margin-left: 10px;">Số hóa đơn: @Model.InvoiceNumber</strong>
+                </div>
+                <div style="font-size: 12.5px; color: #334155;">
+                    Mã chứng từ: <strong style="font-family: monospace; color: #0f172a;">@Model.TransactionCode</strong>
+                </div>
+            </div>
+
+            <div style="font-size: 13px; color: #334155; line-height: 1.6; margin-bottom: 14px; background: #ffffff; padding: 12px 16px; border-radius: 8px; border: 1px solid #bbf7d0;">
+                <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                    <div>Thời gian quyết toán: <strong>@(Model.PaidAt?.ToString("HH:mm, dd/MM/yyyy") ?? DateTime.Now.ToString("HH:mm, dd/MM/yyyy"))</strong></div>
+                    <div>Phương thức: <strong>@(Model.PaymentMethod ?? "Tiền mặt")</strong> · Thu ngân: <strong>@(Model.CashierName ?? (shift?.CashierName ?? "Thu ngân"))</strong></div>
+                </div>
+                <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #cbd5e1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+                    <div>
+                        <span style="color: #64748b; font-size: 11.5px;">Viện phí BN tự trả:</span><br />
+                        <strong style="color: #0f172a; font-size: 14px;">@Model.PatientAmount.ToString("N0") đ</strong>
+                    </div>
+                    <div>
+                        <span style="color: #64748b; font-size: 11.5px;">Tạm ứng đã nộp:</span><br />
+                        <strong style="color: #0284c7; font-size: 14px;">@depositBal.ToString("N0") đ</strong>
+                    </div>
+                    <div>
+                        <span style="color: #64748b; font-size: 11.5px;">Đã cấn trừ tạm ứng:</span><br />
+                        <strong style="color: #0f172a; font-size: 14px;">@Model.DepositDeducted.ToString("N0") đ</strong>
+                    </div>
+                    <div>
+                        @if (Model.RefundedAmount > 0)
+                        {
+                            <span style="color: #64748b; font-size: 11.5px;">Đã hoàn tiền mặt cho BN:</span><br />
+                            <strong style="color: #b91c1c; font-size: 14px;">@Model.RefundedAmount.ToString("N0") đ</strong>
+                        }
+                        else if (Model.AdditionalPaid > 0)
+                        {
+                            <span style="color: #64748b; font-size: 11.5px;">Đã thu thêm:</span><br />
+                            <strong style="color: #15803d; font-size: 14px;">@Model.AdditionalPaid.ToString("N0") đ</strong>
+                        }
+                        else
+                        {
+                            <span style="color: #64748b; font-size: 11.5px;">Đã thu tại quầy:</span><br />
+                            <strong style="color: #15803d; font-size: 14px;">@Model.PatientAmount.ToString("N0") đ</strong>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap;">
+                <button type="button" class="btn primary" style="background: #0284c7; border-color: #0284c7; padding: 10px 20px; font-weight: 700; font-size: 13.5px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;"
+                        onclick="printDischargeSettlement()">
+                    🖨️ In bảng kê &amp; biên lai quyết toán (Mẫu C40-HD)
+                </button>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- TRƯỜNG HỢP: CHƯA QUYẾT TOÁN -->
+        <div style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 10px; padding: 18px 20px;">
+            <div style="font-size: 13px; font-weight: 800; color: #1e293b; text-transform: uppercase; margin-bottom: 12px;">
+                @(Model.PatientDeposits != null && Model.PatientDeposits.Count > 0 ? "III. Tổng hợp cân đối tạm ứng & thanh toán" : "II. Tổng hợp thanh toán viện phí")
+            </div>
+
+            <!-- 3 Ô số liệu đối chiếu gọn, 1 tông màu đồng nhất, nổi bật ô kết quả -->
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 16px;">
+                <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px 16px;">
+                    <div style="font-size: 11.5px; font-weight: 700; color: #64748b; text-transform: uppercase;">Tổng chi phí BN phải trả</div>
+                    <div style="font-size: 20px; font-weight: 800; color: #0f172a; margin-top: 4px;">@patientFee.ToString("N0") đ</div>
+                    <div style="font-size: 11.5px; color: #64748b; margin-top: 2px;">Sau khi trừ BHYT (@Model.InsuranceCoveredAmount.ToString("N0") đ)</div>
+                </div>
+
+                <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px 16px;">
+                    <div style="font-size: 11.5px; font-weight: 700; color: #64748b; text-transform: uppercase;">Tiền tạm ứng đã nộp</div>
+                    <div style="font-size: 20px; font-weight: 800; color: #0284c7; margin-top: 4px;">@depositBal.ToString("N0") đ</div>
+                    <div style="font-size: 11.5px; color: #64748b; margin-top: 2px;">@(depositBal > 0 ? $"Khấu trừ viện phí: {Math.Min(depositBal, patientFee):N0} đ" : "Chưa có tạm ứng")</div>
+                </div>
+
+                <div style="background: #ffffff; border: 2px solid @(netDiff > 0 ? "#dc2626" : (netDiff < 0 ? "#0284c7" : "#16a34a")); border-radius: 8px; padding: 12px 16px;">
+                    <div style="font-size: 11.5px; font-weight: 800; color: @(netDiff > 0 ? "#dc2626" : (netDiff < 0 ? "#0284c7" : "#16a34a")); text-transform: uppercase;">
+                        @(netDiff > 0 ? "Số tiền cần thu thêm" : (netDiff < 0 ? "Số tiền hoàn trả cho BN" : "Cân đối vừa đủ"))
+                    </div>
+                    <div style="font-size: 22px; font-weight: 900; color: @(netDiff > 0 ? "#dc2626" : (netDiff < 0 ? "#0284c7" : "#16a34a")); margin-top: 4px;" id="val-net-diff" data-net="@netDiff">
+                        @(Math.Abs(netDiff).ToString("N0")) đ
+                    </div>
+                    <div style="font-size: 11.5px; color: #475569; margin-top: 2px;">
+                        @(netDiff > 0 ? "Thu tiền mặt hoặc quét VietQR" : (netDiff < 0 ? "Chi hoàn tiền mặt trực tiếp tại quầy" : "Không phát sinh thu/chi thêm"))
+                    </div>
+                </div>
+            </div>
+
+            @if (netDiff > 0)
+            {
+                <!-- KỊCH BẢN 1: THU TIỀN CHI PHÍ DỊCH VỤ & THUỐC -->
+                <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 16px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;">
+                        <button type="button" class="pay-method-btn active" id="btn-settle-cash" onclick="selectSettleMethod('Cash')"
+                                style="padding: 11px; border: 2px solid #0284c7; background: #f0f9ff; border-radius: 6px; font-weight: 700; font-size: 13.5px; cursor: pointer;">
+                            💵 Thu Tiền mặt (@netDiff.ToString("N0") đ)
+                        </button>
+                        <button type="button" class="pay-method-btn" id="btn-settle-bank" onclick="selectSettleMethod('BankTransfer')"
+                                style="padding: 11px; border: 2px solid #cbd5e1; background: #ffffff; border-radius: 6px; font-weight: 700; font-size: 13.5px; cursor: pointer;">
+                            📱 Thu Chuyển khoản VietQR (@netDiff.ToString("N0") đ)
+                        </button>
+                    </div>
+
+                    <!-- Máy tính tiền mặt -->
+                    <div id="settle-cash-calc-panel" style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px; margin-bottom: 14px;">
+                        <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; align-items: start;">
+                            <div>
+                                <label style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 6px; display: block;">
+                                    🧮 Số tiền khách đưa (VNĐ) — Tự động tính tiền thừa trả khách:
+                                </label>
+                                <div style="display: flex; gap: 6px;">
+                                    <input type="number" id="calc-cash-given" min="0" step="1000" class="form-control"
+                                           placeholder="Nhập số tiền khách đưa..."
+                                           style="flex: 1; padding: 9px 12px; font-size: 16px; font-weight: 800; color: #047857; border: 2px solid #0284c7; border-radius: 6px;"
+                                           oninput="calculateCashChange(@netDiff)" />
+                                    <button type="button" class="btn outline" onclick="clearCashGiven(@netDiff)" style="padding: 6px 12px; font-size: 12px;">Xóa</button>
+                                </div>
+
+                                <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">
+                                    <button type="button" class="btn outline" style="padding: 4px 10px; font-size: 11.5px; font-weight: 700; background: #e0f2fe; color: #0369a1; border-color: #7dd3fc;"
+                                            onclick="setCashGiven(@netDiff, @netDiff)">
+                                        Vừa đủ (@netDiff.ToString("N0") đ)
+                                    </button>
+                                    @if (netDiff <= 100000)
+                                    {
+                                        <button type="button" class="btn outline" style="padding: 4px 8px; font-size: 11.5px;" onclick="setCashGiven(100000, @netDiff)">100.000</button>
+                                    }
+                                    @if (netDiff <= 200000)
+                                    {
+                                        <button type="button" class="btn outline" style="padding: 4px 8px; font-size: 11.5px;" onclick="setCashGiven(200000, @netDiff)">200.000</button>
+                                    }
+                                    @if (netDiff <= 500000)
+                                    {
+                                        <button type="button" class="btn outline" style="padding: 4px 8px; font-size: 11.5px;" onclick="setCashGiven(500000, @netDiff)">500.000</button>
+                                    }
+                                    <button type="button" class="btn outline" style="padding: 4px 8px; font-size: 11.5px;" onclick="setCashGiven(1000000, @netDiff)">1.000.000</button>
+                                    <button type="button" class="btn outline" style="padding: 4px 8px; font-size: 11.5px;" onclick="addCashGiven(50000, @netDiff)">+50k</button>
+                                    <button type="button" class="btn outline" style="padding: 4px 8px; font-size: 11.5px;" onclick="addCashGiven(100000, @netDiff)">+100k</button>
+                                </div>
+                            </div>
+
+                            <div id="calc-change-box" style="background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 12px 14px; min-height: 92px; display: flex; flex-direction: column; justify-content: center;">
+                                <div style="font-size: 11.5px; font-weight: 700; color: #64748b; text-transform: uppercase;" id="calc-change-label">Tiền thừa thối lại cho khách:</div>
+                                <div style="font-size: 22px; font-weight: 900; color: #15803d; margin: 4px 0;" id="calc-change-amount">0 đ</div>
+                                <div style="font-size: 11.5px; color: #475569; font-style: italic;" id="calc-change-words">(Không đồng)</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Khung Quét VietQR -->
+                    <div id="settle-vietqr-panel" style="display: none; background: #f8fafc; border: 1.5px solid #0284c7; border-radius: 8px; padding: 14px; margin-bottom: 14px;">
+                        <div style="display: flex; gap: 16px; align-items: center;">
+                            <div style="text-align: center; flex-shrink: 0;">
+                                <img id="settle-qr-img" src="" alt="Mã VietQR Quyết toán" style="width: 150px; height: 150px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff;" />
+                                <div style="font-size: 11px; color: #64748b; margin-top: 3px;">Quét mã để chuyển khoản</div>
+                            </div>
+                            <div style="flex: 1; font-size: 13px; color: #334155; line-height: 1.65;">
+                                <div style="font-weight: 800; color: #1e3a8a; font-size: 14px;" id="settle-qr-bank">Ngân hàng: VietinBank (970415)</div>
+                                <div>Số tài khoản: <strong id="settle-qr-acc" style="color: #0f172a; font-family: monospace;">119002953584</strong></div>
+                                <div>Chủ tài khoản: <strong id="settle-qr-holder">BENH VIEN MEDICARE</strong></div>
+                                <div>Số tiền thanh toán: <strong id="settle-qr-amount" style="color: #dc2626; font-size: 15px;">@netDiff.ToString("N0") đ</strong></div>
+                                <div>Nội dung CK: <strong id="settle-qr-msg" style="color: #0284c7; font-family: monospace;">HIS @Model.AppointmentCode</strong></div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 10px;">
+                            <label style="font-size: 12px; font-weight: 700; color: #1e293b; margin-bottom: 4px; display: block;">
+                                Mã chuẩn chi / Giao dịch ngân hàng sau khi khách quét QR <span style="color: #dc2626;">*</span>:
+                            </label>
+                            <input type="text" id="settle-ref-code" class="form-control" placeholder="Nhập mã giao dịch ngân hàng (VD: FT26318...)..." style="width: 100%; padding: 8px 12px; font-size: 13px; border: 1.5px solid #cbd5e1; border-radius: 6px;" />
+                        </div>
+                    </div>
+
+                    @if (shift != null)
+                    {
+                        <button type="button" class="btn primary" id="btn-settle-discharge" onclick="submitSettleDischarge(@Model.AppointmentId)"
+                                style="width: 100%; padding: 13px; font-size: 15px; font-weight: 800; border-radius: 6px; background: #0284c7; border-color: #0284c7; cursor: pointer;">
+                            ✓ XÁC NHẬN ĐÃ THU TIỀN &amp; IN HÓA ĐƠN (@netDiff.ToString("N0") đ)
+                        </button>
+                    }
+                    else
+                    {
+                        <div style="background: #fff3e0; border: 1.5px solid #ff9800; border-radius: 8px; padding: 12px; text-align: center;">
+                            <strong style="color: #e65100; font-size: 13px;">⚠️ Vui lòng mở ca thu ngân trước khi thu tiền.</strong>
+                        </div>
+                    }
+                </div>
+            }
+            else if (netDiff < 0)
+            {
+                <!-- KỊCH BẢN 2: HOÀN TRẢ TIỀN MẶT CHO BỆNH NHÂN (ĐƠN GIẢN, MẶC ĐỊNH TIỀN MẶT TẠI QUẦY) -->
+                <div style="background: #ffffff; border: 1.5px solid #0284c7; border-radius: 8px; padding: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px dashed #cbd5e1;">
+                        <div>
+                            <span style="font-size: 11.5px; font-weight: 800; color: #0369a1; background: #e0f2fe; padding: 3px 10px; border-radius: 4px; text-transform: uppercase;">
+                                💵 CHI HOÀN TIỀN MẶT TRỰC TIẾP TẠI QUẦY
+                            </span>
+                            <div style="font-size: 13px; color: #475569; margin-top: 6px;">
+                                Hệ thống tự động cấn trừ <strong>@patientFee.ToString("N0") đ</strong> viện phí từ tạm ứng và hoàn lại số tiền dư bằng <strong>Tiền mặt</strong> cho người bệnh.
+                            </div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 11.5px; color: #64748b; font-weight: 700;">SỐ TIỀN MẶT HOÀN LẠI</div>
+                            <div style="font-size: 22px; font-weight: 900; color: #0284c7;">@refundAmount.ToString("N0") đ</div>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 12px; margin-bottom: 14px;">
+                        <div>
+                            <label style="font-size: 12px; font-weight: 700; color: #1e293b; margin-bottom: 4px; display: block;">
+                                Người duyệt hoàn tiền <span style="color: #dc2626;">*</span>:
+                            </label>
+                            <input type="text" id="settle-approved-by" class="form-control" value="Kế toán trưởng / Trưởng ca thu ngân" placeholder="Nhập người duyệt chi hoàn..." style="width: 100%; padding: 8px 12px; font-size: 13px; border: 1.5px solid #cbd5e1; border-radius: 6px;" />
+                        </div>
+                        <div>
+                            <label style="font-size: 12px; font-weight: 700; color: #1e293b; margin-bottom: 4px; display: block;">
+                                Nội dung / Lý do hoàn trả:
+                            </label>
+                            <input type="text" id="settle-reason-note" class="form-control" value="Tất toán ra viện và hoàn trả tiền mặt số dư tạm ứng thừa" style="width: 100%; padding: 8px 12px; font-size: 13px; border: 1.5px solid #cbd5e1; border-radius: 6px;" />
+                        </div>
+                    </div>
+
+                    @if (shift != null)
+                    {
+                        <button type="button" class="btn primary" id="btn-settle-discharge" onclick="submitSettleDischarge(@Model.AppointmentId)"
+                                style="width: 100%; padding: 13px; font-size: 15px; font-weight: 800; border-radius: 6px; background: #0284c7; border-color: #0284c7; cursor: pointer;">
+                            💵 XÁC NHẬN CHI HOÀN TIỀN MẶT (@refundAmount.ToString("N0") đ) &amp; IN BẢNG KÊ QUYẾT TOÁN
+                        </button>
+                    }
+                    else
+                    {
+                        <div style="background: #fff3e0; border: 1.5px solid #ff9800; border-radius: 8px; padding: 12px; text-align: center;">
+                            <strong style="color: #e65100; font-size: 13px;">⚠️ Vui lòng mở ca thu ngân trước khi chi hoàn tiền mặt.</strong>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <!-- KỊCH BẢN 3: CẤN TRỪ VỪA ĐỦ 100% -->
+                <div style="background: #ffffff; border: 1.5px solid #16a34a; border-radius: 8px; padding: 16px; text-align: center;">
+                    <div style="font-size: 14px; font-weight: 700; color: #15803d; margin-bottom: 8px;">
+                        ✓ Tiền tạm ứng vừa đủ chi trả 100% viện phí (@patientFee.ToString("N0") đ) — Không phát sinh thu thêm hay hoàn tiền.
+                    </div>
+                    @if (shift != null)
+                    {
+                        <button type="button" class="btn primary" id="btn-settle-discharge" onclick="submitSettleDischarge(@Model.AppointmentId)"
+                                style="width: 100%; padding: 13px; font-size: 15px; font-weight: 800; border-radius: 6px; background: #16a34a; border-color: #16a34a; cursor: pointer;">
+                            ✓ XÁC NHẬN CẤN TRỪ ĐỦ &amp; IN HÓA ĐƠN QUYẾT TOÁN
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+    }
+}

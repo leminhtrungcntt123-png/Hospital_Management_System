@@ -46,12 +46,19 @@ public class AppDbContext : DbContext
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<InvoiceItem> InvoiceItems => Set<InvoiceItem>();
     public DbSet<AccessLog> AccessLogs => Set<AccessLog>();
+    public DbSet<CashierShift> CashierShifts => Set<CashierShift>();
+    public DbSet<Deposit> Deposits => Set<Deposit>();
+    public DbSet<DepositUsage> DepositUsages => Set<DepositUsage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
         modelBuilder.UseIdentityAlwaysColumns();
+
+        modelBuilder.HasSequence<int>("seq_invoice_number").StartsAt(1).IncrementsBy(1);
+        modelBuilder.HasSequence<int>("seq_transaction_code").StartsAt(1).IncrementsBy(1);
+        modelBuilder.HasSequence<int>("seq_deposit_code").StartsAt(1).IncrementsBy(1);
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
 

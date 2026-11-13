@@ -1,0 +1,912 @@
+@model IReadOnlyList<HIS.BLL.DTOs.DepositDto>
+@{
+    Layout = "_StaffLayout";
+    ViewData["Title"] = "Quản lý tạm ứng viện phí";
+    var shift = ViewBag.CurrentShift as HIS.BLL.DTOs.CashierShiftDto;
+    var status = ViewBag.Status as HIS.Domain.DepositStatus?;
+    var method = ViewBag.Method as HIS.Domain.PaymentMethod?;
+    string search = (ViewBag.Search as string) ?? "";
+    int? patientId = ViewBag.PatientId as int?;
+}
+
+<div id="anti-forgery-token-holder" style="display: none;">
+    @Html.AntiForgeryToken()
+</div>
+
+<div class="reception-desk" style="padding: 24px; max-width: 1400px; margin: 0 auto;">
+    <header class="reception-heading" style="display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-bottom: 20px; border-bottom: 1px solid #e0e0e0; padding-bottom: 16px; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 320px;">
+            <span class="reception-eyebrow" style="font-size: 12px; font-weight: 700; color: #0288d1; text-transform: uppercase; letter-spacing: 0.5px;">PHÒNG TÀI CHÍNH KẾ TOÁN · QUẢN LÝ TẠM ỨNG</span>
+            <h1 style="font-size: 26px; font-weight: 800; margin: 4px 0; color: #1a237e;">Thu &amp; quản lý tạm ứng viện phí</h1>
+            <p style="color: #616161; margin: 0; font-size: 13.5px;">Lập phiếu thu tạm ứng (lưu rõ bác sĩ chỉ định / người duyệt), theo dõi tiền tạm ứng đang tồn quỹ và trạng thái cấn trừ viện phí.</p>
+        </div>
+
+        <div style="display: flex; gap: 12px; align-items: center; flex-shrink: 0; white-space: nowrap;">
+            @if (shift != null)
+            {
+                <div style="background: #e8f5e9; border: 1.5px solid #81c784; border-radius: 10px; padding: 10px 16px; display: inline-flex; align-items: center; gap: 10px; white-space: nowrap;">
+                    <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #2e7d32; flex-shrink: 0;"></span>
+                    <span style="font-size: 12.5px; color: #1b5e20; font-weight: 800;">CA ĐANG MỞ (Từ @shift.OpenedAt.ToString("HH:mm"))</span>
+                </div>
+            }
+            else
+            {
+                <div style="background: #fff3e0; border: 1.5px solid #ffb74d; border-radius: 10px; padding: 10px 16px; display: inline-flex; align-items: center; gap: 10px; white-space: nowrap;">
+                    <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #f57c00; flex-shrink: 0;"></span>
+                    <span style="font-size: 12.5px; color: #e65100; font-weight: 800;">CHƯA MỞ CA THU NGÂN</span>
+                </div>
+            }
+
+            <button type="button" class="btn primary" onclick="handleCreateDepositClick()" style="display: inline-flex; align-items: center; gap: 6px; padding: 10px 18px; font-size: 13.5px; font-weight: 700; white-space: nowrap;">
+                + Thu tạm ứng mới
+            </button>
+            <a class="btn outline" asp-action="Deposits" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; padding: 10px 16px; font-size: 13px; font-weight: 600; white-space: nowrap;">
+                @await Html.PartialAsync("_AdminIcon", "refresh") Làm mới
+            </a>
+        </div>
+    </header>
+
+    @if (shift == null)
+    {
+        <div style="background: #fff3e0; border: 1.5px solid #ff9800; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 20px;">⚠️</span>
+                <div>
+                    <strong style="color: #e65100; font-size: 14px;">Chưa mở ca thu ngân:</strong>
+                    <span style="color: #5d4037; font-size: 13px;">Bạn cần mở ca làm việc tại Quầy thu ngân trước khi thực hiện thu tạm ứng cho bệnh nhân.</span>
+                </div>
+            </div>
+            <a class="btn primary" asp-action="Index" style="padding: 6px 14px; font-size: 12px; font-weight: 700; text-decoration: none;">
+                Đến Quầy thu ngân mở ca
+            </a>
+        </div>
+    }
+
+    @if (TempData["SuccessMessage"] is string success)
+    {
+        <div style="background: #e8f5e9; color: #1b5e20; border: 1px solid #c8e6c9; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; font-size: 14px; font-weight: 600;">
+            ✓ @success
+        </div>
+    }
+    @if (TempData["ErrorMessage"] is string error)
+    {
+        <div style="background: #ffebee; color: #b71c1c; border: 1px solid #ffcdd2; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; font-size: 14px; font-weight: 600;">
+            ✕ @error
+        </div>
+    }
+
+    <!-- Thống kê nhanh 4 khối -->
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;">
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
+            <div style="font-size: 11.5px; font-weight: 700; color: #64748b; text-transform: uppercase;">Tổng phiếu tạm ứng</div>
+            <div style="font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 4px;">@Model.Count</div>
+        </div>
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
+            <div style="font-size: 11.5px; font-weight: 700; color: #64748b; text-transform: uppercase;">Tổng tiền đã thu</div>
+            <div style="font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 4px;">@Model.Sum(m => m.Amount).ToString("N0") đ</div>
+        </div>
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
+            <div style="font-size: 11.5px; font-weight: 700; color: #64748b; text-transform: uppercase;">Viện phí đã khấu trừ</div>
+            <div style="font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 4px;">@Model.Sum(m => m.UsedAmount).ToString("N0") đ</div>
+        </div>
+        <div style="background: #ffffff; border: 1.5px solid #0284c7; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(2, 132, 199, 0.08);">
+            <div style="font-size: 11.5px; font-weight: 700; color: #0284c7; text-transform: uppercase;">Tiền tạm ứng đang tồn quỹ</div>
+            <div style="font-size: 22px; font-weight: 900; color: #0284c7; margin-top: 4px;">@Model.Sum(m => m.Balance).ToString("N0") đ</div>
+        </div>
+    </div>
+
+    <!-- Bộ lọc & Tìm kiếm tạm ứng -->
+    <form asp-action="Deposits" method="get" style="background: #ffffff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 16px 20px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <div style="display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end;">
+            <div style="flex: 1; min-width: 280px;">
+                <label style="font-size: 12px; font-weight: 700; color: #37474f; margin-bottom: 6px; display: block;">
+                    🔍 Tìm kiếm theo Mã BN / Số CCCD / Họ tên / SĐT / Mã phiếu / Người duyệt:
+                </label>
+                <input type="text" name="search" value="@search" class="form-control"
+                       placeholder="Nhập Mã BN (00000001), CCCD, họ tên, SĐT, mã TU-... hoặc tên Bác sĩ duyệt"
+                       style="width: 100%; padding: 9px 12px; border: 1.5px solid #cfd8dc; border-radius: 6px; font-size: 13.5px;" />
+            </div>
+
+            <div style="width: 220px;">
+                <label style="font-size: 12px; font-weight: 700; color: #37474f; margin-bottom: 6px; display: block;">
+                    💳 Hình thức thanh toán:
+                </label>
+                <select name="method" class="form-control" style="width: 100%; padding: 9px 12px; border: 1.5px solid #cfd8dc; border-radius: 6px; font-size: 13.5px;">
+                    <option value="">-- Tất cả hình thức --</option>
+                    <option value="1" selected="@(method == HIS.Domain.PaymentMethod.BankTransfer)">Đã chuyển khoản (CK)</option>
+                    <option value="0" selected="@(method == HIS.Domain.PaymentMethod.Cash)">Tiền mặt</option>
+                </select>
+            </div>
+
+            <div style="width: 210px;">
+                <label style="font-size: 12px; font-weight: 700; color: #37474f; margin-bottom: 6px; display: block;">
+                    🏷️ Trạng thái tạm ứng:
+                </label>
+                <select name="status" class="form-control" style="width: 100%; padding: 9px 12px; border: 1.5px solid #cfd8dc; border-radius: 6px; font-size: 13.5px;">
+                    <option value="">-- Tất cả trạng thái --</option>
+                    <option value="0" selected="@(status == HIS.Domain.DepositStatus.Active)">Đang tồn quỹ (Chưa tất toán)</option>
+                    <option value="1" selected="@(status == HIS.Domain.DepositStatus.Depleted)">Đã cấn trừ hết</option>
+                    <option value="2" selected="@(status == HIS.Domain.DepositStatus.Refunded)">Đã hoàn trả tiền mặt</option>
+                </select>
+            </div>
+
+            <div style="display: flex; gap: 8px;">
+                <button type="submit" class="btn primary" style="padding: 9px 18px; font-size: 13.5px; font-weight: 700; border-radius: 6px; display: inline-flex; align-items: center; gap: 6px;">
+                    Lọc dữ liệu
+                </button>
+                @if (!string.IsNullOrWhiteSpace(search) || method.HasValue || status.HasValue)
+                {
+                    <a asp-action="Deposits" class="btn outline" style="padding: 9px 14px; font-size: 13.5px; text-decoration: none; border-radius: 6px;">
+                        Xóa lọc
+                    </a>
+                }
+            </div>
+        </div>
+    </form>
+
+    <!-- Bảng danh sách tạm ứng -->
+    <div style="background: #ffffff; border: 1px solid #e0e0e0; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); overflow: hidden;">
+        <div style="overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 12.5px;">
+                <thead>
+                    <tr style="background: #f8fafc; border-bottom: 1.5px solid #e2e8f0; text-align: left;">
+                        <th style="padding: 11px 10px; font-weight: 700; color: #334155; white-space: nowrap;">Mã phiếu</th>
+                        <th style="padding: 11px 10px; font-weight: 700; color: #334155; white-space: nowrap;">Thời gian</th>
+                        <th style="padding: 11px 10px; font-weight: 700; color: #334155;">Bệnh nhân</th>
+                        <th style="padding: 11px 10px; font-weight: 700; color: #334155;">Mục đích tạm ứng</th>
+                        <th style="padding: 11px 10px; font-weight: 700; color: #0369a1;">Người duyệt / Chỉ định</th>
+                        <th style="padding: 11px 10px; font-weight: 700; color: #334155; white-space: nowrap; text-align: center;">Hình thức</th>
+                        <th style="padding: 11px 10px; font-weight: 700; color: #334155; text-align: right; white-space: nowrap;">Tiền tạm ứng</th>
+                        <th style="padding: 11px 10px; font-weight: 700; color: #334155; text-align: right; white-space: nowrap;">Đã trừ viện phí</th>
+                        <th style="padding: 11px 10px; font-weight: 700; color: #0284c7; text-align: right; white-space: nowrap;">Số dư tồn quỹ</th>
+                        <th style="padding: 11px 10px; font-weight: 700; color: #334155; text-align: center; white-space: nowrap;">Trạng thái</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="10" style="text-align: center; padding: 48px 20px; color: #94a3b8;">
+                                <div style="font-size: 15px; font-weight: 600; margin-bottom: 4px;">Không tìm thấy phiếu tạm ứng phù hợp</div>
+                                <div style="font-size: 13px;">Hãy thử thay đổi từ khóa tìm kiếm hoặc điều chỉnh bộ lọc hình thức / trạng thái.</div>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in Model)
+                        {
+                            <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.1s ease;">
+                                <td style="padding: 10px 10px; font-weight: 800; color: #1e3a8a; white-space: nowrap; font-family: monospace; font-size: 13px;">
+                                    @item.DepositCode
+                                </td>
+                                <td style="padding: 10px 10px; color: #64748b; white-space: nowrap; font-size: 12px;">
+                                    @item.CreatedAt.ToString("dd/MM/yyyy HH:mm")
+                                </td>
+                                <td style="padding: 10px 10px;">
+                                    <div style="font-weight: 700; color: #0f172a; font-size: 13px;">@item.PatientName</div>
+                                    <div style="font-size: 11.5px; color: #64748b; line-height: 1.35; margin-top: 2px;">
+                                        Mã BN: <strong>@item.PatientCode</strong> · SĐT: @item.PhoneNumber
+                                        @if (!string.IsNullOrWhiteSpace(item.NationalId))
+                                        {
+                                            <br /><span style="color: #0284c7; font-weight: 600;">CCCD: @item.NationalId</span>
+                                        }
+                                    </div>
+                                </td>
+                                <td style="padding: 10px 10px; color: #334155; font-size: 12.5px;">
+                                    @(item.Purpose ?? "Tạm ứng viện phí")
+                                    @if (!string.IsNullOrWhiteSpace(item.ReferenceCode))
+                                    {
+                                        <div style="font-size: 11px; color: #64748b; font-family: monospace;">Ref: @item.ReferenceCode</div>
+                                    }
+                                </td>
+                                <td style="padding: 10px 10px; color: #0369a1; font-weight: 700; font-size: 12px;">
+                                    @(string.IsNullOrWhiteSpace(item.ApprovedBy) ? "BS. Phạm Thu Hằng" : item.ApprovedBy)
+                                    <div style="font-size: 11px; color: #64748b; font-weight: 500;">Thu ngân: @(item.CashierName ?? "Thu ngân")</div>
+                                </td>
+                                <td style="padding: 10px 10px; text-align: center; white-space: nowrap;">
+                                    @if (item.PaymentMethod == HIS.Domain.PaymentMethod.Cash)
+                                    {
+                                        <span style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-size: 11px; font-weight: 700; padding: 3px 7px; border-radius: 4px;">Tiền mặt</span>
+                                    }
+                                    else
+                                    {
+                                        <span style="background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; font-size: 11px; font-weight: 700; padding: 3px 7px; border-radius: 4px;">Chuyển khoản</span>
+                                    }
+                                </td>
+                                <td style="padding: 10px 10px; text-align: right; font-weight: 700; color: #0f172a; white-space: nowrap;">
+                                    @item.Amount.ToString("N0") đ
+                                </td>
+                                <td style="padding: 10px 10px; text-align: right; color: #334155; white-space: nowrap; font-weight: 600;">
+                                    @item.UsedAmount.ToString("N0") đ
+                                </td>
+                                <td style="padding: 10px 10px; text-align: right; font-weight: 800; color: #0284c7; font-size: 13.5px; white-space: nowrap;">
+                                    @item.Balance.ToString("N0") đ
+                                </td>
+                                <td style="padding: 10px 10px; text-align: center; white-space: nowrap;">
+                                    @if (item.Status == HIS.Domain.DepositStatus.Active)
+                                    {
+                                        <span style="background: #ecfdf5; color: #047857; font-size: 11px; font-weight: 700; padding: 3px 7px; border-radius: 4px; border: 1px solid #a7f3d0;">ĐANG TỒN QUỸ</span>
+                                    }
+                                    else if (item.Status == HIS.Domain.DepositStatus.Depleted)
+                                    {
+                                        <span style="background: #f1f5f9; color: #64748b; font-size: 11px; font-weight: 600; padding: 3px 7px; border-radius: 4px;">ĐÃ CẤN TRỪ HẾT</span>
+                                    }
+                                    else
+                                    {
+                                        <span style="background: #fef2f2; color: #b91c1c; font-size: 11px; font-weight: 600; padding: 3px 7px; border-radius: 4px; border: 1px solid #fecaca;">ĐÃ HOÀN TIỀN MẶT</span>
+                                        @if (item.RefundedAmount > 0)
+                                        {
+                                            <div style="font-size: 10.5px; color: #b91c1c; margin-top: 3px; font-weight: 600;">Hoàn: @item.RefundedAmount.ToString("N0") đ</div>
+                                        }
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Thu tạm ứng mới (Có tra cứu & đối chiếu hồ sơ người bệnh + Lưu Người duyệt tạm ứng) -->
+<dialog id="modal-create-deposit" style="border: none; border-radius: 12px; padding: 24px; max-width: 640px; width: 95%; box-shadow: 0 15px 35px rgba(0,0,0,0.25);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
+        <h3 style="margin: 0; font-size: 19px; color: #1e3a8a; display: flex; align-items: center; gap: 8px;">
+            <span>💰</span> Lập phiếu thu tạm ứng viện phí
+        </h3>
+        <button type="button" onclick="document.getElementById('modal-create-deposit').close()" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #64748b;">✕</button>
+    </div>
+    <p style="font-size: 13px; color: #64748b; margin-top: 0; margin-bottom: 16px;">
+        Thu tiền tạm ứng trước khi nhập viện, phẫu thuật hoặc cận lâm sàng. Lưu rõ Bác sĩ chỉ định / Người duyệt tạm ứng để đối chiếu khi tất toán.
+    </p>
+
+    <!-- BƯỚC 1: TRA CỨU & XÁC THỰC HỒ SƠ BỆNH NHÂN -->
+    <div style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+        <label style="font-size: 12.5px; font-weight: 700; display: block; margin-bottom: 6px; color: #1e293b;">
+            1. Tra cứu &amp; Đối chiếu hồ sơ bệnh nhân <span style="color: #dc2626;">*</span>:
+        </label>
+
+        <div id="dep-search-box-container">
+            <div style="display: flex; gap: 8px;">
+                <input type="text" id="dep-search-input" class="form-control" 
+                       placeholder="Gõ Mã BN (00000001), CCCD, SĐT hoặc Họ tên..." 
+                       style="flex: 1; padding: 9px 12px; font-size: 13.5px; border: 1.5px solid #94a3b8; border-radius: 6px;" 
+                       onkeydown="if(event.key==='Enter'){event.preventDefault();searchPatientForDeposit();}" />
+                <button type="button" class="btn primary" onclick="searchPatientForDeposit()" style="padding: 9px 16px; font-size: 13px; font-weight: 700; white-space: nowrap;">
+                    🔍 Tìm hồ sơ
+                </button>
+            </div>
+            <div id="dep-search-status" style="font-size: 12px; color: #64748b; margin-top: 6px; display: none;"></div>
+            
+            <div id="dep-search-results-list" style="margin-top: 10px; max-height: 220px; overflow-y: auto; display: none; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff;">
+            </div>
+        </div>
+
+        <!-- Thẻ hồ sơ bệnh nhân đã chọn -->
+        <div id="dep-selected-patient-card" style="display: none; background: #ecfdf5; border: 1.5px solid #10b981; border-radius: 8px; padding: 12px 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="background: #10b981; color: #fff; width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800;">✓</span>
+                    <span style="font-size: 12px; font-weight: 800; color: #047857; text-transform: uppercase; letter-spacing: 0.5px;">HỒ SƠ BỆNH NHÂN ĐÃ XÁC THỰC</span>
+                </div>
+                <button type="button" class="btn outline" onclick="resetSelectedPatientForDeposit()" style="padding: 3px 8px; font-size: 11.5px; font-weight: 600; color: #475569; background: #fff;">
+                    🔄 Đổi bệnh nhân
+                </button>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px;">
+                <div>Họ và tên: <strong id="dep-card-name" style="color: #0f172a; font-size: 14.5px;"></strong></div>
+                <div>Mã BN: <strong id="dep-card-code" style="color: #1e3a8a; font-family: monospace; font-size: 14.5px;"></strong></div>
+                <div>CCCD: <strong id="dep-card-cccd" style="color: #0369a1;"></strong></div>
+                <div>Ngày sinh: <span id="dep-card-dob"></span> (<span id="dep-card-age"></span> tuổi) - <span id="dep-card-gender"></span></div>
+                <div style="grid-column: span 2;">SĐT: <strong id="dep-card-phone"></strong> · Địa chỉ: <span id="dep-card-address" style="color: #475569;"></span></div>
+                <div id="dep-card-app-box" style="grid-column: span 2; display: none; background: #eff6ff; padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #1e40af; border: 1px solid #bfdbfe;">
+                    🏥 Lượt khám liên kết: <strong id="dep-card-app-code"></strong> - <span id="dep-card-app-dept"></span>
+                </div>
+            </div>
+        </div>
+        <input type="hidden" id="dep-patient-id" value="" />
+        <input type="hidden" id="dep-appointment-id" value="" />
+    </div>
+
+    <!-- BƯỚC 2: THÔNG TIN TẠM ỨNG & NGƯỜI DUYỆT -->
+    <div style="margin-bottom: 12px;">
+        <label style="font-size: 12px; font-weight: 700; display: block; margin-bottom: 4px; color: #1e293b;">
+            2. Số tiền tạm ứng (VNĐ) <span style="color: #dc2626;">*</span>:
+        </label>
+        <input type="number" id="dep-amount" min="10000" step="50000" class="form-control" placeholder="VD: 2000000" style="width: 100%; padding: 8px 12px; font-size: 16px; font-weight: 700; color: #047857;" oninput="refreshDepositQrIfTransfer()" required />
+        <div style="display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap;">
+            <button type="button" class="btn outline" style="padding: 2px 8px; font-size: 11.5px; border-radius: 4px;" onclick="setDepositAmount(500000)">+500.000 đ</button>
+            <button type="button" class="btn outline" style="padding: 2px 8px; font-size: 11.5px; border-radius: 4px;" onclick="setDepositAmount(1000000)">+1.000.000 đ</button>
+            <button type="button" class="btn outline" style="padding: 2px 8px; font-size: 11.5px; border-radius: 4px;" onclick="setDepositAmount(2000000)">+2.000.000 đ</button>
+            <button type="button" class="btn outline" style="padding: 2px 8px; font-size: 11.5px; border-radius: 4px;" onclick="setDepositAmount(5000000)">+5.000.000 đ</button>
+            <button type="button" class="btn outline" style="padding: 2px 8px; font-size: 11.5px; border-radius: 4px;" onclick="setDepositAmount(10000000)">+10.000.000 đ</button>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+        <div>
+            <label style="font-size: 12px; font-weight: 700; display: block; margin-bottom: 4px; color: #1e293b;">
+                Người duyệt / Bác sĩ chỉ định tạm ứng <span style="color: #dc2626;">*</span>:
+            </label>
+            <input type="text" id="dep-approved-by" class="form-control" list="dep-approved-by-suggestions" value="BS. Phạm Thu Hằng (Khoa Nội tổng quát)" placeholder="Nhập tên BS chỉ định / Người duyệt..." style="width: 100%; padding: 8px 12px; font-size: 13px; font-weight: 600; color: #0369a1;" required />
+            <datalist id="dep-approved-by-suggestions">
+                <option value="BS. Phạm Thu Hằng (Khoa Nội tổng quát)" />
+                <option value="BS. Nguyễn Hoàng Nam (Khoa Ngoại tổng quát)" />
+                <option value="BS. Trần Minh Đức (Khoa Cấp cứu)" />
+                <option value="Trưởng ca thu ngân" />
+            </datalist>
+        </div>
+        <div>
+            <label style="font-size: 12px; font-weight: 700; display: block; margin-bottom: 4px; color: #1e293b;">Hình thức thu tiền *:</label>
+            <select id="dep-method" class="form-control" style="width: 100%; padding: 8px 12px; font-size: 13.5px;" onchange="toggleDepRefCode()">
+                <option value="0">💵 Tiền mặt</option>
+                <option value="1">📱 Chuyển khoản ngân hàng (VietQR)</option>
+            </select>
+        </div>
+    </div>
+
+    <div style="margin-bottom: 12px;">
+        <label style="font-size: 12px; font-weight: 700; display: block; margin-bottom: 4px; color: #1e293b;">Mục đích tạm ứng:</label>
+        <input type="text" id="dep-purpose" class="form-control" list="dep-purpose-suggestions" placeholder="VD: Tạm ứng viện phí..." style="width: 100%; padding: 8px 12px; font-size: 13px;" />
+        <datalist id="dep-purpose-suggestions">
+            <option value="Tạm ứng nhập viện điều trị" />
+            <option value="Tạm ứng phẫu thuật - thủ thuật" />
+            <option value="Tạm ứng xét nghiệm / CLS kỹ thuật cao" />
+            <option value="Tạm ứng viện phí tổng quát" />
+        </datalist>
+    </div>
+
+    <!-- Khung VietQR Động khi chọn Chuyển khoản -->
+    <div id="dep-vietqr-panel" style="display: none; background: #f8fafc; border: 1.5px solid #0284c7; border-radius: 8px; padding: 14px; margin-bottom: 14px;">
+        <div style="font-size: 12px; font-weight: 800; color: #0284c7; text-transform: uppercase; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+            <span>📱</span> Quét mã VietQR chuyển khoản (Napas 247)
+        </div>
+        
+        <div id="dep-qr-prompt" style="font-size: 12.5px; color: #b45309; background: #fffbeb; padding: 10px 12px; border-radius: 6px; border: 1px solid #fef3c7; display: none;">
+            ⚠️ Vui lòng chọn hồ sơ bệnh nhân và nhập số tiền tạm ứng lớn hơn 0 đ để tạo mã VietQR động.
+        </div>
+
+        <div id="dep-qr-content" style="display: none;">
+            <div style="display: flex; gap: 16px; align-items: center; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px;">
+                <div style="text-align: center; flex-shrink: 0;">
+                    <img id="dep-qr-img" src="" alt="Mã VietQR Tạm ứng" style="width: 155px; height: 155px; border: 1px solid #e2e8f0; border-radius: 6px;" />
+                    <div style="font-size: 11px; color: #64748b; margin-top: 3px;">Quét bằng app ngân hàng</div>
+                </div>
+                <div style="flex: 1; font-size: 12.5px; color: #334155; line-height: 1.6;">
+                    <div style="font-weight: 800; color: #1e3a8a; font-size: 13.5px;" id="dep-qr-bank">Ngân hàng: VietinBank (970415)</div>
+                    <div>
+                        Số tài khoản: <strong id="dep-qr-acc" style="color: #0f172a; font-family: monospace; font-size: 13.5px;">119002953584</strong>
+                        <button type="button" class="btn outline" style="padding: 1px 6px; font-size: 11px; margin-left: 6px;" onclick="copyText(document.getElementById('dep-qr-acc').innerText)">Sao chép</button>
+                    </div>
+                    <div>
+                        Chủ TK: <strong id="dep-qr-holder">BENH VIEN MEDICARE</strong>
+                    </div>
+                    <div>
+                        Số tiền: <strong id="dep-qr-amount-text" style="color: #0284c7; font-size: 14px;">0 đ</strong>
+                        <button type="button" class="btn outline" style="padding: 1px 6px; font-size: 11px; margin-left: 6px;" onclick="copyText(document.getElementById('dep-amount').value)">Sao chép</button>
+                    </div>
+                    <div>
+                        Nội dung: <strong id="dep-qr-msg" style="color: #b91c1c; font-family: monospace; font-size: 12.5px;">TU...</strong>
+                        <button type="button" class="btn outline" style="padding: 1px 6px; font-size: 11px; margin-left: 6px;" onclick="copyText(document.getElementById('dep-qr-msg').innerText)">Sao chép</button>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 10px;">
+                <label style="font-size: 12px; font-weight: 700; color: #1e293b; margin-bottom: 4px; display: block;">
+                    Mã chuẩn chi / Giao dịch ngân hàng (Bắt buộc khi CK) <span style="color: #dc2626;">*</span>:
+                </label>
+                <input type="text" id="dep-ref" class="form-control" placeholder="Nhập mã chuẩn chi từ thông báo biến động số dư / app ngân hàng..." style="width: 100%; padding: 8px 12px; font-size: 13px; border: 1.5px solid #cbd5e1; border-radius: 6px;" />
+            </div>
+        </div>
+    </div>
+
+    <div style="margin-bottom: 20px;">
+        <label style="font-size: 12px; font-weight: 700; display: block; margin-bottom: 4px; color: #1e293b;">Ghi chú:</label>
+        <input type="text" id="dep-note" class="form-control" placeholder="Ghi chú thêm (người nộp hộ, cam kết,...)" style="width: 100%; padding: 8px 12px; font-size: 13px;" />
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e2e8f0; padding-top: 14px;">
+        <button type="button" class="btn outline" onclick="document.getElementById('modal-create-deposit').close()">Hủy bỏ</button>
+        <button type="button" class="btn primary" id="btn-submit-deposit" onclick="submitCreateDeposit()" style="font-weight: 700; padding: 9px 20px;">
+            ✓ Xác nhận thu tạm ứng
+        </button>
+    </div>
+</dialog>
+
+@section Scripts {
+    <script>
+        var isShiftOpen = @(shift != null ? "true" : "false");
+
+        function handleCreateDepositClick() {
+            if (!isShiftOpen) {
+                alert('Vui lòng mở ca thu ngân tại quầy trước khi thu tạm ứng.');
+                window.location.href = '@Url.Action("Index", "Cashier", new { area = "Staff" })';
+                return;
+            }
+            resetSelectedPatientForDeposit();
+            document.getElementById('dep-search-input').value = '';
+            document.getElementById('dep-amount').value = '';
+            document.getElementById('dep-method').value = '0';
+            document.getElementById('dep-approved-by').value = 'BS. Phạm Thu Hằng (Khoa Nội tổng quát)';
+            toggleDepRefCode();
+            document.getElementById('dep-purpose').value = 'Tạm ứng viện phí điều trị';
+            document.getElementById('dep-ref').value = '';
+            document.getElementById('dep-note').value = '';
+
+            document.getElementById('modal-create-deposit').showModal();
+            setTimeout(() => document.getElementById('dep-search-input')?.focus(), 150);
+        }
+
+        async function searchPatientForDeposit() {
+            var input = document.getElementById('dep-search-input');
+            var status = document.getElementById('dep-search-status');
+            var resultsBox = document.getElementById('dep-search-results-list');
+            var term = input.value.trim();
+
+            if (!term) {
+                status.style.display = 'block';
+                status.innerHTML = '<span style="color: #b91c1c;">Vui lòng nhập Mã BN, CCCD, SĐT hoặc Họ tên để tìm kiếm.</span>';
+                resultsBox.style.display = 'none';
+                input.focus();
+                return;
+            }
+
+            status.style.display = 'block';
+            status.innerHTML = '<span style="color: #0284c7;">⏳ Đang tìm kiếm hồ sơ người bệnh...</span>';
+            resultsBox.style.display = 'none';
+
+            try {
+                var url = '@Url.Action("SearchPatients", "Cashier", new { area = "Staff" })?term=' + encodeURIComponent(term);
+                var res = await fetch(url);
+                if (!res.ok) throw new Error('Không thể tải dữ liệu tìm kiếm.');
+                var list = await res.json();
+
+                if (!list || list.length === 0) {
+                    status.innerHTML = '<span style="color: #b91c1c;">Không tìm thấy hồ sơ người bệnh nào khớp với từ khóa "<strong>' + term + '</strong>".</span>';
+                    resultsBox.style.display = 'none';
+                    return;
+                }
+
+                status.innerHTML = '<span style="color: #15803d;">Tìm thấy <strong>' + list.length + '</strong> hồ sơ phù hợp. Bấm "Chọn" để đối chiếu:</span>';
+                resultsBox.innerHTML = '';
+
+                list.forEach(p => {
+                    var item = document.createElement('div');
+                    item.style.cssText = 'padding: 10px 12px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: background 0.15s;';
+                    item.onmouseover = function() { this.style.backgroundColor = '#f8fafc'; };
+                    item.onmouseout = function() { this.style.backgroundColor = 'transparent'; };
+
+                    var cccdHtml = p.nationalId ? ' · <span style="color: #0284c7; font-weight: 600;">CCCD: ' + p.nationalId + '</span>' : '';
+                    var appHtml = p.activeAppointmentCode 
+                        ? '<div style="font-size: 11.5px; color: #0369a1; margin-top: 3px;">🏥 Lượt khám gần nhất: <strong>' + p.activeAppointmentCode + '</strong> (' + (p.activeDepartmentName || 'Đang khám') + ')</div>' 
+                        : '';
+
+                    item.innerHTML = `
+                        <div style="flex: 1; padding-right: 12px;">
+                            <div style="font-weight: 700; color: #0f172a; font-size: 13.5px;">
+                                ${p.fullName} <span style="color: #1e3a8a; font-family: monospace; font-size: 12.5px; font-weight: 700;">(Mã: ${p.patientCode})</span>
+                            </div>
+                            <div style="font-size: 12px; color: #475569; margin-top: 2px;">
+                                ${p.gender} · ${p.age} tuổi (${p.dateOfBirth}) · SĐT: <strong>${p.phoneNumber}</strong>${cccdHtml}
+                            </div>
+                            ${appHtml}
+                        </div>
+                        <button type="button" class="btn primary" style="padding: 5px 12px; font-size: 12px; font-weight: 700; white-space: nowrap;">✓ Chọn</button>
+                    `;
+
+                    item.onclick = function() { selectPatientForDeposit(p); };
+                    resultsBox.appendChild(item);
+                });
+
+                resultsBox.style.display = 'block';
+
+                if (list.length === 1) {
+                    selectPatientForDeposit(list[0]);
+                }
+            } catch (err) {
+                status.innerHTML = '<span style="color: #b91c1c;">Lỗi: ' + err.message + '</span>';
+            }
+        }
+
+        function selectPatientForDeposit(p) {
+            document.getElementById('dep-patient-id').value = p.id;
+            document.getElementById('dep-appointment-id').value = p.activeAppointmentId || '';
+
+            document.getElementById('dep-card-name').innerText = p.fullName;
+            document.getElementById('dep-card-code').innerText = p.patientCode;
+            document.getElementById('dep-card-cccd').innerText = p.nationalId || 'Chưa cập nhật';
+            document.getElementById('dep-card-dob').innerText = p.dateOfBirth;
+            document.getElementById('dep-card-age').innerText = p.age;
+            document.getElementById('dep-card-gender').innerText = p.gender;
+            document.getElementById('dep-card-phone').innerText = p.phoneNumber;
+            document.getElementById('dep-card-address').innerText = p.address || 'Chưa cập nhật';
+
+            var appBox = document.getElementById('dep-card-app-box');
+            if (p.activeAppointmentCode) {
+                document.getElementById('dep-card-app-code').innerText = p.activeAppointmentCode;
+                document.getElementById('dep-card-app-dept').innerText = p.activeDepartmentName || 'Khám bệnh';
+                appBox.style.display = 'block';
+                if (p.activeDepartmentName) {
+                    document.getElementById('dep-approved-by').value = 'BS. Phạm Thu Hằng (' + p.activeDepartmentName + ')';
+                }
+            } else {
+                appBox.style.display = 'none';
+            }
+
+            document.getElementById('dep-search-box-container').style.display = 'none';
+            document.getElementById('dep-selected-patient-card').style.display = 'block';
+
+            refreshDepositQrIfTransfer();
+            setTimeout(() => document.getElementById('dep-amount')?.focus(), 100);
+        }
+
+        function resetSelectedPatientForDeposit() {
+            document.getElementById('dep-patient-id').value = '';
+            document.getElementById('dep-appointment-id').value = '';
+            document.getElementById('dep-selected-patient-card').style.display = 'none';
+            document.getElementById('dep-search-box-container').style.display = 'block';
+            document.getElementById('dep-search-results-list').style.display = 'none';
+            document.getElementById('dep-search-results-list').innerHTML = '';
+            document.getElementById('dep-search-status').style.display = 'none';
+            setTimeout(() => document.getElementById('dep-search-input')?.focus(), 100);
+        }
+
+        function setDepositAmount(val) {
+            document.getElementById('dep-amount').value = val;
+            refreshDepositQrIfTransfer();
+        }
+
+        function toggleDepRefCode() {
+            refreshDepositQrIfTransfer();
+        }
+
+        async function refreshDepositQrIfTransfer() {
+            var method = document.getElementById('dep-method').value;
+            var panel = document.getElementById('dep-vietqr-panel');
+            var prompt = document.getElementById('dep-qr-prompt');
+            var content = document.getElementById('dep-qr-content');
+            
+            if (method !== '1') {
+                if (panel) panel.style.display = 'none';
+                return;
+            }
+            if (panel) panel.style.display = 'block';
+
+            var patientId = parseInt(document.getElementById('dep-patient-id').value);
+            var amount = parseFloat(document.getElementById('dep-amount').value);
+
+            if (!patientId || isNaN(patientId) || patientId <= 0 || !amount || isNaN(amount) || amount <= 0) {
+                if (prompt) prompt.style.display = 'block';
+                if (content) content.style.display = 'none';
+                return;
+            }
+
+            if (prompt) prompt.style.display = 'none';
+            if (content) content.style.display = 'block';
+            document.getElementById('dep-qr-amount-text').innerText = Number(amount).toLocaleString('vi-VN') + ' đ';
+
+            try {
+                var url = '@Url.Action("GenerateDepositQr", "Cashier", new { area = "Staff" })?patientId=' + patientId + '&amount=' + amount;
+                var res = await fetch(url);
+                var data = await res.json();
+                if (res.ok && data.qrDataUri) {
+                    document.getElementById('dep-qr-img').src = data.qrDataUri;
+                    document.getElementById('dep-qr-bank').innerText = 'Ngân hàng: ' + data.bankName + ' (' + data.bankCode + ')';
+                    document.getElementById('dep-qr-acc').innerText = data.accountNumber;
+                    document.getElementById('dep-qr-holder').innerText = data.accountHolder;
+                    document.getElementById('dep-qr-msg').innerText = data.message;
+                }
+            } catch (err) {
+                console.error('Không thể tạo mã VietQR:', err);
+            }
+        }
+
+        function copyText(text) {
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Đã sao chép: ' + text);
+            }).catch(() => {
+                prompt('Sao chép nội dung:', text);
+            });
+        }
+
+        function numberToVietnameseWords(n) {
+            if (!n || isNaN(n) || n === 0) return 'Không đồng';
+            if (n < 0) return 'Âm ' + numberToVietnameseWords(-n);
+
+            var units = ['', 'nghìn', 'triệu', 'tỷ', 'nghìn tỷ', 'triệu tỷ'];
+            var numbers = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín'];
+
+            function readThreeDigits(num, hasHigherGroup) {
+                var h = Math.floor(num / 100);
+                var t = Math.floor((num % 100) / 10);
+                var u = num % 10;
+                var res = '';
+
+                if (h > 0 || hasHigherGroup) {
+                    res += numbers[h] + ' trăm ';
+                }
+
+                if (t === 0 && u === 0) {
+                    return res.trim();
+                }
+
+                if (t === 0 && u > 0) {
+                    res += (hasHigherGroup || h > 0 ? 'lẻ ' : '') + numbers[u];
+                    return res.trim();
+                }
+
+                if (t === 1) {
+                    res += 'mười ';
+                } else if (t > 1) {
+                    res += numbers[t] + ' mươi ';
+                }
+
+                if (u === 1) {
+                    res += t > 1 ? 'mốt' : 'một';
+                } else if (u === 5) {
+                    res += t > 0 ? 'lăm' : 'năm';
+                } else if (u > 0) {
+                    res += numbers[u];
+                }
+
+                return res.trim();
+            }
+
+            var groups = [];
+            var temp = Math.floor(n);
+            while (temp > 0) {
+                groups.push(temp % 1000);
+                temp = Math.floor(temp / 1000);
+            }
+
+            var parts = [];
+            for (var i = groups.length - 1; i >= 0; i--) {
+                var g = groups[i];
+                if (g > 0) {
+                    var s = readThreeDigits(g, i < groups.length - 1);
+                    parts.push(s + ' ' + units[i]);
+                }
+            }
+
+            var result = parts.join(' ').replace(/\s+/g, ' ').trim();
+            if (!result) return 'Không đồng';
+            return result.charAt(0).toUpperCase() + result.slice(1) + ' đồng chẵn.';
+        }
+
+        function printDepositReceipt(dep) {
+            if (!dep) return;
+            var printWin = window.open('', '_blank', 'width=850,height=750');
+            if (!printWin) {
+                alert('Trình duyệt đã chặn cửa sổ bật lên (popup). Vui lòng cho phép popup để in biên lai tạm ứng.');
+                return;
+            }
+
+            var now = dep.createdAt ? new Date(dep.createdAt) : new Date();
+            var words = numberToVietnameseWords(Math.round(dep.amount));
+            var methodStr = dep.paymentMethod === 0 ? 'Tiền mặt' : ('Chuyển khoản' + (dep.referenceCode ? ' (Mã chuẩn chi: ' + dep.referenceCode + ')' : ''));
+            var approvedByStr = dep.approvedBy || 'BS. Phạm Thu Hằng';
+
+            var content = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Biên lai thu tạm ứng - ${dep.depositCode}</title>
+    <style>
+        body { font-family: 'Times New Roman', serif; font-size: 13.5px; line-height: 1.45; color: #000; padding: 24px; }
+        .header { display: flex; justify-content: space-between; margin-bottom: 12px; }
+        .header-left { text-align: left; }
+        .header-right { text-align: right; }
+        .title { text-align: center; font-size: 18px; font-weight: bold; margin: 18px 0 4px; text-transform: uppercase; }
+        .sub-title { text-align: center; font-style: italic; margin-bottom: 18px; font-size: 12px; }
+        .info-row { margin-bottom: 7px; display: flex; }
+        .info-label { width: 200px; flex-shrink: 0; }
+        .info-val { flex: 1; font-weight: 500; }
+        .money-box { border: 1.5px solid #000; padding: 12px 16px; margin: 16px 0; background: #fafafa; }
+        .signatures { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; margin-top: 32px; page-break-inside: avoid; }
+        .sig-title { font-weight: bold; margin-bottom: 75px; }
+        @@media print {
+            body { padding: 0; }
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <strong>SỞ Y TẾ TP. HỒ CHÍ MINH</strong><br />
+            <strong>BỆNH VIỆN ĐA KHOA MEDICARE</strong><br />
+            <span>Phòng Tài chính - Kế toán</span>
+        </div>
+        <div class="header-right">
+            <strong>Mẫu số: C38-BB</strong><br />
+            <span>(Ban hành theo TT 107/2017/TT-BTC)</span><br />
+            <span>Số phiếu: <strong style="font-family: monospace; font-size: 14px;">${dep.depositCode}</strong></span>
+        </div>
+    </div>
+
+    <div class="title">PHIẾU THU TIỀN TẠM ỨNG VIỆN PHÍ</div>
+    <div class="sub-title">Ngày ${now.getDate()} tháng ${now.getMonth() + 1} năm ${now.getFullYear()}</div>
+
+    <div class="info-row">
+        <div class="info-label">Họ và tên người bệnh:</div>
+        <div class="info-val"><strong>${dep.patientName}</strong></div>
+    </div>
+    <div class="info-row">
+        <div class="info-label">Mã người bệnh:</div>
+        <div class="info-val"><strong>${dep.patientCode}</strong>${dep.nationalId ? ' · CCCD: <strong>' + dep.nationalId + '</strong>' : ''} · SĐT: ${dep.phoneNumber || '—'}</div>
+    </div>
+    <div class="info-row">
+        <div class="info-label">Lượt khám / Đợt điều trị:</div>
+        <div class="info-val">${dep.appointmentCode ? ('Mã lượt: <strong>' + dep.appointmentCode + '</strong>') : 'Tạm ứng đợt khám/nhập viện mới'}</div>
+    </div>
+    <div class="info-row">
+        <div class="info-label">Người duyệt / BS chỉ định:</div>
+        <div class="info-val"><strong>${approvedByStr}</strong></div>
+    </div>
+    <div class="info-row">
+        <div class="info-label">Lý do nộp tạm ứng:</div>
+        <div class="info-val">${dep.purpose || 'Tạm ứng viện phí điều trị'}</div>
+    </div>
+    <div class="info-row">
+        <div class="info-label">Hình thức nộp tiền:</div>
+        <div class="info-val"><strong>${methodStr}</strong></div>
+    </div>
+
+    <div class="money-box">
+        <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <span style="font-weight: bold; font-size: 14px;">SỐ TIỀN TẠM ỨNG NỘP:</span>
+            <span style="font-weight: bold; font-size: 18px;">${Number(dep.amount).toLocaleString('vi-VN')} VNĐ</span>
+        </div>
+        <div style="font-style: italic; margin-top: 6px;">
+            (Viết bằng chữ: <strong>${words}</strong>)
+        </div>
+    </div>
+
+    <div style="font-size: 12px; font-style: italic; color: #333; margin-top: 8px;">
+        * Ghi chú: Người bệnh/thân nhân vui lòng giữ phiếu tạm ứng này để làm thủ tục cấn trừ viện phí và nhận lại tiền thừa (bằng tiền mặt) tại Quầy thu ngân.
+    </div>
+
+    <div class="signatures">
+        <div>
+            <div class="sig-title">NGƯỜI NỘP TIỀN<br /><span style="font-weight: normal; font-size: 11px;">(Ký, ghi rõ họ tên)</span></div>
+            <div><strong>${dep.patientName}</strong></div>
+        </div>
+        <div>
+            <div class="sig-title">BÁC SĨ CHỈ ĐỊNH / DUYỆT<br /><span style="font-weight: normal; font-size: 11px;">(Ký, ghi rõ họ tên)</span></div>
+            <div><strong>${approvedByStr}</strong></div>
+        </div>
+        <div>
+            <div class="sig-title">THU NGÂN LẬP PHIẾU<br /><span style="font-weight: normal; font-size: 11px;">(Ký, đóng dấu, ghi rõ họ tên)</span></div>
+            <div><strong>${dep.cashierName || '@(shift?.CashierName ?? "Thu ngân")'}</strong></div>
+        </div>
+    </div>
+
+    <div class="no-print" style="margin-top: 36px; text-align: center;">
+        <button onclick="window.print()" style="padding: 10px 24px; font-size: 14px; font-weight: bold; background: #0284c7; color: #fff; border: none; border-radius: 6px; cursor: pointer;">
+            🖨️ In biên lai ngay
+        </button>
+    </div>
+</body>
+</html>`;
+
+            printWin.document.open();
+            printWin.document.write(content);
+            printWin.document.close();
+        }
+
+        async function submitCreateDeposit() {
+            var patientId = parseInt(document.getElementById('dep-patient-id').value);
+            var amount = parseFloat(document.getElementById('dep-amount').value);
+            var method = parseInt(document.getElementById('dep-method').value);
+            var approvedBy = document.getElementById('dep-approved-by')?.value?.trim() || '';
+            var purpose = document.getElementById('dep-purpose').value.trim();
+            var ref = document.getElementById('dep-ref')?.value?.trim() || '';
+            var note = document.getElementById('dep-note').value.trim();
+            var appointmentId = parseInt(document.getElementById('dep-appointment-id').value) || null;
+
+            if (!patientId || isNaN(patientId) || patientId <= 0) {
+                alert('⚠️ Vui lòng tra cứu và bấm chọn hồ sơ bệnh nhân để đối chiếu trước khi thu tiền.');
+                resetSelectedPatientForDeposit();
+                return;
+            }
+            if (!amount || amount <= 0) {
+                alert('⚠️ Số tiền tạm ứng phải lớn hơn 0 đ.');
+                document.getElementById('dep-amount')?.focus();
+                return;
+            }
+            if (!approvedBy) {
+                alert('⚠️ Vui lòng nhập tên Bác sĩ chỉ định / Người duyệt tạm ứng.');
+                document.getElementById('dep-approved-by')?.focus();
+                return;
+            }
+            if (method === 1 && !ref) {
+                alert('⚠️ Người bệnh quét mã VietQR thành công: vui lòng nhập mã chuẩn chi / giao dịch ngân hàng để đối soát.');
+                document.getElementById('dep-ref')?.focus();
+                return;
+            }
+
+            var patientName = document.getElementById('dep-card-name')?.innerText || 'Bệnh nhân';
+            var methodStr = method === 0 ? 'Tiền mặt' : 'Chuyển khoản (VietQR)';
+            var confirmMsg = `Xác nhận thu tạm ứng viện phí:\n` +
+                `- Người bệnh: ${patientName}\n` +
+                `- Số tiền thu: ${amount.toLocaleString('vi-VN')} đ\n` +
+                `- Người duyệt / BS chỉ định: ${approvedBy}\n` +
+                `- Hình thức: ${methodStr}\n` +
+                `- Mục đích: ${purpose || 'Tạm ứng viện phí'}\n\n` +
+                `Bấm OK để ghi sổ và in biên lai thu tiền tạm ứng.`;
+
+            if (!confirm(confirmMsg)) {
+                return;
+            }
+
+            var btnSubmit = document.getElementById('btn-submit-deposit');
+            if (btnSubmit) {
+                btnSubmit.disabled = true;
+                btnSubmit.innerText = '⏳ Đang ghi sổ...';
+            }
+
+            try {
+                var token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+                var res = await fetch('@Url.Action("CreateDeposit", "Cashier", new { area = "Staff" })', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': token || ''
+                    },
+                    body: JSON.stringify({
+                        patientId: patientId,
+                        appointmentId: appointmentId,
+                        amount: amount,
+                        method: method,
+                        purpose: purpose || 'Tạm ứng viện phí',
+                        approvedBy: approvedBy,
+                        referenceCode: ref || null,
+                        note: note || null,
+                        cashierAccountId: 0
+                    })
+                });
+
+                var data = await res.json();
+                if (res.ok && data.success) {
+                    var depositObj = data.deposit || {
+                        depositCode: (data.message && data.message.match(/TU-\d+/)) ? data.message.match(/TU-\d+/)[0] : 'TU-MỚI',
+                        patientName: patientName,
+                        patientCode: document.getElementById('dep-card-code')?.innerText || '',
+                        nationalId: document.getElementById('dep-card-cccd')?.innerText || '',
+                        phoneNumber: document.getElementById('dep-card-phone')?.innerText || '',
+                        appointmentCode: document.getElementById('dep-card-app-code')?.innerText || '',
+                        amount: amount,
+                        paymentMethod: method,
+                        referenceCode: ref || null,
+                        purpose: purpose || 'Tạm ứng viện phí',
+                        approvedBy: approvedBy,
+                        cashierName: '@(shift?.CashierName ?? "Thu ngân")',
+                        createdAt: new Date().toISOString()
+                    };
+
+                    alert('✓ ' + data.message + '\n\nHệ thống sẽ mở cửa sổ in biên lai thu tạm ứng cho người bệnh.');
+                    document.getElementById('modal-create-deposit').close();
+                    printDepositReceipt(depositObj);
+                    setTimeout(() => window.location.reload(), 800);
+                } else {
+                    alert('Lỗi: ' + (data.message || 'Không thể tạo phiếu tạm ứng.'));
+                    if (btnSubmit) {
+                        btnSubmit.disabled = false;
+                        btnSubmit.innerText = '✓ Xác nhận thu tạm ứng';
+                    }
+                }
+            } catch (err) {
+                alert('Lỗi kết nối: ' + err.message);
+                if (btnSubmit) {
+                    btnSubmit.disabled = false;
+                    btnSubmit.innerText = '✓ Xác nhận thu tạm ứng';
+                }
+            }
+        }
+    </script>
+}

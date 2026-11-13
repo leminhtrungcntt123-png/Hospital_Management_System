@@ -1,0 +1,189 @@
+@model IReadOnlyList<HIS.BLL.DTOs.LedgerItemDto>
+@{
+    Layout = "_StaffLayout";
+    ViewData["Title"] = "Sổ nhật ký thu ngân";
+    var filter = ViewBag.Filter as HIS.BLL.DTOs.LedgerFilterDto ?? new HIS.BLL.DTOs.LedgerFilterDto();
+
+    // Tiền mặt thực thu = Tiền mặt thu viện phí + Tiền mặt thu tạm ứng
+    decimal totalCash = Model.Where(p => p.PaymentMethod == HIS.Domain.PaymentMethod.Cash && (p.PaymentType == HIS.Domain.PaymentType.Payment || p.PaymentType == HIS.Domain.PaymentType.Deposit)).Sum(p => p.Amount);
+
+    // Tiền chuyển khoản thực nhận = CK thu viện phí + CK thu tạm ứng
+    decimal totalTransfer = Model.Where(p => p.PaymentMethod == HIS.Domain.PaymentMethod.BankTransfer && (p.PaymentType == HIS.Domain.PaymentType.Payment || p.PaymentType == HIS.Domain.PaymentType.Deposit)).Sum(p => p.Amount);
+
+    // Viện phí đã cấn trừ từ tạm ứng (đối trừ nội bộ không phát sinh dòng tiền mặt/CK mới tại quầy)
+    decimal totalDepositDeduct = Model.Where(p => p.PaymentMethod == HIS.Domain.PaymentMethod.DepositDeduction).Sum(p => p.Amount);
+
+    // Tiền hoàn trả cho người bệnh (hoàn số dư tạm ứng thừa hoặc hoàn viện phí)
+    decimal totalRefund = Model.Where(p => p.PaymentType == HIS.Domain.PaymentType.Refund).Sum(p => p.Amount);
+
+    // Thực thu ròng tại quỹ = (Tiền mặt + Chuyển khoản) - Hoàn trả
+    decimal netTotal = totalCash + totalTransfer - totalRefund;
+}
+
+<div class="reception-desk" style="padding: 24px; max-width: 1400px; margin: 0 auto;">
+    <header class="reception-heading" style="display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-bottom: 20px; border-bottom: 1px solid #e0e0e0; padding-bottom: 16px; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 320px;">
+            <span class="reception-eyebrow" style="font-size: 12px; font-weight: 700; color: #0288d1; text-transform: uppercase;">PHÒNG TÀI CHÍNH KẾ TOÁN</span>
+            <h1 style="font-size: 26px; font-weight: 800; margin: 4px 0; color: #1a237e;">Sổ nhật ký thu ngân &amp; đối chiếu</h1>
+            <p style="color: #616161; margin: 0; font-size: 13.5px;">Báo cáo danh sách mọi giao dịch thu tiền, tạm ứng, cấn trừ viện phí và chi hoàn theo thời gian thực.</p>
+        </div>
+
+        <div style="display: flex; gap: 10px; align-items: center; flex-shrink: 0; white-space: nowrap;">
+            <a class="btn primary" asp-action="LedgerExport"
+               asp-route-fromDate="@filter.FromDate" asp-route-toDate="@filter.ToDate" asp-route-method="@filter.Method" asp-route-type="@filter.Type"
+               style="text-decoration: none; padding: 10px 16px; font-size: 13px; font-weight: 600; white-space: nowrap;">
+                @await Html.PartialAsync("_AdminIcon", "download") Xuất file CSV
+            </a>
+            <a class="btn outline" asp-action="Ledger" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; padding: 10px 16px; font-size: 13px; font-weight: 600; white-space: nowrap;">
+                @await Html.PartialAsync("_AdminIcon", "refresh") Làm mới
+            </a>
+        </div>
+    </header>
+
+    <!-- Thống kê tổng quan 5 khối cân đối tài chính minh bạch -->
+    <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 24px;">
+        <div style="background: #ffffff; border: 1.5px solid #0284c7; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(2, 132, 199, 0.08);">
+            <div style="font-size: 11.5px; color: #0284c7; font-weight: 700; text-transform: uppercase;">Thực thu ròng</div>
+            <div style="font-size: 22px; font-weight: 900; color: #0284c7; margin-top: 4px;">@netTotal.ToString("N0") đ</div>
+            <div style="font-size: 11.5px; color: #64748b; margin-top: 2px;">(TM + CK - Hoàn trả)</div>
+        </div>
+
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
+            <div style="font-size: 11.5px; color: #64748b; font-weight: 700; text-transform: uppercase;">Thu tiền mặt</div>
+            <div style="font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 4px;">@totalCash.ToString("N0") đ</div>
+            <div style="font-size: 11.5px; color: #64748b; margin-top: 2px;">Tiền mặt tại quầy</div>
+        </div>
+
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
+            <div style="font-size: 11.5px; color: #64748b; font-weight: 700; text-transform: uppercase;">Thu chuyển khoản / QR</div>
+            <div style="font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 4px;">@totalTransfer.ToString("N0") đ</div>
+            <div style="font-size: 11.5px; color: #64748b; margin-top: 2px;">Qua ngân hàng VietQR</div>
+        </div>
+
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
+            <div style="font-size: 11.5px; color: #64748b; font-weight: 700; text-transform: uppercase;">Cấn trừ tạm ứng</div>
+            <div style="font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 4px;">@totalDepositDeduct.ToString("N0") đ</div>
+            <div style="font-size: 11.5px; color: #64748b; margin-top: 2px;">Đối trừ vào viện phí</div>
+        </div>
+
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
+            <div style="font-size: 11.5px; color: #64748b; font-weight: 700; text-transform: uppercase;">Hoàn trả người bệnh</div>
+            <div style="font-size: 22px; font-weight: 800; color: #b91c1c; margin-top: 4px;">@totalRefund.ToString("N0") đ</div>
+            <div style="font-size: 11.5px; color: #dc2626; margin-top: 2px;">Hoàn dư tạm ứng &amp; viện phí</div>
+        </div>
+    </div>
+
+    <!-- Bộ lọc -->
+    <form asp-action="Ledger" method="get" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 24px; display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap;">
+        <div>
+            <label style="font-size: 12px; font-weight: 700; display: block; margin-bottom: 4px; color: #334155;">Từ ngày:</label>
+            <input type="date" name="FromDate" value="@(filter.FromDate?.ToString("yyyy-MM-dd"))" class="form-control" style="padding: 7px 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px;" />
+        </div>
+
+        <div>
+            <label style="font-size: 12px; font-weight: 700; display: block; margin-bottom: 4px; color: #334155;">Đến ngày:</label>
+            <input type="date" name="ToDate" value="@(filter.ToDate?.ToString("yyyy-MM-dd"))" class="form-control" style="padding: 7px 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px;" />
+        </div>
+
+        <div>
+            <label style="font-size: 12px; font-weight: 700; display: block; margin-bottom: 4px; color: #334155;">Hình thức thanh toán:</label>
+            <select name="Method" class="form-control" style="padding: 7px 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px;">
+                <option value="">-- Tất cả hình thức --</option>
+                <option value="Cash" selected="@(filter.Method == HIS.Domain.PaymentMethod.Cash)">Tiền mặt</option>
+                <option value="BankTransfer" selected="@(filter.Method == HIS.Domain.PaymentMethod.BankTransfer)">Chuyển khoản (VietQR)</option>
+                <option value="DepositDeduction" selected="@(filter.Method == HIS.Domain.PaymentMethod.DepositDeduction)">Cấn trừ tạm ứng</option>
+            </select>
+        </div>
+
+        <div>
+            <label style="font-size: 12px; font-weight: 700; display: block; margin-bottom: 4px; color: #334155;">Loại giao dịch:</label>
+            <select name="Type" class="form-control" style="padding: 7px 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px;">
+                <option value="">-- Tất cả loại GD --</option>
+                <option value="Payment" selected="@(filter.Type == HIS.Domain.PaymentType.Payment)">Thu phí viện phí</option>
+                <option value="Deposit" selected="@(filter.Type == HIS.Domain.PaymentType.Deposit)">Thu tạm ứng</option>
+                <option value="Refund" selected="@(filter.Type == HIS.Domain.PaymentType.Refund)">Chi hoàn tiền</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn primary" style="padding: 8px 18px; font-size: 13px; font-weight: 700;">Lọc dữ liệu</button>
+        <a asp-action="Ledger" class="btn outline" style="padding: 8px 14px; font-size: 13px; text-decoration: none;">Đặt lại</a>
+    </form>
+
+    <!-- Bảng danh sách giao dịch -->
+    <div style="background: #ffffff; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <thead>
+                <tr style="background: #f8fafc; border-bottom: 1.5px solid #e2e8f0; text-align: left;">
+                    <th style="padding: 12px 14px; font-weight: 700; color: #334155;">Mã giao dịch</th>
+                    <th style="padding: 12px 14px; font-weight: 700; color: #334155;">Số hóa đơn / Phiếu</th>
+                    <th style="padding: 12px 14px; font-weight: 700; color: #334155;">Thời gian</th>
+                    <th style="padding: 12px 14px; font-weight: 700; color: #334155;">Mã hẹn / Người bệnh</th>
+                    <th style="padding: 12px 14px; text-align: right; font-weight: 700; color: #334155;">Số tiền</th>
+                    <th style="padding: 12px 14px; text-align: center; font-weight: 700; color: #334155;">Loại GD</th>
+                    <th style="padding: 12px 14px; text-align: center; font-weight: 700; color: #334155;">Hình thức</th>
+                    <th style="padding: 12px 14px; font-weight: 700; color: #334155;">Mã chuẩn chi</th>
+                    <th style="padding: 12px 14px; font-weight: 700; color: #334155;">Thu ngân</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Count == 0)
+                {
+                    <tr>
+                        <td colspan="9" style="text-align: center; padding: 48px 20px; color: #94a3b8;">
+                            Không có giao dịch nào phù hợp với bộ lọc.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var item in Model)
+                    {
+                        <tr style="border-bottom: 1px solid #f1f5f9;">
+                            <td style="padding: 12px 14px; font-family: monospace; font-weight: 700; color: #1e3a8a;">@item.TransactionCode</td>
+                            <td style="padding: 12px 14px; color: #0284c7; font-weight: 600; font-family: monospace;">@item.InvoiceNumber</td>
+                            <td style="padding: 12px 14px; color: #64748b;">@item.PaidAt.ToString("HH:mm:ss, dd/MM/yyyy")</td>
+                            <td style="padding: 12px 14px;">
+                                <span style="font-weight: 700; color: #0f172a;">@item.PatientName</span><br />
+                                <small style="color: #64748b;">Mã: @item.AppointmentCode</small>
+                            </td>
+                            <td style="padding: 12px 14px; text-align: right; font-weight: 800; font-family: monospace; color: @(item.PaymentType == HIS.Domain.PaymentType.Refund ? "#b91c1c" : (item.PaymentMethod == HIS.Domain.PaymentMethod.DepositDeduction ? "#0284c7" : "#0f172a"));">
+                                @(item.PaymentType == HIS.Domain.PaymentType.Refund ? "-" : "")@item.Amount.ToString("N0") đ
+                            </td>
+                            <td style="padding: 12px 14px; text-align: center;">
+                                @if (item.PaymentType == HIS.Domain.PaymentType.Payment)
+                                {
+                                    <span style="background: #ecfdf5; color: #047857; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; border: 1px solid #a7f3d0;">Thu phí</span>
+                                }
+                                else if (item.PaymentType == HIS.Domain.PaymentType.Deposit)
+                                {
+                                    <span style="background: #eff6ff; color: #1d4ed8; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; border: 1px solid #bfdbfe;">Tạm ứng</span>
+                                }
+                                else
+                            {
+                                    <span style="background: #fef2f2; color: #b91c1c; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; border: 1px solid #fecaca;">Hoàn tiền</span>
+                                }
+                            </td>
+                            <td style="padding: 12px 14px; text-align: center;">
+                                @if (item.PaymentMethod == HIS.Domain.PaymentMethod.Cash)
+                                {
+                                    <span style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 2px 6px; border-radius: 4px; font-size: 11.5px; font-weight: 600;">💵 Tiền mặt</span>
+                                }
+                                else if (item.PaymentMethod == HIS.Domain.PaymentMethod.BankTransfer)
+                                {
+                                    <span style="background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; padding: 2px 6px; border-radius: 4px; font-size: 11.5px; font-weight: 600;">📱 Chuyển khoản (VietQR)</span>
+                                }
+                                else
+                                {
+                                    <span style="background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; padding: 2px 6px; border-radius: 4px; font-size: 11.5px; font-weight: 700;">🔄 Cấn trừ tạm ứng</span>
+                                }
+                            </td>
+                            <td style="padding: 12px 14px; color: #64748b; font-family: monospace;">@(item.ReferenceCode ?? "—")</td>
+                            <td style="padding: 12px 14px; color: #334155;">@item.CashierName</td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
