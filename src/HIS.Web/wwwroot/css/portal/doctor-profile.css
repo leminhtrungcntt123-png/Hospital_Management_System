@@ -7,7 +7,7 @@
 }
 
 .doctor-meta-label small {
-    color: #647d8f;
+    color: #526d83;
     font-size: 10px;
     font-weight: 500;
 }
@@ -132,7 +132,7 @@
 
 .doctor-profile-summary .doctor-profile-note,
 .doctor-profile-note {
-    color: #657e90;
+    color: #4b6579;
     font-size: 12px;
     line-height: 1.75;
 }
@@ -206,8 +206,8 @@
 }
 
 .doctor-career-section summary .career-sample-label {
-    background: #ffffff20;
-    color: #fff;
+    background: #e4f4fa;
+    color: #154b63;
 }
 
 .doctor-career-section summary:focus-visible {

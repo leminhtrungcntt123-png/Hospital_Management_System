@@ -52,7 +52,7 @@ public static class GuestBookingScenario
             Room = new ClinicRoom
             {
                 Department = department,
-                RoomName = "Test room",
+                RoomName = d.FullName + " room",
                 RoomNumber = d.FullName.Replace(" ", "")
             },
             WorkDate = new DateOnly(2026, 11, 12),
