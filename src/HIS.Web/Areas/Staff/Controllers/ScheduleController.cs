@@ -36,6 +36,11 @@ public class ScheduleController : Controller
         var departmentId = await _departmentHeadService.ResolveDepartmentIdByAccountIdAsync(accountId, ct);
 
         var activeTab = string.IsNullOrWhiteSpace(tab) ? "schedule" : tab.ToLowerInvariant();
+        // Ma trận duyệt pick ca chỉ dành cho trưởng khoa (API GetDecisionMatrix bị chặn với vai trò khác)
+        if (activeTab == "bidding" && !User.IsInRole("DEPARTMENT_HEAD"))
+        {
+            activeTab = "schedule";
+        }
 
         var today = DateOnly.FromDateTime(DateTime.Today);
         int daysSinceMonday = ((int)today.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
