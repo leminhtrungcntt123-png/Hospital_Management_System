@@ -131,8 +131,11 @@ public class ScheduleController : Controller
             ? await _departmentHeadService.GetPatientsAsync(departmentId, ct)
             : (IReadOnlyList<DepartmentPatientListItemDto>)[];
 
-        var headDoctor = doctors.FirstOrDefault(d => d.AccountId == accountId)
-            ?? doctors.FirstOrDefault(d => d.Specialty.Contains("chuyên sâu") || d.FullName.Contains("Hằng"));
+        var headDoctor = doctors.FirstOrDefault(d => d.AccountId == accountId);
+        if (headDoctor == null && activeTab == "my-schedule")
+        {
+            ViewBag.UnlinkedAccountMessage = "Tài khoản hiện tại chưa được liên kết với hồ sơ bác sĩ trong khoa. Vui lòng liên hệ Quản trị viên để gán tài khoản với hồ sơ Bác sĩ.";
+        }
 
         var vm = new ScheduleViewModel
         {
@@ -429,7 +432,7 @@ public class ScheduleController : Controller
     [HttpPost]
     [Authorize(Policy = "DepartmentHeadOnly")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ApproveShift(int scheduleId, int roomId, CancellationToken ct)
+    public async Task<IActionResult> ApproveShift(int scheduleId, int roomId, string? tab, DateOnly? date, string? shift, CancellationToken ct)
     {
         var currentAccountId = GetCurrentAccountId();
         var request = new ApproveShiftRequest(scheduleId, roomId, currentAccountId);
@@ -444,14 +447,19 @@ public class ScheduleController : Controller
             TempData["SuccessMessage"] = "Đã phê duyệt ca khám và phân công phòng thành công.";
         }
 
-        return RedirectToAction(nameof(Index), new { tab = "schedule" });
+        return RedirectToAction(nameof(Index), new
+        {
+            tab = string.IsNullOrWhiteSpace(tab) ? "bidding" : tab,
+            date = date?.ToString("yyyy-MM-dd"),
+            shift = shift
+        });
     }
 
     // Trưởng khoa điều chuyển ca trượt sang ca mới
     [HttpPost]
     [Authorize(Policy = "DepartmentHeadOnly")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ReallocateShift(int oldScheduleId, DateOnly targetDate, ExamShift targetShift, int targetRoomId, CancellationToken ct)
+    public async Task<IActionResult> ReallocateShift(int oldScheduleId, DateOnly targetDate, ExamShift targetShift, int targetRoomId, string? tab, DateOnly? date, string? shift, CancellationToken ct)
     {
         var currentAccountId = GetCurrentAccountId();
         var request = new ReallocateShiftRequest(oldScheduleId, targetDate, targetShift, targetRoomId, currentAccountId);
@@ -466,14 +474,19 @@ public class ScheduleController : Controller
             TempData["SuccessMessage"] = $"Đã điều chuyển bác sĩ sang ca ngày {targetDate:dd/MM/yyyy} ({targetShift}) thành công!";
         }
 
-        return RedirectToAction(nameof(Index), new { tab = "schedule" });
+        return RedirectToAction(nameof(Index), new
+        {
+            tab = string.IsNullOrWhiteSpace(tab) ? "bidding" : tab,
+            date = date?.ToString("yyyy-MM-dd"),
+            shift = shift
+        });
     }
 
     // Trưởng khoa xuất bản toàn bộ lịch kỳ (PUBLISHED -> Sinh appointment_slots hàng loạt)
     [HttpPost]
     [Authorize(Policy = "DepartmentHeadOnly")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> PublishPeriod(int periodId, CancellationToken ct)
+    public async Task<IActionResult> PublishPeriod(int periodId, string? tab, CancellationToken ct)
     {
         var currentAccountId = GetCurrentAccountId();
         var result = await _departmentHeadService.PublishSchedulingPeriodAsync(periodId, currentAccountId, ct);
@@ -487,7 +500,7 @@ public class ScheduleController : Controller
             TempData["SuccessMessage"] = $"Đã xuất bản lịch làm việc thành công! Hệ thống đã tạo {result.Value} slots khám trực tuyến.";
         }
 
-        return RedirectToAction(nameof(Index), new { tab = "schedule" });
+        return RedirectToAction(nameof(Index), new { tab = string.IsNullOrWhiteSpace(tab) ? "bidding" : tab });
     }
 
     // Lấy thông tin cảnh báo ảnh hưởng lịch hẹn trước khi hủy ca
