@@ -12,17 +12,7 @@ namespace HIS.Tests.Unit;
 
 public class CashierShiftTests
 {
-    private const string ConnectionString = "Host=localhost;Port=5432;Database=his_db;Username=postgres;Password=123456789";
-
-    private static AppDbContext CreateDb()
-    {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseNpgsql(ConnectionString)
-            .UseSnakeCaseNamingConvention()
-            .Options;
-
-        return new AppDbContext(options, new VietnamTimeProvider());
-    }
+    private static AppDbContext CreateDb() => CashierTestDatabase.CreateDbAsync().GetAwaiter().GetResult();
 
     [Fact]
     public async Task OpenAndCloseShift_Workflow_WorksAsExpected()

@@ -17,7 +17,10 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
 
         builder.HasKey(e => e.Id);
 
-        builder.Property(e => e.InvoiceNumber).HasMaxLength(20).IsRequired();
+        builder.Property(e => e.InvoiceNumber)
+            .HasMaxLength(20)
+            .HasDefaultValueSql("'HD-' || substr(md5(random()::text || clock_timestamp()::text), 1, 10)")
+            .IsRequired();
         builder.HasIndex(e => e.InvoiceNumber).IsUnique();
         builder.Property(e => e.ExamDate);
 

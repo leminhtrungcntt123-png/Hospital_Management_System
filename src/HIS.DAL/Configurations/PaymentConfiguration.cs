@@ -18,10 +18,16 @@ public class PaymentConfiguration : IEntityTypeConfiguration<Payment>
 
         builder.HasKey(e => e.Id);
 
-        builder.Property(e => e.TransactionCode).HasMaxLength(30).IsRequired();
+        builder.Property(e => e.TransactionCode)
+            .HasMaxLength(30)
+            .HasDefaultValueSql("'PT-' || substr(md5(random()::text || clock_timestamp()::text), 1, 10)")
+            .IsRequired();
         builder.HasIndex(e => e.TransactionCode).IsUnique();
         builder.Property(e => e.ReferenceCode).HasMaxLength(100);
-        builder.Property(e => e.Status).HasConversion<UpperSnakeCaseEnumConverter<PaymentStatus>>().HasMaxLength(20);
+        builder.Property(e => e.Status)
+            .HasConversion<UpperSnakeCaseEnumConverter<PaymentStatus>>()
+            .HasMaxLength(20)
+            .HasDefaultValue(PaymentStatus.Confirmed);
         builder.Property(e => e.IdempotencyKey).HasMaxLength(100);
         builder.HasIndex(e => e.IdempotencyKey).IsUnique().HasFilter("idempotency_key IS NOT NULL");
 

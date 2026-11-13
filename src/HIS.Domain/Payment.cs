@@ -14,7 +14,7 @@ public class Payment
     public string? Note { get; set; }
     public string? RefundReason { get; set; }
     /// <summary>Mã giao dịch nội bộ dạng PT-00000001, sinh bằng sequence DB.</summary>
-    public string TransactionCode { get; set; } = null!;
+    public string TransactionCode { get; set; } = $"PT-{Guid.NewGuid().ToString("N")[..10].ToUpperInvariant()}";
     /// <summary>Mã giao dịch ngân hàng (bắt buộc khi chuyển khoản).</summary>
     public string? ReferenceCode { get; set; }
     public PaymentStatus Status { get; set; } = PaymentStatus.Confirmed;

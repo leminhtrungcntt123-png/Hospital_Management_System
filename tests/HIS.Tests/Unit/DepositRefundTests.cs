@@ -12,17 +12,7 @@ namespace HIS.Tests.Unit;
 
 public class DepositRefundTests
 {
-    private const string ConnectionString = "Host=localhost;Port=5432;Database=his_db;Username=postgres;Password=123456789";
-
-    private static AppDbContext CreateDb()
-    {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseNpgsql(ConnectionString)
-            .UseSnakeCaseNamingConvention()
-            .Options;
-
-        return new AppDbContext(options, new VietnamTimeProvider());
-    }
+    private static AppDbContext CreateDb() => CashierTestDatabase.CreateDbAsync().GetAwaiter().GetResult();
 
     private static IBillingService CreateBillingService(AppDbContext db)
     {
