@@ -26,44 +26,89 @@ function specialtiesPage() {
                         .join('')}</div>`
                   : empty('Chưa có thông tin chuyên khoa')
         }
-        </section>`;
+        </section>${specialtyIntroductionSection()}`;
 }
 
 function doctorsPage() {
-    const doctors = catalog.doctors.filter(
-        (doctor) =>
-            matched(doctor.name + ' ' + doctor.specialty) &&
-            (!ui.department || doctor.department === ui.department),
-    );
-    return `${pageIntro('ĐỘI NGŨ CHUYÊN MÔN', 'Bác sĩ của bạn', 'Thông tin chuyên môn được cung cấp bởi bệnh viện.')}
+    const departments = [
+        ...new Set([
+            ...catalog.departments.map((department) => department.name),
+            ...doctorIntroductions.map((doctor) => doctor.department),
+        ]),
+    ];
+    return `${pageIntro('ĐỘI NGŨ CHUYÊN MÔN', 'Bác sĩ của bạn', 'Tra cứu bác sĩ trong hệ thống và các hồ sơ giới thiệu có nhãn minh hoạ.')}
         <section class="listing-section"><div class="listing-toolbar">
             <label class="search-input">${icon('search')}<input data-search value="${esc(ui.query)}" placeholder="Tìm bác sĩ hoặc chuyên khoa…" aria-label="Tìm bác sĩ hoặc chuyên khoa" /></label>
             <select data-department aria-label="Lọc khoa bác sĩ"><option value="">Tất cả khoa</option>
-                ${catalog.departments.map((department) => `<option value="${esc(department.name)}" ${ui.department === department.name ? 'selected' : ''}>${esc(department.name)}</option>`).join('')}
+                ${departments.map((department) => `<option value="${esc(department)}" ${ui.department === department ? 'selected' : ''}>${esc(department)}</option>`).join('')}
             </select>
-        </div>${
-            catalog.status !== 'ready'
-                ? catalogStatus()
-                : doctors.length
-                  ? `<div class="doctor-grid">${doctors.map(doctorCard).join('')}</div>`
-                  : empty('Không tìm thấy bác sĩ', 'Thử đổi khoa hoặc từ khóa tìm kiếm.')
+        </div>${doctorList()}</section>`;
+}
+
+function doctorList(route = 'public/doctors') {
+    const matchesDoctor = (doctor) =>
+        matched(doctor.name + ' ' + doctor.specialty + ' ' + doctor.department) &&
+        (!ui.department || doctor.department === ui.department);
+    const doctors = catalog.doctors.filter(matchesDoctor);
+    const introductions = doctorIntroductions.filter(matchesDoctor);
+    const results = ['idle', 'loading'].includes(catalog.status)
+        ? []
+        : [...doctors, ...introductions];
+    const pageCount = Math.max(1, Math.ceil(results.length / 4));
+    const page = Math.max(1, Math.min(ui.doctorPage, pageCount));
+    const start = (page - 1) * 4;
+    const visibleDoctors = results.slice(start, start + 4);
+    return `<div class="doctor-list">
+        ${catalog.status !== 'ready' ? catalogStatus() : ''}
+        ${
+            results.length
+                ? `<div class="catalog-results-meta"><p>Hiển thị <strong>${start + 1}–${Math.min(start + 4, results.length)}</strong> trên <strong>${results.length}</strong> hồ sơ</p>
+                <span>${doctors.length} trong hệ thống · ${introductions.length} minh hoạ</span></div>
+                ${visibleDoctors.some((doctor) => doctor.kind === 'illustration') ? introductionNotice() : ''}
+                <div class="doctor-grid">${visibleDoctors.map(doctorCard).join('')}</div>
+                ${doctorPagination(page, pageCount, route)}`
+                : catalog.status === 'ready'
+                  ? empty('Không tìm thấy bác sĩ', 'Thử đổi khoa hoặc từ khóa tìm kiếm.')
+                  : ''
         }
-        </section>`;
+        </div>`;
+}
+
+function doctorPagination(page, pageCount, listRoute = 'public/doctors') {
+    if (pageCount < 2) return '';
+    const pageLink = (number, label, content, classes = '') => {
+        const filters = new URLSearchParams({
+            q: ui.query,
+            department: ui.department,
+            page: number,
+        });
+        const route = listRoute + '?' + filters.toString();
+        return `<a class="catalog-page-link ${classes}" href="${esc(routeUrl(route))}" data-route="${esc(route)}"
+            aria-label="${esc(label)}" ${number === page ? 'aria-current="page"' : ''}>${content}</a>`;
+    };
+    return `<nav class="catalog-pagination" aria-label="Phân trang danh sách bác sĩ">
+        ${
+            page > 1
+                ? pageLink(page - 1, 'Trang trước', icon('chevron'), 'previous')
+                : `<span class="catalog-page-link previous" role="link" aria-label="Trang trước" aria-disabled="true">${icon('chevron')}</span>`
+        }
+        ${Array.from({ length: pageCount }, (_, index) => index + 1)
+            .map((number) => pageLink(number, 'Trang ' + number, number))
+            .join('')}
+        ${
+            page < pageCount
+                ? pageLink(page + 1, 'Trang sau', icon('chevron'))
+                : `<span class="catalog-page-link" role="link" aria-label="Trang sau" aria-disabled="true">${icon('chevron')}</span>`
+        }
+    </nav>`;
 }
 
 function doctorDetail(id) {
-    if (catalog.status !== 'ready') return catalogStatus();
-    const doctor = catalog.doctors.find((item) => String(item.id) === id);
+    const introduction = doctorIntroductions.find((item) => item.id === id);
+    if (!introduction && catalog.status !== 'ready') return catalogStatus();
+    const doctor = introduction || catalog.doctors.find((item) => String(item.id) === id);
     if (!doctor) return empty('Không tìm thấy thông tin bác sĩ');
-    return `${pageIntro(doctor.specialty, doctor.name, doctor.department)}
-        <section class="detail-layout"><article class="card doctor-bio">
-            <div class="doctor-bio-top">${doctorPhoto()}
-                <div><h2>${esc(doctor.name)}</h2><p>${esc(doctor.specialty)}</p><p>${esc(doctor.department)}</p></div>
-            </div>
-            <h2>Chuẩn bị trước buổi khám</h2><ul class="content-list"><li>Mang giấy tờ của người khám.</li><li>Chuẩn bị kết quả khám trước đây nếu có.</li></ul>
-        </article><aside class="card sticky-card"><h2>Lịch khám</h2><p>Tra cứu lịch trong mục đặt lịch khám.</p>
-            ${!config.authenticated || config.role === 'PATIENT' ? link('Chọn bác sĩ này', 'public/booking?doctorId=' + encodeURIComponent(doctor.id), 'calendar', 'btn primary full') : `<a class="btn primary full" href="${esc(config.home)}">Về bàn làm việc</a>`}
-        </aside></section>`;
+    return doctorProfile(doctor, Boolean(introduction));
 }
 
 function servicesPage() {

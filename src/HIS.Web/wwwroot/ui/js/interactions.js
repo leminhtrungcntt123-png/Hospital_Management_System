@@ -101,6 +101,7 @@ function bindEvents() {
         if (!event.target.matches('[data-search]')) return;
         const cursor = event.target.selectionStart;
         ui.query = event.target.value;
+        ui.doctorPage = 1;
         render();
         const input = $('[data-search]');
         input?.focus();
@@ -117,6 +118,7 @@ function bindEvents() {
         }
         if (!event.target.matches('[data-department]')) return;
         ui.department = event.target.value;
+        ui.doctorPage = 1;
         render();
     });
     document.addEventListener('keydown', (event) => {

@@ -1,0 +1,247 @@
+@model HIS.BLL.DTOs.InvoiceDetailDto
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <title>Biên lai thu tiền viện phí - @Model.InvoiceNumber</title>
+    <style>
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 14px;
+            line-height: 1.4;
+            color: #000;
+            background: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+        }
+        .receipt-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px 40px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .hospital-info {
+            font-size: 13px;
+        }
+        .hospital-name {
+            font-weight: bold;
+            font-size: 15px;
+            text-transform: uppercase;
+        }
+        .invoice-title {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .invoice-title h1 {
+            margin: 0;
+            font-size: 20px;
+            text-transform: uppercase;
+        }
+        .invoice-title p {
+            margin: 4px 0 0;
+            font-style: italic;
+            font-size: 13px;
+        }
+        .patient-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px 20px;
+            margin-bottom: 15px;
+        }
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+        .items-table th, .items-table td {
+            border: 1px solid #333;
+            padding: 6px 8px;
+            font-size: 13px;
+        }
+        .items-table th {
+            background-color: #f2f2f2;
+            text-align: center;
+            font-weight: bold;
+        }
+        .text-end { text-align: right; }
+        .text-center { text-align: center; }
+        .summary-box {
+            margin-top: 10px;
+            border-top: 1px solid #333;
+            padding-top: 10px;
+        }
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+        .signatures {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 40px;
+            text-align: center;
+        }
+        .sign-title { font-weight: bold; margin-bottom: 60px; }
+        .no-print {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .btn-print {
+            background: #0288d1;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        @@media print {
+            body { background: #fff; padding: 0; }
+            .receipt-container { box-shadow: none; padding: 0; }
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <button class="btn-print" onclick="window.print()">🖨 IN PHIẾU THU</button>
+        <button class="btn-print" style="background:#757575; margin-left: 10px;" onclick="window.close()">Đóng</button>
+    </div>
+
+    <div class="receipt-container">
+        <div class="header">
+            <div class="hospital-info">
+                <div>SỞ Y TẾ TP. HỒ CHÍ MINH</div>
+                <div class="hospital-name">BỆNH VIỆN ĐA KHOA MEDICARE</div>
+                <div>Địa chỉ: 456 Đường Nguyễn Trãi, Quận 5, TP.HCM</div>
+                <div>Hotline: 1900 8888</div>
+            </div>
+            <div style="text-align: right; font-size: 13px;">
+                <div><strong>Số HĐ:</strong> @Model.InvoiceNumber</div>
+                <div><strong>Mã GD:</strong> @(Model.TransactionCode ?? "—")</div>
+                <div><strong>Mã hẹn:</strong> @Model.AppointmentCode</div>
+                <div><strong>Mã BN:</strong> @Model.PatientCode</div>
+            </div>
+        </div>
+
+        <div class="invoice-title">
+            <h1>BIÊN LAI THU VIỆN PHÍ</h1>
+            <p>Liên 2: Giao cho người bệnh · Ngày thu: @(Model.PaidAt?.ToString("dd/MM/yyyy HH:mm") ?? "Chưa thanh toán")</p>
+        </div>
+
+        <div class="patient-info">
+            <div>Họ và tên người bệnh: <strong>@Model.PatientName</strong></div>
+            <div>Giới tính: @Model.Gender · Năm sinh: @Model.DateOfBirth.Year (@Model.Age tuổi)</div>
+            <div>Số điện thoại: @Model.PatientPhone</div>
+            <div>Bác sĩ khám: @Model.DoctorName (@Model.DepartmentName)</div>
+            <div style="grid-column: span 2;">
+                Thẻ BHYT: <strong>@(Model.HasInsurance ? Model.InsuranceCardNumber : "Không áp dụng")</strong>
+                @if (Model.HasInsurance)
+                {
+                    <span> · Mức hưởng: <strong>@Model.CoveragePct.ToString("0.##")%</strong> · Nơi ĐK KCB: @(Model.RegisteredFacility ?? "Bệnh viện Đa khoa MediCare")</span>
+                }
+            </div>
+        </div>
+
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th style="width: 35px;">STT</th>
+                    <th>Nội dung chi phí / Dịch vụ</th>
+                    <th style="width: 40px;">SL</th>
+                    <th style="width: 85px;">Đơn giá</th>
+                    <th style="width: 95px;">Thành tiền</th>
+                    <th style="width: 60px;">% BHYT</th>
+                    <th style="width: 95px;">BHYT trả</th>
+                    <th style="width: 100px;">BN cùng trả</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model.Items)
+                {
+                    <tr>
+                        <td class="text-center">@item.Id</td>
+                        <td>
+                            <strong>[@item.Category]</strong> @item.Description
+                        </td>
+                        <td class="text-center">@item.Quantity</td>
+                        <td class="text-end">@item.UnitPrice.ToString("N0")</td>
+                        <td class="text-end">@item.Total.ToString("N0")</td>
+                        <td class="text-center">@(item.CoveragePctApplied > 0 ? $"{item.CoveragePctApplied:0.##}%" : "0%")</td>
+                        <td class="text-end">@item.CoveredAmount.ToString("N0")</td>
+                        <td class="text-end font-monospace"><strong>@item.PatientAmount.ToString("N0")</strong></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <div class="summary-box">
+            <div class="summary-row">
+                <span>Tổng chi phí khám &amp; điều trị:</span>
+                <strong>@Model.TotalAmount.ToString("N0") đ</strong>
+            </div>
+            <div class="summary-row" style="color: #2e7d32;">
+                <span>Quỹ Bảo hiểm Y tế chi trả:</span>
+                <strong>- @Model.InsuranceCoveredAmount.ToString("N0") đ</strong>
+            </div>
+            <div class="summary-row" style="font-size: 16px; margin-top: 6px; padding-top: 6px; border-top: 1px dashed #333;">
+                <span><strong>VIỆN PHÍ NGƯỜI BỆNH CÙNG CHI TRẢ:</strong></span>
+                <strong style="font-size: 18px;">@Model.PatientAmount.ToString("N0") VNĐ</strong>
+            </div>
+            @if (Model.DepositDeducted > 0 || Model.RefundedAmount > 0)
+            {
+                <div class="summary-row" style="margin-top: 4px;">
+                    <span>Tiền tạm ứng đã nộp:</span>
+                    <strong>@((Model.DepositDeducted + Model.RefundedAmount).ToString("N0")) đ</strong>
+                </div>
+                <div class="summary-row">
+                    <span>Đã cấn trừ thanh toán viện phí:</span>
+                    <strong>@Model.DepositDeducted.ToString("N0") đ</strong>
+                </div>
+                @if (Model.RefundedAmount > 0)
+                {
+                    <div class="summary-row" style="font-weight: bold;">
+                        <span>SỐ TIỀN BỆNH VIỆN HOÀN TRẢ NGƯỜI BỆNH:</span>
+                        <strong>@Model.RefundedAmount.ToString("N0") VNĐ</strong>
+                    </div>
+                }
+                else if (Model.AdditionalPaid > 0)
+                {
+                    <div class="summary-row" style="font-weight: bold;">
+                        <span>SỐ TIỀN NGƯỜI BỆNH NỘP THÊM:</span>
+                        <strong>@Model.AdditionalPaid.ToString("N0") VNĐ</strong>
+                    </div>
+                }
+            }
+            <div style="margin-top: 4px; font-style: italic; font-size: 13px;">
+                Hình thức thanh toán: @(Model.PaymentMethod ?? "Tiền mặt") · Thu ngân phụ trách: @(Model.CashierName ?? "Hệ thống")
+            </div>
+        </div>
+
+        <div class="signatures">
+            <div>
+                <div class="sign-title">NGƯỜI NỘP TIỀN</div>
+                <div>(Ký và ghi rõ họ tên)</div>
+            </div>
+            <div>
+                <div><em>Ngày @DateTime.Now.Day tháng @DateTime.Now.Month năm @DateTime.Now.Year</em></div>
+                <div class="sign-title">NGƯỜI THU TIỀN</div>
+                <div>@(Model.CashierName ?? "Thu ngân")</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

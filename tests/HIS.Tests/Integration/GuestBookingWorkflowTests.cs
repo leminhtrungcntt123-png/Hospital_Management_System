@@ -41,15 +41,15 @@ public static class GuestBookingScenario
         await using var db = new AppDbContext(config, clock);
         await db.Database.EnsureCreatedAsync();
         var department = new Department { Name = "Guest booking test department" };
-        var room = new ClinicRoom { Department = department, RoomName = "Test room", RoomNumber = "TEST01" };
+        ClinicRoom Room(string num) => new() { Department = department, RoomName = "Test room " + num, RoomNumber = num };
         Doctor Doctor(string name) => new() { Department = department, FullName = name, Account = new Account { Username = name.Replace(" ", "_"), PasswordHash = "test-only", RoleId = 3, IsActive = true } };
         var doctor = Doctor("Test Doctor");
         var raceDoctor = Doctor("Test Race Doctor");
         var httpDoctor = Doctor("Test HTTP Doctor");
-        DoctorSchedule Schedule(Doctor d, int quota) => new() { Doctor = d, Room = room, DayOfWeek = DayOfWeek.Thursday, Shift = ExamShift.Morning, StartTime = new TimeOnly(7, 30), EndTime = new TimeOnly(8, 30), SlotDurationMinutes = 15, OnlineSlots = quota, MaxPatients = 4, IsActive = true, EffectiveFrom = new DateOnly(2026, 1, 1) };
-        var schedule = Schedule(doctor, 2);
-        var raceSchedule = Schedule(raceDoctor, 1);
-        var httpSchedule = Schedule(httpDoctor, 2);
+        DoctorSchedule Schedule(Doctor d, ClinicRoom r, int quota) => new() { Doctor = d, Department = department, Room = r, WorkDate = new DateOnly(2026, 11, 12), Status = DoctorScheduleStatus.Approved, Shift = ExamShift.Morning, StartTime = new TimeOnly(7, 30), EndTime = new TimeOnly(8, 30), SlotDurationMinutes = 15, OnlineSlots = quota, MaxPatients = 4 };
+        var schedule = Schedule(doctor, Room("TEST01"), 2);
+        var raceSchedule = Schedule(raceDoctor, Room("TEST02"), 1);
+        var httpSchedule = Schedule(httpDoctor, Room("TEST03"), 2);
         var nurseAccount = new Account { Username = "test_guest_nurse", PasswordHash = "test-only", RoleId = 4, IsActive = true };
         db.AddRange(schedule, raceSchedule, httpSchedule, new Nurse { Account = nurseAccount, Department = department, FullName = "Test Nurse" });
         await db.SaveChangesAsync();
@@ -95,7 +95,7 @@ public static class GuestBookingScenario
         Assert.Empty((await service.GetSlotsAsync(raceDoctor.Id, date)).Value!);
 
         var sharedDoctor = Doctor("Test Shared Slot Doctor");
-        var sharedSchedule = Schedule(sharedDoctor, 4);
+        var sharedSchedule = Schedule(sharedDoctor, Room("TEST04"), 4);
         sharedSchedule.SlotDurationMinutes = 30;
         db.Add(sharedSchedule);
         await db.SaveChangesAsync();

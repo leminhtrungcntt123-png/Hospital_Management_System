@@ -9,6 +9,9 @@ public interface IDoctorService
     // Lấy danh sách bác sĩ
     Task<IReadOnlyList<DoctorListItemDto>> GetDoctorsAsync(CancellationToken cancellationToken = default);
 
+    // Lấy danh sách bác sĩ hiển thị trang chủ (Public Showcase)
+    Task<IReadOnlyList<DoctorPublicDto>> GetPublicFeaturedDoctorsAsync(int count = 8, CancellationToken cancellationToken = default);
+
     // Lấy danh sách bệnh nhân chờ khám theo bác sĩ và ca khám
     Task<IReadOnlyList<QueuePatientDto>> GetQueuePatientsAsync(int doctorId, DateOnly date, ExamShift shift, CancellationToken cancellationToken = default);
 

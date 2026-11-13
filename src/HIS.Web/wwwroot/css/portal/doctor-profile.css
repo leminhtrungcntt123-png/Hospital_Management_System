@@ -1,0 +1,280 @@
+.doctor-meta-label {
+    display: block;
+    margin-bottom: 2px;
+    color: #294c63;
+    font-size: 11px;
+    font-weight: 650;
+}
+
+.doctor-meta-label small {
+    color: #526d83;
+    font-size: 10px;
+    font-weight: 500;
+}
+
+.doctor-profile-page {
+    max-width: 1100px;
+    margin: 24px auto 48px;
+}
+
+.doctor-profile-breadcrumb {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 18px;
+    color: #587083;
+    font-size: 11px;
+}
+
+.doctor-profile-breadcrumb a {
+    color: #007d9f;
+}
+
+.doctor-profile-breadcrumb .icon {
+    width: 12px;
+    height: 12px;
+}
+
+.doctor-profile-layout {
+    display: grid;
+    grid-template-columns: 36% minmax(0, 1fr);
+    align-items: stretch;
+    border: 1px solid #e1eaf0;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+}
+
+.doctor-profile-summary,
+.doctor-profile-content {
+    padding: 24px;
+    min-width: 0;
+}
+
+.doctor-profile-summary {
+    border-right: 1px solid #e1eaf0;
+    background: #f8fafb;
+}
+
+.doctor-profile-identity {
+    display: grid;
+    grid-template-columns: 112px minmax(0, 1fr);
+    align-items: center;
+    gap: 16px;
+}
+
+.doctor-profile-summary .doctor-photo {
+    width: 112px;
+    height: 148px;
+    margin: 0;
+    overflow: hidden;
+    border-radius: 4px;
+}
+
+.doctor-profile-identity h1 {
+    margin: 6px 0 12px;
+    color: #007590;
+    font-size: 19px;
+    line-height: 1.45;
+}
+
+.doctor-profile-summary p {
+    margin-bottom: 10px;
+    color: #4e6a7f;
+    font-size: 13px;
+    line-height: 1.8;
+}
+
+.doctor-profile-summary .doctor-profile-degree {
+    margin: 0;
+    color: #325a72;
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+.hospital-portal .doctor-profile-booking {
+    max-width: 100%;
+    min-height: 36px;
+    padding: 8px 12px;
+    gap: 6px;
+    border: 0;
+    border-radius: 24px;
+    background: #147d65;
+    color: #fff;
+    font-size: 12px;
+    white-space: normal;
+}
+
+.hospital-portal .doctor-profile-booking:hover {
+    background: #116f59;
+}
+
+.hospital-portal .doctor-profile-booking:disabled {
+    background: #e2ece9;
+    color: #4c7066;
+    cursor: not-allowed;
+    opacity: 1;
+}
+
+.doctor-profile-summary > .text-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.doctor-profile-summary h2 {
+    margin: 22px 0 10px;
+    color: #007590;
+    font-size: 16px;
+}
+
+.doctor-profile-summary .doctor-profile-note,
+.doctor-profile-note {
+    color: #4b6579;
+    font-size: 12px;
+    line-height: 1.75;
+}
+
+.doctor-profile-facts {
+    margin: 0;
+    font-size: 13px;
+}
+
+.doctor-profile-facts > div {
+    padding: 14px 0;
+    border-bottom: 1px solid #e0eaf0;
+}
+
+.doctor-profile-facts > div:first-child {
+    padding-top: 0;
+}
+
+.doctor-profile-facts dt {
+    margin-bottom: 6px;
+    color: #007590;
+    font-size: 14px;
+    font-weight: 650;
+}
+
+.doctor-profile-facts dd {
+    margin: 0;
+    color: #4b687d;
+    line-height: 1.8;
+}
+
+.career-sample-label {
+    display: inline-block;
+    padding: 3px 6px;
+    border-radius: 4px;
+    background: #e9f0f7;
+    color: #526d83;
+    font-size: 10px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.doctor-career-section {
+    margin-top: 24px;
+    overflow: hidden;
+    border: 1px solid #d4e5ed;
+    border-radius: 4px;
+}
+
+.doctor-career-section summary {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 13px 16px;
+    background: #007d9f;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 650;
+    list-style: none;
+    cursor: pointer;
+}
+
+.doctor-career-section summary::-webkit-details-marker {
+    display: none;
+}
+
+.doctor-career-section summary > .icon {
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+.doctor-career-section summary .career-sample-label {
+    background: #e4f4fa;
+    color: #154b63;
+}
+
+.doctor-career-section summary:focus-visible {
+    outline: 3px solid #76d3e7;
+    outline-offset: -3px;
+}
+
+.doctor-career-section[open] summary > .icon {
+    transform: rotate(180deg);
+}
+
+.doctor-career-list {
+    margin: 18px 20px;
+    padding-left: 16px;
+    list-style: disc;
+    color: #007d9f;
+}
+
+.doctor-career-list li {
+    padding: 0 0 16px 4px;
+}
+
+.doctor-career-list li:last-child {
+    padding-bottom: 0;
+}
+
+.doctor-career-list h3 {
+    margin-bottom: 6px;
+    color: #294f68;
+    font-size: 13px;
+}
+
+.doctor-career-list p {
+    color: #526d80;
+    font-size: 13px;
+    line-height: 1.8;
+}
+
+.doctor-career-body > .doctor-profile-note {
+    margin: 0;
+    padding: 18px 20px;
+}
+
+@media (max-width: 800px) {
+    .doctor-profile-layout {
+        grid-template-columns: 1fr;
+    }
+    .doctor-profile-summary {
+        border-right: 0;
+        border-bottom: 1px solid #e1eaf0;
+    }
+}
+
+@media (max-width: 600px) {
+    .doctor-profile-summary,
+    .doctor-profile-content {
+        padding: 20px;
+    }
+    .doctor-profile-identity {
+        grid-template-columns: 96px minmax(0, 1fr);
+        gap: 14px;
+    }
+    .doctor-profile-summary .doctor-photo {
+        width: 96px;
+        height: 128px;
+    }
+    .doctor-profile-identity h1 {
+        font-size: 18px;
+    }
+}

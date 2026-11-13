@@ -92,12 +92,13 @@ public static class AdminWorkflowScenario
             db.DoctorSchedules.Add(new DoctorSchedule
             {
                 Doctor = person,
+                Department = department,
                 Room = clinic,
-                DayOfWeek = DayOfWeek.Friday,
+                WorkDate = new DateOnly(2026, 11, 6),
                 Shift = ExamShift.Morning,
                 StartTime = new TimeOnly(7, 30),
                 EndTime = new TimeOnly(11, 30),
-                EffectiveFrom = new DateOnly(2026, 1, 1),
+                Status = DoctorScheduleStatus.Approved,
                 OnlineSlots = online,
                 MaxPatients = 8
             });

@@ -20,6 +20,7 @@ public sealed class ManagementController(
     IDepartmentService departments,
     IAdminReportService reports,
     IScheduleChangeService schedules,
+    IHospitalCatalogService catalog,
     TimeProvider clock,
     ILogger<ManagementController> logger) : Controller
 {
@@ -115,6 +116,62 @@ public sealed class ManagementController(
                 result
             });
         });
+
+    [HttpGet("CatalogDirectory")]
+    public Task<IActionResult> CatalogDirectory(CancellationToken ct) => ExecuteAsync(async () => Ok(new
+    {
+        rooms = await catalog.GetRoomsAsync(null, ct),
+        services = await catalog.GetServicesAsync(null, ct),
+        serviceTypes = await catalog.GetServiceTypesAsync(ct),
+        medications = await catalog.GetMedicationsAsync(ct),
+        departments = await departments.GetDepartmentsAsync(ct)
+    }));
+
+    [HttpPost("Rooms")]
+    public Task<IActionResult> CreateRoom([FromBody] CreateRoomRequest request, CancellationToken ct) =>
+        ExecuteAsync(async () =>
+        {
+            AdminValidate(request);
+            var id = await catalog.CreateRoomAsync(request, ct);
+            return Ok(new { id, message = "Đã thêm phòng khám mới." });
+        });
+
+    [HttpPost("Rooms/Delete")]
+    public Task<IActionResult> DeleteRoom([FromBody] DeleteRoomRequest request, CancellationToken ct) =>
+        ExecuteAsync(async () =>
+        {
+            var success = await catalog.DeleteRoomAsync(request.RoomId, ct);
+            return success ? Ok(new { message = "Đã xóa phòng khám." }) : NotFound(new { message = "Phòng khám không tồn tại." });
+        });
+
+    [HttpPost("Services")]
+    public Task<IActionResult> UpsertService([FromBody] UpsertServiceRequest request, CancellationToken ct) =>
+        ExecuteAsync(async () =>
+        {
+            AdminValidate(request);
+            var id = await catalog.UpsertServiceAsync(request, ct);
+            return Ok(new { id, message = request.Id.HasValue ? "Đã cập nhật dịch vụ y tế." : "Đã thêm dịch vụ y tế mới." });
+        });
+
+    [HttpPost("Medications")]
+    public Task<IActionResult> UpsertMedication([FromBody] UpsertMedicationRequest request, CancellationToken ct) =>
+        ExecuteAsync(async () =>
+        {
+            AdminValidate(request);
+            var id = await catalog.UpsertMedicationAsync(request, ct);
+            return Ok(new { id, message = request.Id.HasValue ? "Đã cập nhật thuốc." : "Đã thêm thuốc vào danh mục." });
+        });
+
+    [HttpGet("AuditLogs")]
+    public Task<IActionResult> AuditLogs(DateOnly? from, DateOnly? to, string? action, string? search, int limit = 200, CancellationToken ct = default) =>
+        ExecuteAsync(async () => Ok(await reports.GetAuditLogsAsync(ActorId, from, to, action, search, limit, ct)));
+
+    [HttpGet("DepartmentStats")]
+    public Task<IActionResult> DepartmentStats(DateOnly? from, DateOnly? to, CancellationToken ct) => ExecuteAsync(async () =>
+    {
+        var today = DateOnly.FromDateTime(clock.GetLocalNow().DateTime);
+        return Ok(await reports.GetDepartmentStatsAsync(ActorId, from ?? new DateOnly(today.Year, today.Month, 1), to ?? today, ct));
+    });
 
     private async Task<IActionResult> ExecuteAsync(Func<Task<IActionResult>> operation)
     {

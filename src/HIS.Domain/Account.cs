@@ -30,4 +30,6 @@ public class Account
     public ICollection<LabResult> PerformedLabResults { get; set; } = [];
     public ICollection<Payment> CashierPayments { get; set; } = [];
     public ICollection<AccessLog> AccessLogs { get; set; } = [];
+    public ICollection<SchedulingPeriod> CreatedSchedulingPeriods { get; set; } = [];
+    public ICollection<DoctorSchedule> ReviewedSchedules { get; set; } = [];
 }

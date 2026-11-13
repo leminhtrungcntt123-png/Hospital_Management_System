@@ -8,7 +8,22 @@ public class Doctor
     public string FullName { get; set; } = string.Empty;
     public string? Specialty { get; set; }
     public string? LicenseNumber { get; set; }
-    public int AvgConsultationMinutes { get; set; } = 15;
+    public int AvgConsultationMinutes { get; set; } = 30;
+
+    // Homepage Showcase
+    public string? AcademicTitle { get; set; }
+    public string? AvatarUrl { get; set; }
+    public string? ShortBio { get; set; }
+    public string? Biography { get; set; }
+    public short YearsOfExperience { get; set; } = 0;
+    public bool IsPublic { get; set; } = true;
+    public bool IsFeatured { get; set; } = false;
+    public int DisplayOrder { get; set; } = 100;
+
+    // Shift Bidding Quota
+    public EmploymentType EmploymentType { get; set; } = EmploymentType.FullTime;
+    public short MinShiftsPerWeek { get; set; } = 2;
+    public short MaxShiftsPerWeek { get; set; } = 10;
 
     public Account Account { get; set; } = null!;
     public Department Department { get; set; } = null!;

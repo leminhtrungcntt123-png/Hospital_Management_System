@@ -27,6 +27,7 @@
     <PackageReference Include="Moq" />
     <PackageReference Include="Testcontainers.PostgreSql" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="QRCoder" />
   </ItemGroup>
 
 </Project>

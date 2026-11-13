@@ -12,6 +12,7 @@ public class ServiceConfiguration : IEntityTypeConfiguration<Service>
         builder.HasKey(e => e.Id);
 
         builder.Property(e => e.Name).HasMaxLength(150).IsRequired();
+        builder.HasIndex(e => e.Name).IsUnique();
         builder.Property(e => e.Price).HasPrecision(12, 2).HasDefaultValue(0m);
         builder.Property(e => e.IsActive).HasDefaultValue(true);
 

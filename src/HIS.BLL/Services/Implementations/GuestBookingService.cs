@@ -37,11 +37,11 @@ public sealed class GuestBookingService(
             .Where(s => s.DoctorId == doctorId
                 && s.Doctor.Account.IsActive
                 && s.Doctor.Account.Role.Code == "DOCTOR"
+                && s.RoomId.HasValue
+                && s.Room != null
                 && s.Room.DepartmentId == s.Doctor.DepartmentId
-                && s.IsActive
-                && s.DayOfWeek == date.DayOfWeek
-                && s.EffectiveFrom <= date
-                && (s.EffectiveTo == null || s.EffectiveTo >= date)
+                && s.Status == DoctorScheduleStatus.Approved
+                && s.WorkDate == date
                 && !db.ScheduleExceptions.Any(e => e.DoctorId == doctorId
                     && e.Date == date
                     && e.Status == ScheduleExceptionStatus.Approved
@@ -90,7 +90,7 @@ public sealed class GuestBookingService(
                 var available = Math.Min(remaining, (existing?.Capacity ?? capacity) - (existing?.BookedCount ?? 0));
                 if (available > 0 && result.All(s => s.StartTime != time))
                 {
-                    result.Add(new(schedule.Id, time, time.AddMinutes(schedule.SlotDurationMinutes), schedule.Room.RoomNumber, available));
+                    result.Add(new(schedule.Id, time, time.AddMinutes(schedule.SlotDurationMinutes), schedule.Room?.RoomNumber ?? string.Empty, available));
                 }
             }
         }
@@ -152,8 +152,9 @@ public sealed class GuestBookingService(
                 {
                     slot = new AppointmentSlot
                     {
+                        ScheduleId = schedule.Id,
                         DoctorId = schedule.DoctorId,
-                        RoomId = schedule.RoomId,
+                        RoomId = schedule.RoomId ?? 0,
                         StartTime = choice.StartTime,
                         EndTime = choice.EndTime,
                         Capacity = choice.Remaining

@@ -17,5 +17,7 @@ public class MedicationConfiguration : IEntityTypeConfiguration<Medication>
         builder.Property(e => e.Unit).HasMaxLength(20).IsRequired();
         builder.Property(e => e.Price).HasPrecision(12, 2).HasDefaultValue(0m);
         builder.Property(e => e.IsActive).HasDefaultValue(true);
+
+        builder.HasIndex(e => new { e.Name, e.Strength }).IsUnique();
     }
 }

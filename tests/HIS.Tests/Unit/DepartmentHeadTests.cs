@@ -13,15 +13,15 @@ public class DepartmentHeadTests
             null,
             1,
             1,
-            DayOfWeek.Monday,
+            1,
+            1,
+            DateOnly.FromDateTime(DateTime.Today),
             ExamShift.Morning,
             new TimeOnly(7, 30),
             new TimeOnly(11, 30),
             15,
             40,
-            50, // 50 > 40 -> invalid
-            DateOnly.FromDateTime(DateTime.Today),
-            null
+            50 // 50 > 40 -> invalid
         );
 
         Assert.True(request.OnlineSlots > request.MaxPatients);
@@ -114,6 +114,18 @@ public class DepartmentHeadTests
         int targetStatusId = (int)AppointmentStatusId.ReadyForDoctor;
         Assert.Equal(4, targetStatusId);
         Assert.NotEqual((int)AppointmentStatusId.CheckedIn, targetStatusId);
+    }
+
+    [Theory]
+    [InlineData(null, 1, false)]
+    [InlineData(0, 1, false)]
+    [InlineData(-1, 1, false)]
+    [InlineData(1, 2, false)]
+    [InlineData(1, 1, true)]
+    public void ExceptionDepartmentAuthorization_ShouldFailClosed(int? requestDeptId, int doctorDeptId, bool shouldAllow)
+    {
+        bool isAllowed = requestDeptId.HasValue && requestDeptId.Value > 0 && doctorDeptId == requestDeptId.Value;
+        Assert.Equal(shouldAllow, isAllowed);
     }
 
     [Fact]

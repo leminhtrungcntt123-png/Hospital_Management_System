@@ -102,7 +102,7 @@ public class ReviewRegressionTests
         departments.Setup(service => service.CreateDepartmentAsync("Khoa X", null, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException(duplicate ? expected : "private database connection details"));
         var controller = new ManagementController(Mock.Of<IStaffService>(), departments.Object,
-            Mock.Of<IAdminReportService>(), Mock.Of<IScheduleChangeService>(), TimeProvider.System,
+            Mock.Of<IAdminReportService>(), Mock.Of<IScheduleChangeService>(), Mock.Of<IHospitalCatalogService>(), TimeProvider.System,
             NullLogger<ManagementController>.Instance);
         var result = Assert.IsType<BadRequestObjectResult>(await controller.CreateDepartment(new DepartmentCreateRequest { Name = "Khoa X" }, default));
         var message = result.Value!.GetType().GetProperty("message")!.GetValue(result.Value);

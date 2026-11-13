@@ -19,6 +19,46 @@ public enum ExamShift
     Afternoon
 }
 
+public enum EmploymentType
+{
+    FullTime,
+    PartTime
+}
+
+public enum SchedulingPeriodStatus
+{
+    Draft,
+    Open,
+    Reviewing,
+    Published,
+    Closed
+}
+
+public enum DutyShiftStatus
+{
+    Bidding,
+    Approved,
+    Rejected,
+    Cancelled
+}
+
+public enum DoctorScheduleStatus
+{
+    Bidding,
+    Approved,
+    Rejected,
+    Reallocated,
+    Cancelled
+}
+
+public enum AuditSeverity
+{
+    Info,
+    Warning,
+    Security,
+    Critical
+}
+
 public enum ScheduleExceptionType
 {
     Leave,

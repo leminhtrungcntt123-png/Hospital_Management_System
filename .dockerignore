@@ -1,0 +1,12 @@
+.git/
+.github/
+.vs/
+**/bin/
+**/obj/
+tests/
+docs/
+*.log
+*.user
+.env
+.env.*
+

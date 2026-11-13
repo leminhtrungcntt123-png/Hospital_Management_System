@@ -26,19 +26,22 @@ public static class BusinessServiceCollectionExtensions
         services.AddOptions<EmailOptions>()
             .Bind(configuration.GetSection(EmailOptions.SectionName));
 
+        services.AddOptions<BillingOptions>()
+            .Bind(configuration.GetSection(BillingOptions.SectionName));
+
         services.AddValidatorsFromAssembly(typeof(BusinessServiceCollectionExtensions).Assembly);
 
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.AddScoped<IPatientProfileService, PatientProfileService>();
         services.AddScoped<IPatientAccessService, PatientAccessService>();
-        services.AddScoped<IBookingService, BookingService>();
         services.AddScoped<IGuestBookingService, GuestBookingService>();
         services.AddScoped<ISlotGenerationService, SlotGenerationService>();
         services.AddScoped<IScheduleChangeService, ScheduleChangeService>();
         services.AddScoped<IQueueService, QueueService>();
         services.AddScoped<IReceptionService, ReceptionService>();
         services.AddScoped<IBillingService, BillingService>();
+        services.AddScoped<ICashierShiftService, CashierShiftService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IDepartmentService, DepartmentService>();
         services.AddScoped<IDoctorService, DoctorService>();
@@ -47,6 +50,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddScoped<IDepartmentHeadService, DepartmentHeadService>();
         services.AddScoped<IVitalSignsService, VitalSignsService>();
         services.AddScoped<INurseDashboardService, NurseDashboardService>();
+        services.AddScoped<IHospitalCatalogService, HospitalCatalogService>();
 
         return services;
     }

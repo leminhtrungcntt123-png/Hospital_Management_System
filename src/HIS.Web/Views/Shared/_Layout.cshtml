@@ -94,6 +94,12 @@
                             </svg>
                             <span>Danh mục Khoa phòng</span>
                         </a>
+                        <a href="/Staff/Schedule?tab=slots" class="@(currentPath.StartsWith("/Staff/Schedule") && currentTab == "slots" ? "active" : "")">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                            </svg>
+                            <span>Quản lý Slot & Khung giờ</span>
+                        </a>
                     </div>
                 }
                 @if (User.IsInRole("DOCTOR"))
@@ -163,7 +169,19 @@
                             <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line>
                             </svg>
-                            <span>Lịch khám & trực</span>
+                            <span>Lịch khám khoa</span>
+                        </a>
+                        <a href="/Staff/Schedule?tab=my-schedule" class="@(currentPath.StartsWith("/Staff/Schedule") && currentTab == "my-schedule" ? "active" : "")">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle>
+                            </svg>
+                            <span>Lịch của tôi (Trưởng khoa)</span>
+                        </a>
+                        <a href="/Staff/Schedule?tab=slots" class="@(currentPath.StartsWith("/Staff/Schedule") && currentTab == "slots" ? "active" : "")">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                            </svg>
+                            <span>Quản lý Slot & Khung giờ</span>
                         </a>
                         <a href="/Staff/Schedule?tab=exceptions" class="@(currentPath.StartsWith("/Staff/Schedule") && currentTab == "exceptions" ? "active" : "")">
                             <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

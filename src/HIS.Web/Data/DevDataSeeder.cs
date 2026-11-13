@@ -107,7 +107,23 @@ public static class DevDataSeeder
             var doc1 = await db.Doctors.FirstOrDefaultAsync(d => d.AccountId == docAcc1.Id);
             if (doc1 == null)
             {
-                doc1 = new Doctor { AccountId = docAcc1.Id, DepartmentId = deptNoi.Id, FullName = "BS. Nguyễn Hoàng Nam", Specialty = "Nội tổng quát", LicenseNumber = "CCHN-001" };
+                doc1 = new Doctor
+                {
+                    AccountId = docAcc1.Id,
+                    DepartmentId = deptNoi.Id,
+                    FullName = "BS. Nguyễn Hoàng Nam",
+                    Specialty = "Nội tổng quát",
+                    AcademicTitle = "ThS.BS",
+                    LicenseNumber = "CCHN-001",
+                    YearsOfExperience = 10,
+                    IsFeatured = true,
+                    IsPublic = true,
+                    DisplayOrder = 1,
+                    ShortBio = "Bác sĩ chuyên khoa Nội tổng quát, giàu kinh nghiệm trong chẩn đoán và điều trị bệnh lý người lớn.",
+                    EmploymentType = EmploymentType.FullTime,
+                    MinShiftsPerWeek = 6,
+                    MaxShiftsPerWeek = 10
+                };
                 db.Doctors.Add(doc1);
                 await db.SaveChangesAsync();
             }
@@ -123,7 +139,23 @@ public static class DevDataSeeder
             var doc2 = await db.Doctors.FirstOrDefaultAsync(d => d.AccountId == docAcc2.Id);
             if (doc2 == null)
             {
-                doc2 = new Doctor { AccountId = docAcc2.Id, DepartmentId = deptNoi.Id, FullName = "BS. Lê Quang Huy", Specialty = "Nội tim mạch", LicenseNumber = "CCHN-002" };
+                doc2 = new Doctor
+                {
+                    AccountId = docAcc2.Id,
+                    DepartmentId = deptNoi.Id,
+                    FullName = "BS. Lê Quang Huy",
+                    Specialty = "Nội tim mạch",
+                    AcademicTitle = "BS.CKII",
+                    LicenseNumber = "CCHN-002",
+                    YearsOfExperience = 15,
+                    IsFeatured = true,
+                    IsPublic = true,
+                    DisplayOrder = 2,
+                    ShortBio = "Chuyên gia tim mạch can thiệp, tư vấn và điều trị tăng huyết áp, bệnh mạch vành.",
+                    EmploymentType = EmploymentType.FullTime,
+                    MinShiftsPerWeek = 6,
+                    MaxShiftsPerWeek = 10
+                };
                 db.Doctors.Add(doc2);
                 await db.SaveChangesAsync();
             }
@@ -139,7 +171,23 @@ public static class DevDataSeeder
             var doc3 = await db.Doctors.FirstOrDefaultAsync(d => d.AccountId == docAcc3.Id);
             if (doc3 == null)
             {
-                doc3 = new Doctor { AccountId = docAcc3.Id, DepartmentId = deptNoi.Id, FullName = "BS. Trần Minh Thư", Specialty = "Tim mạch", LicenseNumber = "CCHN-003" };
+                doc3 = new Doctor
+                {
+                    AccountId = docAcc3.Id,
+                    DepartmentId = deptNoi.Id,
+                    FullName = "BS. Trần Minh Thư",
+                    Specialty = "Tim mạch",
+                    AcademicTitle = "TS.BS",
+                    LicenseNumber = "CCHN-003",
+                    YearsOfExperience = 12,
+                    IsFeatured = true,
+                    IsPublic = true,
+                    DisplayOrder = 3,
+                    ShortBio = "Tiến sĩ Y khoa, nghiên cứu và điều trị chuyên sâu bệnh lý mạch máu và rối loạn nhịp.",
+                    EmploymentType = EmploymentType.FullTime,
+                    MinShiftsPerWeek = 6,
+                    MaxShiftsPerWeek = 10
+                };
                 db.Doctors.Add(doc3);
                 await db.SaveChangesAsync();
             }
@@ -204,105 +252,172 @@ public static class DevDataSeeder
             }
             await db.SaveChangesAsync();
 
-            // 5. CẤU HÌNH LỊCH KHÁM TUẦN (DoctorSchedule)
-            var scheduleStartDate = new DateOnly(2026, 1, 1);
-            if (!await db.DoctorSchedules.AnyAsync(s => s.DoctorId == doc1.Id))
+            // 5. CẤU HÌNH KỲ ĐĂNG KÝ (SchedulingPeriod) & LỊCH KHÁM (DoctorSchedule)
+            var currentDay = DateOnly.FromDateTime(DateTime.Today);
+            var daysFromMonday = ((int)currentDay.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+            var periodMonday = currentDay.AddDays(-daysFromMonday);
+            var periodSunday = periodMonday.AddDays(6);
+
+            var period = await db.SchedulingPeriods.FirstOrDefaultAsync(p => p.StartDate <= currentDay && p.EndDate >= currentDay);
+            if (period == null)
             {
-                for (int day = 1; day <= 5; day++)
+                period = new SchedulingPeriod
                 {
+                    Name = $"Kỳ làm việc tuần {periodMonday:dd/MM} - {periodSunday:dd/MM/yyyy}",
+                    StartDate = periodMonday,
+                    EndDate = periodSunday,
+                    BiddingOpensAt = DateTime.UtcNow.AddDays(-2),
+                    BiddingClosesAt = DateTime.UtcNow.AddDays(5),
+                    Status = SchedulingPeriodStatus.Open,
+                    CreatedBy = headAcc1.Id,
+                    CreatedAt = DateTime.UtcNow
+                };
+                db.SchedulingPeriods.Add(period);
+                await db.SaveChangesAsync();
+            }
+
+            if (!await db.DoctorSchedules.AnyAsync(s => s.DoctorId == doc1.Id && s.WorkDate >= periodMonday && s.WorkDate <= periodSunday))
+            {
+                for (int i = 0; i < 5; i++)
+                {
+                    var wDate = periodMonday.AddDays(i);
                     db.DoctorSchedules.Add(new DoctorSchedule
                     {
                         DoctorId = doc1.Id,
+                        PeriodId = period.Id,
+                        DepartmentId = deptNoi.Id,
                         RoomId = room1.Id,
-                        DayOfWeek = (DayOfWeek)day,
+                        WorkDate = wDate,
                         Shift = ExamShift.Morning,
                         StartTime = new TimeOnly(7, 30),
                         EndTime = new TimeOnly(11, 30),
-                        SlotDurationMinutes = 15,
+                        SlotDurationMinutes = 30,
                         MaxPatients = 40,
                         OnlineSlots = 28,
-                        EffectiveFrom = scheduleStartDate
+                        Status = DoctorScheduleStatus.Approved,
+                        ReviewedBy = headAcc1.Id,
+                        ReviewedAt = DateTime.UtcNow
                     });
                     db.DoctorSchedules.Add(new DoctorSchedule
                     {
                         DoctorId = doc1.Id,
+                        PeriodId = period.Id,
+                        DepartmentId = deptNoi.Id,
                         RoomId = room1.Id,
-                        DayOfWeek = (DayOfWeek)day,
+                        WorkDate = wDate,
                         Shift = ExamShift.Afternoon,
                         StartTime = new TimeOnly(13, 0),
                         EndTime = new TimeOnly(16, 30),
-                        SlotDurationMinutes = 15,
+                        SlotDurationMinutes = 30,
                         MaxPatients = 40,
                         OnlineSlots = 28,
-                        EffectiveFrom = scheduleStartDate
+                        Status = DoctorScheduleStatus.Approved,
+                        ReviewedBy = headAcc1.Id,
+                        ReviewedAt = DateTime.UtcNow
                     });
                 }
                 await db.SaveChangesAsync();
             }
 
-            if (!await db.DoctorSchedules.AnyAsync(s => s.DoctorId == doc2.Id))
+            if (!await db.DoctorSchedules.AnyAsync(s => s.DoctorId == doc2.Id && s.WorkDate >= periodMonday && s.WorkDate <= periodSunday))
             {
-                for (int day = 1; day <= 5; day++)
+                for (int i = 0; i < 4; i++)
                 {
+                    var wDate = periodMonday.AddDays(i);
                     db.DoctorSchedules.Add(new DoctorSchedule
                     {
                         DoctorId = doc2.Id,
+                        PeriodId = period.Id,
+                        DepartmentId = deptNoi.Id,
                         RoomId = room102.Id,
-                        DayOfWeek = (DayOfWeek)day,
+                        WorkDate = wDate,
                         Shift = ExamShift.Morning,
                         StartTime = new TimeOnly(7, 30),
                         EndTime = new TimeOnly(11, 30),
-                        SlotDurationMinutes = 15,
+                        SlotDurationMinutes = 30,
                         MaxPatients = 35,
                         OnlineSlots = 25,
-                        EffectiveFrom = scheduleStartDate
+                        Status = DoctorScheduleStatus.Approved,
+                        ReviewedBy = headAcc1.Id,
+                        ReviewedAt = DateTime.UtcNow
                     });
                     db.DoctorSchedules.Add(new DoctorSchedule
                     {
                         DoctorId = doc2.Id,
+                        PeriodId = period.Id,
+                        DepartmentId = deptNoi.Id,
                         RoomId = room102.Id,
-                        DayOfWeek = (DayOfWeek)day,
+                        WorkDate = wDate,
                         Shift = ExamShift.Afternoon,
                         StartTime = new TimeOnly(13, 0),
                         EndTime = new TimeOnly(16, 30),
-                        SlotDurationMinutes = 15,
+                        SlotDurationMinutes = 30,
                         MaxPatients = 35,
                         OnlineSlots = 25,
-                        EffectiveFrom = scheduleStartDate
+                        Status = DoctorScheduleStatus.Approved,
+                        ReviewedBy = headAcc1.Id,
+                        ReviewedAt = DateTime.UtcNow
                     });
                 }
+                // Thứ 6: Đăng ký Bidding ca Sáng (để test Shift Bidding)
+                var friday = periodMonday.AddDays(4);
+                db.DoctorSchedules.Add(new DoctorSchedule
+                {
+                    DoctorId = doc2.Id,
+                    PeriodId = period.Id,
+                    DepartmentId = deptNoi.Id,
+                    RoomId = null,
+                    WorkDate = friday,
+                    Shift = ExamShift.Morning,
+                    StartTime = new TimeOnly(7, 30),
+                    EndTime = new TimeOnly(11, 30),
+                    SlotDurationMinutes = 30,
+                    MaxPatients = 35,
+                    OnlineSlots = 25,
+                    Status = DoctorScheduleStatus.Bidding,
+                    DoctorNote = "Đăng ký ca sáng thứ 6"
+                });
                 await db.SaveChangesAsync();
             }
 
-            if (doc3 != null && !await db.DoctorSchedules.AnyAsync(s => s.DoctorId == doc3.Id))
+            if (doc3 != null && !await db.DoctorSchedules.AnyAsync(s => s.DoctorId == doc3.Id && s.WorkDate >= periodMonday && s.WorkDate <= periodSunday))
             {
-                for (int day = 1; day <= 5; day++)
+                for (int i = 0; i < 5; i++)
                 {
+                    var wDate = periodMonday.AddDays(i);
                     db.DoctorSchedules.Add(new DoctorSchedule
                     {
                         DoctorId = doc3.Id,
+                        PeriodId = period.Id,
+                        DepartmentId = deptNgoai.Id,
                         RoomId = room201.Id,
-                        DayOfWeek = (DayOfWeek)day,
+                        WorkDate = wDate,
                         Shift = ExamShift.Morning,
                         StartTime = new TimeOnly(7, 30),
                         EndTime = new TimeOnly(11, 30),
-                        SlotDurationMinutes = 15,
+                        SlotDurationMinutes = 30,
                         MaxPatients = 30,
                         OnlineSlots = 20,
-                        EffectiveFrom = scheduleStartDate
+                        Status = DoctorScheduleStatus.Approved,
+                        ReviewedBy = headAcc1.Id,
+                        ReviewedAt = DateTime.UtcNow
                     });
                     db.DoctorSchedules.Add(new DoctorSchedule
                     {
                         DoctorId = doc3.Id,
+                        PeriodId = period.Id,
+                        DepartmentId = deptNgoai.Id,
                         RoomId = room201.Id,
-                        DayOfWeek = (DayOfWeek)day,
+                        WorkDate = wDate,
                         Shift = ExamShift.Afternoon,
                         StartTime = new TimeOnly(13, 0),
                         EndTime = new TimeOnly(16, 30),
-                        SlotDurationMinutes = 15,
+                        SlotDurationMinutes = 30,
                         MaxPatients = 30,
                         OnlineSlots = 20,
-                        EffectiveFrom = scheduleStartDate
+                        Status = DoctorScheduleStatus.Approved,
+                        ReviewedBy = headAcc1.Id,
+                        ReviewedAt = DateTime.UtcNow
                     });
                 }
                 await db.SaveChangesAsync();
@@ -365,7 +480,7 @@ public static class DevDataSeeder
                     VisitType = VisitType.Scheduled,
                     QueueNumber = "O05",
                     Reason = "Tái khám huyết áp",
-                    CreatedAt = DateTime.UtcNow.AddDays(-2)
+                    CreatedAt = DateTime.Now.AddDays(-2)
                 };
 
                 var oldApp2 = new Appointment
@@ -380,7 +495,7 @@ public static class DevDataSeeder
                     VisitType = VisitType.Scheduled,
                     QueueNumber = "O03",
                     Reason = "Khám sức khỏe",
-                    CreatedAt = DateTime.UtcNow.AddDays(-10)
+                    CreatedAt = DateTime.Now.AddDays(-10)
                 };
 
                 db.Appointments.AddRange(oldApp1, oldApp2);
@@ -396,6 +511,7 @@ public static class DevDataSeeder
                         PrimaryDiagnosisCode = "I10",
                         PrimaryDiagnosisDesc = "Tăng huyết áp nguyên phát",
                         Conclusion = "Đã hoàn tất khám theo yêu cầu",
+                        FollowUpDate = currentDay.AddDays(2),
                         CreatedAt = DateTime.UtcNow.AddDays(-2)
                     },
                     new MedicalRecord
@@ -407,7 +523,7 @@ public static class DevDataSeeder
                         PrimaryDiagnosisCode = "Z00.0",
                         PrimaryDiagnosisDesc = "Khám sức khỏe tổng quát",
                         Conclusion = "Khám sức khỏe định kỳ",
-                        CreatedAt = DateTime.UtcNow.AddDays(-10)
+                        CreatedAt = DateTime.Now.AddDays(-10)
                     }
                 );
                 await db.SaveChangesAsync();
@@ -424,7 +540,7 @@ public static class DevDataSeeder
                     EndTime = today.AddDays(1).ToDateTime(new TimeOnly(7, 0)),
                     Note = "Trực cấp cứu nội khoa sảnh B",
                     AssignedBy = headAcc1.Id,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now
                 });
 
                 db.DutyShifts.Add(new DutyShift
@@ -435,7 +551,7 @@ public static class DevDataSeeder
                     EndTime = today.AddDays(1).ToDateTime(new TimeOnly(7, 0)),
                     Note = "Trực điều dưỡng theo dõi bệnh phòng",
                     AssignedBy = headAcc1.Id,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now
                 });
 
                 await db.SaveChangesAsync();
@@ -462,13 +578,286 @@ public static class DevDataSeeder
                         Status = ScheduleExceptionStatus.Pending,
                         Reason = "Tham gia đào tạo chuyên môn",
                         ReplacementDoctorId = doc1.Id,
-                        CreatedAt = DateTime.UtcNow
+                        CreatedAt = DateTime.Now
                     });
                     await db.SaveChangesAsync();
                 }
             }
 
-            logger.LogInformation("DevDataSeeder: Đã nạp đầy đủ dữ liệu mẫu thực tế cho Bác sĩ, Bệnh nhân, Hàng chờ, Bệnh án và Chỉ định xét nghiệm.");
+            // 11. TÀI KHOẢN KẾ TOÁN / THU NGÂN (Role Nurse = 4 để giữ nguyên schema develop)
+            var cashierAcc = await db.Accounts.FirstOrDefaultAsync(a => a.Username == "ketoan");
+            if (cashierAcc == null)
+            {
+                cashierAcc = new Account
+                {
+                    Username = "ketoan",
+                    Email = "ketoan@his.local",
+                    PasswordHash = passwordHash,
+                    RoleId = (int)RoleId.Nurse,
+                    IsActive = true
+                };
+                db.Accounts.Add(cashierAcc);
+                await db.SaveChangesAsync();
+            }
+
+            // 12. DANH MỤC DỊCH VỤ KỸ THUẬT & CÔNG KHÁM (Services)
+            if (!await db.Services.AnyAsync(s => s.Name == "Tổng phân tích tế bào máu ngoại vi"))
+            {
+                var sExam = await db.Services.FirstOrDefaultAsync(s => s.ServiceTypeId == (int)ServiceTypeId.Examination);
+                if (sExam == null)
+                {
+                    sExam = new Service { Name = "Khám bệnh chuyên khoa Nội", ServiceTypeId = (int)ServiceTypeId.Examination, Price = 150000m, IsActive = true };
+                    db.Services.Add(sExam);
+                }
+                var sBlood = new Service { Name = "Tổng phân tích tế bào máu ngoại vi", ServiceTypeId = (int)ServiceTypeId.LabTest, Price = 120000m, IsActive = true };
+                var sXray = new Service { Name = "Chụp X-quang ngực thẳng kỹ thuật số", ServiceTypeId = (int)ServiceTypeId.Imaging, Price = 180000m, IsActive = true };
+                var sUltra = new Service { Name = "Siêu âm ổ bụng tổng quát", ServiceTypeId = (int)ServiceTypeId.Imaging, Price = 220000m, IsActive = true };
+                var sVip = new Service { Name = "Khám chuyên gia theo yêu cầu (Tự túc)", ServiceTypeId = (int)ServiceTypeId.Examination, Price = 300000m, IsActive = true };
+
+                db.Services.AddRange(sBlood, sXray, sUltra, sVip);
+                await db.SaveChangesAsync();
+            }
+
+            // 13. DANH MỤC THUỐC (Medications)
+            if (!await db.Medications.AnyAsync())
+            {
+                db.Medications.AddRange(
+                    new Medication { Name = "Paracetamol 500mg", ActiveIngredient = "Paracetamol", Strength = "500mg", Unit = "Viên", Price = 1500m, IsActive = true },
+                    new Medication { Name = "Amoxicillin 500mg", ActiveIngredient = "Amoxicillin", Strength = "500mg", Unit = "Viên", Price = 3500m, IsActive = true },
+                    new Medication { Name = "Amlodipine 5mg", ActiveIngredient = "Amlodipine", Strength = "5mg", Unit = "Viên", Price = 4000m, IsActive = true },
+                    new Medication { Name = "Vitamin C 500mg", ActiveIngredient = "Acid Ascorbic", Strength = "500mg", Unit = "Viên", Price = 1000m, IsActive = true },
+                    new Medication { Name = "Viên bổ gan thảo dược (Tự túc)", ActiveIngredient = "Cao Actiso", Strength = "200mg", Unit = "Viên", Price = 25000m, IsActive = true }
+                );
+                await db.SaveChangesAsync();
+            }
+
+            // 14. DANH MỤC GÓI BHYT (InsurancePlans)
+            var plan80 = await db.InsurancePlans.FirstOrDefaultAsync(p => p.CoveragePct == 80m);
+            if (plan80 == null)
+            {
+                plan80 = new InsurancePlan { Name = "BHYT Đúng tuyến - Hưởng 80%", CoveragePct = 80m, ReferralType = ReferralType.InNetwork };
+                var plan100 = new InsurancePlan { Name = "BHYT Đúng tuyến đặc biệt - Hưởng 100%", CoveragePct = 100m, ReferralType = ReferralType.InNetwork };
+                var plan0 = new InsurancePlan { Name = "BHYT Trái tuyến ngoại trú - 0%", CoveragePct = 0m, ReferralType = ReferralType.OutOfNetwork };
+                db.InsurancePlans.AddRange(plan80, plan100, plan0);
+                await db.SaveChangesAsync();
+            }
+
+            // 15. THẺ BHYT MẪU (InsuranceCards)
+            if (!await db.InsuranceCards.AnyAsync())
+            {
+                if (pBao != null && plan80 != null)
+                {
+                    db.InsuranceCards.Add(new InsuranceCard
+                    {
+                        PatientId = pBao.Id,
+                        CardNumber = "DN4797938328123",
+                        InsurancePlanId = plan80.Id,
+                        RegisteredFacility = "Bệnh viện Đa khoa MediCare",
+                        IsRegisteredHere = true,
+                        ValidFrom = new DateOnly(2024, 1, 1),
+                        ValidTo = new DateOnly(2028, 12, 31),
+                        IsActive = true
+                    });
+                }
+                if (pMinh != null && plan80 != null)
+                {
+                    var plan100 = await db.InsurancePlans.FirstOrDefaultAsync(p => p.CoveragePct == 100m) ?? plan80;
+                    db.InsuranceCards.Add(new InsuranceCard
+                    {
+                        PatientId = pMinh.Id,
+                        CardNumber = "HT2797911223344",
+                        InsurancePlanId = plan100.Id,
+                        RegisteredFacility = "Bệnh viện Đa khoa MediCare",
+                        IsRegisteredHere = true,
+                        ValidFrom = new DateOnly(2024, 1, 1),
+                        ValidTo = new DateOnly(2028, 12, 31),
+                        IsActive = true
+                    });
+                }
+                await db.SaveChangesAsync();
+            }
+
+            // 16. DỮ LIỆU ĐỒNG BỘ CHO THU VIỆN PHÍ, TẠM ỨNG & SỔ THU NGÂN
+            var pChi = await db.Patients.FirstOrDefaultAsync(p => p.FullName == "Lê Minh Chí");
+            if (pChi == null)
+            {
+                pChi = new Patient { FullName = "Lê Minh Chí", DateOfBirth = new DateOnly(1995, 2, 14), Gender = Gender.Male, PhoneNumber = "0890201234", NationalId = "079085001234", Address = "Quận 1, TP. Hồ Chí Minh" };
+                db.Patients.Add(pChi);
+                await db.SaveChangesAsync();
+            }
+
+            // Thẻ BHYT cho Lê Minh Chí
+            if (pChi != null && plan80 != null && !await db.InsuranceCards.AnyAsync(c => c.PatientId == pChi.Id))
+            {
+                db.InsuranceCards.Add(new InsuranceCard
+                {
+                    PatientId = pChi.Id,
+                    CardNumber = "DN4797938328001",
+                    InsurancePlanId = plan80.Id,
+                    RegisteredFacility = "Bệnh viện Đa khoa MediCare",
+                    IsRegisteredHere = true,
+                    ValidFrom = new DateOnly(2024, 1, 1),
+                    ValidTo = new DateOnly(2028, 12, 31),
+                    IsActive = true
+                });
+                await db.SaveChangesAsync();
+            }
+
+            // Đảm bảo có ca thu ngân đang mở (lưu trong access_logs theo schema develop)
+            int cashierId = cashierAcc?.Id ?? 1;
+            var hasOpenShift = await db.AccessLogs.AnyAsync(l => l.EntityName == "cashier_shifts" && l.AccountId == cashierId && l.Action == "SHIFT_OPEN");
+            if (!hasOpenShift)
+            {
+                var shiftLog = new AccessLog
+                {
+                    AccountId = cashierId,
+                    Action = "SHIFT_OPEN",
+                    EntityName = "cashier_shifts",
+                    IsSuccess = true,
+                    Severity = "INFO",
+                    OccurredAt = DateTime.Now.AddHours(-2),
+                    Details = "{\"OpeningCash\":1000000,\"Note\":\"Ca làm việc thu ngân mẫu\"}"
+                };
+                db.AccessLogs.Add(shiftLog);
+                await db.SaveChangesAsync();
+                shiftLog.EntityId = checked((int)shiftLog.Id);
+                await db.SaveChangesAsync();
+            }
+
+            if (db.Database.IsRelational())
+            {
+                await db.Payments
+                    .Where(p => p.ReceiptEmail != null && p.ReceiptEmail.StartsWith("#U=") && p.PaymentType != PaymentType.Deposit)
+                    .ExecuteUpdateAsync(s => s.SetProperty(p => p.PaymentType, PaymentType.Deposit));
+            }
+
+            if (!await db.Payments.AnyAsync(p => p.PaymentType == PaymentType.Deposit) && pChi != null)
+            {
+                async Task<Invoice?> EnsureSeedInvoiceAsync(int patId, DateTime at)
+                {
+                    var app = await db.Appointments
+                        .Include(a => a.Invoice)
+                        .Where(a => a.PatientId == patId && (a.Invoice == null || a.Invoice.Status != InvoiceStatus.Paid))
+                        .OrderByDescending(a => a.CreatedAt)
+                        .FirstOrDefaultAsync();
+                    if (app == null)
+                    {
+                        var anyDoc = await db.Doctors.AsNoTracking().FirstOrDefaultAsync();
+                        var anyDept = await db.Departments.AsNoTracking().FirstOrDefaultAsync();
+                        if (anyDoc == null || anyDept == null) return null;
+                        app = new Appointment
+                        {
+                            PatientId = patId,
+                            DoctorId = anyDoc.Id,
+                            DepartmentId = anyDept.Id,
+                            AppointmentCode = $"DEP-SEED-{patId}",
+                            StatusId = (int)AppointmentStatusId.CheckedIn,
+                            CreatedAt = at
+                        };
+                        db.Appointments.Add(app);
+                        await db.SaveChangesAsync();
+                    }
+
+                    if (app.Invoice == null)
+                    {
+                        var inv = new Invoice
+                        {
+                            AppointmentId = app.Id,
+                            PatientId = patId,
+                            TotalAmount = 0m,
+                            InsuranceCoveredAmount = 0m,
+                            PatientAmount = 0m,
+                            Status = InvoiceStatus.Unpaid,
+                            CreatedAt = at
+                        };
+                        db.Invoices.Add(inv);
+                        await db.SaveChangesAsync();
+                        return inv;
+                    }
+
+                    return app.Invoice;
+                }
+
+                await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+                {
+                    await using var depositTx = await db.Database.BeginTransactionAsync();
+
+                    var invChi = await EnsureSeedInvoiceAsync(pChi.Id, DateTime.Now.AddMinutes(-90));
+                    if (invChi != null)
+                    {
+                        db.Payments.Add(new Payment
+                        {
+                            InvoiceId = invChi.Id,
+                            Amount = 2000000m,
+                            PaymentType = PaymentType.Deposit,
+                            PaymentMethod = PaymentMethod.Cash,
+                            CashierId = cashierId,
+                            ReceiptEmail = "#U=0;R=0#",
+                            Note = "#BY=BS.CKII Phạm Thu Hằng;PUR=Tạm ứng nhập viện Ngoại khoa#Thu tạm ứng mẫu",
+                            PaidAt = DateTime.Now.AddMinutes(-90)
+                        });
+                    }
+
+                    if (pBao != null)
+                    {
+                        var invBao = await EnsureSeedInvoiceAsync(pBao.Id, DateTime.Now.AddMinutes(-60));
+                        if (invBao != null)
+                        {
+                            db.Payments.Add(new Payment
+                            {
+                                InvoiceId = invBao.Id,
+                                Amount = 300000m,
+                                PaymentType = PaymentType.Deposit,
+                                PaymentMethod = PaymentMethod.BankTransfer,
+                                CashierId = cashierId,
+                                ReceiptEmail = "#U=0;R=0;REF=FT2431889210#",
+                                Note = "#BY=BS.CKII Phạm Thu Hằng;PUR=Tạm ứng xét nghiệm cận lâm sàng#Thu tạm ứng qua VietQR",
+                                PaidAt = DateTime.Now.AddMinutes(-60)
+                            });
+                        }
+                    }
+
+                    if (pNgoc != null)
+                    {
+                        var invNgoc = await EnsureSeedInvoiceAsync(pNgoc.Id, DateTime.Now.AddMinutes(-45));
+                        if (invNgoc != null)
+                        {
+                            db.Payments.Add(new Payment
+                            {
+                                InvoiceId = invNgoc.Id,
+                                Amount = 1200000m,
+                                PaymentType = PaymentType.Deposit,
+                                PaymentMethod = PaymentMethod.Cash,
+                                CashierId = cashierId,
+                                ReceiptEmail = "#U=0;R=0#",
+                                Note = "#BY=TS.BS Lê Hoàng Nam;PUR=Tạm ứng phẫu thuật nội soi#Thu tạm ứng mẫu",
+                                PaidAt = DateTime.Now.AddMinutes(-45)
+                            });
+                        }
+                    }
+
+                    await db.SaveChangesAsync();
+                    if (db.Database.IsRelational())
+                    {
+                        await db.Payments
+                            .Where(p => p.ReceiptEmail != null && p.ReceiptEmail.StartsWith("#U=") && p.PaymentType != PaymentType.Deposit)
+                            .ExecuteUpdateAsync(s => s.SetProperty(p => p.PaymentType, PaymentType.Deposit));
+                    }
+                    await depositTx.CommitAsync();
+                });
+            }
+
+            // 17. NHẬT KÝ TRUY VẾT MẪU (AccessLogs)
+            if (!await db.AccessLogs.AnyAsync() && adminAcc != null)
+            {
+                db.AccessLogs.AddRange(
+                    new AccessLog { AccountId = adminAcc.Id, Action = "AdminLogin", OccurredAt = DateTime.UtcNow.AddHours(-3), IpAddress = "127.0.0.1" },
+                    new AccessLog { AccountId = adminAcc.Id, Action = "ViewDepartmentCatalog", OccurredAt = DateTime.UtcNow.AddHours(-2), IpAddress = "127.0.0.1" }
+                );
+                await db.SaveChangesAsync();
+            }
+
+            logger.LogInformation("DevDataSeeder: Đã nạp đầy đủ dữ liệu mẫu thực tế cho Bác sĩ, Bệnh nhân, Hàng chờ, Bệnh án, Thu ngân, Tạm ứng và Thẻ BHYT.");
         }
         catch (Exception ex)
         {
