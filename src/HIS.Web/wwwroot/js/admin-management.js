@@ -931,8 +931,8 @@
                         ${statusChip}
                     </div>
                     <div style="display:flex; flex-direction:column; gap:4px;">${biddersHtml}</div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-top:2px;">
-                        <button type="button" style="background:none; border:none; color:#0284c7; font-size:11.5px; font-weight:600; cursor:pointer; padding:0;" data-select-matrix="${escape(cell.workDate)}" data-shift="${shiftVal}">Xem ma trận ↓</button>
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-top:2px;">
+                        <button type="button" style="background:none; border:none; color:#0284c7; font-size:11.5px; font-weight:600; cursor:pointer; padding:0; white-space:nowrap;" data-select-matrix="${escape(cell.workDate)}" data-shift="${shiftVal}">Xem ma trận ↓</button>
                         ${actionBtn}
                     </div>
                 </div>
