@@ -26,40 +26,18 @@ public static class CashierTestDatabase
             {
                 if (_resolvedConnectionString == null)
                 {
-                    var localCandidates = new[]
-                    {
-                        "Host=localhost;Port=5432;Database=his_db;Username=postgres;Password=123;Timeout=2;Command Timeout=5",
-                        "Host=localhost;Port=5432;Database=his_db;Username=postgres;Password=123456789;Timeout=2;Command Timeout=5"
-                    };
+                    // Luôn dùng container riêng, không chạm vào his_db thật của máy.
+                    _container = new PostgreSqlBuilder("postgres:16-alpine").Build();
+                    await _container.StartAsync();
+                    _resolvedConnectionString = _container.GetConnectionString();
 
-                    foreach (var candidate in localCandidates)
-                    {
-                        var testOpts = new DbContextOptionsBuilder<AppDbContext>()
-                            .UseNpgsql(candidate)
-                            .UseSnakeCaseNamingConvention()
-                            .Options;
-                        await using var probeDb = new AppDbContext(testOpts, new VietnamTimeProvider());
-                        if (await probeDb.Database.CanConnectAsync())
-                        {
-                            _resolvedConnectionString = candidate;
-                            break;
-                        }
-                    }
-
-                    if (_resolvedConnectionString == null)
-                    {
-                        _container = new PostgreSqlBuilder("postgres:16-alpine").Build();
-                        await _container.StartAsync();
-                        _resolvedConnectionString = _container.GetConnectionString();
-
-                        var initOpts = new DbContextOptionsBuilder<AppDbContext>()
-                            .UseNpgsql(_resolvedConnectionString)
-                            .UseSnakeCaseNamingConvention()
-                            .Options;
-                        await using var initDb = new AppDbContext(initOpts, new VietnamTimeProvider());
-                        await initDb.Database.EnsureCreatedAsync();
-                        await SeedMinimalCashierDataAsync(initDb);
-                    }
+                    var initOpts = new DbContextOptionsBuilder<AppDbContext>()
+                        .UseNpgsql(_resolvedConnectionString)
+                        .UseSnakeCaseNamingConvention()
+                        .Options;
+                    await using var initDb = new AppDbContext(initOpts, new VietnamTimeProvider());
+                    await initDb.Database.EnsureCreatedAsync();
+                    await SeedMinimalCashierDataAsync(initDb);
                 }
             }
             finally
@@ -176,6 +154,7 @@ public static class CashierTestDatabase
     }
 }
 
+[Trait("Category", "Integration")]
 public class BillingTests
 {
     private static Task<AppDbContext> CreateDbAsync() => CashierTestDatabase.CreateDbAsync();

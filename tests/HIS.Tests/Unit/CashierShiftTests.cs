@@ -10,6 +10,7 @@ using Xunit;
 
 namespace HIS.Tests.Unit;
 
+[Trait("Category", "Integration")]
 public class CashierShiftTests
 {
     private static AppDbContext CreateDb() => CashierTestDatabase.CreateDbAsync().GetAwaiter().GetResult();
