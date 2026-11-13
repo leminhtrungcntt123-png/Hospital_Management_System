@@ -174,10 +174,7 @@ app.MapDefaultControllerRoute();
 
 app.MapHealthChecks("/health");
 
-// Run DevDataSeeder
-if (app.Environment.IsDevelopment())
-{
-    await DevDataSeeder.SeedAsync(app.Services);
-}
+// Run DevDataSeeder: tự bỏ qua trừ khi Seed:Enabled=true (Development, hoặc env Seed__Enabled trên Render).
+await DevDataSeeder.SeedAsync(app.Services);
 
 app.Run();
