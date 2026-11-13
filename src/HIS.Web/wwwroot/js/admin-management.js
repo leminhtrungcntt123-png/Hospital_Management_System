@@ -702,7 +702,8 @@
     find('#refresh-data').addEventListener('click', () =>
         refresh().catch((error) => notify(error.message, true)),
     );
-    window.addEventListener('hashchange', selectSection);
+    // Không truyền thẳng selectSection: hashchange sẽ đưa đối tượng event vào làm tên mục và luôn quay về dashboard
+    window.addEventListener('hashchange', () => selectSection());
 
     document.addEventListener('click', (event) => {
         const open = event.target.closest('[data-open]');
