@@ -34,15 +34,30 @@ public class HomeController(
         {
             var doctorList = await doctors.GetDoctorsAsync(ct);
             var departmentList = await departments.GetDepartmentsAsync(ct);
+            // Danh sách công khai đã sắp theo nổi bật/thứ tự; bác sĩ không công khai vẫn đặt lịch được.
+            var showcase = (await doctors.GetPublicFeaturedDoctorsAsync(1000, ct))
+                .Select((d, index) => (d, index)).ToDictionary(x => x.d.Id);
             return Json(new
             {
-                doctors = doctorList.Select(doctor => new
-                {
-                    doctor.Id,
-                    name = doctor.FullName,
-                    doctor.Specialty,
-                    department = doctor.DepartmentName
-                }),
+                doctors = doctorList
+                    .OrderBy(doctor => showcase.TryGetValue(doctor.Id, out var s) ? s.index : int.MaxValue)
+                    .Select(doctor =>
+                    {
+                        var p = showcase.TryGetValue(doctor.Id, out var s) ? s.d : null;
+                        return new
+                        {
+                            doctor.Id,
+                            name = doctor.FullName,
+                            doctor.Specialty,
+                            department = doctor.DepartmentName,
+                            isPublic = p != null,
+                            avatar = p?.AvatarUrl,
+                            degree = p?.AcademicTitle,
+                            years = p?.YearsOfExperience,
+                            shortBio = p?.ShortBio,
+                            biography = p?.Biography
+                        };
+                    }),
                 departments = departmentList.Select(department => new
                 {
                     department.Id,

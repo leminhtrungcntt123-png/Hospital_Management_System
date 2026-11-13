@@ -1,4 +1,4 @@
-// Illustrative career content, kept outside the server catalog until verified data is available.
+// Công trình tiêu biểu theo ảnh bác sĩ; học vị, kinh nghiệm, tiểu sử lấy từ server.
 const doctorCareerIntroductions = {
     'doctor-nam.jpg': {
         degree: 'Bác sĩ, Chuyên khoa I Nội khoa',
@@ -194,67 +194,76 @@ const doctorCareerIntroductions = {
     },
 };
 
+// academic_title lưu mã ngắn (VARCHAR 30) theo schema nhóm.
+const academicTitles = {
+    BS: 'Bác sĩ',
+    'ThS.BS': 'Thạc sĩ, Bác sĩ',
+    'TS.BS': 'Tiến sĩ, Bác sĩ',
+    'BS.CKI': 'Bác sĩ Chuyên khoa I',
+    'BS.CKII': 'Bác sĩ Chuyên khoa II',
+    'PGS.TS': 'Phó giáo sư, Tiến sĩ',
+};
+
 function doctorCareer(doctor) {
-    return (
-        doctorCareerIntroductions[doctor.illustration || doctorIllustrations[doctor.name]] || null
-    );
+    if (!doctor.degree) return null;
+    return {
+        degree: (academicTitles[doctor.degree] || doctor.degree) + ' ' + doctor.department,
+        years: doctor.years,
+        focus: doctor.specialty || doctor.department,
+        introduction: doctor.biography || doctor.shortBio || '',
+        publications: doctorCareerIntroductions[doctor.avatar]?.publications || [],
+    };
 }
 
 function doctorCareerSummary(doctor) {
     const career = doctorCareer(doctor);
-    return `<li>${icon('file')}<span><span class="doctor-meta-label">Học vấn ${career ? '<small>(minh hoạ)</small>' : ''}</span>${esc(career?.degree || 'Chưa cập nhật')}</span></li>
-        <li>${icon('clock')}<span><span class="doctor-meta-label">Kinh nghiệm ${career ? '<small>(minh hoạ)</small>' : ''}</span>${career ? esc(career.years) + ' năm · ' + esc(career.focus) : 'Chưa cập nhật'}</span></li>`;
+    return `<li>${icon('file')}<span><span class="doctor-meta-label">Học vấn</span>${esc(career?.degree || 'Chưa cập nhật')}</span></li>
+        <li>${icon('clock')}<span><span class="doctor-meta-label">Kinh nghiệm</span>${career ? esc(career.years) + ' năm · ' + esc(career.focus) : 'Chưa cập nhật'}</span></li>`;
 }
 
-function doctorProfile(doctor, illustrative) {
+function doctorProfile(doctor) {
     const career = doctorCareer(doctor);
-    const canBook = !illustrative && (!config.authenticated || config.role === 'PATIENT');
+    const canBook = !config.authenticated || config.role === 'PATIENT';
     const pendingCareer =
-        '<p class="doctor-profile-note">Quá trình đào tạo và công tác sẽ hiển thị khi bệnh viện cung cấp thông tin.</p>';
+        '<p class="doctor-profile-note">Quá trình đào tạo và công tác đang được cập nhật.</p>';
     const training = career
         ? `<ol class="doctor-career-list"><li><h3>Bác sĩ Y khoa</h3><p>Đào tạo nền tảng y khoa và thực hành chăm sóc người bệnh.</p></li>
         <li><h3>${esc(career.degree)}</h3><p>Đào tạo chuyên sâu trong lĩnh vực ${esc(career.focus)}.</p></li></ol>`
         : pendingCareer;
     const experience = career
         ? `<ol class="doctor-career-list"><li><h3>${esc(career.years)} năm kinh nghiệm chuyên môn</h3><p>Lĩnh vực ${esc(career.focus)}.</p></li>
-        <li><h3>Hoạt động chuyên môn</h3><p>Khám, theo dõi người bệnh và phối hợp chăm sóc trong phạm vi chuyên khoa ${esc(doctor.department || career.focus)}.</p></li></ol>`
+        <li><h3>Bác sĩ khoa ${esc(doctor.department)}</h3><p>Khám, theo dõi người bệnh và phối hợp chăm sóc tại Bệnh viện MediCare.</p></li></ol>`
         : pendingCareer;
-    const publications = career
-        ? `<p class="doctor-profile-note">Nội dung minh hoạ: các tên sách, bài viết và đề tài dưới đây là giả định, không phải tài liệu y khoa đã công bố.</p>
-            <ul class="doctor-career-list">${career.publications.map((title) => `<li><h3>${esc(title)}</h3></li>`).join('')}</ul>`
-        : '<p class="doctor-profile-note">Danh sách công bố và đề tài nghiên cứu sẽ được bổ sung khi có thông tin đã xác minh.</p>';
+    const publications = career?.publications.length
+        ? `<ul class="doctor-career-list">${career.publications.map((title) => `<li><h3>${esc(title)}</h3></li>`).join('')}</ul>`
+        : '<p class="doctor-profile-note">Danh sách công trình đang được cập nhật.</p>';
     return `<section class="doctor-profile-page">
         <nav class="doctor-profile-breadcrumb" aria-label="Đường dẫn hồ sơ bác sĩ">${link('Trang chủ', 'public/home')}${icon('chevron')}${link('Tìm bác sĩ', 'public/doctors')}${icon('chevron')}<span aria-current="page">${esc(doctor.name)}</span></nav>
         <section class="doctor-profile-layout">
             <aside class="doctor-profile-summary">
                 <header class="doctor-profile-identity">${doctorPhoto(doctor)}<div>
-                    <p class="doctor-profile-degree">${esc(career?.degree || 'Bác sĩ')} ${career ? '<span class="career-sample-label">Minh hoạ</span>' : ''}</p>
+                    <p class="doctor-profile-degree">${esc(career?.degree || 'Bác sĩ')}</p>
                     <h1 tabindex="-1">${esc(doctor.name)}</h1>
-                    ${canBook ? link('Đăng ký khám', 'public/booking?doctorId=' + encodeURIComponent(doctor.id), 'calendar', 'btn doctor-profile-booking') : ''}
-                    ${illustrative ? '<button class="btn doctor-profile-booking" type="button" disabled title="Hồ sơ minh hoạ chưa mở đặt lịch">Chưa có lịch khám</button>' : ''}
-                    ${!illustrative && config.authenticated && config.role !== 'PATIENT' ? `<a class="btn outline" href="${esc(config.home)}">Về bàn làm việc</a>` : ''}
+                    ${canBook ? link('Đăng ký khám', 'public/booking?doctorId=' + encodeURIComponent(doctor.id), 'calendar', 'btn doctor-profile-booking') : `<a class="btn outline" href="${esc(config.home)}">Về bàn làm việc</a>`}
                 </div></header>
-                <h2>Giới thiệu ${career ? '<span class="career-sample-label">Nội dung minh hoạ</span>' : ''}</h2>
-                <p>Hồ sơ chuyên môn của ${esc(doctor.name)}, lĩnh vực ${esc(doctor.specialty || doctor.department || 'chuyên môn')}.</p>
-                ${career ? `<p>${esc(career.introduction)}</p><p>Hồ sơ mẫu thể hiện trình độ ${esc(career.degree)} và ${esc(career.years)} năm kinh nghiệm trong lĩnh vực ${esc(career.focus)}.</p>` : ''}
-                <p class="doctor-profile-note">Ảnh, tiểu sử, học vấn, kinh nghiệm và các tên công trình đang dùng để minh hoạ, chưa phải thông tin đã xác minh.</p>
-                ${illustrative ? `<span class="catalog-badge illustration">Hồ sơ minh hoạ</span><p class="doctor-profile-note">Bác sĩ này chưa có lịch khám trong hệ thống.</p>${link('Tìm hiểu chuyên khoa', 'public/specialty/' + doctor.specialtyId, 'arrow', 'text-link')}` : ''}
+                <h2>Giới thiệu</h2>
+                <p>${esc(doctor.shortBio || 'Bác sĩ khoa ' + doctor.department + ', lĩnh vực ' + (doctor.specialty || doctor.department) + '.')}</p>
+                ${career?.introduction && career.introduction !== doctor.shortBio ? `<p>${esc(career.introduction)}</p>` : ''}
             </aside>
             <article class="doctor-profile-content" aria-label="Thông tin chuyên môn">
                 <dl class="doctor-profile-facts">
-                    <div><dt>Chức vụ</dt><dd>Bác sĩ chuyên khoa ${illustrative ? '<span class="career-sample-label">Minh hoạ</span>' : ''}</dd></div>
+                    <div><dt>Chức vụ</dt><dd>Bác sĩ chuyên khoa</dd></div>
                     <div><dt>Chuyên khoa</dt><dd>${esc(doctor.specialty || 'Chưa cập nhật')}</dd></div>
-                    <div><dt>Nơi làm việc ${illustrative ? '<span class="career-sample-label">Minh hoạ</span>' : ''}</dt><dd>Bệnh viện MediCare<br />${esc(doctor.department || 'Đơn vị đang cập nhật')}</dd></div>
-                    <div><dt>Số năm kinh nghiệm ${career ? '<span class="career-sample-label">Minh hoạ</span>' : ''}</dt><dd>${career ? esc(career.years) + ' năm' : 'Chưa cập nhật'}</dd></div>
+                    <div><dt>Nơi làm việc</dt><dd>Bệnh viện MediCare<br />Khoa ${esc(doctor.department)}</dd></div>
+                    <div><dt>Số năm kinh nghiệm</dt><dd>${career ? esc(career.years) + ' năm' : 'Chưa cập nhật'}</dd></div>
                 </dl>
-                ${doctorProfileSection('Quá trình đào tạo', training, Boolean(career))}
-                ${doctorProfileSection('Kinh nghiệm làm việc', experience, Boolean(career))}
-                ${doctorProfileSection('Sách, báo, công trình nghiên cứu', publications, Boolean(career))}
-                ${doctorProfileSection('Giải thưởng và ghi nhận', '<p class="doctor-profile-note">Thông tin giải thưởng và ghi nhận đang được cập nhật.</p>')}
+                ${doctorProfileSection('Quá trình đào tạo', training)}
+                ${doctorProfileSection('Kinh nghiệm làm việc', experience)}
+                ${doctorProfileSection('Sách, báo, công trình nghiên cứu', publications)}
             </article>
         </section></section>`;
 }
 
-function doctorProfileSection(title, content, illustrative = false) {
-    return `<details class="doctor-career-section" open><summary>${esc(title)}${illustrative ? '<span class="career-sample-label">Minh hoạ</span>' : ''}${icon('down')}</summary><div class="doctor-career-body">${content}</div></details>`;
+function doctorProfileSection(title, content) {
+    return `<details class="doctor-career-section" open><summary>${esc(title)}${icon('down')}</summary><div class="doctor-career-body">${content}</div></details>`;
 }

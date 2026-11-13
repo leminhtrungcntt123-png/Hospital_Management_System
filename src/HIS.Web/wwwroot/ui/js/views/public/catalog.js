@@ -9,34 +9,13 @@ function catalogStatus() {
 }
 
 function specialtiesPage() {
-    return `${pageIntro('CHUYÊN KHOA', 'Chuyên khoa', 'Thông tin khoa phòng từ bệnh viện.')}
-        <section class="listing-section">${
-            catalog.status !== 'ready'
-                ? catalogStatus()
-                : catalog.departments.length
-                  ? `<div class="specialty-detail-grid">${catalog.departments
-                        .map(
-                            (department) => `
-                <article class="specialty-detail"><span class="specialty-icon">${icon('building')}</span>
-                    <div><h2>${esc(department.name)}</h2><p>${esc(department.description)}</p>
-                        ${link('Xem đội ngũ bác sĩ', 'public/doctors?department=' + encodeURIComponent(department.name), 'arrow', 'text-link')}
-                    </div>
-                </article>`,
-                        )
-                        .join('')}</div>`
-                  : empty('Chưa có thông tin chuyên khoa')
-        }
-        </section>${specialtyIntroductionSection()}`;
+    return `${pageIntro('CHUYÊN KHOA', 'Chuyên khoa', 'Các chuyên khoa đang khám tại bệnh viện.')}
+        <section class="listing-section">${specialtyCards()}</section>`;
 }
 
 function doctorsPage() {
-    const departments = [
-        ...new Set([
-            ...catalog.departments.map((department) => department.name),
-            ...doctorIntroductions.map((doctor) => doctor.department),
-        ]),
-    ];
-    return `${pageIntro('ĐỘI NGŨ CHUYÊN MÔN', 'Bác sĩ của bạn', 'Tra cứu bác sĩ trong hệ thống và các hồ sơ giới thiệu có nhãn minh hoạ.')}
+    const departments = catalog.departments.map((department) => department.name);
+    return `${pageIntro('ĐỘI NGŨ CHUYÊN MÔN', 'Bác sĩ của bạn', 'Tra cứu đội ngũ bác sĩ đang khám tại bệnh viện.')}
         <section class="listing-section"><div class="listing-toolbar">
             <label class="search-input">${icon('search')}<input data-search value="${esc(ui.query)}" placeholder="Tìm bác sĩ hoặc chuyên khoa…" aria-label="Tìm bác sĩ hoặc chuyên khoa" /></label>
             <select data-department aria-label="Lọc khoa bác sĩ"><option value="">Tất cả khoa</option>
@@ -46,14 +25,14 @@ function doctorsPage() {
 }
 
 function doctorList(route = 'public/doctors') {
-    const matchesDoctor = (doctor) =>
-        matched(doctor.name + ' ' + doctor.specialty + ' ' + doctor.department) &&
-        (!ui.department || doctor.department === ui.department);
-    const doctors = catalog.doctors.filter(matchesDoctor);
-    const introductions = doctorIntroductions.filter(matchesDoctor);
     const results = ['idle', 'loading'].includes(catalog.status)
         ? []
-        : [...doctors, ...introductions];
+        : catalog.doctors.filter(
+              (doctor) =>
+                  doctor.isPublic &&
+                  matched(doctor.name + ' ' + doctor.specialty + ' ' + doctor.department) &&
+                  (!ui.department || doctor.department === ui.department),
+          );
     const pageCount = Math.max(1, Math.ceil(results.length / 4));
     const page = Math.max(1, Math.min(ui.doctorPage, pageCount));
     const start = (page - 1) * 4;
@@ -62,9 +41,7 @@ function doctorList(route = 'public/doctors') {
         ${catalog.status !== 'ready' ? catalogStatus() : ''}
         ${
             results.length
-                ? `<div class="catalog-results-meta"><p>Hiển thị <strong>${start + 1}–${Math.min(start + 4, results.length)}</strong> trên <strong>${results.length}</strong> hồ sơ</p>
-                <span>${doctors.length} trong hệ thống · ${introductions.length} minh hoạ</span></div>
-                ${visibleDoctors.some((doctor) => doctor.kind === 'illustration') ? introductionNotice() : ''}
+                ? `<div class="catalog-results-meta"><p>Hiển thị <strong>${start + 1}–${Math.min(start + 4, results.length)}</strong> trên <strong>${results.length}</strong> bác sĩ</p></div>
                 <div class="doctor-grid">${visibleDoctors.map(doctorCard).join('')}</div>
                 ${doctorPagination(page, pageCount, route)}`
                 : catalog.status === 'ready'
@@ -104,11 +81,10 @@ function doctorPagination(page, pageCount, listRoute = 'public/doctors') {
 }
 
 function doctorDetail(id) {
-    const introduction = doctorIntroductions.find((item) => item.id === id);
-    if (!introduction && catalog.status !== 'ready') return catalogStatus();
-    const doctor = introduction || catalog.doctors.find((item) => String(item.id) === id);
+    if (catalog.status !== 'ready') return catalogStatus();
+    const doctor = catalog.doctors.find((item) => String(item.id) === id);
     if (!doctor) return empty('Không tìm thấy thông tin bác sĩ');
-    return doctorProfile(doctor, Boolean(introduction));
+    return doctorProfile(doctor);
 }
 
 function servicesPage() {

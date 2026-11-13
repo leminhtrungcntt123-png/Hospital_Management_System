@@ -45,18 +45,18 @@ public static class DevDataSeeder
             }
 
             // 2. DANH MỤC KHOA PHÒNG
-            var deptNoi = await db.Departments.FirstOrDefaultAsync(d => d.Name.Contains("Nội"));
+            var deptNoi = await db.Departments.FirstOrDefaultAsync(d => d.Name == "Nội tổng quát");
             if (deptNoi == null)
             {
-                deptNoi = new Department { Name = "Khoa Nội tổng quát", Description = "Khám và điều trị nội khoa" };
+                deptNoi = new Department { Name = "Nội tổng quát", Description = "Khám và điều trị bệnh lý nội khoa người lớn: tăng huyết áp, đái tháo đường, bệnh mạn tính." };
                 db.Departments.Add(deptNoi);
                 await db.SaveChangesAsync();
             }
 
-            var deptNgoai = await db.Departments.FirstOrDefaultAsync(d => d.Name.Contains("Ngoại"));
+            var deptNgoai = await db.Departments.FirstOrDefaultAsync(d => d.Name == "Ngoại tổng quát");
             if (deptNgoai == null)
             {
-                deptNgoai = new Department { Name = "Khoa Ngoại tổng quát", Description = "Khám và phẫu thuật ngoại khoa" };
+                deptNgoai = new Department { Name = "Ngoại tổng quát", Description = "Khám ngoại khoa, xử trí chấn thương và tư vấn phẫu thuật." };
                 db.Departments.Add(deptNgoai);
                 await db.SaveChangesAsync();
             }
@@ -856,6 +856,11 @@ public static class DevDataSeeder
                 );
                 await db.SaveChangesAsync();
             }
+
+            // 18. CHUYÊN KHOA + ĐỘI NGŨ BÁC SĨ CỔNG BỆNH NHÂN, rồi sinh khung giờ để đặt lịch được ngay
+            await DevCatalogSeeder.SeedAsync(db, passwordHash, headAcc1.Id);
+            var slotService = scope.ServiceProvider.GetRequiredService<HIS.BLL.Services.ISlotGenerationService>();
+            await slotService.GenerateSlotsAsync(currentDay, currentDay.AddDays(14));
 
             logger.LogInformation("DevDataSeeder: Đã nạp đầy đủ dữ liệu mẫu thực tế cho Bác sĩ, Bệnh nhân, Hàng chờ, Bệnh án, Thu ngân, Tạm ứng và Thẻ BHYT.");
         }
