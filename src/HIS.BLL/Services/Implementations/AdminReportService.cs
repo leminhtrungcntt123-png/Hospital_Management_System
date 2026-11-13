@@ -10,12 +10,15 @@ namespace HIS.BLL.Services;
 
 public sealed class AdminReportService(AppDbContext db) : IAdminReportService
 {
+    private static void ValidateReportRange(DateOnly from, DateOnly to) =>
+        AdminRules.Require(from <= to && to < DateOnly.MaxValue && to.DayNumber - from.DayNumber <= 365,
+            "Chọn khoảng báo cáo từ 1 đến 366 ngày.");
+
     public async Task<RevenueReport> GetRevenueAsync(
         int actorId, DateOnly from, DateOnly to, CancellationToken ct = default)
     {
         await AdminRules.RequireAdminAsync(db, actorId, ct);
-        AdminRules.Require(from <= to && to < DateOnly.MaxValue && to.DayNumber - from.DayNumber <= 365,
-            "Chọn khoảng báo cáo từ 1 đến 366 ngày.");
+        ValidateReportRange(from, to);
 
         var start = from.ToDateTime(TimeOnly.MinValue);
         var end = to.AddDays(1).ToDateTime(TimeOnly.MinValue);
@@ -83,6 +86,7 @@ public sealed class AdminReportService(AppDbContext db) : IAdminReportService
         int actorId, DateOnly from, DateOnly to, CancellationToken ct = default)
     {
         await AdminRules.RequireAdminAsync(db, actorId, ct);
+        ValidateReportRange(from, to);
         var start = from.ToDateTime(TimeOnly.MinValue);
         var end = to.AddDays(1).ToDateTime(TimeOnly.MinValue);
 

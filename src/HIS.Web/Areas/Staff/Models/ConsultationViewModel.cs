@@ -20,7 +20,8 @@ public record ConsultationQueueItemDto(
     int? Spo2,
     decimal? Weight,
     string? DoctorName = null,
-    string? RoomNumber = null
+    string? RoomNumber = null,
+    int StatusId = (int)AppointmentStatusId.ReadyForDoctor
 );
 
 public record ConsultationLabItemDto(

@@ -102,7 +102,8 @@ public record ScheduleRequestRow(
     string? Replacement,
     bool CanApprove,
     bool CanReject,
-    IReadOnlyList<AdminOption> Replacements);
+    IReadOnlyList<AdminOption> Replacements,
+    DateTime? ApprovedAt = null);
 
 public record ScheduleDecisionResult(
     int Transferred,
