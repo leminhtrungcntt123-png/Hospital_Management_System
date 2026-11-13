@@ -1615,6 +1615,14 @@ else if (tab == "my-schedule")
     var totalBookedCount = myApprovedSchedules.Sum(s => s.BookedAppointmentsCount);
     var weekDutyCount = myDutyShifts.Count(ds => Model.WeekDates.Contains(DateOnly.FromDateTime(ds.StartTime)));
 
+    @if (ViewBag.UnlinkedAccountMessage != null)
+    {
+        <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:12px 16px; margin-bottom:14px; color:#92400e; font-size:13px; display:flex; align-items:center; gap:8px;">
+            <span>⚠️</span>
+            <span>@ViewBag.UnlinkedAccountMessage</span>
+        </div>
+    }
+
     <!-- PAGE HEADING CHO TAB LỊCH CỦA TÔI -->
     <div class="page-heading" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
         <div style="display:flex; align-items:center; gap:14px;">
@@ -1639,13 +1647,19 @@ else if (tab == "my-schedule")
                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
                 <span>👥 Xem lịch bác sĩ khác</span>
             </a>
-            <button type="button" class="btn outline" onclick="openDutyModalWithStaff(@headDocAccountId, '@Model.Today.ToString("yyyy-MM-dd")')" style="border-color:#0f172a; color:#0f172a;">
-                <span>🌙 + Đăng ký trực đêm</span>
-            </button>
-            <button type="button" class="btn primary" onclick="openScheduleModalWithData(@headDocId, 0, @((int)Model.Today.DayOfWeek), 0, '07:30', '11:30', 40, 28, 0, '@Model.Today.ToString("yyyy-MM-dd")')" style="background:#0284c7; border-color:#0284c7;">
-                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                <span>+ Thêm ca khám của tôi</span>
-            </button>
+            @if (headDocAccountId > 0)
+            {
+                <button type="button" class="btn outline" onclick="openDutyModalWithStaff(@headDocAccountId, '@Model.Today.ToString("yyyy-MM-dd")')" style="border-color:#0f172a; color:#0f172a;">
+                    <span>🌙 + Đăng ký trực đêm</span>
+                </button>
+            }
+            @if (headDocId > 0)
+            {
+                <button type="button" class="btn primary" onclick="openScheduleModalWithData(@headDocId, 0, @((int)Model.Today.DayOfWeek), 0, '07:30', '11:30', 40, 28, 0, '@Model.Today.ToString("yyyy-MM-dd")')" style="background:#0284c7; border-color:#0284c7;">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    <span>+ Thêm ca khám của tôi</span>
+                </button>
+            }
         </div>
     </div>
 
@@ -2976,11 +2990,11 @@ else
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
                     <div>
                         <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Ngày chuyển sang *</label>
-                        <input type="date" name="targetDate" id="reallocTargetDate" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" required />
+                        <input type="date" name="targetDate" id="reallocTargetDate" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" required onchange="onReallocateTargetChanged()" />
                     </div>
                     <div>
                         <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Ca chuyển sang *</label>
-                        <select name="targetShift" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" required>
+                        <select name="targetShift" id="reallocTargetShift" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" required onchange="onReallocateTargetChanged()">
                             <option value="Morning">🌅 Ca Sáng (07:30–11:30)</option>
                             <option value="Afternoon">🌇 Ca Chiều (13:00–16:30)</option>
                         </select>
@@ -3873,6 +3887,8 @@ else
     // ========================================================
 
     let cachedAvailableRooms = [];
+    let dmModalReqSeq = 0;
+    let dmInlineReqSeq = 0;
 
     function openDecisionMatrixQuick() {
         if ('@tab' === 'bidding') {
@@ -3896,6 +3912,7 @@ else
     }
 
     function loadDecisionMatrix(workDate, shift) {
+        const seq = ++dmModalReqSeq;
         const dateInput = document.getElementById('dmDateSelect');
         const shiftInput = document.getElementById('dmShiftSelect');
         const modal = document.getElementById('decisionMatrixModal');
@@ -3927,6 +3944,7 @@ else
                 return res.json();
             })
             .then(data => {
+                if (seq !== dmModalReqSeq) return;
                 if (loading) loading.style.display = 'none';
                 cachedAvailableRooms = data.availableRooms || [];
 
@@ -4000,7 +4018,7 @@ else
                         }
                     } else if (isRejected) {
                         actionHtml = `
-                            <button type="button" class="btn outline sm" onclick="openReallocateModal(${c.scheduleId}, '${escapeHtml(c.doctorName)}')" style="padding:4px 10px; font-size:11.5px; border-color:#d97706; color:#d97706; font-weight:600;">
+                            <button type="button" class="btn outline sm btn-reallocate" data-schedule-id="${c.scheduleId}" data-doctor-name="${escapeHtml(c.doctorName)}" onclick="onReallocateButtonClick(this)" style="padding:4px 10px; font-size:11.5px; border-color:#d97706; color:#d97706; font-weight:600;">
                                 🔀 Điều chuyển bù
                             </button>
                         `;
@@ -4031,6 +4049,7 @@ else
                 tbody.innerHTML = html;
             })
             .catch(err => {
+                if (seq !== dmModalReqSeq) return;
                 if (loading) loading.style.display = 'none';
                 alert(err.message || 'Lỗi khi tải bảng quyết định.');
             });
@@ -4078,6 +4097,42 @@ else
         form.submit();
     }
 
+    function onReallocateButtonClick(btn) {
+        if (!btn) return;
+        const scheduleId = btn.dataset.scheduleId;
+        const doctorName = btn.dataset.doctorName || '';
+        openReallocateModal(scheduleId, doctorName);
+    }
+
+    function onReallocateTargetChanged() {
+        const targetDate = document.getElementById('reallocTargetDate')?.value;
+        const targetShift = document.getElementById('reallocTargetShift')?.value || 'Morning';
+        const roomSelect = document.getElementById('reallocTargetRoomId');
+        if (!roomSelect || !targetDate) return;
+
+        roomSelect.innerHTML = '<option value="">⏳ Đang tải buồng khám khả dụng...</option>';
+        fetch(`/Staff/Schedule/GetDecisionMatrix?workDate=${encodeURIComponent(targetDate)}&shift=${encodeURIComponent(targetShift)}`)
+            .then(res => {
+                if (!res.ok) throw new Error('Không thể tải danh sách phòng.');
+                return res.json();
+            })
+            .then(data => {
+                const rooms = data.availableRooms || [];
+                if (rooms.length === 0) {
+                    roomSelect.innerHTML = '<option value="">🔒 Đã hết buồng trống trong ca này</option>';
+                } else {
+                    let options = '<option value="">-- Chọn buồng khám --</option>';
+                    rooms.forEach(r => {
+                        options += `<option value="${r.id}">${r.roomNumber} - ${r.roomName}</option>`;
+                    });
+                    roomSelect.innerHTML = options;
+                }
+            })
+            .catch(() => {
+                roomSelect.innerHTML = '<option value="">Lỗi tải danh sách buồng khám</option>';
+            });
+    }
+
     function openReallocateModal(oldScheduleId, doctorName) {
         const idInput = document.getElementById('reallocOldScheduleId');
         const nameEl = document.getElementById('reallocDoctorName');
@@ -4091,21 +4146,18 @@ else
         if (reallocDate && curDate) reallocDate.value = curDate;
         if (reallocShift && curShift) reallocShift.value = curShift;
 
-        // Populate available rooms dropdown
-        const roomSelect = document.getElementById('reallocTargetRoomId');
-        if (roomSelect) {
-            let options = '';
-            cachedAvailableRooms.forEach(r => {
-                options += `<option value="${r.id}">${r.roomNumber} - ${r.roomName}</option>`;
-            });
-            roomSelect.innerHTML = options;
-        }
-
-        // Set default target date to current select date
+        // Set default target date & shift to current select date & shift
         const targetDateInput = document.getElementById('reallocTargetDate');
         if (targetDateInput && curDate) {
             targetDateInput.value = curDate;
         }
+        const targetShiftInput = document.getElementById('reallocTargetShift');
+        if (targetShiftInput && curShift) {
+            targetShiftInput.value = curShift;
+        }
+
+        // Fetch free rooms specifically for the chosen target date & shift
+        onReallocateTargetChanged();
 
         document.getElementById('reallocateModal')?.classList.add('show');
     }
@@ -4172,6 +4224,7 @@ else
     }
 
     function loadDecisionMatrixInline(workDate, shift) {
+        const seq = ++dmInlineReqSeq;
         const loading = document.getElementById('dmInlineLoading');
         const tableContainer = document.getElementById('dmInlineTableContainer');
         const emptyState = document.getElementById('dmInlineEmpty');
@@ -4195,6 +4248,7 @@ else
                 return res.json();
             })
             .then(data => {
+                if (seq !== dmInlineReqSeq) return;
                 if (loading) loading.style.display = 'none';
                 cachedAvailableRooms = data.availableRooms || [];
 
@@ -4261,7 +4315,7 @@ else
                         }
                     } else if (isRejected) {
                         actionHtml = `
-                            <button type="button" class="btn outline sm" onclick="openReallocateModal(${c.scheduleId}, '${escapeHtml(c.doctorName)}')" style="padding:4px 10px; font-size:11.5px; border-color:#d97706; color:#d97706; font-weight:600;">
+                            <button type="button" class="btn outline sm btn-reallocate" data-schedule-id="${c.scheduleId}" data-doctor-name="${escapeHtml(c.doctorName)}" onclick="onReallocateButtonClick(this)" style="padding:4px 10px; font-size:11.5px; border-color:#d97706; color:#d97706; font-weight:600;">
                                 🔀 Điều chuyển bù
                             </button>
                         `;
@@ -4292,6 +4346,7 @@ else
                 tbody.innerHTML = html;
             })
             .catch(err => {
+                if (seq !== dmInlineReqSeq) return;
                 if (loading) loading.style.display = 'none';
                 alert(err.message || 'Lỗi khi tải bảng quyết định.');
             });

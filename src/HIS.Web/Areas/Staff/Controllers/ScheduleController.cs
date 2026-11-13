@@ -131,9 +131,11 @@ public class ScheduleController : Controller
             ? await _departmentHeadService.GetPatientsAsync(departmentId, ct)
             : (IReadOnlyList<DepartmentPatientListItemDto>)[];
 
-        var headDoctor = doctors.FirstOrDefault(d => d.AccountId == accountId)
-            ?? doctors.FirstOrDefault(d => d.Specialty.Contains("chuyên sâu") || d.FullName.Contains("Hằng"))
-            ?? doctors.FirstOrDefault();
+        var headDoctor = doctors.FirstOrDefault(d => d.AccountId == accountId);
+        if (headDoctor == null && activeTab == "my-schedule")
+        {
+            ViewBag.UnlinkedAccountMessage = "Tài khoản hiện tại chưa được liên kết với hồ sơ bác sĩ trong khoa. Vui lòng liên hệ Quản trị viên để gán tài khoản với hồ sơ Bác sĩ.";
+        }
 
         var vm = new ScheduleViewModel
         {
