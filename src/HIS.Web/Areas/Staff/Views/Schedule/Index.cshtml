@@ -2631,6 +2631,8 @@ else
         </div>
     </section>
 
+}
+
     <!-- Modal Phân ca trực đêm -->
     <div id="dutyModal" class="app-modal-backdrop">
         <div class="app-modal-card">
@@ -2683,52 +2685,6 @@ else
                 <div class="app-modal-footer">
                     <button type="button" class="btn ghost" onclick="closeDutyModal()">Hủy</button>
                     <button type="submit" class="btn primary">Lưu phân công</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal: Mở đợt đăng ký lịch (Shift Bidding Period) -->
-    <div id="createPeriodModal" class="app-modal-backdrop">
-        <div class="app-modal-card">
-            <div class="app-modal-header">
-                <div>
-                    <h5 style="margin:0; font-size:15px; font-weight:700;">Mở đợt đăng ký lịch khám</h5>
-                    <small style="color:#94a3b8; font-size:12px;">Thiết lập khoảng thời gian làm việc và thời hạn bác sĩ đăng ký</small>
-                </div>
-                <button type="button" class="app-modal-close" onclick="closeCreatePeriodModal()">✕</button>
-            </div>
-            <form asp-area="Staff" asp-controller="Schedule" asp-action="CreatePeriod" method="post">
-                @Html.AntiForgeryToken()
-                <div class="app-modal-body">
-                    <div style="margin-bottom:12px;">
-                        <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Tên đợt đăng ký *</label>
-                        <input type="text" name="name" class="form-control" placeholder="VD: Lịch làm việc Tuần 48 (23/11 - 27/11/2026)" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" required />
-                    </div>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
-                        <div>
-                            <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Từ ngày *</label>
-                            <input type="date" name="startDate" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" required />
-                        </div>
-                        <div>
-                            <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Đến ngày *</label>
-                            <input type="date" name="endDate" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" required />
-                        </div>
-                    </div>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
-                        <div>
-                            <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Mở cổng lúc *</label>
-                            <input type="datetime-local" name="biddingOpensAt" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" required />
-                        </div>
-                        <div>
-                            <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Đóng cổng lúc *</label>
-                            <input type="datetime-local" name="biddingClosesAt" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" required />
-                        </div>
-                    </div>
-                </div>
-                <div class="app-modal-footer">
-                    <button type="button" class="btn ghost" onclick="closeCreatePeriodModal()">Hủy bỏ</button>
-                    <button type="submit" class="btn primary">Tạo đợt đăng ký</button>
                 </div>
             </form>
         </div>
@@ -2890,7 +2846,53 @@ else
         <input type="hidden" name="returnTab" value="@tab" />
         <input type="hidden" name="id" id="deleteDutyIdInput" value="" />
     </form>
-}
+
+    <!-- Modal: Mở đợt đăng ký lịch (Shift Bidding Period) -->
+    <div id="createPeriodModal" class="app-modal-backdrop">
+        <div class="app-modal-card">
+            <div class="app-modal-header">
+                <div>
+                    <h5 style="margin:0; font-size:15px; font-weight:700;">Mở đợt đăng ký lịch khám</h5>
+                    <small style="color:#94a3b8; font-size:12px;">Thiết lập khoảng thời gian làm việc và thời hạn bác sĩ đăng ký</small>
+                </div>
+                <button type="button" class="app-modal-close" onclick="closeCreatePeriodModal()">✕</button>
+            </div>
+            <form asp-area="Staff" asp-controller="Schedule" asp-action="CreatePeriod" method="post">
+                @Html.AntiForgeryToken()
+                <div class="app-modal-body">
+                    <div style="margin-bottom:12px;">
+                        <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Tên đợt đăng ký *</label>
+                        <input type="text" name="name" class="form-control" placeholder="VD: Lịch làm việc Tuần 48 (23/11 - 27/11/2026)" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" required />
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+                        <div>
+                            <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Từ ngày *</label>
+                            <input type="date" name="startDate" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" required />
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Đến ngày *</label>
+                            <input type="date" name="endDate" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" required />
+                        </div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+                        <div>
+                            <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Mở cổng lúc *</label>
+                            <input type="datetime-local" name="biddingOpensAt" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" required />
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Đóng cổng lúc *</label>
+                            <input type="datetime-local" name="biddingClosesAt" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" required />
+                        </div>
+                    </div>
+                </div>
+                <div class="app-modal-footer">
+                    <button type="button" class="btn ghost" onclick="closeCreatePeriodModal()">Hủy bỏ</button>
+                    <button type="submit" class="btn primary">Tạo đợt đăng ký</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
 
 <!-- Modal: Bảng Chỉ Số Quyết Định & Điều Phối Ca (Decision Matrix) -->
 <div id="decisionMatrixModal" class="app-modal-backdrop">
