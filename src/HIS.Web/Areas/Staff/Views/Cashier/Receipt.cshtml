@@ -139,7 +139,7 @@
 
         <div class="invoice-title">
             <h1>BIÊN LAI THU VIỆN PHÍ</h1>
-            <p>Liên 2: Giao cho người bệnh · Ngày thu: @(Model.PaidAt?.ToString("dd/MM/yyyy HH:mm") ?? DateTime.Now.ToString("dd/MM/yyyy HH:mm"))</p>
+            <p>Liên 2: Giao cho người bệnh · Ngày thu: @(Model.PaidAt?.ToString("dd/MM/yyyy HH:mm") ?? "Chưa thanh toán")</p>
         </div>
 
         <div class="patient-info">

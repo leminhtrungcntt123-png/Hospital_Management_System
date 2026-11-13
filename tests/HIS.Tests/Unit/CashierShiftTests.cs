@@ -18,31 +18,19 @@ public class CashierShiftTests
     public async Task OpenAndCloseShift_Workflow_WorksAsExpected()
     {
         await using var db = CreateDb();
-        var cashier = await db.Accounts.FirstOrDefaultAsync(a => a.Username == "ketoan");
-        if (cashier == null)
+        var unique = Guid.NewGuid().ToString("N")[..8];
+        var cashier = new Account
         {
-            var unique = Guid.NewGuid().ToString("N")[..8];
-            cashier = new Account
-            {
-                Username = $"ketoan_{unique}",
-                Email = $"shift_{unique}@his.local",
-                PasswordHash = "hash",
-                RoleId = (int)RoleId.Accountant,
-                IsActive = true
-            };
-            db.Accounts.Add(cashier);
-            await db.SaveChangesAsync();
-        }
+            Username = $"ketoan_{unique}",
+            Email = $"shift_{unique}@his.local",
+            PasswordHash = "hash",
+            RoleId = (int)RoleId.Accountant,
+            IsActive = true
+        };
+        db.Accounts.Add(cashier);
+        await db.SaveChangesAsync();
 
         var shiftService = new CashierShiftService(db, new VietnamTimeProvider());
-
-        // Đóng bất kỳ ca mở cũ nào của user này để test sạch
-        var old = await db.CashierShifts.Where(s => s.CashierId == cashier.Id && s.Status == ShiftStatus.Open).ToListAsync();
-        foreach (var s in old)
-        {
-            s.Status = ShiftStatus.Closed;
-        }
-        await db.SaveChangesAsync();
 
         // 1. Mở ca
         var openRes = await shiftService.OpenShiftAsync(new OpenShiftRequest(cashier.Id, 1000000m, "Test mở ca"));
@@ -111,17 +99,35 @@ public class CashierShiftTests
 
         // 2. Thử thanh toán viện phí khi chưa mở ca -> phải trả về SHIFT_REQUIRED
         var app = await db.Appointments.FirstOrDefaultAsync(a => a.Invoice == null || a.Invoice.Status != InvoiceStatus.Paid);
-        if (app != null)
+        if (app == null)
         {
-            var checkoutRes = await billingService.CheckoutInvoiceAsync(new CheckoutInvoiceRequest(
-                app.Id,
-                PaymentMethod.Cash,
-                null,
-                "Thanh toán test",
-                cashier.Id));
-
-            Assert.False(checkoutRes.IsSuccess);
-            Assert.Equal("SHIFT_REQUIRED", checkoutRes.Error.Code);
+            var doctor = await db.Doctors.FirstAsync();
+            var dept = await db.Departments.FirstAsync();
+            var slot = await db.AppointmentSlots.FirstOrDefaultAsync();
+            app = new Appointment
+            {
+                PatientId = patient.Id,
+                DoctorId = doctor.Id,
+                DepartmentId = dept.Id,
+                SlotId = slot?.Id,
+                AppointmentCode = $"AP-{unique}",
+                StatusId = (int)AppointmentStatusId.CheckedIn,
+                CreatedAt = DateTime.Now
+            };
+            db.Appointments.Add(app);
+            await db.SaveChangesAsync();
         }
+
+        Assert.NotNull(app);
+
+        var checkoutRes = await billingService.CheckoutInvoiceAsync(new CheckoutInvoiceRequest(
+            app.Id,
+            PaymentMethod.Cash,
+            null,
+            "Thanh toán test",
+            cashier.Id));
+
+        Assert.False(checkoutRes.IsSuccess);
+        Assert.Equal("SHIFT_REQUIRED", checkoutRes.Error.Code);
     }
 }

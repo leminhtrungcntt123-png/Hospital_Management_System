@@ -26,7 +26,15 @@ public static class DevDataSeeder
 
         try
         {
-            await db.Database.ExecuteSqlRawAsync("ALTER TABLE deposits ADD COLUMN IF NOT EXISTS approved_by character varying(150);");
+            await db.Database.ExecuteSqlRawAsync(@"
+                ALTER TABLE deposits ADD COLUMN IF NOT EXISTS approved_by character varying(150);
+                ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS service_id integer REFERENCES services(id);
+                ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS medication_id integer REFERENCES medications(id);
+                CREATE SEQUENCE IF NOT EXISTS seq_invoice_number START WITH 100 INCREMENT BY 1;
+                CREATE SEQUENCE IF NOT EXISTS seq_transaction_code START WITH 200 INCREMENT BY 1;
+                CREATE SEQUENCE IF NOT EXISTS seq_deposit_code START WITH 100 INCREMENT BY 1;
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_cashier_shifts_one_open_per_cashier ON cashier_shifts(cashier_id) WHERE status = 'OPEN';
+            ");
             var passwordHash = BCrypt.Net.BCrypt.HashPassword(defaultPassword);
 
             // 1. TÀI KHOẢN ADMIN
@@ -721,6 +729,7 @@ public static class DevDataSeeder
 
             if (!await db.Deposits.AnyAsync() && pChi != null)
             {
+                await using var depositTx = await db.Database.BeginTransactionAsync();
                 // Phiếu 1: Lê Minh Chí - 2.000.000 đ Tiền mặt
                 var dep1 = new Deposit
                 {
@@ -828,6 +837,7 @@ public static class DevDataSeeder
                     });
                 }
                 await db.SaveChangesAsync();
+                await depositTx.CommitAsync();
             }
 
             // 17. NHẬT KÝ TRUY VẾT MẪU (AccessLogs)

@@ -71,12 +71,12 @@
         </div>
     }
 
-    <!-- KHỐI TRA CỨU BỆNH NHÂN ĐẾN QUẦY (1 CỘT TOÀN MÀN HÌNH, KHÔNG HIỂN THỊ DANH SÁCH DƯ THỪA BÊN TRÁI) -->
+    <!-- KHỐI TRA CỨU BỆNH NHÂN ĐẾN QUẦY (1 CỘT TOÀN MÀN HÌNH, CHỈ TRA CỨU MÃ BN & CCCD CHO HỒ SƠ CHƯA ĐÓNG TIỀN) -->
     <section style="background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 18px 20px; margin-bottom: 20px; box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);">
         <form asp-action="Index" method="get" style="display: flex; gap: 10px; align-items: center;">
             <div style="flex: 1; position: relative;">
                 <input id="cashier-search" name="search" value="@search" maxlength="60" class="form-control"
-                       placeholder="🔍 Quét mã vạch hoặc nhập Mã BN (VD: 00000001, 00000007), Số CCCD, SĐT, Họ tên hoặc Mã phiếu tạm ứng (TU-...)..."
+                       placeholder="🔍 Quét mã vạch hoặc nhập Mã bệnh nhân (VD: 00000001, BN0006) hoặc Số CCCD (12 số) để tra cứu hồ sơ chưa đóng tiền..."
                        style="width: 100%; padding: 11px 16px; border: 1.5px solid #94a3b8; border-radius: 8px; font-size: 14.5px; font-weight: 500; color: #0f172a;" />
             </div>
             <button class="btn primary" type="submit" style="padding: 11px 24px; font-size: 14px; font-weight: 700; border-radius: 8px; white-space: nowrap;">
@@ -90,10 +90,10 @@
             }
         </form>
 
-        @if (!string.IsNullOrWhiteSpace(search) && Model.Count == 0)
+        @if (!string.IsNullOrWhiteSpace(search) && Model.Count == 0 && selected == null)
         {
             <div style="margin-top: 12px; background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; padding: 10px 14px; border-radius: 8px; font-size: 13.5px; font-weight: 600;">
-                ⚠️ Không tìm thấy hồ sơ viện phí hoặc phiếu tạm ứng nào khớp với từ khóa "<strong>@search</strong>". Vui lòng kiểm tra lại Mã BN, CCCD hoặc SĐT.
+                ⚠️ Không tìm thấy hồ sơ viện phí chưa đóng tiền nào khớp với Mã BN / Số CCCD "<strong>@search</strong>" (Hồ sơ không tồn tại hoặc đã thanh toán).
             </div>
         }
 
@@ -155,7 +155,40 @@
 
     <!-- KHỐI NỘI DUNG CHÍNH TOÀN MÀN HÌNH (100% WIDTH): BẢNG KÊ VIỆN PHÍ, BHYT, TẠM ỨNG & QUYẾT TOÁN -->
     <section id="right-detail-container" style="background: #ffffff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 24px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); min-height: 460px; transition: opacity 0.15s ease;">
-        @await Html.PartialAsync("_InvoiceDetail", selected)
+        @if (selected != null)
+        {
+            @await Html.PartialAsync("_InvoiceDetail", selected)
+        }
+        else if (string.IsNullOrWhiteSpace(search))
+        {
+            <div style="text-align: center; padding: 56px 24px; color: #475569; background: #f8fafc; border: 1.5px dashed #cbd5e1; border-radius: 12px;">
+                <div style="font-size: 42px; margin-bottom: 12px;">🏥</div>
+                <h3 style="font-size: 18px; font-weight: 800; color: #1e293b; margin: 0 0 8px;">Quầy thu viện phí, BHYT &amp; tất toán tạm ứng</h3>
+                <p style="font-size: 14px; color: #64748b; margin: 0 auto 20px; max-width: 580px; line-height: 1.6;">
+                    Khi người bệnh đến quầy thanh toán, vui lòng nhập <strong>Mã bệnh nhân (Mã BN)</strong> hoặc <strong>Số CCCD</strong> vào thanh tra cứu phía trên để mở bảng kê các hồ sơ viện phí chưa thanh toán.
+                </p>
+                <div style="display: inline-grid; grid-template-columns: repeat(2, minmax(240px, 300px)); gap: 14px; text-align: left;">
+                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px;">
+                        <div style="font-weight: 800; color: #0284c7; font-size: 13px; margin-bottom: 4px;">1. Thu tiền dịch vụ &amp; thuốc</div>
+                        <div style="font-size: 12px; color: #64748b; line-height: 1.45;">Tổng hợp công khám, cận lâm sàng, thuốc kê đơn, trừ BHYT &amp; tạm ứng. Hỗ trợ máy tính tiền thừa và quét VietQR.</div>
+                    </div>
+                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px;">
+                        <div style="font-weight: 800; color: #15803d; font-size: 13px; margin-bottom: 4px;">2. Hoàn trả tiền mặt cho người bệnh</div>
+                        <div style="font-size: 12px; color: #64748b; line-height: 1.45;">Tự động khấu trừ viện phí từ các phiếu tạm ứng đã nộp và chi hoàn số tiền thừa bằng tiền mặt tại quầy.</div>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div style="text-align: center; padding: 56px 24px; color: #64748b; background: #fff1f2; border: 1.5px dashed #fda4af; border-radius: 12px;">
+                <div style="font-size: 38px; margin-bottom: 10px;">🔍</div>
+                <h3 style="font-size: 16px; font-weight: 700; color: #9f1239; margin-bottom: 6px;">Không tìm thấy hồ sơ viện phí chưa đóng tiền</h3>
+                <p style="font-size: 13.5px; color: #881337; margin: 0 auto; max-width: 480px; line-height: 1.5;">
+                    Không tìm thấy hồ sơ viện phí chưa thanh toán nào khớp với Mã BN / Số CCCD <strong>"@search"</strong> (Hồ sơ không tồn tại hoặc đã được thanh toán hoàn tất).
+                </p>
+            </div>
+        }
     </section>
 </div>
 
@@ -210,17 +243,50 @@
 }
 
 @section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
         var isShiftOpen = @(shift != null ? "true" : "false");
         var currentSettleMethod = 'Cash';
+        var detailLoadSeq = 0;
+        var settleQrSeq = 0;
 
         function getAntiForgeryToken() {
             return document.querySelector('#anti-forgery-token-holder input[name="__RequestVerificationToken"]')?.value || '';
         }
 
+        @if (TempData["SuccessMessage"] is string swalSuccess)
+        {
+            <text>
+            document.addEventListener('DOMContentLoaded', function() {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Thành công',
+                    text: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(swalSuccess)),
+                    confirmButtonColor: '#15803d',
+                    timer: 3000,
+                    timerProgressBar: true
+                });
+            });
+            </text>
+        }
+        @if (TempData["ErrorMessage"] is string swalError)
+        {
+            <text>
+            document.addEventListener('DOMContentLoaded', function() {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Thông báo lỗi',
+                    text: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(swalError)),
+                    confirmButtonColor: '#dc2626'
+                });
+            });
+            </text>
+        }
+
         // 1. CHỌN HỒ SƠ BỆNH NHÂN QUA AJAX (KHÔNG RELOAD TRANG)
         function selectAppointment(appId, chipElem) {
-            if (!appId) return;
+            if (!appId) return Promise.resolve();
+            const reqSeq = ++detailLoadSeq;
 
             document.querySelectorAll('.patient-quick-chip').forEach(function(el) {
                 el.style.borderColor = '#cbd5e1';
@@ -244,12 +310,13 @@
             }
 
             var fetchUrl = '@Url.Action("GetDetailPartial", "Cashier", new { area = "Staff" })?appointmentId=' + appId;
-            fetch(fetchUrl)
+            return fetch(fetchUrl)
                 .then(function(res) {
                     if (!res.ok) throw new Error('Không thể tải chi tiết hồ sơ viện phí.');
                     return res.text();
                 })
                 .then(function(html) {
+                    if (reqSeq !== detailLoadSeq) return;
                     if (container) {
                         container.innerHTML = html;
                         container.style.opacity = '1';
@@ -258,6 +325,7 @@
                     }
                 })
                 .catch(function(err) {
+                    if (reqSeq !== detailLoadSeq) return;
                     if (container) {
                         container.innerHTML = '<div style="color: #dc2626; padding: 40px 20px; text-align: center; font-size: 14px;">Lỗi tải dữ liệu: ' + err.message + '</div>';
                         container.style.opacity = '1';
@@ -381,6 +449,7 @@
         }
 
         async function loadSettleVietQr() {
+            const reqSeq = ++settleQrSeq;
             var container = document.getElementById('current-invoice-data-container');
             var appId = container ? parseInt(container.getAttribute('data-appointment-id')) : 0;
             if (!appId) return;
@@ -389,12 +458,19 @@
             var netDiff = netDiffElem ? Math.max(0, parseFloat(netDiffElem.getAttribute('data-net')) || 0) : 0;
             if (netDiff <= 0) return;
 
+            var img = document.getElementById('settle-qr-img');
+            if (img) img.removeAttribute('src');
+
             try {
                 var url = '@Url.Action("GenerateQr", "Cashier", new { area = "Staff" })?appointmentId=' + appId + '&customAmount=' + netDiff;
                 var res = await fetch(url);
                 var data = await res.json();
+                var activeContainer = document.getElementById('current-invoice-data-container');
+                var activeAppId = activeContainer ? parseInt(activeContainer.getAttribute('data-appointment-id')) : 0;
+                if (reqSeq !== settleQrSeq || activeAppId !== appId) return;
+
                 if (res.ok && data.qrDataUri) {
-                    var img = document.getElementById('settle-qr-img');
+                    img = document.getElementById('settle-qr-img');
                     if (img) img.src = data.qrDataUri;
                     var bTitle = document.getElementById('settle-qr-bank');
                     if (bTitle) bTitle.innerText = 'Ngân hàng: ' + data.bankName + ' (' + data.bankCode + ')';
@@ -415,7 +491,15 @@
         function copyText(text) {
             if (!text) return;
             navigator.clipboard.writeText(text).then(function() {
-                alert('Đã sao chép: ' + text);
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'success',
+                    title: 'Đã sao chép: ' + text,
+                    showConfirmButton: false,
+                    timer: 1800,
+                    timerProgressBar: true
+                });
             }).catch(function() {
                 prompt('Sao chép nội dung:', text);
             });
@@ -424,7 +508,13 @@
         // 4. THỰC HIỆN QUYẾT TOÁN VIỆN PHÍ & HOÀN TIỀN MẶT TẠM ỨNG DƯ
         async function submitSettleDischarge(appId) {
             if (!isShiftOpen) {
-                alert('Vui lòng mở ca thu ngân trước khi thực hiện quyết toán.');
+                await Swal.fire({
+                    icon: 'warning',
+                    title: 'Chưa mở ca thu ngân',
+                    text: 'Vui lòng mở ca thu ngân trước khi thực hiện thu tiền & quyết toán.',
+                    confirmButtonText: 'Mở ca ngay',
+                    confirmButtonColor: '#0284c7'
+                });
                 document.getElementById('modal-open-shift').showModal();
                 return;
             }
@@ -443,31 +533,57 @@
                 var cashGivenInput = document.getElementById('calc-cash-given');
                 var cashGivenVal = cashGivenInput ? parseFloat(cashGivenInput.value) : 0;
                 if (cashGivenVal > 0 && cashGivenVal < netDiffVal) {
-                    alert('⚠️ Số tiền khách đưa (' + cashGivenVal.toLocaleString('vi-VN') + ' đ) đang ít hơn số tiền cần thu thêm (' + netDiffVal.toLocaleString('vi-VN') + ' đ). Vui lòng kiểm tra lại!');
+                    await Swal.fire({
+                        icon: 'warning',
+                        title: 'Tiền khách đưa chưa đủ',
+                        text: 'Số tiền khách đưa (' + cashGivenVal.toLocaleString('vi-VN') + ' đ) đang ít hơn số tiền cần thu thêm (' + netDiffVal.toLocaleString('vi-VN') + ' đ). Vui lòng kiểm tra lại!',
+                        confirmButtonColor: '#0284c7'
+                    });
                     cashGivenInput.focus();
                     return;
                 }
             }
 
             if (netDiffVal > 0 && currentSettleMethod === 'BankTransfer' && !refCode) {
-                alert('⚠️ Vui lòng nhập mã chuẩn chi / giao dịch ngân hàng.');
+                await Swal.fire({
+                    icon: 'warning',
+                    title: 'Thiếu mã giao dịch ngân hàng',
+                    text: 'Vui lòng nhập mã chuẩn chi / giao dịch ngân hàng trước khi xác nhận.',
+                    confirmButtonColor: '#0284c7'
+                });
                 if (refInput) refInput.focus();
                 return;
             }
 
             if (netDiffVal < 0) {
                 if (!approvedBy) {
-                    alert('⚠️ Vui lòng nhập họ tên Người duyệt hoàn tiền (Bác sĩ / Trưởng ca thu ngân).');
+                    await Swal.fire({
+                        icon: 'warning',
+                        title: 'Thiếu thông tin người duyệt',
+                        text: 'Vui lòng nhập họ tên Người duyệt hoàn tiền (Bác sĩ / Trưởng ca thu ngân).',
+                        confirmButtonColor: '#0284c7'
+                    });
                     if (approvedByInput) approvedByInput.focus();
                     return;
                 }
             }
 
-            var confirmText = netDiffVal < 0
-                ? 'Xác nhận cấn trừ viện phí và CHI HOÀN TIỀN MẶT ' + Math.abs(netDiffVal).toLocaleString('vi-VN') + ' đ cho người bệnh (Người duyệt: ' + approvedBy + ')?'
-                : 'Xác nhận hoàn tất thu tiền & quyết toán viện phí cho lượt khám này?';
+            var confirmRes = await Swal.fire({
+                icon: 'question',
+                title: netDiffVal < 0 ? 'Xác nhận hoàn trả tiền thừa?' : 'Xác nhận thu tiền & quyết toán?',
+                html: netDiffVal < 0
+                    ? 'Xác nhận cấn trừ viện phí và <b>CHI HOÀN TIỀN MẶT ' + Math.abs(netDiffVal).toLocaleString('vi-VN') + ' đ</b> cho người bệnh?<br/><small style="color:#475569;">Người duyệt: ' + approvedBy + '</small>'
+                    : (netDiffVal > 0
+                        ? 'Xác nhận thu đủ <b>' + netDiffVal.toLocaleString('vi-VN') + ' đ</b> (' + (currentSettleMethod === 'BankTransfer' ? 'Chuyển khoản VietQR' : 'Tiền mặt') + ') và hoàn tất quyết toán viện phí?'
+                        : 'Xác nhận cấn trừ tạm ứng đủ 100% và hoàn tất quyết toán viện phí?'),
+                showCancelButton: true,
+                confirmButtonText: '✓ Xác nhận ngay',
+                cancelButtonText: 'Hủy',
+                confirmButtonColor: netDiffVal < 0 ? '#0284c7' : '#15803d',
+                cancelButtonColor: '#64748b'
+            });
 
-            if (!confirm(confirmText)) {
+            if (!confirmRes.isConfirmed) {
                 return;
             }
 
@@ -507,8 +623,6 @@
                 }
 
                 if (res.ok && data.success) {
-                    alert('✓ ' + (data.message || 'Quyết toán thành công!'));
-
                     var chipStatus = document.getElementById('app-chip-status-' + appId);
                     if (chipStatus) {
                         chipStatus.style.background = '#15803d';
@@ -516,20 +630,41 @@
                         chipStatus.innerText = '✓ Đã tất toán';
                     }
 
-                    selectAppointment(appId, document.getElementById('app-card-' + appId));
+                    await selectAppointment(appId, document.getElementById('app-card-' + appId));
 
-                    setTimeout(function() {
-                        printDischargeSettlement();
-                    }, 400);
+                    await Swal.fire({
+                        icon: 'success',
+                        title: netDiffVal < 0 ? 'Hoàn tiền & Quyết toán thành công!' : 'Thu viện phí thành công!',
+                        text: data.message || 'Hồ sơ viện phí đã được quyết toán hoàn tất.',
+                        showCancelButton: true,
+                        confirmButtonText: '🖨️ In bảng kê & Hóa đơn',
+                        cancelButtonText: 'Đóng',
+                        confirmButtonColor: '#0284c7',
+                        cancelButtonColor: '#64748b'
+                    }).then(function(result) {
+                        if (result.isConfirmed) {
+                            printDischargeSettlement();
+                        }
+                    });
                 } else {
-                    alert('Lỗi: ' + (data ? data.message : 'Không thể thực hiện quyết toán.'));
+                    await Swal.fire({
+                        icon: 'error',
+                        title: 'Không thể quyết toán',
+                        text: data ? data.message : 'Không thể thực hiện quyết toán.',
+                        confirmButtonColor: '#dc2626'
+                    });
                     if (btn) {
                         btn.disabled = false;
                         btn.innerText = 'Thử lại';
                     }
                 }
             } catch (err) {
-                alert('Lỗi kết nối: ' + err.message);
+                await Swal.fire({
+                    icon: 'error',
+                    title: 'Lỗi kết nối',
+                    text: err.message,
+                    confirmButtonColor: '#dc2626'
+                });
                 if (btn) {
                     btn.disabled = false;
                     btn.innerText = 'Thử lại';
@@ -606,7 +741,7 @@
         function printDischargeSettlement() {
             var container = document.getElementById('current-invoice-data-container');
             if (!container) {
-                alert('Chưa có thông tin lượt khám để in bảng kê.');
+                Swal.fire({ icon: 'warning', title: 'Chưa có thông tin', text: 'Chưa có thông tin lượt khám để in bảng kê.', confirmButtonColor: '#0284c7' });
                 return;
             }
 
@@ -633,7 +768,7 @@
 
             var printWin = window.open('', '_blank', 'width=950,height=800');
             if (!printWin) {
-                alert('Trình duyệt đã chặn popup. Vui lòng cho phép popup để in bảng kê.');
+                Swal.fire({ icon: 'warning', title: 'Trình duyệt chặn Popup', text: 'Vui lòng cho phép popup trên trình duyệt để in bảng kê.', confirmButtonColor: '#0284c7' });
                 return;
             }
 

@@ -580,6 +580,7 @@ public class ScheduleController : Controller
     // ========================================================
 
     [HttpPost]
+    [Authorize(Roles = "ADMIN,DEPARTMENT_HEAD,NURSE")]
     public async Task<IActionResult> GenerateSlots([FromBody] SlotGenerationRequest request, CancellationToken ct = default)
     {
         if (request == null)

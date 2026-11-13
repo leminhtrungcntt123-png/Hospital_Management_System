@@ -193,17 +193,16 @@ public class BillingTests
         Assert.NotNull(patient);
 
         var app = await db.Appointments.FirstOrDefaultAsync(a => a.PatientId == patient.Id);
-        if (app != null)
-        {
-            var result = await billingService.GetInvoiceDetailAsync(app.Id);
-            Assert.True(result.IsSuccess);
-            var detail = result.Value!;
-            Assert.True(detail.HasInsurance);
-            Assert.Equal(80m, detail.CoveragePct);
-            Assert.True(detail.TotalAmount > 0);
-            Assert.True(detail.InsuranceCoveredAmount > 0);
-            Assert.Equal(detail.TotalAmount - detail.InsuranceCoveredAmount, detail.PatientAmount);
-        }
+        Assert.NotNull(app);
+
+        var result = await billingService.GetInvoiceDetailAsync(app.Id);
+        Assert.True(result.IsSuccess);
+        var detail = result.Value!;
+        Assert.True(detail.HasInsurance);
+        Assert.Equal(80m, detail.CoveragePct);
+        Assert.True(detail.TotalAmount > 0);
+        Assert.True(detail.InsuranceCoveredAmount > 0);
+        Assert.Equal(detail.TotalAmount - detail.InsuranceCoveredAmount, detail.PatientAmount);
     }
 
     [Fact]

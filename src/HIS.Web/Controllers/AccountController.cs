@@ -173,6 +173,16 @@ public class AccountController : Controller
                 }
             }
         }
+        else if (targetRole == "ACCOUNTANT")
+        {
+            var accountantAcc = await db.Accounts.FirstOrDefaultAsync(a => a.Username == "ketoan" || a.RoleId == (int)RoleId.Accountant);
+            if (accountantAcc != null)
+            {
+                accountId = accountantAcc.Id;
+                username = accountantAcc.Username;
+                fullName = "Thu ngân / Kế toán";
+            }
+        }
         else if (targetRole == "PATIENT")
         {
             var patientAcc = await db.Accounts.FirstOrDefaultAsync(a => a.RoleId == (int)RoleId.Patient);

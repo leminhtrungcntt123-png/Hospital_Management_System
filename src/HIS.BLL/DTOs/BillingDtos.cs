@@ -293,3 +293,9 @@ public record SettleDischargeResultDto(
     PaymentMethod Method,
     string TransactionCode,
     DateTime SettledAt);
+
+public record DepositSummaryTotalsDto(
+    int TotalCount,
+    decimal TotalAmount,
+    decimal TotalUsed,
+    decimal TotalBalance);

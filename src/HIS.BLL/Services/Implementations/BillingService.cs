@@ -28,6 +28,43 @@ public class BillingService : IBillingService
     private DateTime Now => DateTime.SpecifyKind(_timeProvider.GetLocalNow().DateTime, DateTimeKind.Unspecified);
     private DateOnly Today => DateOnly.FromDateTime(Now);
 
+    private async Task<Result<T>> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<Result<T>>> action, CancellationToken ct)
+    {
+        if (_context.Database.CurrentTransaction != null)
+        {
+            return await action(ct);
+        }
+
+        var strategy = _context.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await _context.Database.BeginTransactionAsync(ct);
+            var result = await action(ct);
+            if (result.IsSuccess)
+            {
+                await transaction.CommitAsync(ct);
+            }
+            else
+            {
+                await transaction.RollbackAsync(ct);
+            }
+
+            return result;
+        });
+    }
+
+    private Task<CashierShift?> LockOpenShiftAsync(int cashierAccountId, CancellationToken ct)
+    {
+        if (cashierAccountId <= 0)
+        {
+            return Task.FromResult<CashierShift?>(null);
+        }
+
+        return _context.CashierShifts
+            .FromSqlInterpolated($"SELECT * FROM cashier_shifts WHERE cashier_id = {cashierAccountId} AND status = 'OPEN' FOR UPDATE")
+            .FirstOrDefaultAsync(ct);
+    }
+
     public async Task<IReadOnlyList<PendingInvoiceItemDto>> GetPendingInvoicesAsync(
         string? search = null,
         InvoiceStatus? invoiceStatus = null,
@@ -44,38 +81,25 @@ public class BillingService : IBillingService
             .Include(a => a.MedicalRecord)!.ThenInclude(m => m!.Prescriptions)!.ThenInclude(p => p.PrescriptionItems)!.ThenInclude(pi => pi.Medication)
             .Where(a => a.StatusId >= (int)AppointmentStatusId.CheckedIn);
 
-        if (invoiceStatus.HasValue)
+        if (invoiceStatus == InvoiceStatus.Paid)
         {
-            if (invoiceStatus.Value == InvoiceStatus.Paid)
-            {
-                query = query.Where(a => a.Invoice != null && a.Invoice.Status == InvoiceStatus.Paid);
-            }
-            else
-            {
-                query = query.Where(a => a.Invoice == null || a.Invoice.Status == InvoiceStatus.Unpaid);
-            }
+            query = query.Where(a => a.Invoice != null && a.Invoice.Status == InvoiceStatus.Paid);
+        }
+        else
+        {
+            query = query.Where(a => a.Invoice == null || a.Invoice.Status == InvoiceStatus.Unpaid);
         }
 
         if (!string.IsNullOrWhiteSpace(search))
         {
             search = search.Trim();
-            bool hasIntId = int.TryParse(search, out var parsedId) || int.TryParse(search.TrimStart('0'), out parsedId);
-            var depositPatientIds = await _context.Deposits
-                .AsNoTracking()
-                .Where(d => d.DepositCode.Contains(search))
-                .Select(d => d.PatientId)
-                .Distinct()
-                .ToListAsync(ct);
+            string searchUpper = search.ToUpperInvariant();
+            bool hasIntId = TryParsePatientId(search, out var parsedId);
 
             query = query.Where(a =>
-                a.AppointmentCode.Contains(search)
-                || a.Patient.FullName.Contains(search)
-                || a.Patient.PhoneNumber.Contains(search)
-                || (a.Patient.NationalId != null && a.Patient.NationalId.Contains(search))
-                || (hasIntId && a.PatientId == parsedId)
-                || a.PatientId.ToString().Contains(search)
-                || depositPatientIds.Contains(a.PatientId)
-                || (a.QueueNumber != null && a.QueueNumber.Contains(search)));
+                (hasIntId && a.PatientId == parsedId)
+                || a.AppointmentCode.ToUpper() == searchUpper
+                || (a.Patient.NationalId != null && a.Patient.NationalId == search));
         }
         else
         {
@@ -497,214 +521,217 @@ public class BillingService : IBillingService
             return Result.Failure<int>("INVALID_REQUEST", "Mã lượt khám không hợp lệ.");
         }
 
-        // 1. Kiểm tra IdempotencyKey nếu có để chống ghi trùng
-        if (!string.IsNullOrWhiteSpace(request.IdempotencyKey))
+        return await ExecuteInTransactionAsync(async innerCt =>
         {
-            var existingPayment = await _context.Payments
-                .AsNoTracking()
-                .Include(p => p.Invoice)
-                .FirstOrDefaultAsync(p => p.IdempotencyKey == request.IdempotencyKey, ct);
-
-            if (existingPayment != null)
+            // 1. Kiểm tra IdempotencyKey nếu có để chống ghi trùng
+            if (!string.IsNullOrWhiteSpace(request.IdempotencyKey))
             {
-                return Result.Success(existingPayment.InvoiceId ?? 0);
-            }
-        }
+                var existingPayment = await _context.Payments
+                    .AsNoTracking()
+                    .Include(p => p.Invoice)
+                    .FirstOrDefaultAsync(p => p.IdempotencyKey == request.IdempotencyKey, innerCt);
 
-        var app = await _context.Appointments
-            .Include(a => a.Patient)
-            .Include(a => a.Slot)
-            .Include(a => a.Invoice)!.ThenInclude(i => i!.Payments)
-            .FirstOrDefaultAsync(a => a.Id == request.AppointmentId, ct);
-
-        if (app == null)
-        {
-            return Result.Failure<int>("NOT_FOUND", "Không tìm thấy thông tin lượt khám.");
-        }
-
-        if (app.Invoice != null && (app.Invoice.Status == InvoiceStatus.Paid || app.Invoice.Payments.Any(p => p.PaymentType == PaymentType.Payment)))
-        {
-            return Result.Failure<int>("ALREADY_PAID", "Lượt khám này đã được thanh toán viện phí trước đó.");
-        }
-
-        var detailRes = await GetInvoiceDetailAsync(request.AppointmentId, ct);
-        if (!detailRes.IsSuccess)
-        {
-            return Result.Failure<int>(detailRes.Error.Code, detailRes.Error.Message);
-        }
-
-        var detail = detailRes.Value!;
-        var now = Now;
-        var examDate = detail.ExamDate;
-
-        var insuranceCard = await _context.InsuranceCards
-            .FirstOrDefaultAsync(c => c.PatientId == app.PatientId && c.IsActive && c.ValidFrom <= examDate && c.ValidTo >= examDate, ct);
-
-        // Bắt buộc thu ngân phải có ca đang mở
-        var shift = request.CashierAccountId > 0
-            ? await _context.CashierShifts.FirstOrDefaultAsync(s => s.CashierId == request.CashierAccountId && s.Status == ShiftStatus.Open, ct)
-            : null;
-
-        if (shift == null)
-        {
-            return Result.Failure<int>("SHIFT_REQUIRED", "Thu ngân chưa mở ca làm việc. Vui lòng mở ca trước khi thực hiện thu tiền.");
-        }
-
-        // Sinh số hóa đơn và mã giao dịch từ sequence DB
-        int invoiceSeq = await GetNextSequenceValueAsync("seq_invoice_number", ct);
-        int transSeq = await GetNextSequenceValueAsync("seq_transaction_code", ct);
-
-        string invoiceNum = $"HD-{invoiceSeq:D6}";
-        string transCode = $"PT-{transSeq:D8}";
-
-        var invoice = app.Invoice;
-        if (invoice == null)
-        {
-            invoice = new Invoice
-            {
-                AppointmentId = app.Id,
-                PatientId = app.PatientId,
-                InvoiceNumber = invoiceNum,
-                ExamDate = examDate,
-                CoveragePctApplied = detail.CoveragePct,
-                TotalAmount = detail.TotalAmount,
-                InsuranceCoveredAmount = detail.InsuranceCoveredAmount,
-                PatientAmount = detail.PatientAmount,
-                InsuranceCardId = insuranceCard?.Id,
-                InsurancePlanId = insuranceCard?.InsurancePlanId,
-                Status = InvoiceStatus.Paid,
-                CreatedAt = now
-            };
-
-            foreach (var item in detail.Items)
-            {
-                InvoiceCategory cat = item.Category.Contains("Thuốc") ? InvoiceCategory.Medication
-                    : (item.Category.Contains("Khám") ? InvoiceCategory.Examination : InvoiceCategory.Service);
-
-                invoice.InvoiceItems.Add(new InvoiceItem
+                if (existingPayment != null)
                 {
-                    Category = cat,
-                    Description = item.Description,
-                    UnitPrice = item.UnitPrice,
-                    Quantity = item.Quantity,
-                    Amount = item.Total,
-                    IsInsuranceCovered = item.IsInsuranceCovered,
-                    CoveragePctApplied = item.CoveragePctApplied,
-                    CoveredAmount = item.CoveredAmount,
-                    PatientAmount = item.PatientAmount
+                    return Result.Success(existingPayment.InvoiceId ?? 0);
+                }
+            }
+
+            var app = await _context.Appointments
+                .FromSqlInterpolated($"SELECT * FROM appointments WHERE id = {request.AppointmentId} FOR UPDATE")
+                .Include(a => a.Patient)
+                .Include(a => a.Slot)
+                .Include(a => a.Invoice)!.ThenInclude(i => i!.Payments)
+                .FirstOrDefaultAsync(innerCt);
+
+            if (app == null)
+            {
+                return Result.Failure<int>("NOT_FOUND", "Không tìm thấy thông tin lượt khám.");
+            }
+
+            if (app.Invoice != null && (app.Invoice.Status == InvoiceStatus.Paid || app.Invoice.Payments.Any(p => p.PaymentType == PaymentType.Payment)))
+            {
+                return Result.Failure<int>("ALREADY_PAID", "Lượt khám này đã được thanh toán viện phí trước đó.");
+            }
+
+            var detailRes = await GetInvoiceDetailAsync(request.AppointmentId, innerCt);
+            if (!detailRes.IsSuccess)
+            {
+                return Result.Failure<int>(detailRes.Error.Code, detailRes.Error.Message);
+            }
+
+            var detail = detailRes.Value!;
+            var now = Now;
+            var examDate = detail.ExamDate;
+
+            var insuranceCard = await _context.InsuranceCards
+                .FirstOrDefaultAsync(c => c.PatientId == app.PatientId && c.IsActive && c.ValidFrom <= examDate && c.ValidTo >= examDate, innerCt);
+
+            // Bắt buộc thu ngân phải có ca đang mở (khóa hàng ca thu ngân)
+            var shift = await LockOpenShiftAsync(request.CashierAccountId, innerCt);
+
+            if (shift == null)
+            {
+                return Result.Failure<int>("SHIFT_REQUIRED", "Thu ngân chưa mở ca làm việc. Vui lòng mở ca trước khi thực hiện thu tiền.");
+            }
+
+            // Sinh số hóa đơn và mã giao dịch từ sequence DB
+            int invoiceSeq = await GetNextSequenceValueAsync("seq_invoice_number", innerCt);
+            int transSeq = await GetNextSequenceValueAsync("seq_transaction_code", innerCt);
+
+            string invoiceNum = $"HD-{invoiceSeq:D6}";
+            string transCode = $"PT-{transSeq:D8}";
+
+            var invoice = app.Invoice;
+            if (invoice == null)
+            {
+                invoice = new Invoice
+                {
+                    AppointmentId = app.Id,
+                    PatientId = app.PatientId,
+                    InvoiceNumber = invoiceNum,
+                    ExamDate = examDate,
+                    CoveragePctApplied = detail.CoveragePct,
+                    TotalAmount = detail.TotalAmount,
+                    InsuranceCoveredAmount = detail.InsuranceCoveredAmount,
+                    PatientAmount = detail.PatientAmount,
+                    InsuranceCardId = insuranceCard?.Id,
+                    InsurancePlanId = insuranceCard?.InsurancePlanId,
+                    Status = InvoiceStatus.Paid,
+                    CreatedAt = now
+                };
+
+                foreach (var item in detail.Items)
+                {
+                    InvoiceCategory cat = item.Category.Contains("Thuốc") ? InvoiceCategory.Medication
+                        : (item.Category.Contains("Khám") ? InvoiceCategory.Examination : InvoiceCategory.Service);
+
+                    invoice.InvoiceItems.Add(new InvoiceItem
+                    {
+                        Category = cat,
+                        Description = item.Description,
+                        UnitPrice = item.UnitPrice,
+                        Quantity = item.Quantity,
+                        Amount = item.Total,
+                        IsInsuranceCovered = item.IsInsuranceCovered,
+                        CoveragePctApplied = item.CoveragePctApplied,
+                        CoveredAmount = item.CoveredAmount,
+                        PatientAmount = item.PatientAmount
+                    });
+                }
+
+                _context.Invoices.Add(invoice);
+            }
+            else
+            {
+                invoice.InvoiceNumber = string.IsNullOrWhiteSpace(invoice.InvoiceNumber) ? invoiceNum : invoice.InvoiceNumber;
+                invoice.ExamDate = examDate;
+                invoice.CoveragePctApplied = detail.CoveragePct;
+                invoice.TotalAmount = detail.TotalAmount;
+                invoice.InsuranceCoveredAmount = detail.InsuranceCoveredAmount;
+                invoice.PatientAmount = detail.PatientAmount;
+                invoice.InsuranceCardId = insuranceCard?.Id;
+                invoice.InsurancePlanId = insuranceCard?.InsurancePlanId;
+                invoice.Status = InvoiceStatus.Paid;
+            }
+
+            // Kiểm tra và cấn trừ tạm ứng nếu được yêu cầu (khóa hàng tạm ứng)
+            decimal depositDeduct = 0m;
+            if (request.DepositId.HasValue && request.DepositDeductAmount.HasValue && request.DepositDeductAmount.Value > 0)
+            {
+                var depositEntity = await _context.Deposits
+                    .FromSqlInterpolated($"SELECT * FROM deposits WHERE id = {request.DepositId.Value} AND status = 'ACTIVE' FOR UPDATE")
+                    .FirstOrDefaultAsync(innerCt);
+
+                if (depositEntity == null)
+                {
+                    return Result.Failure<int>("DEPOSIT_NOT_FOUND", "Không tìm thấy thông tin phiếu tạm ứng hợp lệ.");
+                }
+
+                if (depositEntity.PatientId != app.PatientId)
+                {
+                    return Result.Failure<int>("DEPOSIT_MISMATCH", "Phiếu tạm ứng không thuộc về bệnh nhân này.");
+                }
+
+                decimal maxAvailable = depositEntity.Amount - depositEntity.UsedAmount - depositEntity.RefundedAmount;
+                if (request.DepositDeductAmount.Value > maxAvailable)
+                {
+                    return Result.Failure<int>("INSUFFICIENT_DEPOSIT", $"Số tiền trừ ({request.DepositDeductAmount.Value:N0} đ) vượt quá số dư tạm ứng còn lại ({maxAvailable:N0} đ).");
+                }
+
+                depositDeduct = Math.Min(detail.PatientAmount, request.DepositDeductAmount.Value);
+                depositEntity.UsedAmount += depositDeduct;
+                if (depositEntity.Amount - depositEntity.UsedAmount - depositEntity.RefundedAmount <= 0)
+                {
+                    depositEntity.Status = DepositStatus.Depleted;
+                }
+
+                _context.DepositUsages.Add(new DepositUsage
+                {
+                    Deposit = depositEntity,
+                    Invoice = invoice,
+                    Amount = depositDeduct,
+                    UsedAt = now,
+                    CashierId = request.CashierAccountId > 0 ? request.CashierAccountId : null
+                });
+
+                int transSeqDeposit = await GetNextSequenceValueAsync("seq_transaction_code", innerCt);
+                _context.Payments.Add(new Payment
+                {
+                    Invoice = invoice,
+                    Deposit = depositEntity,
+                    TransactionCode = $"PT-{transSeqDeposit:D8}",
+                    Amount = depositDeduct,
+                    PaymentType = PaymentType.Payment,
+                    PaymentMethod = PaymentMethod.DepositDeduction,
+                    Status = PaymentStatus.Confirmed,
+                    CashierId = request.CashierAccountId > 0 ? request.CashierAccountId : null,
+                    ShiftId = shift?.Id,
+                    Note = $"Trừ từ phiếu tạm ứng {depositEntity.DepositCode}",
+                    PaidAt = now
                 });
             }
 
-            _context.Invoices.Add(invoice);
-        }
-        else
-        {
-            invoice.InvoiceNumber = string.IsNullOrWhiteSpace(invoice.InvoiceNumber) ? invoiceNum : invoice.InvoiceNumber;
-            invoice.ExamDate = examDate;
-            invoice.CoveragePctApplied = detail.CoveragePct;
-            invoice.TotalAmount = detail.TotalAmount;
-            invoice.InsuranceCoveredAmount = detail.InsuranceCoveredAmount;
-            invoice.PatientAmount = detail.PatientAmount;
-            invoice.InsuranceCardId = insuranceCard?.Id;
-            invoice.InsurancePlanId = insuranceCard?.InsurancePlanId;
-            invoice.Status = InvoiceStatus.Paid;
-        }
-
-        // Kiểm tra và cấn trừ tạm ứng nếu được yêu cầu
-        decimal depositDeduct = 0m;
-        if (request.DepositId.HasValue && request.DepositDeductAmount.HasValue && request.DepositDeductAmount.Value > 0)
-        {
-            var depositEntity = await _context.Deposits
-                .FirstOrDefaultAsync(d => d.Id == request.DepositId.Value && d.Status == DepositStatus.Active, ct);
-
-            if (depositEntity == null)
+            // Phần còn lại bệnh nhân thanh toán bằng Tiền mặt / Chuyển khoản (nếu có)
+            decimal remainingToPay = detail.PatientAmount - depositDeduct;
+            if (remainingToPay > 0)
             {
-                return Result.Failure<int>("DEPOSIT_NOT_FOUND", "Không tìm thấy thông tin phiếu tạm ứng hợp lệ.");
+                transSeq = await GetNextSequenceValueAsync("seq_transaction_code", innerCt);
+                transCode = $"PT-{transSeq:D8}";
+
+                var payment = new Payment
+                {
+                    Invoice = invoice,
+                    TransactionCode = transCode,
+                    ReferenceCode = request.ReferenceCode?.Trim(),
+                    Amount = remainingToPay,
+                    PaymentType = PaymentType.Payment,
+                    PaymentMethod = request.Method,
+                    Status = PaymentStatus.Confirmed,
+                    CashierId = request.CashierAccountId > 0 ? request.CashierAccountId : null,
+                    ShiftId = shift?.Id,
+                    IdempotencyKey = request.IdempotencyKey,
+                    Note = string.IsNullOrWhiteSpace(request.Note) ? "Thu viện phí tại quầy thu ngân" : request.Note.Trim(),
+                    PaidAt = now
+                };
+
+                _context.Payments.Add(payment);
             }
 
-            if (depositEntity.PatientId != app.PatientId)
+            if (request.CashierAccountId > 0)
             {
-                return Result.Failure<int>("DEPOSIT_MISMATCH", "Phiếu tạm ứng không thuộc về bệnh nhân này.");
+                _context.AccessLogs.Add(new AccessLog
+                {
+                    AccountId = request.CashierAccountId,
+                    PatientId = app.PatientId,
+                    Action = "CHECKOUT_INVOICE",
+                    OccurredAt = now
+                });
             }
 
-            decimal maxAvailable = depositEntity.Amount - depositEntity.UsedAmount - depositEntity.RefundedAmount;
-            if (request.DepositDeductAmount.Value > maxAvailable)
-            {
-                return Result.Failure<int>("INSUFFICIENT_DEPOSIT", $"Số tiền trừ ({request.DepositDeductAmount.Value:N0} đ) vượt quá số dư tạm ứng còn lại ({maxAvailable:N0} đ).");
-            }
-
-            depositDeduct = Math.Min(detail.PatientAmount, request.DepositDeductAmount.Value);
-            depositEntity.UsedAmount += depositDeduct;
-            if (depositEntity.Amount - depositEntity.UsedAmount - depositEntity.RefundedAmount <= 0)
-            {
-                depositEntity.Status = DepositStatus.Depleted;
-            }
-
-            _context.DepositUsages.Add(new DepositUsage
-            {
-                Deposit = depositEntity,
-                Invoice = invoice,
-                Amount = depositDeduct,
-                UsedAt = now,
-                CashierId = request.CashierAccountId > 0 ? request.CashierAccountId : null
-            });
-
-            int transSeqDeposit = await GetNextSequenceValueAsync("seq_transaction_code", ct);
-            _context.Payments.Add(new Payment
-            {
-                Invoice = invoice,
-                Deposit = depositEntity,
-                TransactionCode = $"PT-{transSeqDeposit:D8}",
-                Amount = depositDeduct,
-                PaymentType = PaymentType.Payment,
-                PaymentMethod = PaymentMethod.DepositDeduction,
-                Status = PaymentStatus.Confirmed,
-                CashierId = request.CashierAccountId > 0 ? request.CashierAccountId : null,
-                ShiftId = shift?.Id,
-                Note = $"Trừ từ phiếu tạm ứng {depositEntity.DepositCode}",
-                PaidAt = now
-            });
-        }
-
-        // Phần còn lại bệnh nhân thanh toán bằng Tiền mặt / Chuyển khoản (nếu có)
-        decimal remainingToPay = detail.PatientAmount - depositDeduct;
-        if (remainingToPay > 0)
-        {
-            transSeq = await GetNextSequenceValueAsync("seq_transaction_code", ct);
-            transCode = $"PT-{transSeq:D8}";
-
-            var payment = new Payment
-            {
-                Invoice = invoice,
-                TransactionCode = transCode,
-                ReferenceCode = request.ReferenceCode?.Trim(),
-                Amount = remainingToPay,
-                PaymentType = PaymentType.Payment,
-                PaymentMethod = request.Method,
-                Status = PaymentStatus.Confirmed,
-                CashierId = request.CashierAccountId > 0 ? request.CashierAccountId : null,
-                ShiftId = shift?.Id,
-                IdempotencyKey = request.IdempotencyKey,
-                Note = string.IsNullOrWhiteSpace(request.Note) ? "Thu viện phí tại quầy thu ngân" : request.Note.Trim(),
-                PaidAt = now
-            };
-
-            _context.Payments.Add(payment);
-        }
-
-        if (request.CashierAccountId > 0)
-        {
-            _context.AccessLogs.Add(new AccessLog
-            {
-                AccountId = request.CashierAccountId,
-                PatientId = app.PatientId,
-                Action = "CHECKOUT_INVOICE",
-                OccurredAt = now
-            });
-        }
-
-        await _context.SaveChangesAsync(ct);
-        return Result.Success(invoice.Id);
+            await _context.SaveChangesAsync(innerCt);
+            return Result.Success(invoice.Id);
+        }, ct);
     }
 
     public async Task<Result<SettleDischargeResultDto>> SettleDischargeAsync(SettleDischargeRequest request, CancellationToken ct = default)
@@ -714,263 +741,264 @@ public class BillingService : IBillingService
             return Result.Failure<SettleDischargeResultDto>("INVALID_REQUEST", "Mã lượt khám không hợp lệ.");
         }
 
-        var app = await _context.Appointments
-            .Include(a => a.Patient)
-            .Include(a => a.Slot)
-            .Include(a => a.Invoice)!.ThenInclude(i => i!.Payments)
-            .FirstOrDefaultAsync(a => a.Id == request.AppointmentId, ct);
-
-        if (app == null)
+        return await ExecuteInTransactionAsync(async innerCt =>
         {
-            return Result.Failure<SettleDischargeResultDto>("NOT_FOUND", "Không tìm thấy thông tin lượt khám.");
-        }
+            var app = await _context.Appointments
+                .FromSqlInterpolated($"SELECT * FROM appointments WHERE id = {request.AppointmentId} FOR UPDATE")
+                .Include(a => a.Patient)
+                .Include(a => a.Slot)
+                .Include(a => a.Invoice)!.ThenInclude(i => i!.Payments)
+                .FirstOrDefaultAsync(innerCt);
 
-        if (app.Invoice != null && app.Invoice.Status == InvoiceStatus.Paid)
-        {
-            return Result.Failure<SettleDischargeResultDto>("ALREADY_PAID", "Lượt khám này đã hoàn tất quyết toán trước đó.");
-        }
-
-        var detailRes = await GetInvoiceDetailAsync(request.AppointmentId, ct);
-        if (!detailRes.IsSuccess)
-        {
-            return Result.Failure<SettleDischargeResultDto>(detailRes.Error.Code, detailRes.Error.Message);
-        }
-
-        var detail = detailRes.Value!;
-        var now = Now;
-        var examDate = detail.ExamDate;
-
-        var shift = request.CashierAccountId > 0
-            ? await _context.CashierShifts.FirstOrDefaultAsync(s => s.CashierId == request.CashierAccountId && s.Status == ShiftStatus.Open, ct)
-            : null;
-
-        if (shift == null)
-        {
-            return Result.Failure<SettleDischargeResultDto>("SHIFT_REQUIRED", "Thu ngân chưa mở ca làm việc. Vui lòng mở ca trước khi thực hiện quyết toán.");
-        }
-
-        // Lấy tất cả các phiếu tạm ứng khả dụng của bệnh nhân
-        var activeDeposits = await _context.Deposits
-            .Where(d => d.PatientId == app.PatientId && d.Status == DepositStatus.Active && (d.Amount - d.UsedAmount - d.RefundedAmount) > 0)
-            .OrderBy(d => d.CreatedAt)
-            .ToListAsync(ct);
-
-        // Sinh số hóa đơn và mã giao dịch từ sequence DB
-        int invoiceSeq = await GetNextSequenceValueAsync("seq_invoice_number", ct);
-        string invoiceNum = $"HD-{invoiceSeq:D6}";
-
-        var invoice = app.Invoice;
-        if (invoice == null)
-        {
-            invoice = new Invoice
+            if (app == null)
             {
-                AppointmentId = app.Id,
-                PatientId = app.PatientId,
-                InvoiceNumber = invoiceNum,
-                ExamDate = examDate,
-                CoveragePctApplied = detail.CoveragePct,
-                TotalAmount = detail.TotalAmount,
-                InsuranceCoveredAmount = detail.InsuranceCoveredAmount,
-                PatientAmount = detail.PatientAmount,
-                Status = InvoiceStatus.Paid,
-                CreatedAt = now
-            };
-
-            foreach (var item in detail.Items)
-            {
-                InvoiceCategory cat = item.Category.Contains("Thuốc") ? InvoiceCategory.Medication
-                    : (item.Category.Contains("Khám") ? InvoiceCategory.Examination : InvoiceCategory.Service);
-
-                invoice.InvoiceItems.Add(new InvoiceItem
-                {
-                    Category = cat,
-                    Description = item.Description,
-                    UnitPrice = item.UnitPrice,
-                    Quantity = item.Quantity,
-                    Amount = item.Total,
-                    IsInsuranceCovered = item.IsInsuranceCovered,
-                    CoveragePctApplied = item.CoveragePctApplied,
-                    CoveredAmount = item.CoveredAmount,
-                    PatientAmount = item.PatientAmount
-                });
+                return Result.Failure<SettleDischargeResultDto>("NOT_FOUND", "Không tìm thấy thông tin lượt khám.");
             }
 
-            _context.Invoices.Add(invoice);
-        }
-        else
-        {
-            invoice.Status = InvoiceStatus.Paid;
-            if (string.IsNullOrWhiteSpace(invoice.InvoiceNumber) || invoice.InvoiceNumber == "Chưa lập")
+            if (app.Invoice != null && app.Invoice.Status == InvoiceStatus.Paid)
             {
-                invoice.InvoiceNumber = invoiceNum;
+                return Result.Failure<SettleDischargeResultDto>("ALREADY_PAID", "Lượt khám này đã hoàn tất quyết toán trước đó.");
             }
-        }
 
-        decimal patientRemainingOwed = detail.PatientAmount;
-        decimal depositDeductedTotal = 0m;
-        decimal additionalPaid = 0m;
-        decimal refundedToPatient = 0m;
-        string mainTransCode = string.Empty;
-
-        // 1. Tự động cấn trừ từ các phiếu tạm ứng khả dụng
-        foreach (var dep in activeDeposits)
-        {
-            decimal depBalance = dep.Amount - dep.UsedAmount - dep.RefundedAmount;
-            if (depBalance <= 0) continue;
-
-            if (patientRemainingOwed > 0)
+            var detailRes = await GetInvoiceDetailAsync(request.AppointmentId, innerCt);
+            if (!detailRes.IsSuccess)
             {
-                decimal deduct = Math.Min(patientRemainingOwed, depBalance);
-                dep.UsedAmount += deduct;
-                patientRemainingOwed -= deduct;
-                depositDeductedTotal += deduct;
+                return Result.Failure<SettleDischargeResultDto>(detailRes.Error.Code, detailRes.Error.Message);
+            }
 
-                if (dep.Amount - dep.UsedAmount - dep.RefundedAmount <= 0)
+            var detail = detailRes.Value!;
+            var now = Now;
+            var examDate = detail.ExamDate;
+
+            var shift = await LockOpenShiftAsync(request.CashierAccountId, innerCt);
+
+            if (shift == null)
+            {
+                return Result.Failure<SettleDischargeResultDto>("SHIFT_REQUIRED", "Thu ngân chưa mở ca làm việc. Vui lòng mở ca trước khi thực hiện quyết toán.");
+            }
+
+            // Lấy và khóa tất cả các phiếu tạm ứng khả dụng của bệnh nhân
+            var activeDeposits = await _context.Deposits
+                .FromSqlInterpolated($"SELECT * FROM deposits WHERE patient_id = {app.PatientId} AND status = 'ACTIVE' AND (amount - used_amount - refunded_amount) > 0 ORDER BY created_at FOR UPDATE")
+                .ToListAsync(innerCt);
+
+            // Sinh số hóa đơn và mã giao dịch từ sequence DB
+            int invoiceSeq = await GetNextSequenceValueAsync("seq_invoice_number", innerCt);
+            string invoiceNum = $"HD-{invoiceSeq:D6}";
+
+            var invoice = app.Invoice;
+            if (invoice == null)
+            {
+                invoice = new Invoice
                 {
-                    dep.Status = DepositStatus.Depleted;
+                    AppointmentId = app.Id,
+                    PatientId = app.PatientId,
+                    InvoiceNumber = invoiceNum,
+                    ExamDate = examDate,
+                    CoveragePctApplied = detail.CoveragePct,
+                    TotalAmount = detail.TotalAmount,
+                    InsuranceCoveredAmount = detail.InsuranceCoveredAmount,
+                    PatientAmount = detail.PatientAmount,
+                    Status = InvoiceStatus.Paid,
+                    CreatedAt = now
+                };
+
+                foreach (var item in detail.Items)
+                {
+                    InvoiceCategory cat = item.Category.Contains("Thuốc") ? InvoiceCategory.Medication
+                        : (item.Category.Contains("Khám") ? InvoiceCategory.Examination : InvoiceCategory.Service);
+
+                    invoice.InvoiceItems.Add(new InvoiceItem
+                    {
+                        Category = cat,
+                        Description = item.Description,
+                        UnitPrice = item.UnitPrice,
+                        Quantity = item.Quantity,
+                        Amount = item.Total,
+                        IsInsuranceCovered = item.IsInsuranceCovered,
+                        CoveragePctApplied = item.CoveragePctApplied,
+                        CoveredAmount = item.CoveredAmount,
+                        PatientAmount = item.PatientAmount
+                    });
                 }
 
-                _context.DepositUsages.Add(new DepositUsage
-                {
-                    Deposit = dep,
-                    Invoice = invoice,
-                    Amount = deduct,
-                    UsedAt = now,
-                    CashierId = request.CashierAccountId > 0 ? request.CashierAccountId : null
-                });
-
-                int transSeqDep = await GetNextSequenceValueAsync("seq_transaction_code", ct);
-                string depTransCode = $"PT-{transSeqDep:D8}";
-                if (string.IsNullOrEmpty(mainTransCode)) mainTransCode = depTransCode;
-
-                _context.Payments.Add(new Payment
-                {
-                    Invoice = invoice,
-                    Deposit = dep,
-                    TransactionCode = depTransCode,
-                    Amount = deduct,
-                    PaymentType = PaymentType.Payment,
-                    PaymentMethod = PaymentMethod.DepositDeduction,
-                    Status = PaymentStatus.Confirmed,
-                    CashierId = request.CashierAccountId > 0 ? request.CashierAccountId : null,
-                    ShiftId = shift?.Id,
-                    Note = $"Cấn trừ tạm ứng {dep.DepositCode} vào quyết toán {invoice.InvoiceNumber}",
-                    PaidAt = now
-                });
+                _context.Invoices.Add(invoice);
             }
-        }
-
-        // 2. Kiểm tra kết quả sau cấn trừ:
-        // TH1: Bệnh nhân còn thiếu tiền -> Thu thêm (additionalPaid)
-        if (patientRemainingOwed > 0)
-        {
-            if (request.Method == PaymentMethod.BankTransfer && string.IsNullOrWhiteSpace(request.ReferenceCode))
+            else
             {
-                return Result.Failure<SettleDischargeResultDto>("MISSING_REFERENCE", "Vui lòng nhập mã chuẩn chi / giao dịch ngân hàng.");
+                invoice.Status = InvoiceStatus.Paid;
+                if (string.IsNullOrWhiteSpace(invoice.InvoiceNumber) || invoice.InvoiceNumber == "Chưa lập")
+                {
+                    invoice.InvoiceNumber = invoiceNum;
+                }
             }
 
-            additionalPaid = patientRemainingOwed;
-            int transSeqPay = await GetNextSequenceValueAsync("seq_transaction_code", ct);
-            string payTransCode = $"PT-{transSeqPay:D8}";
-            mainTransCode = payTransCode;
+            decimal patientRemainingOwed = detail.PatientAmount;
+            decimal depositDeductedTotal = 0m;
+            decimal additionalPaid = 0m;
+            decimal refundedToPatient = 0m;
+            string mainTransCode = string.Empty;
 
-            _context.Payments.Add(new Payment
-            {
-                Invoice = invoice,
-                TransactionCode = payTransCode,
-                ReferenceCode = request.ReferenceCode?.Trim(),
-                Amount = additionalPaid,
-                PaymentType = PaymentType.Payment,
-                PaymentMethod = request.Method,
-                Status = PaymentStatus.Confirmed,
-                CashierId = request.CashierAccountId > 0 ? request.CashierAccountId : null,
-                ShiftId = shift?.Id,
-                IdempotencyKey = request.IdempotencyKey,
-                Note = string.IsNullOrWhiteSpace(request.Note) ? $"Thu thêm chênh lệch quyết toán {invoice.InvoiceNumber}" : request.Note.Trim(),
-                PaidAt = now
-            });
-        }
-        // TH2: Bệnh nhân còn dư tiền tạm ứng -> Hoàn trả (refundedToPatient)
-        else
-        {
+            // 1. Tự động cấn trừ từ các phiếu tạm ứng khả dụng
             foreach (var dep in activeDeposits)
             {
-                decimal remainingDep = dep.Amount - dep.UsedAmount - dep.RefundedAmount;
-                if (remainingDep > 0)
+                decimal depBalance = dep.Amount - dep.UsedAmount - dep.RefundedAmount;
+                if (depBalance <= 0) continue;
+
+                if (patientRemainingOwed > 0)
                 {
-                    dep.RefundedAmount += remainingDep;
-                    dep.Status = DepositStatus.Refunded;
-                    refundedToPatient += remainingDep;
+                    decimal deduct = Math.Min(patientRemainingOwed, depBalance);
+                    dep.UsedAmount += deduct;
+                    patientRemainingOwed -= deduct;
+                    depositDeductedTotal += deduct;
 
-                    int transSeqRef = await GetNextSequenceValueAsync("seq_transaction_code", ct);
-                    string refTransCode = $"PT-{transSeqRef:D8}";
-                    if (string.IsNullOrEmpty(mainTransCode)) mainTransCode = refTransCode;
+                    if (dep.Amount - dep.UsedAmount - dep.RefundedAmount <= 0)
+                    {
+                        dep.Status = DepositStatus.Depleted;
+                    }
 
-                    var refundNoteSuffix = !string.IsNullOrWhiteSpace(request.ApprovedBy)
-                        ? $" (Người duyệt hoàn: {request.ApprovedBy.Trim()})"
-                        : "";
-                    var refundReasonText = !string.IsNullOrWhiteSpace(request.Note)
-                        ? request.Note.Trim()
-                        : "Tất toán xuất viện và hoàn trả tiền mặt số dư tạm ứng";
+                    _context.DepositUsages.Add(new DepositUsage
+                    {
+                        Deposit = dep,
+                        Invoice = invoice,
+                        Amount = deduct,
+                        UsedAt = now,
+                        CashierId = request.CashierAccountId > 0 ? request.CashierAccountId : null
+                    });
+
+                    int transSeqDep = await GetNextSequenceValueAsync("seq_transaction_code", innerCt);
+                    string depTransCode = $"PT-{transSeqDep:D8}";
+                    if (string.IsNullOrEmpty(mainTransCode)) mainTransCode = depTransCode;
 
                     _context.Payments.Add(new Payment
                     {
                         Invoice = invoice,
                         Deposit = dep,
-                        TransactionCode = refTransCode,
-                        ReferenceCode = null,
-                        Amount = remainingDep,
-                        PaymentType = PaymentType.Refund,
-                        PaymentMethod = PaymentMethod.Cash,
+                        TransactionCode = depTransCode,
+                        Amount = deduct,
+                        PaymentType = PaymentType.Payment,
+                        PaymentMethod = PaymentMethod.DepositDeduction,
                         Status = PaymentStatus.Confirmed,
                         CashierId = request.CashierAccountId > 0 ? request.CashierAccountId : null,
                         ShiftId = shift?.Id,
-                        RefundReason = refundReasonText,
-                        Note = $"Hoàn tiền mặt số dư phiếu {dep.DepositCode} khi quyết toán {invoice.InvoiceNumber}{refundNoteSuffix}",
+                        Note = $"Cấn trừ tạm ứng {dep.DepositCode} vào quyết toán {invoice.InvoiceNumber}",
                         PaidAt = now
                     });
                 }
             }
-        }
 
-        if (string.IsNullOrEmpty(mainTransCode))
-        {
-            int transSeq = await GetNextSequenceValueAsync("seq_transaction_code", ct);
-            mainTransCode = $"PT-{transSeq:D8}";
-        }
-
-        if (request.CashierAccountId > 0)
-        {
-            _context.AccessLogs.Add(new AccessLog
+            // 2. Kiểm tra kết quả sau cấn trừ:
+            // TH1: Bệnh nhân còn thiếu tiền -> Thu thêm (additionalPaid)
+            if (patientRemainingOwed > 0)
             {
-                AccountId = request.CashierAccountId,
-                PatientId = app.PatientId,
-                Action = "SETTLE_DISCHARGE_INVOICE",
-                OccurredAt = now
-            });
-        }
+                if (request.Method == PaymentMethod.BankTransfer && string.IsNullOrWhiteSpace(request.ReferenceCode))
+                {
+                    return Result.Failure<SettleDischargeResultDto>("MISSING_REFERENCE", "Vui lòng nhập mã chuẩn chi / giao dịch ngân hàng.");
+                }
 
-        await _context.SaveChangesAsync(ct);
+                additionalPaid = patientRemainingOwed;
+                int transSeqPay = await GetNextSequenceValueAsync("seq_transaction_code", innerCt);
+                string payTransCode = $"PT-{transSeqPay:D8}";
+                mainTransCode = payTransCode;
 
-        var resultDto = new SettleDischargeResultDto(
-            invoice.Id,
-            invoice.InvoiceNumber,
-            app.AppointmentCode,
-            app.Patient.FullName,
-            detail.TotalAmount,
-            detail.InsuranceCoveredAmount,
-            detail.PatientAmount,
-            depositDeductedTotal,
-            additionalPaid,
-            refundedToPatient,
-            request.Method,
-            mainTransCode,
-            now);
+                _context.Payments.Add(new Payment
+                {
+                    Invoice = invoice,
+                    TransactionCode = payTransCode,
+                    ReferenceCode = request.ReferenceCode?.Trim(),
+                    Amount = additionalPaid,
+                    PaymentType = PaymentType.Payment,
+                    PaymentMethod = request.Method,
+                    Status = PaymentStatus.Confirmed,
+                    CashierId = request.CashierAccountId > 0 ? request.CashierAccountId : null,
+                    ShiftId = shift?.Id,
+                    IdempotencyKey = request.IdempotencyKey,
+                    Note = string.IsNullOrWhiteSpace(request.Note) ? $"Thu thêm chênh lệch quyết toán {invoice.InvoiceNumber}" : request.Note.Trim(),
+                    PaidAt = now
+                });
+            }
+            // TH2: Bệnh nhân còn dư tiền tạm ứng -> Hoàn trả (refundedToPatient)
+            else
+            {
+                foreach (var dep in activeDeposits)
+                {
+                    decimal remainingDep = dep.Amount - dep.UsedAmount - dep.RefundedAmount;
+                    if (remainingDep > 0)
+                    {
+                        dep.RefundedAmount += remainingDep;
+                        dep.Status = DepositStatus.Refunded;
+                        refundedToPatient += remainingDep;
 
-        return Result.Success(resultDto);
+                        int transSeqRef = await GetNextSequenceValueAsync("seq_transaction_code", innerCt);
+                        string refTransCode = $"PT-{transSeqRef:D8}";
+                        if (string.IsNullOrEmpty(mainTransCode)) mainTransCode = refTransCode;
+
+                        var refundNoteSuffix = !string.IsNullOrWhiteSpace(request.ApprovedBy)
+                            ? $" (Người duyệt hoàn: {request.ApprovedBy.Trim()})"
+                            : "";
+                        var refundReasonText = !string.IsNullOrWhiteSpace(request.Note)
+                            ? request.Note.Trim()
+                            : "Tất toán xuất viện và hoàn trả tiền mặt số dư tạm ứng";
+
+                        _context.Payments.Add(new Payment
+                        {
+                            Invoice = invoice,
+                            Deposit = dep,
+                            TransactionCode = refTransCode,
+                            ReferenceCode = null,
+                            Amount = remainingDep,
+                            PaymentType = PaymentType.Refund,
+                            PaymentMethod = PaymentMethod.Cash,
+                            Status = PaymentStatus.Confirmed,
+                            CashierId = request.CashierAccountId > 0 ? request.CashierAccountId : null,
+                            ShiftId = shift?.Id,
+                            RefundReason = refundReasonText,
+                            Note = $"Hoàn tiền mặt số dư phiếu {dep.DepositCode} khi quyết toán {invoice.InvoiceNumber}{refundNoteSuffix}",
+                            PaidAt = now
+                        });
+                    }
+                }
+            }
+
+            if (string.IsNullOrEmpty(mainTransCode))
+            {
+                int transSeq = await GetNextSequenceValueAsync("seq_transaction_code", innerCt);
+                mainTransCode = $"PT-{transSeq:D8}";
+            }
+
+            if (request.CashierAccountId > 0)
+            {
+                _context.AccessLogs.Add(new AccessLog
+                {
+                    AccountId = request.CashierAccountId,
+                    PatientId = app.PatientId,
+                    Action = "SETTLE_DISCHARGE_INVOICE",
+                    OccurredAt = now
+                });
+            }
+
+            await _context.SaveChangesAsync(innerCt);
+
+            var resultDto = new SettleDischargeResultDto(
+                invoice.Id,
+                invoice.InvoiceNumber,
+                app.AppointmentCode,
+                app.Patient.FullName,
+                detail.TotalAmount,
+                detail.InsuranceCoveredAmount,
+                detail.PatientAmount,
+                depositDeductedTotal,
+                additionalPaid,
+                refundedToPatient,
+                request.Method,
+                mainTransCode,
+                now);
+
+            return Result.Success(resultDto);
+        }, ct);
     }
 
-    public async Task<IReadOnlyList<LedgerItemDto>> GetLedgerAsync(LedgerFilterDto filter, CancellationToken ct = default)
+    public async Task<IReadOnlyList<LedgerItemDto>> GetLedgerAsync(LedgerFilterDto filter, bool exportAll = false, CancellationToken ct = default)
     {
         var query = _context.Payments
             .AsNoTracking()
@@ -1009,10 +1037,10 @@ public class BillingService : IBillingService
             query = query.Where(p => p.PaidAt < end);
         }
 
-        var list = await query
-            .OrderByDescending(p => p.PaidAt)
-            .Take(100)
-            .ToListAsync(ct);
+        var orderedQuery = query.OrderByDescending(p => p.PaidAt);
+        var list = exportAll
+            ? await orderedQuery.ToListAsync(ct)
+            : await orderedQuery.Take(100).ToListAsync(ct);
 
         return list.Select(p => new LedgerItemDto(
             p.Id,
@@ -1072,157 +1100,158 @@ public class BillingService : IBillingService
         if (request.Amount <= 0)
             return Result.Failure<DepositDto>("INVALID_AMOUNT", "Số tiền tạm ứng phải lớn hơn 0.");
 
-        var patient = await _context.Patients.FirstOrDefaultAsync(p => p.Id == request.PatientId, ct);
-        if (patient == null)
-            return Result.Failure<DepositDto>("PATIENT_NOT_FOUND", "Không tìm thấy thông tin bệnh nhân.");
-
-        var now = Now;
-        var shift = request.CashierAccountId > 0
-            ? await _context.CashierShifts.FirstOrDefaultAsync(s => s.CashierId == request.CashierAccountId && s.Status == ShiftStatus.Open, ct)
-            : null;
-
-        if (shift == null)
+        return await ExecuteInTransactionAsync(async innerCt =>
         {
-            return Result.Failure<DepositDto>("SHIFT_REQUIRED", "Thu ngân chưa mở ca làm việc. Vui lòng mở ca trước khi thu tiền tạm ứng.");
-        }
+            var patient = await _context.Patients.FirstOrDefaultAsync(p => p.Id == request.PatientId, innerCt);
+            if (patient == null)
+                return Result.Failure<DepositDto>("PATIENT_NOT_FOUND", "Không tìm thấy thông tin bệnh nhân.");
 
-        int depSeq = await GetNextSequenceValueAsync("seq_deposit_code", ct);
-        int transSeq = await GetNextSequenceValueAsync("seq_transaction_code", ct);
+            var now = Now;
+            var shift = await LockOpenShiftAsync(request.CashierAccountId, innerCt);
 
-        string depCode = $"TU-{depSeq:D6}";
-        string transCode = $"PT-{transSeq:D8}";
-
-        int? targetAppointmentId = request.AppointmentId;
-        Appointment? app = null;
-
-        if (targetAppointmentId.HasValue)
-        {
-            app = await _context.Appointments
-                .Include(a => a.Doctor)
-                .FirstOrDefaultAsync(a => a.Id == targetAppointmentId.Value, ct);
-        }
-        else if (!patient.FullName.StartsWith("BN Test") && !patient.FullName.StartsWith("Nguyễn Văn Tra Cứu"))
-        {
-            app = await _context.Appointments
-                .Include(a => a.Doctor)
-                .Include(a => a.Invoice)
-                .Where(a => a.PatientId == request.PatientId && (a.Invoice == null || a.Invoice.Status != InvoiceStatus.Paid))
-                .OrderByDescending(a => a.CreatedAt)
-                .FirstOrDefaultAsync(ct);
-
-            if (app != null)
+            if (shift == null)
             {
-                if (app.StatusId < (int)AppointmentStatusId.CheckedIn)
-                {
-                    app.StatusId = (int)AppointmentStatusId.CheckedIn;
-                }
-                targetAppointmentId = app.Id;
+                return Result.Failure<DepositDto>("SHIFT_REQUIRED", "Thu ngân chưa mở ca làm việc. Vui lòng mở ca trước khi thu tiền tạm ứng.");
             }
-            else
+
+            int depSeq = await GetNextSequenceValueAsync("seq_deposit_code", innerCt);
+            int transSeq = await GetNextSequenceValueAsync("seq_transaction_code", innerCt);
+
+            string depCode = $"TU-{depSeq:D6}";
+            string transCode = $"PT-{transSeq:D8}";
+
+            int? targetAppointmentId = request.AppointmentId;
+            Appointment? app = null;
+
+            if (targetAppointmentId.HasValue)
             {
-                var defaultDoc = await _context.Doctors.FirstOrDefaultAsync(ct);
-                var defaultDept = await _context.Departments.FirstOrDefaultAsync(ct);
-                if (defaultDoc != null && defaultDept != null)
+                app = await _context.Appointments
+                    .Include(a => a.Doctor)
+                    .FirstOrDefaultAsync(a => a.Id == targetAppointmentId.Value, innerCt);
+            }
+            else if (!patient.FullName.StartsWith("BN Test") && !patient.FullName.StartsWith("Nguyễn Văn Tra Cứu"))
+            {
+                app = await _context.Appointments
+                    .Include(a => a.Doctor)
+                    .Include(a => a.Invoice)
+                    .Where(a => a.PatientId == request.PatientId && (a.Invoice == null || a.Invoice.Status != InvoiceStatus.Paid))
+                    .OrderByDescending(a => a.CreatedAt)
+                    .FirstOrDefaultAsync(innerCt);
+
+                if (app != null)
                 {
-                    app = new Appointment
+                    if (app.StatusId < (int)AppointmentStatusId.CheckedIn)
                     {
-                        PatientId = request.PatientId,
-                        DoctorId = defaultDoc.Id,
-                        DepartmentId = defaultDept.Id,
-                        AppointmentCode = $"AP-{now:HHmmss}",
-                        StatusId = (int)AppointmentStatusId.CheckedIn,
-                        CreatedAt = now
-                    };
-                    _context.Appointments.Add(app);
-                    await _context.SaveChangesAsync(ct);
+                        app.StatusId = (int)AppointmentStatusId.CheckedIn;
+                    }
                     targetAppointmentId = app.Id;
                 }
+                else
+                {
+                    var defaultDoc = await _context.Doctors.FirstOrDefaultAsync(innerCt);
+                    var defaultDept = await _context.Departments.FirstOrDefaultAsync(innerCt);
+                    if (defaultDoc != null && defaultDept != null)
+                    {
+                        app = new Appointment
+                        {
+                            PatientId = request.PatientId,
+                            DoctorId = defaultDoc.Id,
+                            DepartmentId = defaultDept.Id,
+                            AppointmentCode = $"AP-{now:HHmmss}",
+                            StatusId = (int)AppointmentStatusId.CheckedIn,
+                            CreatedAt = now
+                        };
+                        _context.Appointments.Add(app);
+                        await _context.SaveChangesAsync(innerCt);
+                        targetAppointmentId = app.Id;
+                    }
+                }
             }
-        }
 
-        string approvedByValue = !string.IsNullOrWhiteSpace(request.ApprovedBy)
-            ? request.ApprovedBy.Trim()
-            : (app?.Doctor != null ? $"BS. {app.Doctor.FullName}" : "BS. Phạm Thu Hằng");
+            string approvedByValue = !string.IsNullOrWhiteSpace(request.ApprovedBy)
+                ? request.ApprovedBy.Trim()
+                : (app?.Doctor != null ? $"BS. {app.Doctor.FullName}" : "BS. Phạm Thu Hằng");
 
-        var deposit = new Deposit
-        {
-            DepositCode = depCode,
-            PatientId = request.PatientId,
-            AppointmentId = targetAppointmentId,
-            Amount = request.Amount,
-            UsedAmount = 0m,
-            RefundedAmount = 0m,
-            Status = DepositStatus.Active,
-            PaymentMethod = request.Method,
-            ReferenceCode = request.ReferenceCode?.Trim(),
-            Purpose = string.IsNullOrWhiteSpace(request.Purpose) ? "Tạm ứng viện phí" : request.Purpose.Trim(),
-            ApprovedBy = approvedByValue,
-            Note = request.Note?.Trim(),
-            CashierId = request.CashierAccountId > 0 ? request.CashierAccountId : null,
-            ShiftId = shift?.Id,
-            CreatedAt = now
-        };
-
-        _context.Deposits.Add(deposit);
-        await _context.SaveChangesAsync(ct);
-
-        var payment = new Payment
-        {
-            DepositId = deposit.Id,
-            InvoiceId = null,
-            TransactionCode = transCode,
-            ReferenceCode = request.ReferenceCode?.Trim(),
-            Amount = request.Amount,
-            PaymentType = PaymentType.Deposit,
-            PaymentMethod = request.Method,
-            Status = PaymentStatus.Confirmed,
-            CashierId = request.CashierAccountId > 0 ? request.CashierAccountId : null,
-            ShiftId = shift?.Id,
-            Note = $"Thu tạm ứng {depCode}: {deposit.Purpose} (Duyệt: {approvedByValue})",
-            PaidAt = now
-        };
-
-        _context.Payments.Add(payment);
-
-        if (request.CashierAccountId > 0)
-        {
-            _context.AccessLogs.Add(new AccessLog
+            var deposit = new Deposit
             {
-                AccountId = request.CashierAccountId,
+                DepositCode = depCode,
                 PatientId = request.PatientId,
-                Action = "CREATE_DEPOSIT",
-                OccurredAt = now
-            });
-        }
+                AppointmentId = targetAppointmentId,
+                Amount = request.Amount,
+                UsedAmount = 0m,
+                RefundedAmount = 0m,
+                Status = DepositStatus.Active,
+                PaymentMethod = request.Method,
+                ReferenceCode = request.ReferenceCode?.Trim(),
+                Purpose = string.IsNullOrWhiteSpace(request.Purpose) ? "Tạm ứng viện phí" : request.Purpose.Trim(),
+                ApprovedBy = approvedByValue,
+                Note = request.Note?.Trim(),
+                CashierId = request.CashierAccountId > 0 ? request.CashierAccountId : null,
+                ShiftId = shift?.Id,
+                CreatedAt = now
+            };
 
-        await _context.SaveChangesAsync(ct);
+            _context.Deposits.Add(deposit);
+            await _context.SaveChangesAsync(innerCt);
 
-        var cashier = await _context.Accounts.FirstOrDefaultAsync(a => a.Id == request.CashierAccountId, ct);
+            var payment = new Payment
+            {
+                DepositId = deposit.Id,
+                InvoiceId = null,
+                TransactionCode = transCode,
+                ReferenceCode = request.ReferenceCode?.Trim(),
+                Amount = request.Amount,
+                PaymentType = PaymentType.Deposit,
+                PaymentMethod = request.Method,
+                Status = PaymentStatus.Confirmed,
+                CashierId = request.CashierAccountId > 0 ? request.CashierAccountId : null,
+                ShiftId = shift?.Id,
+                Note = $"Thu tạm ứng {depCode}: {deposit.Purpose} (Duyệt: {approvedByValue})",
+                PaidAt = now
+            };
 
-        var dto = new DepositDto(
-            deposit.Id,
-            deposit.DepositCode,
-            deposit.PatientId,
-            deposit.PatientId.ToString("D8"),
-            patient.FullName,
-            patient.PhoneNumber,
-            deposit.AppointmentId,
-            app?.AppointmentCode,
-            deposit.Amount,
-            0m,
-            0m,
-            deposit.Amount,
-            deposit.Status,
-            deposit.PaymentMethod,
-            deposit.ReferenceCode,
-            deposit.Purpose,
-            deposit.Note,
-            cashier?.Username ?? "Hệ thống",
-            deposit.CreatedAt,
-            patient.NationalId,
-            deposit.ApprovedBy);
+            _context.Payments.Add(payment);
 
-        return Result.Success(dto);
+            if (request.CashierAccountId > 0)
+            {
+                _context.AccessLogs.Add(new AccessLog
+                {
+                    AccountId = request.CashierAccountId,
+                    PatientId = request.PatientId,
+                    Action = "CREATE_DEPOSIT",
+                    OccurredAt = now
+                });
+            }
+
+            await _context.SaveChangesAsync(innerCt);
+
+            var cashier = await _context.Accounts.FirstOrDefaultAsync(a => a.Id == request.CashierAccountId, innerCt);
+
+            var dto = new DepositDto(
+                deposit.Id,
+                deposit.DepositCode,
+                deposit.PatientId,
+                deposit.PatientId.ToString("D8"),
+                patient.FullName,
+                patient.PhoneNumber,
+                deposit.AppointmentId,
+                app?.AppointmentCode,
+                deposit.Amount,
+                0m,
+                0m,
+                deposit.Amount,
+                deposit.Status,
+                deposit.PaymentMethod,
+                deposit.ReferenceCode,
+                deposit.Purpose,
+                deposit.Note,
+                cashier?.Username ?? "Hệ thống",
+                deposit.CreatedAt,
+                patient.NationalId,
+                deposit.ApprovedBy);
+
+            return Result.Success(dto);
+        }, ct);
     }
 
     public async Task<PatientDepositSummaryDto> GetPatientDepositSummaryAsync(int patientId, CancellationToken ct = default)
@@ -1293,14 +1322,13 @@ public class BillingService : IBillingService
         if (!string.IsNullOrWhiteSpace(search))
         {
             search = search.Trim();
-            bool hasIntId = int.TryParse(search, out var parsedId) || int.TryParse(search.TrimStart('0'), out parsedId);
+            bool hasIntId = TryParsePatientId(search, out var parsedId);
             query = query.Where(d =>
                 d.DepositCode.Contains(search)
                 || d.Patient.FullName.Contains(search)
                 || d.Patient.PhoneNumber.Contains(search)
                 || (d.Patient.NationalId != null && d.Patient.NationalId.Contains(search))
                 || (hasIntId && d.PatientId == parsedId)
-                || d.PatientId.ToString().Contains(search)
                 || (d.ApprovedBy != null && d.ApprovedBy.Contains(search))
                 || (d.Appointment != null && d.Appointment.AppointmentCode.Contains(search))
                 || (d.ReferenceCode != null && d.ReferenceCode.Contains(search)));
@@ -1336,6 +1364,22 @@ public class BillingService : IBillingService
             d.ApprovedBy)).ToList();
     }
 
+    public async Task<DepositSummaryTotalsDto> GetDepositTotalsAsync(CancellationToken ct = default)
+    {
+        var agg = await _context.Deposits
+            .AsNoTracking()
+            .Where(d => !d.Patient.FullName.StartsWith("BN Test") && !d.Patient.FullName.StartsWith("Nguyễn Văn Tra Cứu"))
+            .GroupBy(_ => 1)
+            .Select(g => new DepositSummaryTotalsDto(
+                g.Count(),
+                g.Sum(d => d.Amount),
+                g.Sum(d => d.UsedAmount),
+                g.Sum(d => d.Amount - d.UsedAmount - d.RefundedAmount)))
+            .FirstOrDefaultAsync(ct);
+
+        return agg ?? new DepositSummaryTotalsDto(0, 0m, 0m, 0m);
+    }
+
     public async Task<Result<string>> RefundDepositAsync(RefundDepositRequest request, CancellationToken ct = default)
     {
         if (request.DepositId <= 0)
@@ -1347,71 +1391,73 @@ public class BillingService : IBillingService
         if (string.IsNullOrWhiteSpace(request.Reason))
             return Result.Failure<string>("MISSING_REASON", "Bắt buộc phải nhập lý do hoàn tiền tạm ứng.");
 
-        var deposit = await _context.Deposits
-            .Include(d => d.Patient)
-            .FirstOrDefaultAsync(d => d.Id == request.DepositId, ct);
-
-        if (deposit == null)
-            return Result.Failure<string>("NOT_FOUND", "Không tìm thấy phiếu tạm ứng.");
-
-        decimal available = deposit.Amount - deposit.UsedAmount - deposit.RefundedAmount;
-        if (request.Amount > available)
-            return Result.Failure<string>("AMOUNT_EXCEEDED", $"Số tiền yêu cầu hoàn ({request.Amount:N0} đ) vượt quá số dư tạm ứng còn lại ({available:N0} đ).");
-
         if (request.Method == PaymentMethod.BankTransfer && string.IsNullOrWhiteSpace(request.ReferenceCode))
             return Result.Failure<string>("MISSING_REFERENCE", "Vui lòng nhập mã giao dịch ngân hàng khi hoàn tiền qua chuyển khoản.");
 
-        var now = Now;
-        var shift = request.CashierAccountId > 0
-            ? await _context.CashierShifts.FirstOrDefaultAsync(s => s.CashierId == request.CashierAccountId && s.Status == ShiftStatus.Open, ct)
-            : null;
-
-        if (shift == null)
+        return await ExecuteInTransactionAsync(async innerCt =>
         {
-            return Result.Failure<string>("SHIFT_REQUIRED", "Thu ngân chưa mở ca làm việc. Vui lòng mở ca trước khi thực hiện hoàn tiền tạm ứng.");
-        }
+            var deposit = await _context.Deposits
+                .FromSqlInterpolated($"SELECT * FROM deposits WHERE id = {request.DepositId} FOR UPDATE")
+                .Include(d => d.Patient)
+                .FirstOrDefaultAsync(innerCt);
 
-        deposit.RefundedAmount += request.Amount;
-        if (deposit.Amount - deposit.UsedAmount - deposit.RefundedAmount <= 0)
-        {
-            deposit.Status = DepositStatus.Refunded;
-        }
+            if (deposit == null)
+                return Result.Failure<string>("NOT_FOUND", "Không tìm thấy phiếu tạm ứng.");
 
-        int transSeq = await GetNextSequenceValueAsync("seq_transaction_code", ct);
-        string transCode = $"PT-{transSeq:D8}";
+            decimal available = deposit.Amount - deposit.UsedAmount - deposit.RefundedAmount;
+            if (request.Amount > available)
+                return Result.Failure<string>("AMOUNT_EXCEEDED", $"Số tiền yêu cầu hoàn ({request.Amount:N0} đ) vượt quá số dư tạm ứng còn lại ({available:N0} đ).");
 
-        var payment = new Payment
-        {
-            Deposit = deposit,
-            InvoiceId = null,
-            TransactionCode = transCode,
-            ReferenceCode = request.ReferenceCode?.Trim(),
-            Amount = request.Amount,
-            PaymentType = PaymentType.Refund,
-            PaymentMethod = request.Method,
-            Status = PaymentStatus.Confirmed,
-            CashierId = request.CashierAccountId > 0 ? request.CashierAccountId : null,
-            ShiftId = shift?.Id,
-            RefundReason = request.Reason.Trim(),
-            Note = $"Hoàn tiền tạm ứng {deposit.DepositCode}: {request.Reason.Trim()}",
-            PaidAt = now
-        };
+            var now = Now;
+            var shift = await LockOpenShiftAsync(request.CashierAccountId, innerCt);
 
-        _context.Payments.Add(payment);
-
-        if (request.CashierAccountId > 0)
-        {
-            _context.AccessLogs.Add(new AccessLog
+            if (shift == null)
             {
-                AccountId = request.CashierAccountId,
-                PatientId = deposit.PatientId,
-                Action = "REFUND_DEPOSIT",
-                OccurredAt = now
-            });
-        }
+                return Result.Failure<string>("SHIFT_REQUIRED", "Thu ngân chưa mở ca làm việc. Vui lòng mở ca trước khi thực hiện hoàn tiền tạm ứng.");
+            }
 
-        await _context.SaveChangesAsync(ct);
-        return Result.Success(transCode);
+            deposit.RefundedAmount += request.Amount;
+            if (deposit.Amount - deposit.UsedAmount - deposit.RefundedAmount <= 0)
+            {
+                deposit.Status = DepositStatus.Refunded;
+            }
+
+            int transSeq = await GetNextSequenceValueAsync("seq_transaction_code", innerCt);
+            string transCode = $"PT-{transSeq:D8}";
+
+            var payment = new Payment
+            {
+                Deposit = deposit,
+                InvoiceId = null,
+                TransactionCode = transCode,
+                ReferenceCode = request.ReferenceCode?.Trim(),
+                Amount = request.Amount,
+                PaymentType = PaymentType.Refund,
+                PaymentMethod = request.Method,
+                Status = PaymentStatus.Confirmed,
+                CashierId = request.CashierAccountId > 0 ? request.CashierAccountId : null,
+                ShiftId = shift?.Id,
+                RefundReason = request.Reason.Trim(),
+                Note = $"Hoàn tiền tạm ứng {deposit.DepositCode}: {request.Reason.Trim()}",
+                PaidAt = now
+            };
+
+            _context.Payments.Add(payment);
+
+            if (request.CashierAccountId > 0)
+            {
+                _context.AccessLogs.Add(new AccessLog
+                {
+                    AccountId = request.CashierAccountId,
+                    PatientId = deposit.PatientId,
+                    Action = "REFUND_DEPOSIT",
+                    OccurredAt = now
+                });
+            }
+
+            await _context.SaveChangesAsync(innerCt);
+            return Result.Success(transCode);
+        }, ct);
     }
 
     public async Task<Result<QuickPatientDepositLookupDto>> QuickLookupPatientDepositsAsync(string search, CancellationToken ct = default)
@@ -1422,7 +1468,7 @@ public class BillingService : IBillingService
         }
 
         search = search.Trim();
-        bool hasIntId = int.TryParse(search, out var parsedId) || int.TryParse(search.TrimStart('0'), out parsedId);
+        bool hasIntId = TryParsePatientId(search, out var parsedId);
 
         var patient = await _context.Patients
             .AsNoTracking()
@@ -1641,102 +1687,102 @@ public class BillingService : IBillingService
         if (string.IsNullOrWhiteSpace(request.Reason))
             return Result.Failure<RefundAllDepositsResultDto>("MISSING_REASON", "Bắt buộc phải nhập lý do tất toán & hoàn tiền.");
 
-        var patient = await _context.Patients.FirstOrDefaultAsync(p => p.Id == request.PatientId, ct);
-        if (patient == null)
-            return Result.Failure<RefundAllDepositsResultDto>("PATIENT_NOT_FOUND", "Không tìm thấy thông tin bệnh nhân.");
-
-        var shift = request.CashierAccountId > 0
-            ? await _context.CashierShifts.FirstOrDefaultAsync(s => s.CashierId == request.CashierAccountId && s.Status == ShiftStatus.Open, ct)
-            : null;
-
-        if (shift == null)
+        return await ExecuteInTransactionAsync(async innerCt =>
         {
-            return Result.Failure<RefundAllDepositsResultDto>("SHIFT_REQUIRED", "Thu ngân chưa mở ca làm việc. Vui lòng mở ca trước khi thực hiện hoàn tiền.");
-        }
+            var patient = await _context.Patients.FirstOrDefaultAsync(p => p.Id == request.PatientId, innerCt);
+            if (patient == null)
+                return Result.Failure<RefundAllDepositsResultDto>("PATIENT_NOT_FOUND", "Không tìm thấy thông tin bệnh nhân.");
 
-        var activeDeposits = await _context.Deposits
-            .Where(d => d.PatientId == request.PatientId && d.Status == DepositStatus.Active && (d.Amount - d.UsedAmount - d.RefundedAmount) > 0)
-            .OrderBy(d => d.CreatedAt)
-            .ToListAsync(ct);
+            var shift = await LockOpenShiftAsync(request.CashierAccountId, innerCt);
 
-        if (activeDeposits.Count == 0)
-        {
-            return Result.Failure<RefundAllDepositsResultDto>("NO_BALANCE", "Bệnh nhân không có số dư tạm ứng nào cần hoàn trả.");
-        }
-
-        bool hasBankTransfer = activeDeposits.Any(d => d.PaymentMethod == PaymentMethod.BankTransfer);
-        if (hasBankTransfer && string.IsNullOrWhiteSpace(request.BankReferenceCode))
-        {
-            return Result.Failure<RefundAllDepositsResultDto>("MISSING_BANK_REF", "Bệnh nhân có khoản tạm ứng qua chuyển khoản. Vui lòng nhập mã chuẩn chi / giao dịch ngân hàng.");
-        }
-
-        var now = Now;
-        decimal totalRefunded = 0m;
-        decimal cashRefunded = 0m;
-        decimal bankRefunded = 0m;
-        var transCodes = new List<string>();
-
-        foreach (var deposit in activeDeposits)
-        {
-            decimal balance = deposit.Amount - deposit.UsedAmount - deposit.RefundedAmount;
-            if (balance <= 0) continue;
-
-            deposit.RefundedAmount += balance;
-            deposit.Status = DepositStatus.Refunded;
-
-            int transSeq = await GetNextSequenceValueAsync("seq_transaction_code", ct);
-            string transCode = $"PT-{transSeq:D8}";
-            transCodes.Add(transCode);
-
-            var payment = new Payment
+            if (shift == null)
             {
-                Deposit = deposit,
-                InvoiceId = null,
-                TransactionCode = transCode,
-                ReferenceCode = deposit.PaymentMethod == PaymentMethod.BankTransfer ? request.BankReferenceCode?.Trim() : null,
-                Amount = balance,
-                PaymentType = PaymentType.Refund,
-                PaymentMethod = deposit.PaymentMethod,
-                Status = PaymentStatus.Confirmed,
-                CashierId = request.CashierAccountId > 0 ? request.CashierAccountId : null,
-                ShiftId = shift.Id,
-                RefundReason = request.Reason.Trim(),
-                Note = $"Tất toán hoàn trả số dư phiếu {deposit.DepositCode}: {request.Reason.Trim()}",
-                PaidAt = now
-            };
+                return Result.Failure<RefundAllDepositsResultDto>("SHIFT_REQUIRED", "Thu ngân chưa mở ca làm việc. Vui lòng mở ca trước khi thực hiện hoàn tiền.");
+            }
 
-            _context.Payments.Add(payment);
+            var activeDeposits = await _context.Deposits
+                .FromSqlInterpolated($"SELECT * FROM deposits WHERE patient_id = {request.PatientId} AND status = 'ACTIVE' AND (amount - used_amount - refunded_amount) > 0 ORDER BY created_at FOR UPDATE")
+                .ToListAsync(innerCt);
 
-            totalRefunded += balance;
-            if (deposit.PaymentMethod == PaymentMethod.Cash)
-                cashRefunded += balance;
-            else
-                bankRefunded += balance;
-        }
-
-        if (request.CashierAccountId > 0)
-        {
-            _context.AccessLogs.Add(new AccessLog
+            if (activeDeposits.Count == 0)
             {
-                AccountId = request.CashierAccountId,
-                PatientId = patient.Id,
-                Action = "BATCH_REFUND_ALL_DEPOSITS",
-                OccurredAt = now
-            });
-        }
+                return Result.Failure<RefundAllDepositsResultDto>("NO_BALANCE", "Bệnh nhân không có số dư tạm ứng nào cần hoàn trả.");
+            }
 
-        await _context.SaveChangesAsync(ct);
+            bool hasBankTransfer = activeDeposits.Any(d => d.PaymentMethod == PaymentMethod.BankTransfer);
+            if (hasBankTransfer && string.IsNullOrWhiteSpace(request.BankReferenceCode))
+            {
+                return Result.Failure<RefundAllDepositsResultDto>("MISSING_BANK_REF", "Bệnh nhân có khoản tạm ứng qua chuyển khoản. Vui lòng nhập mã chuẩn chi / giao dịch ngân hàng.");
+            }
 
-        var resultDto = new RefundAllDepositsResultDto(
-            patient.Id,
-            patient.FullName,
-            totalRefunded,
-            activeDeposits.Count,
-            cashRefunded,
-            bankRefunded,
-            transCodes);
+            var now = Now;
+            decimal totalRefunded = 0m;
+            decimal cashRefunded = 0m;
+            decimal bankRefunded = 0m;
+            var transCodes = new List<string>();
 
-        return Result.Success(resultDto);
+            foreach (var deposit in activeDeposits)
+            {
+                decimal balance = deposit.Amount - deposit.UsedAmount - deposit.RefundedAmount;
+                if (balance <= 0) continue;
+
+                deposit.RefundedAmount += balance;
+                deposit.Status = DepositStatus.Refunded;
+
+                int transSeq = await GetNextSequenceValueAsync("seq_transaction_code", innerCt);
+                string transCode = $"PT-{transSeq:D8}";
+                transCodes.Add(transCode);
+
+                var payment = new Payment
+                {
+                    Deposit = deposit,
+                    InvoiceId = null,
+                    TransactionCode = transCode,
+                    ReferenceCode = deposit.PaymentMethod == PaymentMethod.BankTransfer ? request.BankReferenceCode?.Trim() : null,
+                    Amount = balance,
+                    PaymentType = PaymentType.Refund,
+                    PaymentMethod = deposit.PaymentMethod,
+                    Status = PaymentStatus.Confirmed,
+                    CashierId = request.CashierAccountId > 0 ? request.CashierAccountId : null,
+                    ShiftId = shift.Id,
+                    RefundReason = request.Reason.Trim(),
+                    Note = $"Tất toán hoàn trả số dư phiếu {deposit.DepositCode}: {request.Reason.Trim()}",
+                    PaidAt = now
+                };
+
+                _context.Payments.Add(payment);
+
+                totalRefunded += balance;
+                if (deposit.PaymentMethod == PaymentMethod.Cash)
+                    cashRefunded += balance;
+                else
+                    bankRefunded += balance;
+            }
+
+            if (request.CashierAccountId > 0)
+            {
+                _context.AccessLogs.Add(new AccessLog
+                {
+                    AccountId = request.CashierAccountId,
+                    PatientId = patient.Id,
+                    Action = "BATCH_REFUND_ALL_DEPOSITS",
+                    OccurredAt = now
+                });
+            }
+
+            await _context.SaveChangesAsync(innerCt);
+
+            var resultDto = new RefundAllDepositsResultDto(
+                patient.Id,
+                patient.FullName,
+                totalRefunded,
+                activeDeposits.Count,
+                cashRefunded,
+                bankRefunded,
+                transCodes);
+
+            return Result.Success(resultDto);
+        }, ct);
     }
 
     public async Task<Result<string>> RefundInvoiceAsync(RefundInvoiceRequest request, CancellationToken ct = default)
@@ -1750,71 +1796,73 @@ public class BillingService : IBillingService
         if (string.IsNullOrWhiteSpace(request.Reason))
             return Result.Failure<string>("MISSING_REASON", "Bắt buộc phải nhập lý do hoàn tiền viện phí.");
 
-        var invoice = await _context.Invoices
-            .Include(i => i.Payments)
-            .Include(i => i.Appointment)!.ThenInclude(a => a.Patient)
-            .FirstOrDefaultAsync(i => i.Id == request.InvoiceId, ct);
-
-        if (invoice == null)
-            return Result.Failure<string>("NOT_FOUND", "Không tìm thấy hóa đơn viện phí.");
-
-        decimal totalRefunded = invoice.Payments.Where(p => p.PaymentType == PaymentType.Refund).Sum(p => p.Amount);
-        decimal maxRefundable = invoice.PatientAmount - totalRefunded;
-
-        if (request.Amount > maxRefundable)
-            return Result.Failure<string>("AMOUNT_EXCEEDED", $"Số tiền hoàn ({request.Amount:N0} đ) vượt quá số tiền bệnh nhân có thể hoàn (tối đa {maxRefundable:N0} đ).");
-
         if (request.Method == PaymentMethod.BankTransfer && string.IsNullOrWhiteSpace(request.ReferenceCode))
             return Result.Failure<string>("MISSING_REFERENCE", "Vui lòng nhập mã giao dịch ngân hàng khi hoàn tiền qua chuyển khoản.");
 
-        var now = Now;
-        var shift = request.CashierAccountId > 0
-            ? await _context.CashierShifts.FirstOrDefaultAsync(s => s.CashierId == request.CashierAccountId && s.Status == ShiftStatus.Open, ct)
-            : null;
-
-        if (shift == null)
+        return await ExecuteInTransactionAsync(async innerCt =>
         {
-            return Result.Failure<string>("SHIFT_REQUIRED", "Thu ngân chưa mở ca làm việc. Vui lòng mở ca trước khi thực hiện hoàn tiền viện phí.");
-        }
+            var invoice = await _context.Invoices
+                .FromSqlInterpolated($"SELECT * FROM invoices WHERE id = {request.InvoiceId} FOR UPDATE")
+                .Include(i => i.Payments)
+                .Include(i => i.Appointment)!.ThenInclude(a => a.Patient)
+                .FirstOrDefaultAsync(innerCt);
 
-        int transSeq = await GetNextSequenceValueAsync("seq_transaction_code", ct);
-        string transCode = $"PT-{transSeq:D8}";
+            if (invoice == null)
+                return Result.Failure<string>("NOT_FOUND", "Không tìm thấy hóa đơn viện phí.");
 
-        var approverSuffix = !string.IsNullOrWhiteSpace(request.ApprovedBy)
-            ? $" (Người duyệt: {request.ApprovedBy.Trim()})"
-            : "";
+            decimal totalRefunded = invoice.Payments.Where(p => p.PaymentType == PaymentType.Refund).Sum(p => p.Amount);
+            decimal maxRefundable = invoice.PatientAmount - totalRefunded;
 
-        var payment = new Payment
-        {
-            Invoice = invoice,
-            TransactionCode = transCode,
-            ReferenceCode = null,
-            Amount = request.Amount,
-            PaymentType = PaymentType.Refund,
-            PaymentMethod = PaymentMethod.Cash,
-            Status = PaymentStatus.Confirmed,
-            CashierId = request.CashierAccountId > 0 ? request.CashierAccountId : null,
-            ShiftId = shift?.Id,
-            RefundReason = request.Reason.Trim(),
-            Note = $"Hoàn tiền mặt HĐ {invoice.InvoiceNumber}: {request.Reason.Trim()}{approverSuffix}",
-            PaidAt = now
-        };
+            if (request.Amount > maxRefundable)
+                return Result.Failure<string>("AMOUNT_EXCEEDED", $"Số tiền hoàn ({request.Amount:N0} đ) vượt quá số tiền bệnh nhân có thể hoàn (tối đa {maxRefundable:N0} đ).");
 
-        _context.Payments.Add(payment);
+            var now = Now;
+            var shift = await LockOpenShiftAsync(request.CashierAccountId, innerCt);
 
-        if (request.CashierAccountId > 0 && invoice.PatientId > 0)
-        {
-            _context.AccessLogs.Add(new AccessLog
+            if (shift == null)
             {
-                AccountId = request.CashierAccountId,
-                PatientId = invoice.PatientId,
-                Action = "REFUND_INVOICE",
-                OccurredAt = now
-            });
-        }
+                return Result.Failure<string>("SHIFT_REQUIRED", "Thu ngân chưa mở ca làm việc. Vui lòng mở ca trước khi thực hiện hoàn tiền viện phí.");
+            }
 
-        await _context.SaveChangesAsync(ct);
-        return Result.Success(transCode);
+            int transSeq = await GetNextSequenceValueAsync("seq_transaction_code", innerCt);
+            string transCode = $"PT-{transSeq:D8}";
+
+            var approverSuffix = !string.IsNullOrWhiteSpace(request.ApprovedBy)
+                ? $" (Người duyệt: {request.ApprovedBy.Trim()})"
+                : "";
+
+            var payment = new Payment
+            {
+                Invoice = invoice,
+                TransactionCode = transCode,
+                ReferenceCode = null,
+                Amount = request.Amount,
+                PaymentType = PaymentType.Refund,
+                PaymentMethod = PaymentMethod.Cash,
+                Status = PaymentStatus.Confirmed,
+                CashierId = request.CashierAccountId > 0 ? request.CashierAccountId : null,
+                ShiftId = shift?.Id,
+                RefundReason = request.Reason.Trim(),
+                Note = $"Hoàn tiền mặt HĐ {invoice.InvoiceNumber}: {request.Reason.Trim()}{approverSuffix}",
+                PaidAt = now
+            };
+
+            _context.Payments.Add(payment);
+
+            if (request.CashierAccountId > 0 && invoice.PatientId > 0)
+            {
+                _context.AccessLogs.Add(new AccessLog
+                {
+                    AccountId = request.CashierAccountId,
+                    PatientId = invoice.PatientId,
+                    Action = "REFUND_INVOICE",
+                    OccurredAt = now
+                });
+            }
+
+            await _context.SaveChangesAsync(innerCt);
+            return Result.Success(transCode);
+        }, ct);
     }
 
     public async Task<IReadOnlyList<PatientSearchResultDto>> SearchPatientsAsync(string search, CancellationToken ct = default)
@@ -1825,7 +1873,7 @@ public class BillingService : IBillingService
         }
 
         search = search.Trim();
-        bool hasIntId = int.TryParse(search, out var parsedId) || int.TryParse(search.TrimStart('0'), out parsedId);
+        bool hasIntId = TryParsePatientId(search, out var parsedId);
 
         var query = _context.Patients
             .AsNoTracking()
@@ -1878,6 +1926,29 @@ public class BillingService : IBillingService
                 latestApp?.AppointmentCode,
                 latestApp?.Department?.Name);
         }).ToList();
+    }
+
+    private static bool TryParsePatientId(string search, out int parsedId)
+    {
+        parsedId = 0;
+        if (string.IsNullOrWhiteSpace(search))
+        {
+            return false;
+        }
+
+        var s = search.Trim();
+        if (s.StartsWith("BN", StringComparison.OrdinalIgnoreCase))
+        {
+            s = s[2..].TrimStart('-', ' ');
+        }
+
+        var trimmed = s.TrimStart('0');
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            return false;
+        }
+
+        return int.TryParse(trimmed, out parsedId) && parsedId > 0;
     }
 
     private async Task<int> GetNextSequenceValueAsync(string sequenceName, CancellationToken ct)

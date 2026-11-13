@@ -12,7 +12,7 @@
             <div style="font-size: 42px; margin-bottom: 12px;">🏥</div>
             <h3 style="font-size: 18px; font-weight: 800; color: #1e293b; margin: 0 0 8px;">Quầy thu viện phí, BHYT &amp; tất toán tạm ứng</h3>
             <p style="font-size: 14px; color: #64748b; margin: 0 auto 20px; max-width: 580px; line-height: 1.6;">
-                Khi người bệnh đến quầy thanh toán, vui lòng nhập <strong>Mã BN, Số CCCD, Số điện thoại, Họ tên</strong> hoặc <strong>Mã phiếu tạm ứng (TU-...)</strong> vào thanh tra cứu phía trên để mở bảng kê chi phí dịch vụ &amp; thuốc, tính tiền thừa hoặc hoàn trả tiền tạm ứng dư.
+                Khi người bệnh đến quầy thanh toán, vui lòng nhập <strong>Mã bệnh nhân (Mã BN)</strong> hoặc <strong>Số CCCD</strong> vào thanh tra cứu phía trên để mở bảng kê các hồ sơ viện phí chưa thanh toán.
             </p>
             <div style="display: inline-grid; grid-template-columns: repeat(2, minmax(240px, 300px)); gap: 14px; text-align: left;">
                 <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px;">
@@ -30,9 +30,9 @@
     {
         <div style="text-align: center; padding: 56px 24px; color: #64748b; background: #fff1f2; border: 1.5px dashed #fda4af; border-radius: 12px;">
             <div style="font-size: 38px; margin-bottom: 10px;">🔍</div>
-            <h3 style="font-size: 16px; font-weight: 700; color: #9f1239; margin-bottom: 6px;">Không tìm thấy hồ sơ bệnh nhân</h3>
-            <p style="font-size: 13.5px; color: #881337; margin: 0 auto; max-width: 460px; line-height: 1.5;">
-                Không tìm thấy lượt khám hoặc hồ sơ bệnh nhân nào khớp với từ khóa <strong>"@search"</strong>. Vui lòng kiểm tra lại Mã BN, CCCD hoặc SĐT.
+            <h3 style="font-size: 16px; font-weight: 700; color: #9f1239; margin-bottom: 6px;">Không tìm thấy hồ sơ viện phí chưa đóng tiền</h3>
+            <p style="font-size: 13.5px; color: #881337; margin: 0 auto; max-width: 480px; line-height: 1.5;">
+                Không tìm thấy hồ sơ viện phí chưa thanh toán nào khớp với Mã BN / CCCD <strong>"@search"</strong> (Hồ sơ không tồn tại hoặc đã thanh toán).
             </p>
         </div>
     }
@@ -294,6 +294,11 @@ else
                         {
                             <span style="color: #64748b; font-size: 11.5px;">Đã thu thêm:</span><br />
                             <strong style="color: #15803d; font-size: 14px;">@Model.AdditionalPaid.ToString("N0") đ</strong>
+                        }
+                        else if (Model.DepositDeducted > 0)
+                        {
+                            <span style="color: #64748b; font-size: 11.5px;">Đã thu thêm tại quầy:</span><br />
+                            <strong style="color: #15803d; font-size: 14px;">0 đ</strong>
                         }
                         else
                         {

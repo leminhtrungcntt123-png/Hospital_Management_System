@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -71,7 +71,7 @@ namespace HIS.DAL.Migrations
                 type: "character varying(30)",
                 maxLength: 30,
                 nullable: false,
-                defaultValue: "");
+                defaultValueSql: "'PT-' || substr(md5(random()::text || clock_timestamp()::text), 1, 10)");
 
             migrationBuilder.AddColumn<bool>(
                 name: "is_insurance_covered",
@@ -134,7 +134,7 @@ namespace HIS.DAL.Migrations
                 type: "character varying(20)",
                 maxLength: 20,
                 nullable: false,
-                defaultValue: "");
+                defaultValueSql: "'HD-' || substr(md5(random()::text || clock_timestamp()::text), 1, 10)");
 
             migrationBuilder.AlterColumn<decimal>(
                 name: "amount",
@@ -254,6 +254,9 @@ namespace HIS.DAL.Migrations
                 table: "payments",
                 column: "shift_id");
 
+            migrationBuilder.Sql("UPDATE payments SET transaction_code = 'PT-' || lpad(nextval('seq_transaction_code')::text, 8, '0') WHERE transaction_code IS NULL OR transaction_code = '';");
+            migrationBuilder.Sql("UPDATE invoices SET invoice_number = 'HD-' || lpad(nextval('seq_invoice_number')::text, 6, '0') WHERE invoice_number IS NULL OR invoice_number = '';");
+
             migrationBuilder.CreateIndex(
                 name: "ix_payments_transaction_code",
                 table: "payments",
@@ -271,6 +274,13 @@ namespace HIS.DAL.Migrations
                 table: "cashier_shifts",
                 columns: new[] { "cashier_id", "status" });
 
+            migrationBuilder.CreateIndex(
+                name: "uq_cashier_shifts_one_open_per_cashier",
+                table: "cashier_shifts",
+                column: "cashier_id",
+                unique: true,
+                filter: "status = 'OPEN'");
+
             migrationBuilder.AddForeignKey(
                 name: "fk_payments_cashier_shifts_shift_id",
                 table: "payments",
@@ -286,6 +296,10 @@ namespace HIS.DAL.Migrations
             migrationBuilder.DropForeignKey(
                 name: "fk_payments_cashier_shifts_shift_id",
                 table: "payments");
+
+            migrationBuilder.DropIndex(
+                name: "uq_cashier_shifts_one_open_per_cashier",
+                table: "cashier_shifts");
 
             migrationBuilder.DropTable(
                 name: "cashier_shifts");

@@ -24,7 +24,7 @@ public interface IBillingService
     /// <summary>
     /// Lấy sổ thu ngân ghi nhận các giao dịch thu/hoàn tiền theo thời gian, nhân viên, phương thức.
     /// </summary>
-    Task<IReadOnlyList<LedgerItemDto>> GetLedgerAsync(LedgerFilterDto filter, CancellationToken ct = default);
+    Task<IReadOnlyList<LedgerItemDto>> GetLedgerAsync(LedgerFilterDto filter, bool exportAll = false, CancellationToken ct = default);
 
     /// <summary>
     /// Lấy lịch sử chi phí khám bệnh và thanh toán của bệnh nhân.
@@ -50,6 +50,7 @@ public interface IBillingService
         DepositStatus? status = null,
         int? patientId = null,
         CancellationToken ct = default);
+    Task<DepositSummaryTotalsDto> GetDepositTotalsAsync(CancellationToken ct = default);
 
     /// <summary>
     /// Hoàn tiền tạm ứng còn dư cho bệnh nhân theo từng phiếu.

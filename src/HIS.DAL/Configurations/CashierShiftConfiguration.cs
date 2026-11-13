@@ -33,6 +33,10 @@ public class CashierShiftConfiguration : IEntityTypeConfiguration<CashierShift>
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(e => new { e.CashierId, e.Status }).HasDatabaseName("idx_cashier_shifts_cashier_status");
+        builder.HasIndex(e => e.CashierId)
+            .IsUnique()
+            .HasFilter("status = 'OPEN'")
+            .HasDatabaseName("uq_cashier_shifts_one_open_per_cashier");
     }
 }
 

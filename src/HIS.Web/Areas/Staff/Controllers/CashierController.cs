@@ -40,52 +40,43 @@ public class CashierController : Controller
         int? selectedId = null,
         CancellationToken ct = default)
     {
-        var invoices = await _billingService.GetPendingInvoicesAsync(search, invoiceStatus, ct);
-        var allInvoices = invoiceStatus.HasValue
-            ? await _billingService.GetPendingInvoicesAsync(search, null, ct)
-            : invoices;
-
+        IReadOnlyList<PendingInvoiceItemDto> invoices = Array.Empty<PendingInvoiceItemDto>();
         InvoiceDetailDto? selectedInvoice = null;
         int activeId = 0;
 
-        if (selectedId.HasValue || !string.IsNullOrWhiteSpace(search))
+        if (!string.IsNullOrWhiteSpace(search))
         {
-            activeId = selectedId ?? invoices.FirstOrDefault(i => i.InvoiceStatus == InvoiceStatus.Unpaid)?.AppointmentId ?? invoices.FirstOrDefault()?.AppointmentId ?? 0;
+            invoices = await _billingService.GetPendingInvoicesAsync(search, InvoiceStatus.Unpaid, ct);
+            activeId = selectedId ?? invoices.FirstOrDefault()?.AppointmentId ?? 0;
             if (activeId > 0)
             {
                 var detailResult = await _billingService.GetInvoiceDetailAsync(activeId, ct);
-                if (detailResult.IsSuccess)
+                if (detailResult.IsSuccess && detailResult.Value?.Status != InvoiceStatus.Paid)
                 {
                     selectedInvoice = detailResult.Value;
                 }
             }
-            else if (!string.IsNullOrWhiteSpace(search))
+        }
+        else if (selectedId.HasValue && selectedId.Value > 0)
+        {
+            activeId = selectedId.Value;
+            var detailResult = await _billingService.GetInvoiceDetailAsync(activeId, ct);
+            if (detailResult.IsSuccess && detailResult.Value?.Status != InvoiceStatus.Paid)
             {
-                // Tra cứu bệnh nhân trực tiếp để nạp hồ sơ quyết toán xuất viện
-                var searchResults = await _billingService.SearchPatientsAsync(search, ct);
-                var matchedPatient = searchResults.FirstOrDefault();
-                if (matchedPatient?.ActiveAppointmentId.HasValue == true)
-                {
-                    activeId = matchedPatient.ActiveAppointmentId.Value;
-                    var detailResult = await _billingService.GetInvoiceDetailAsync(activeId, ct);
-                    if (detailResult.IsSuccess)
-                    {
-                        selectedInvoice = detailResult.Value;
-                    }
-                }
+                selectedInvoice = detailResult.Value;
             }
         }
 
         var currentShift = await _shiftService.GetCurrentShiftAsync(CurrentAccountId, ct);
 
         ViewBag.Search = search;
-        ViewBag.InvoiceStatus = invoiceStatus;
+        ViewBag.InvoiceStatus = InvoiceStatus.Unpaid;
         ViewBag.SelectedInvoice = selectedInvoice;
         ViewBag.SelectedId = activeId;
         ViewBag.CurrentShift = currentShift;
-        ViewBag.UnpaidCount = allInvoices.Count(m => m.InvoiceStatus != InvoiceStatus.Paid);
-        ViewBag.PaidCount = allInvoices.Count(m => m.InvoiceStatus == InvoiceStatus.Paid);
-        ViewBag.AllCount = allInvoices.Count;
+        ViewBag.UnpaidCount = invoices.Count;
+        ViewBag.PaidCount = 0;
+        ViewBag.AllCount = invoices.Count;
 
         return View(invoices);
     }
@@ -185,13 +176,19 @@ public class CashierController : Controller
             return RedirectToAction(nameof(Index));
         }
 
+        if (result.Value!.Status != Domain.InvoiceStatus.Paid)
+        {
+            TempData["ErrorMessage"] = "Hồ sơ này chưa thanh toán hoàn tất, chưa thể in biên lai thu tiền.";
+            return RedirectToAction(nameof(Index), new { selectedId = appointmentId });
+        }
+
         return View(result.Value);
     }
 
     [HttpGet]
     public async Task<IActionResult> Ledger(LedgerFilterDto filter, CancellationToken ct = default)
     {
-        var ledger = await _billingService.GetLedgerAsync(filter, ct);
+        var ledger = await _billingService.GetLedgerAsync(filter, ct: ct);
         var currentShift = await _shiftService.GetCurrentShiftAsync(CurrentAccountId, ct);
         ViewBag.Filter = filter;
         ViewBag.CurrentShift = currentShift;
@@ -201,15 +198,17 @@ public class CashierController : Controller
     [HttpGet]
     public async Task<IActionResult> LedgerExport(LedgerFilterDto filter, CancellationToken ct = default)
     {
-        var ledger = await _billingService.GetLedgerAsync(filter, ct);
+        var ledger = await _billingService.GetLedgerAsync(filter, exportAll: true, ct: ct);
         var sb = new StringBuilder();
         sb.AppendLine("Mã GD,Thời gian,Số HĐ,Mã lượt khám,Bệnh nhân,Số tiền (VNĐ),Loại GD,Hình thức,Mã tham chiếu NH,Thu ngân");
+
+        static string CsvEscape(string? val) => $"\"{(val ?? string.Empty).Replace("\"", "\"\"")}\"";
 
         foreach (var item in ledger)
         {
             var pType = item.PaymentType == Domain.PaymentType.Payment ? "Thanh toán" : (item.PaymentType == Domain.PaymentType.Deposit ? "Tạm ứng" : "Hoàn tiền");
             var pMethod = item.PaymentMethod == Domain.PaymentMethod.Cash ? "Tiền mặt" : (item.PaymentMethod == Domain.PaymentMethod.BankTransfer ? "Chuyển khoản" : "Cấn trừ tạm ứng");
-            sb.AppendLine($"\"{item.TransactionCode}\",\"{item.PaidAt:dd/MM/yyyy HH:mm:ss}\",\"{item.InvoiceNumber}\",\"{item.AppointmentCode}\",\"{item.PatientName}\",{item.Amount},\"{pType}\",\"{pMethod}\",\"{item.ReferenceCode}\",\"{item.CashierName}\"");
+            sb.AppendLine($"{CsvEscape(item.TransactionCode)},\"{item.PaidAt:dd/MM/yyyy HH:mm:ss}\",{CsvEscape(item.InvoiceNumber)},{CsvEscape(item.AppointmentCode)},{CsvEscape(item.PatientName)},{item.Amount},{CsvEscape(pType)},{CsvEscape(pMethod)},{CsvEscape(item.ReferenceCode)},{CsvEscape(item.CashierName)}");
         }
 
         var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
@@ -456,8 +455,10 @@ public class CashierController : Controller
         CancellationToken ct = default)
     {
         var deposits = await _billingService.GetDepositsAsync(search, method, status, patientId, ct);
+        var totals = await _billingService.GetDepositTotalsAsync(ct);
         var currentShift = await _shiftService.GetCurrentShiftAsync(CurrentAccountId, ct);
         ViewBag.CurrentShift = currentShift;
+        ViewBag.Totals = totals;
         ViewBag.Search = search;
         ViewBag.Method = method;
         ViewBag.Status = status;

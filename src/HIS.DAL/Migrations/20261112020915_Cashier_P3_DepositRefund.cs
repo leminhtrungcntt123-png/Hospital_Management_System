@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -72,6 +72,7 @@ namespace HIS.DAL.Migrations
                     payment_method = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
                     reference_code = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     purpose = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
+                    approved_by = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: true),
                     note = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
                     cashier_id = table.Column<int>(type: "integer", nullable: true),
                     shift_id = table.Column<int>(type: "integer", nullable: true),
@@ -262,6 +263,8 @@ namespace HIS.DAL.Migrations
 
             migrationBuilder.DropSequence(
                 name: "seq_deposit_code");
+
+            migrationBuilder.Sql("DELETE FROM payments WHERE invoice_id IS NULL OR payment_method = 'DEPOSIT_DEDUCTION';");
 
             migrationBuilder.AlterColumn<string>(
                 name: "payment_method",

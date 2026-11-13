@@ -3,6 +3,7 @@ using HIS.BLL.DTOs;
 using HIS.DAL;
 using HIS.Domain;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace HIS.BLL.Services;
 
@@ -58,7 +59,15 @@ public class CashierShiftService : ICashierShiftService
         };
 
         _context.CashierShifts.Add(shift);
-        await _context.SaveChangesAsync(ct);
+        try
+        {
+            await _context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == PostgresErrorCodes.UniqueViolation)
+        {
+            _context.Entry(shift).State = EntityState.Detached;
+            return Result.Failure<CashierShiftDto>("SHIFT_ALREADY_OPEN", "Bạn đang có một ca làm việc chưa kết thúc.");
+        }
 
         await _context.Entry(shift).Reference(s => s.Cashier).LoadAsync(ct);
 
@@ -67,47 +76,65 @@ public class CashierShiftService : ICashierShiftService
 
     public async Task<Result<CashierShiftDto>> CloseShiftAsync(CloseShiftRequest request, CancellationToken ct = default)
     {
-        var shift = await _context.CashierShifts
-            .Include(s => s.Cashier)
-            .FirstOrDefaultAsync(s => s.Id == request.ShiftId, ct);
-
-        if (shift == null)
+        if (request.CountedCash < 0)
         {
-            return Result.Failure<CashierShiftDto>("NOT_FOUND", "Không tìm thấy thông tin ca làm việc.");
+            return Result.Failure<CashierShiftDto>("INVALID_COUNTED_CASH", "Số tiền kiểm đếm thực tế không được âm.");
         }
 
-        if (shift.Status == ShiftStatus.Closed)
+        var strategy = _context.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            return Result.Failure<CashierShiftDto>("ALREADY_CLOSED", "Ca làm việc này đã được đóng trước đó.");
-        }
+            await using var transaction = _context.Database.CurrentTransaction == null
+                ? await _context.Database.BeginTransactionAsync(ct)
+                : null;
 
-        if (shift.CashierId != request.CashierAccountId)
-        {
-            return Result.Failure<CashierShiftDto>("FORBIDDEN", "Bạn không có quyền đóng ca làm việc của người khác.");
-        }
+            var shift = await _context.CashierShifts
+                .FromSqlInterpolated($"SELECT * FROM cashier_shifts WHERE id = {request.ShiftId} FOR UPDATE")
+                .Include(s => s.Cashier)
+                .FirstOrDefaultAsync(ct);
 
-        var payments = await _context.Payments
-            .Where(p => p.ShiftId == shift.Id && p.PaymentMethod == PaymentMethod.Cash)
-            .ToListAsync(ct);
+            if (shift == null)
+            {
+                return Result.Failure<CashierShiftDto>("NOT_FOUND", "Không tìm thấy thông tin ca làm việc.");
+            }
 
-        decimal cashIn = payments.Where(p => p.PaymentType == PaymentType.Payment || p.PaymentType == PaymentType.Deposit).Sum(p => p.Amount);
-        decimal cashOut = payments.Where(p => p.PaymentType == PaymentType.Refund).Sum(p => p.Amount);
+            if (shift.Status == ShiftStatus.Closed)
+            {
+                return Result.Failure<CashierShiftDto>("ALREADY_CLOSED", "Ca làm việc này đã được đóng trước đó.");
+            }
 
-        decimal expectedCash = shift.OpeningCash + cashIn - cashOut;
+            if (shift.CashierId != request.CashierAccountId)
+            {
+                return Result.Failure<CashierShiftDto>("FORBIDDEN", "Bạn không có quyền đóng ca làm việc của người khác.");
+            }
 
-        shift.ExpectedCash = expectedCash;
-        shift.CountedCash = request.CountedCash;
-        shift.Difference = request.CountedCash - expectedCash;
-        shift.ClosedAt = Now;
-        shift.Status = ShiftStatus.Closed;
-        if (!string.IsNullOrWhiteSpace(request.Note))
-        {
-            shift.Note = string.IsNullOrWhiteSpace(shift.Note) ? request.Note.Trim() : $"{shift.Note} | {request.Note.Trim()}";
-        }
+            var payments = await _context.Payments
+                .Where(p => p.ShiftId == shift.Id && p.PaymentMethod == PaymentMethod.Cash)
+                .ToListAsync(ct);
 
-        await _context.SaveChangesAsync(ct);
+            decimal cashIn = payments.Where(p => p.PaymentType == PaymentType.Payment || p.PaymentType == PaymentType.Deposit).Sum(p => p.Amount);
+            decimal cashOut = payments.Where(p => p.PaymentType == PaymentType.Refund).Sum(p => p.Amount);
 
-        return Result.Success(MapToDto(shift));
+            decimal expectedCash = shift.OpeningCash + cashIn - cashOut;
+
+            shift.ExpectedCash = expectedCash;
+            shift.CountedCash = request.CountedCash;
+            shift.Difference = request.CountedCash - expectedCash;
+            shift.ClosedAt = Now;
+            shift.Status = ShiftStatus.Closed;
+            if (!string.IsNullOrWhiteSpace(request.Note))
+            {
+                shift.Note = string.IsNullOrWhiteSpace(shift.Note) ? request.Note.Trim() : $"{shift.Note} | {request.Note.Trim()}";
+            }
+
+            await _context.SaveChangesAsync(ct);
+            if (transaction != null)
+            {
+                await transaction.CommitAsync(ct);
+            }
+
+            return Result.Success(MapToDto(shift));
+        });
     }
 
     public async Task<IReadOnlyList<CashierShiftDto>> GetShiftsAsync(DateOnly? date = null, int? cashierAccountId = null, CancellationToken ct = default)

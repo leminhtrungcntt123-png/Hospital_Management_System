@@ -5,6 +5,7 @@ DROP TABLE IF EXISTS
     access_logs,
     invoice_items,
     payments,
+    deposit_usages,
     deposits,
     invoices,
     cashier_shifts,
@@ -39,6 +40,8 @@ DROP TABLE IF EXISTS
     service_types,
     roles 
 CASCADE;
+
+DROP SEQUENCE IF EXISTS seq_invoice_number, seq_transaction_code, seq_deposit_code;
 
 -- ==============================================================================
 -- 1. LOOKUP TABLES
@@ -188,11 +191,12 @@ CREATE TABLE medications (
 );
 
 CREATE TABLE services (
-    id              INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    name            VARCHAR(150) NOT NULL,
-    service_type_id INTEGER NOT NULL REFERENCES service_types(id),
-    price           NUMERIC(12,2) NOT NULL DEFAULT 0,
-    is_active       BOOLEAN NOT NULL DEFAULT TRUE
+    id                   INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name                 VARCHAR(150) NOT NULL,
+    service_type_id      INTEGER NOT NULL REFERENCES service_types(id),
+    price                NUMERIC(12,2) NOT NULL DEFAULT 0,
+    is_insurance_covered BOOLEAN NOT NULL DEFAULT TRUE,
+    is_active            BOOLEAN NOT NULL DEFAULT TRUE
 );
 
 CREATE TABLE insurance_plans (
@@ -470,6 +474,8 @@ CREATE TABLE cashier_shifts (
     note            VARCHAR(255)
 );
 
+CREATE UNIQUE INDEX uq_cashier_shifts_one_open_per_cashier ON cashier_shifts(cashier_id) WHERE status = 'OPEN';
+
 CREATE TABLE invoices (
     id                          INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     invoice_number              VARCHAR(20) NOT NULL UNIQUE,
@@ -519,7 +525,8 @@ CREATE TABLE payments (
     payment_method      VARCHAR(25) NOT NULL
                         CHECK (payment_method IN ('CASH','BANK_TRANSFER','DEPOSIT_DEDUCTION')),
     reference_code      VARCHAR(100),
-    status              VARCHAR(20) NOT NULL DEFAULT 'COMPLETED',
+    status              VARCHAR(20) NOT NULL DEFAULT 'CONFIRMED'
+                        CHECK (status IN ('PENDING','CONFIRMED')),
     idempotency_key     VARCHAR(100),
     cashier_id          INTEGER REFERENCES accounts(id),
     shift_id            INTEGER REFERENCES cashier_shifts(id),
@@ -529,11 +536,17 @@ CREATE TABLE payments (
     paid_at             TIMESTAMP NOT NULL DEFAULT now()
 );
 
+CREATE SEQUENCE IF NOT EXISTS seq_invoice_number START WITH 100 INCREMENT BY 1;
+CREATE SEQUENCE IF NOT EXISTS seq_transaction_code START WITH 200 INCREMENT BY 1;
+CREATE SEQUENCE IF NOT EXISTS seq_deposit_code START WITH 100 INCREMENT BY 1;
+
 CREATE TABLE invoice_items (
     id                   INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     invoice_id           INTEGER NOT NULL REFERENCES invoices(id),
     category             VARCHAR(20) NOT NULL CHECK (category IN ('EXAMINATION','MEDICATION','SERVICE')),
     description          VARCHAR(255) NOT NULL,
+    service_id           INTEGER REFERENCES services(id),
+    medication_id        INTEGER REFERENCES medications(id),
     unit_price           NUMERIC(18,0) NOT NULL DEFAULT 0,
     quantity             INTEGER NOT NULL DEFAULT 1,
     amount               NUMERIC(18,0) NOT NULL,
@@ -541,6 +554,15 @@ CREATE TABLE invoice_items (
     coverage_pct_applied NUMERIC(5,2) NOT NULL DEFAULT 0,
     covered_amount       NUMERIC(18,0) NOT NULL DEFAULT 0,
     patient_amount       NUMERIC(18,0) NOT NULL DEFAULT 0
+);
+
+CREATE TABLE deposit_usages (
+    id          INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    deposit_id  INTEGER NOT NULL REFERENCES deposits(id),
+    invoice_id  INTEGER NOT NULL REFERENCES invoices(id),
+    amount      NUMERIC(18,0) NOT NULL CHECK (amount > 0),
+    used_at     TIMESTAMP NOT NULL DEFAULT now(),
+    cashier_id  INTEGER REFERENCES accounts(id)
 );
 
 -- ==============================================================================

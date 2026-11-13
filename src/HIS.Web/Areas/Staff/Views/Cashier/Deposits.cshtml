@@ -76,22 +76,29 @@
     }
 
     <!-- Thống kê nhanh 4 khối -->
+    @{
+        var totals = ViewBag.Totals as HIS.BLL.DTOs.DepositSummaryTotalsDto;
+        var totalCount = totals?.TotalCount ?? Model.Count;
+        var totalAmount = totals?.TotalAmount ?? Model.Sum(m => m.Amount);
+        var totalUsed = totals?.TotalUsed ?? Model.Sum(m => m.UsedAmount);
+        var totalBalance = totals?.TotalBalance ?? Model.Sum(m => m.Balance);
+    }
     <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;">
         <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
             <div style="font-size: 11.5px; font-weight: 700; color: #64748b; text-transform: uppercase;">Tổng phiếu tạm ứng</div>
-            <div style="font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 4px;">@Model.Count</div>
+            <div style="font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 4px;">@totalCount</div>
         </div>
         <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
             <div style="font-size: 11.5px; font-weight: 700; color: #64748b; text-transform: uppercase;">Tổng tiền đã thu</div>
-            <div style="font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 4px;">@Model.Sum(m => m.Amount).ToString("N0") đ</div>
+            <div style="font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 4px;">@totalAmount.ToString("N0") đ</div>
         </div>
         <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
             <div style="font-size: 11.5px; font-weight: 700; color: #64748b; text-transform: uppercase;">Viện phí đã khấu trừ</div>
-            <div style="font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 4px;">@Model.Sum(m => m.UsedAmount).ToString("N0") đ</div>
+            <div style="font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 4px;">@totalUsed.ToString("N0") đ</div>
         </div>
         <div style="background: #ffffff; border: 1.5px solid #0284c7; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(2, 132, 199, 0.08);">
             <div style="font-size: 11.5px; font-weight: 700; color: #0284c7; text-transform: uppercase;">Tiền tạm ứng đang tồn quỹ</div>
-            <div style="font-size: 22px; font-weight: 900; color: #0284c7; margin-top: 4px;">@Model.Sum(m => m.Balance).ToString("N0") đ</div>
+            <div style="font-size: 22px; font-weight: 900; color: #0284c7; margin-top: 4px;">@totalBalance.ToString("N0") đ</div>
         </div>
     </div>
 
@@ -331,7 +338,7 @@
             <label style="font-size: 12px; font-weight: 700; display: block; margin-bottom: 4px; color: #1e293b;">
                 Người duyệt / Bác sĩ chỉ định tạm ứng <span style="color: #dc2626;">*</span>:
             </label>
-            <input type="text" id="dep-approved-by" class="form-control" list="dep-approved-by-suggestions" value="BS. Phạm Thu Hằng (Khoa Nội tổng quát)" placeholder="Nhập tên BS chỉ định / Người duyệt..." style="width: 100%; padding: 8px 12px; font-size: 13px; font-weight: 600; color: #0369a1;" required />
+            <input type="text" id="dep-approved-by" class="form-control" list="dep-approved-by-suggestions" value="" placeholder="Nhập tên BS chỉ định / Người duyệt..." style="width: 100%; padding: 8px 12px; font-size: 13px; font-weight: 600; color: #0369a1;" required />
             <datalist id="dep-approved-by-suggestions">
                 <option value="BS. Phạm Thu Hằng (Khoa Nội tổng quát)" />
                 <option value="BS. Nguyễn Hoàng Nam (Khoa Ngoại tổng quát)" />
@@ -418,12 +425,20 @@
 </dialog>
 
 @section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
         var isShiftOpen = @(shift != null ? "true" : "false");
+        var depositQrSeq = 0;
 
-        function handleCreateDepositClick() {
+        async function handleCreateDepositClick() {
             if (!isShiftOpen) {
-                alert('Vui lòng mở ca thu ngân tại quầy trước khi thu tạm ứng.');
+                await Swal.fire({
+                    icon: 'warning',
+                    title: 'Chưa mở ca thu ngân',
+                    text: 'Vui lòng mở ca thu ngân tại quầy trước khi thu tạm ứng.',
+                    confirmButtonText: 'Đến quầy mở ca',
+                    confirmButtonColor: '#0284c7'
+                });
                 window.location.href = '@Url.Action("Index", "Cashier", new { area = "Staff" })';
                 return;
             }
@@ -431,7 +446,7 @@
             document.getElementById('dep-search-input').value = '';
             document.getElementById('dep-amount').value = '';
             document.getElementById('dep-method').value = '0';
-            document.getElementById('dep-approved-by').value = 'BS. Phạm Thu Hằng (Khoa Nội tổng quát)';
+            document.getElementById('dep-approved-by').value = '';
             toggleDepRefCode();
             document.getElementById('dep-purpose').value = 'Tạm ứng viện phí điều trị';
             document.getElementById('dep-ref').value = '';
@@ -530,9 +545,6 @@
                 document.getElementById('dep-card-app-code').innerText = p.activeAppointmentCode;
                 document.getElementById('dep-card-app-dept').innerText = p.activeDepartmentName || 'Khám bệnh';
                 appBox.style.display = 'block';
-                if (p.activeDepartmentName) {
-                    document.getElementById('dep-approved-by').value = 'BS. Phạm Thu Hằng (' + p.activeDepartmentName + ')';
-                }
             } else {
                 appBox.style.display = 'none';
             }
@@ -545,6 +557,9 @@
         }
 
         function resetSelectedPatientForDeposit() {
+            depositQrSeq++;
+            var qrImg = document.getElementById('dep-qr-img');
+            if (qrImg) qrImg.removeAttribute('src');
             document.getElementById('dep-patient-id').value = '';
             document.getElementById('dep-appointment-id').value = '';
             document.getElementById('dep-selected-patient-card').style.display = 'none';
@@ -565,13 +580,16 @@
         }
 
         async function refreshDepositQrIfTransfer() {
+            const reqSeq = ++depositQrSeq;
             var method = document.getElementById('dep-method').value;
             var panel = document.getElementById('dep-vietqr-panel');
             var prompt = document.getElementById('dep-qr-prompt');
             var content = document.getElementById('dep-qr-content');
+            var qrImg = document.getElementById('dep-qr-img');
             
             if (method !== '1') {
                 if (panel) panel.style.display = 'none';
+                if (qrImg) qrImg.removeAttribute('src');
                 return;
             }
             if (panel) panel.style.display = 'block';
@@ -582,25 +600,33 @@
             if (!patientId || isNaN(patientId) || patientId <= 0 || !amount || isNaN(amount) || amount <= 0) {
                 if (prompt) prompt.style.display = 'block';
                 if (content) content.style.display = 'none';
+                if (qrImg) qrImg.removeAttribute('src');
                 return;
             }
 
             if (prompt) prompt.style.display = 'none';
             if (content) content.style.display = 'block';
+            if (qrImg) qrImg.removeAttribute('src');
             document.getElementById('dep-qr-amount-text').innerText = Number(amount).toLocaleString('vi-VN') + ' đ';
 
             try {
                 var url = '@Url.Action("GenerateDepositQr", "Cashier", new { area = "Staff" })?patientId=' + patientId + '&amount=' + amount;
                 var res = await fetch(url);
                 var data = await res.json();
+                if (reqSeq !== depositQrSeq) return;
                 if (res.ok && data.qrDataUri) {
-                    document.getElementById('dep-qr-img').src = data.qrDataUri;
+                    if (qrImg) qrImg.src = data.qrDataUri;
                     document.getElementById('dep-qr-bank').innerText = 'Ngân hàng: ' + data.bankName + ' (' + data.bankCode + ')';
                     document.getElementById('dep-qr-acc').innerText = data.accountNumber;
                     document.getElementById('dep-qr-holder').innerText = data.accountHolder;
                     document.getElementById('dep-qr-msg').innerText = data.message;
+                } else if (qrImg) {
+                    qrImg.removeAttribute('src');
                 }
             } catch (err) {
+                if (reqSeq === depositQrSeq && qrImg) {
+                    qrImg.removeAttribute('src');
+                }
                 console.error('Không thể tạo mã VietQR:', err);
             }
         }
@@ -608,7 +634,15 @@
         function copyText(text) {
             if (!text) return;
             navigator.clipboard.writeText(text).then(() => {
-                alert('Đã sao chép: ' + text);
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'success',
+                    title: 'Đã sao chép: ' + text,
+                    showConfirmButton: false,
+                    timer: 1800,
+                    timerProgressBar: true
+                });
             }).catch(() => {
                 prompt('Sao chép nội dung:', text);
             });
@@ -810,37 +844,67 @@
             var appointmentId = parseInt(document.getElementById('dep-appointment-id').value) || null;
 
             if (!patientId || isNaN(patientId) || patientId <= 0) {
-                alert('⚠️ Vui lòng tra cứu và bấm chọn hồ sơ bệnh nhân để đối chiếu trước khi thu tiền.');
+                await Swal.fire({
+                    icon: 'warning',
+                    title: 'Chưa chọn bệnh nhân',
+                    text: 'Vui lòng tra cứu và bấm chọn hồ sơ bệnh nhân để đối chiếu trước khi thu tiền.',
+                    confirmButtonColor: '#0284c7'
+                });
                 resetSelectedPatientForDeposit();
                 return;
             }
             if (!amount || amount <= 0) {
-                alert('⚠️ Số tiền tạm ứng phải lớn hơn 0 đ.');
+                await Swal.fire({
+                    icon: 'warning',
+                    title: 'Số tiền không hợp lệ',
+                    text: 'Số tiền tạm ứng phải lớn hơn 0 đ.',
+                    confirmButtonColor: '#0284c7'
+                });
                 document.getElementById('dep-amount')?.focus();
                 return;
             }
             if (!approvedBy) {
-                alert('⚠️ Vui lòng nhập tên Bác sĩ chỉ định / Người duyệt tạm ứng.');
+                await Swal.fire({
+                    icon: 'warning',
+                    title: 'Thiếu thông tin người duyệt',
+                    text: 'Vui lòng nhập tên Bác sĩ chỉ định / Người duyệt tạm ứng.',
+                    confirmButtonColor: '#0284c7'
+                });
                 document.getElementById('dep-approved-by')?.focus();
                 return;
             }
             if (method === 1 && !ref) {
-                alert('⚠️ Người bệnh quét mã VietQR thành công: vui lòng nhập mã chuẩn chi / giao dịch ngân hàng để đối soát.');
+                await Swal.fire({
+                    icon: 'warning',
+                    title: 'Thiếu mã giao dịch ngân hàng',
+                    text: 'Người bệnh quét mã VietQR thành công: vui lòng nhập mã chuẩn chi / giao dịch ngân hàng để đối soát.',
+                    confirmButtonColor: '#0284c7'
+                });
                 document.getElementById('dep-ref')?.focus();
                 return;
             }
 
             var patientName = document.getElementById('dep-card-name')?.innerText || 'Bệnh nhân';
             var methodStr = method === 0 ? 'Tiền mặt' : 'Chuyển khoản (VietQR)';
-            var confirmMsg = `Xác nhận thu tạm ứng viện phí:\n` +
-                `- Người bệnh: ${patientName}\n` +
-                `- Số tiền thu: ${amount.toLocaleString('vi-VN')} đ\n` +
-                `- Người duyệt / BS chỉ định: ${approvedBy}\n` +
-                `- Hình thức: ${methodStr}\n` +
-                `- Mục đích: ${purpose || 'Tạm ứng viện phí'}\n\n` +
-                `Bấm OK để ghi sổ và in biên lai thu tiền tạm ứng.`;
 
-            if (!confirm(confirmMsg)) {
+            var confirmRes = await Swal.fire({
+                icon: 'question',
+                title: 'Xác nhận thu tạm ứng viện phí?',
+                html: `<div style="text-align:left; font-size:14px; line-height:1.6;">
+                    <div>• Người bệnh: <b>${patientName}</b></div>
+                    <div>• Số tiền thu: <b style="color:#0284c7;">${amount.toLocaleString('vi-VN')} đ</b></div>
+                    <div>• Người duyệt / BS chỉ định: <b>${approvedBy}</b></div>
+                    <div>• Hình thức: <b>${methodStr}</b></div>
+                    <div>• Mục đích: <b>${purpose || 'Tạm ứng viện phí'}</b></div>
+                </div>`,
+                showCancelButton: true,
+                confirmButtonText: '✓ Ghi sổ & In biên lai',
+                cancelButtonText: 'Hủy',
+                confirmButtonColor: '#0284c7',
+                cancelButtonColor: '#64748b'
+            });
+
+            if (!confirmRes.isConfirmed) {
                 return;
             }
 
@@ -889,19 +953,41 @@
                         createdAt: new Date().toISOString()
                     };
 
-                    alert('✓ ' + data.message + '\n\nHệ thống sẽ mở cửa sổ in biên lai thu tạm ứng cho người bệnh.');
                     document.getElementById('modal-create-deposit').close();
-                    printDepositReceipt(depositObj);
-                    setTimeout(() => window.location.reload(), 800);
+                    await Swal.fire({
+                        icon: 'success',
+                        title: 'Thu tạm ứng thành công!',
+                        text: data.message || 'Đã ghi sổ phiếu thu tạm ứng.',
+                        showCancelButton: true,
+                        confirmButtonText: '🖨️ In biên lai tạm ứng',
+                        cancelButtonText: 'Đóng',
+                        confirmButtonColor: '#0284c7',
+                        cancelButtonColor: '#64748b'
+                    }).then(function(result) {
+                        if (result.isConfirmed) {
+                            printDepositReceipt(depositObj);
+                        }
+                    });
+                    window.location.reload();
                 } else {
-                    alert('Lỗi: ' + (data.message || 'Không thể tạo phiếu tạm ứng.'));
+                    await Swal.fire({
+                        icon: 'error',
+                        title: 'Không thể tạo phiếu tạm ứng',
+                        text: data.message || 'Không thể tạo phiếu tạm ứng.',
+                        confirmButtonColor: '#dc2626'
+                    });
                     if (btnSubmit) {
                         btnSubmit.disabled = false;
                         btnSubmit.innerText = '✓ Xác nhận thu tạm ứng';
                     }
                 }
             } catch (err) {
-                alert('Lỗi kết nối: ' + err.message);
+                await Swal.fire({
+                    icon: 'error',
+                    title: 'Lỗi kết nối',
+                    text: err.message,
+                    confirmButtonColor: '#dc2626'
+                });
                 if (btnSubmit) {
                     btnSubmit.disabled = false;
                     btnSubmit.innerText = '✓ Xác nhận thu tạm ứng';

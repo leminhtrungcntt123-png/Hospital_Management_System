@@ -207,6 +207,44 @@ public class DepositRefundTests
         Assert.Equal(DepositStatus.Refunded, finalDep.Status);
     }
 
+    private static async Task<Invoice> CreatePaidInvoiceAsync(AppDbContext db, decimal patientAmount = 150000m)
+    {
+        var patient = await CreateIsolatedPatientAsync(db);
+        var doctor = await db.Doctors.FirstAsync();
+        var dept = await db.Departments.FirstAsync();
+        var slot = await db.AppointmentSlots.FirstOrDefaultAsync();
+        var unique = Guid.NewGuid().ToString("N")[..6];
+
+        var app = new Appointment
+        {
+            PatientId = patient.Id,
+            DoctorId = doctor.Id,
+            DepartmentId = dept.Id,
+            SlotId = slot?.Id,
+            AppointmentCode = $"AP-{unique}",
+            StatusId = (int)AppointmentStatusId.CheckedIn,
+            CreatedAt = DateTime.Now
+        };
+        db.Appointments.Add(app);
+        await db.SaveChangesAsync();
+
+        var invoice = new Invoice
+        {
+            AppointmentId = app.Id,
+            PatientId = patient.Id,
+            InvoiceNumber = $"HD-T-{unique}",
+            ExamDate = DateOnly.FromDateTime(DateTime.Today),
+            TotalAmount = patientAmount,
+            InsuranceCoveredAmount = 0m,
+            PatientAmount = patientAmount,
+            Status = InvoiceStatus.Paid,
+            CreatedAt = DateTime.Now
+        };
+        db.Invoices.Add(invoice);
+        await db.SaveChangesAsync();
+        return invoice;
+    }
+
     [Fact]
     public async Task RefundInvoice_ExceedsPatientAmount_ReturnsError()
     {
@@ -214,25 +252,20 @@ public class DepositRefundTests
         await EnsureOpenShiftAsync(db, 1);
         var billingService = CreateBillingService(db);
 
-        // Tìm một hóa đơn đã thanh toán
-        var invoice = await db.Invoices
-            .Include(i => i.Payments)
-            .FirstOrDefaultAsync(i => i.Status == InvoiceStatus.Paid && i.PatientAmount > 0);
+        var invoice = await CreatePaidInvoiceAsync(db);
+        Assert.NotNull(invoice);
 
-        if (invoice != null)
-        {
-            var req = new RefundInvoiceRequest(
-                invoice.Id,
-                invoice.PatientAmount + 500000m,
-                "Hoàn tiền quá mức",
-                PaymentMethod.Cash,
-                null,
-                1);
+        var req = new RefundInvoiceRequest(
+            invoice.Id,
+            invoice.PatientAmount + 500000m,
+            "Hoàn tiền quá mức",
+            PaymentMethod.Cash,
+            null,
+            1);
 
-            var res = await billingService.RefundInvoiceAsync(req);
-            Assert.False(res.IsSuccess);
-            Assert.Equal("AMOUNT_EXCEEDED", res.Error.Code);
-        }
+        var res = await billingService.RefundInvoiceAsync(req);
+        Assert.False(res.IsSuccess);
+        Assert.Equal("AMOUNT_EXCEEDED", res.Error.Code);
     }
 
     [Fact]
@@ -242,29 +275,25 @@ public class DepositRefundTests
         await EnsureOpenShiftAsync(db, 1);
         var billingService = CreateBillingService(db);
 
-        var invoice = await db.Invoices
-            .Include(i => i.Payments)
-            .FirstOrDefaultAsync(i => i.Status == InvoiceStatus.Paid && i.PatientAmount >= 50000m);
+        var invoice = await CreatePaidInvoiceAsync(db);
+        Assert.NotNull(invoice);
 
-        if (invoice != null)
-        {
-            decimal refundAmount = 10000m;
-            var req = new RefundInvoiceRequest(
-                invoice.Id,
-                refundAmount,
-                "Hủy dịch vụ xét nghiệm theo yêu cầu bác sĩ",
-                PaymentMethod.Cash,
-                null,
-                1);
+        decimal refundAmount = 10000m;
+        var req = new RefundInvoiceRequest(
+            invoice.Id,
+            refundAmount,
+            "Hủy dịch vụ xét nghiệm theo yêu cầu bác sĩ",
+            PaymentMethod.Cash,
+            null,
+            1);
 
-            var res = await billingService.RefundInvoiceAsync(req);
-            Assert.True(res.IsSuccess);
+        var res = await billingService.RefundInvoiceAsync(req);
+        Assert.True(res.IsSuccess);
 
-            var refundPayment = await db.Payments
-                .FirstOrDefaultAsync(p => p.InvoiceId == invoice.Id && p.PaymentType == PaymentType.Refund && p.Amount == refundAmount);
-            Assert.NotNull(refundPayment);
-            Assert.Equal("Hủy dịch vụ xét nghiệm theo yêu cầu bác sĩ", refundPayment.RefundReason);
-        }
+        var refundPayment = await db.Payments
+            .FirstOrDefaultAsync(p => p.InvoiceId == invoice.Id && p.PaymentType == PaymentType.Refund && p.Amount == refundAmount);
+        Assert.NotNull(refundPayment);
+        Assert.Equal("Hủy dịch vụ xét nghiệm theo yêu cầu bác sĩ", refundPayment.RefundReason);
     }
 
     [Fact]
