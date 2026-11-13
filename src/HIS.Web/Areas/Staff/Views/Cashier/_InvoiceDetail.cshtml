@@ -102,7 +102,7 @@ else
                     🩺 <strong>Chẩn đoán lâm sàng:</strong> <span style="color: #1e3a8a; font-weight: 700;">@(Model.Diagnosis ?? "Khám và theo dõi chuyên khoa")</span>
                 </div>
                 <div style="color: #64748b; font-size: 12px; margin-top: 2px;">
-                    Khoa điều trị: <strong>@Model.DepartmentName</strong> · Bác sĩ chỉ định: <strong>BS. @Model.DoctorName</strong> · Ngày khám: <strong>@Model.ExamDate.ToString("dd/MM/yyyy")</strong>
+                    Khoa điều trị: <strong>@Model.DepartmentName</strong> · Bác sĩ chỉ định: <strong>@(Model.DoctorName.StartsWith("BS") ? Model.DoctorName : "BS. " + Model.DoctorName)</strong> · Ngày khám: <strong>@Model.ExamDate.ToString("dd/MM/yyyy")</strong>
                 </div>
             </div>
         </div>
@@ -236,7 +236,7 @@ else
                                 <td style="padding: 8px 12px; font-weight: 800; color: #0369a1; font-family: monospace;">@dep.DepositCode</td>
                                 <td style="padding: 8px 12px; color: #475569;">@dep.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
                                 <td style="padding: 8px 12px; color: #0f172a; font-weight: 600;">@(dep.Purpose ?? "Tạm ứng viện phí")</td>
-                                <td style="padding: 8px 12px; color: #1e3a8a; font-weight: 600;">@(string.IsNullOrWhiteSpace(dep.ApprovedBy) ? $"BS. {Model.DoctorName}" : dep.ApprovedBy)</td>
+                                <td style="padding: 8px 12px; color: #1e3a8a; font-weight: 600;">@(string.IsNullOrWhiteSpace(dep.ApprovedBy) ? (Model.DoctorName.StartsWith("BS") ? Model.DoctorName : $"BS. {Model.DoctorName}") : dep.ApprovedBy)</td>
                                 <td style="padding: 8px 12px; text-align: center;">
                                     @(dep.PaymentMethod == HIS.Domain.PaymentMethod.Cash ? "Tiền mặt" : "Chuyển khoản")
                                 </td>

@@ -893,7 +893,7 @@ public class BillingService : IBillingService
 
             string approvedByValue = !string.IsNullOrWhiteSpace(request.ApprovedBy)
                 ? request.ApprovedBy.Trim()
-                : (app?.Doctor != null ? $"BS. {app.Doctor.FullName}" : "BS. Phạm Thu Hằng");
+                : (app?.Doctor != null ? (app.Doctor.FullName.StartsWith("BS") ? app.Doctor.FullName : $"BS. {app.Doctor.FullName}") : "BS. Phạm Thu Hằng");
             string purposeValue = string.IsNullOrWhiteSpace(request.Purpose)
                 ? "Tạm ứng viện phí"
                 : request.Purpose.Trim();
