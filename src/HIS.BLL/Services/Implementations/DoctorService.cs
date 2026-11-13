@@ -200,6 +200,12 @@ public class DoctorService : IDoctorService
                 $"Chỉ có thể tạo bệnh án khi ca khám đang diễn ra (InProgress). Trạng thái hiện tại: {appointment.StatusId}.");
         }
 
+        var oldStatus = (AppointmentStatusId)appointment.StatusId;
+        if (oldStatus != AppointmentStatusId.Completed && !AppointmentStateMachine.CanTransition(oldStatus, AppointmentStatusId.Completed))
+        {
+            throw new InvalidOperationException("Trạng thái lượt khám hiện tại không hợp lệ để hoàn tất và tạo hồ sơ bệnh án.");
+        }
+
         var now = _timeProvider.GetLocalNow().DateTime;
 
         var record = new MedicalRecord
@@ -285,8 +291,7 @@ public class DoctorService : IDoctorService
         }
 
         // Chuyển trạng thái lượt khám sang Completed và ghi nhận lịch sử trạng thái
-        var oldStatus = (AppointmentStatusId)appointment.StatusId;
-        if (oldStatus != AppointmentStatusId.Completed && AppointmentStateMachine.CanTransition(oldStatus, AppointmentStatusId.Completed))
+        if (oldStatus != AppointmentStatusId.Completed)
         {
             appointment.StatusId = (int)AppointmentStatusId.Completed;
             appointment.UpdatedAt = now;

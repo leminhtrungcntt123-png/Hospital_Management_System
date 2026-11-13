@@ -48,10 +48,14 @@ public class AppointmentStateMachineTests
     [InlineData(AppointmentStatusId.Confirmed, AppointmentStatusId.NoShow, true)]
     [InlineData(AppointmentStatusId.Confirmed, AppointmentStatusId.RescheduleRequired, true)]
     [InlineData(AppointmentStatusId.CheckedIn, AppointmentStatusId.ReadyForDoctor, true)]
+    [InlineData(AppointmentStatusId.CheckedIn, AppointmentStatusId.InProgress, false)]
+    [InlineData(AppointmentStatusId.CheckedIn, AppointmentStatusId.Completed, false)]
     [InlineData(AppointmentStatusId.ReadyForDoctor, AppointmentStatusId.InProgress, true)]
+    [InlineData(AppointmentStatusId.ReadyForDoctor, AppointmentStatusId.Completed, false)]
     [InlineData(AppointmentStatusId.InProgress, AppointmentStatusId.Completed, true)]
     [InlineData(AppointmentStatusId.Completed, AppointmentStatusId.Cancelled, false)]
     [InlineData(AppointmentStatusId.Cancelled, AppointmentStatusId.Confirmed, false)]
+    [InlineData(AppointmentStatusId.Cancelled, AppointmentStatusId.Completed, false)]
     public void CanTransition_ShouldValidateStateTransitionsCorrectly(
         AppointmentStatusId current, AppointmentStatusId next, bool expected)
     {

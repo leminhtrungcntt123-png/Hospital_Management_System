@@ -182,16 +182,16 @@ public class ConsultationController : Controller
 
             var activePatient = await ProjectQueueItems(
                     baseQueueQuery
-                        .Where(a => a.StatusId == (int)AppointmentStatusId.InProgress)
+                        .Where(a => a.StatusId == (int)AppointmentStatusId.InProgress && a.MedicalRecord == null)
                         .OrderByDescending(a => a.UpdatedAt)
                         .ThenBy(a => a.QueueNumber))
                 .FirstOrDefaultAsync(ct);
 
             var queue = await ProjectQueueItems(
                     baseQueueQuery
-                        .Where(a => a.StatusId == (int)AppointmentStatusId.ReadyForDoctor ||
-                                    a.StatusId == (int)AppointmentStatusId.CheckedIn)
-                        // Ưu tiên giảm dần; cùng mức ưu tiên thì ai đến trước xếp trước (không sắp theo chuỗi số thứ tự)
+                        .Where(a => (a.StatusId == (int)AppointmentStatusId.ReadyForDoctor ||
+                                     a.StatusId == (int)AppointmentStatusId.CheckedIn) &&
+                                    a.MedicalRecord == null)
                         .OrderByDescending(a => a.PriorityLevel)
                         .ThenBy(a => a.CheckedInAt ?? a.CreatedAt)
                         .ThenBy(a => a.Id))

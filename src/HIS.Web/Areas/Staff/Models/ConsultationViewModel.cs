@@ -21,7 +21,7 @@ public record ConsultationQueueItemDto(
     decimal? Weight,
     string? DoctorName = null,
     string? RoomNumber = null,
-    int StatusId = 4
+    int StatusId = (int)AppointmentStatusId.ReadyForDoctor
 );
 
 public record ConsultationLabItemDto(

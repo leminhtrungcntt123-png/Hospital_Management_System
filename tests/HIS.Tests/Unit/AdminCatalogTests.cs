@@ -99,6 +99,8 @@ public class AdminCatalogTests
             Mock.Of<IAdminReportService>(),
             Mock.Of<IScheduleChangeService>(),
             catalogMock.Object,
+            Mock.Of<IDepartmentHeadService>(),
+            Mock.Of<ISlotGenerationService>(),
             TimeProvider.System,
             NullLogger<ManagementController>.Instance);
 
