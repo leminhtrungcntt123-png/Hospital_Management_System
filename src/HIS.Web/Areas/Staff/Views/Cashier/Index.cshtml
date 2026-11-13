@@ -1,6 +1,937 @@
+@model IReadOnlyList<HIS.BLL.DTOs.PendingInvoiceItemDto>
 @{
-    Layout = "_MediCareLayout";
-    ViewData["Title"] = "Thu phí và BHYT";
-    ViewData["MediCareRoute"] = "staff/cashier";
+    Layout = "_StaffLayout";
+    ViewData["Title"] = "Thu viện phí & BHYT";
+    var selected = ViewBag.SelectedInvoice as HIS.BLL.DTOs.InvoiceDetailDto;
+    int selectedId = (int)(ViewBag.SelectedId ?? 0);
+    string search = (string)(ViewBag.Search ?? "");
+    var shift = ViewBag.CurrentShift as HIS.BLL.DTOs.CashierShiftDto;
 }
-<div id="app"></div>
+
+<!-- Hidden Anti-Forgery Token cố định toàn trang chống lỗi 400 Bad Request khi gọi fetch -->
+<div id="anti-forgery-token-holder" style="display: none;">
+    @Html.AntiForgeryToken()
+</div>
+
+<div class="reception-desk" style="padding: 24px; max-width: 1280px; margin: 0 auto;">
+    <!-- Topbar Thông tin ca làm việc & Tiêu đề -->
+    <header class="reception-heading" style="display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-bottom: 20px; border-bottom: 1px solid #e0e0e0; padding-bottom: 16px; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 320px;">
+            <span class="reception-eyebrow" style="font-size: 12px; font-weight: 700; color: #0288d1; text-transform: uppercase; letter-spacing: 0.5px;">PHÒNG TÀI CHÍNH KẾ TOÁN · QUẦY THU NGÂN &amp; QUYẾT TOÁN</span>
+            <h1 style="font-size: 26px; font-weight: 800; margin: 4px 0; color: #1a237e;">Thu viện phí, BHYT &amp; tất toán tạm ứng</h1>
+            <p style="color: #616161; margin: 0; font-size: 13.5px;">Hôm nay, @DateTime.Now.ToString("dd/MM/yyyy") · Tra cứu người bệnh đến quầy để thu tiền dịch vụ &amp; thuốc hoặc cấn trừ tạm ứng &amp; hoàn tiền mặt.</p>
+        </div>
+
+        <div style="display: flex; gap: 12px; align-items: center; flex-shrink: 0; white-space: nowrap;">
+            @if (shift != null)
+            {
+                <div style="background: #e8f5e9; border: 1.5px solid #81c784; border-radius: 10px; padding: 10px 18px; display: inline-flex; align-items: center; gap: 14px; white-space: nowrap;">
+                    <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #2e7d32; flex-shrink: 0;"></span>
+                    <div style="display: flex; align-items: center; gap: 10px; white-space: nowrap;">
+                        <span style="font-size: 12.5px; color: #2e7d32; font-weight: 800;">CA ĐANG MỞ (Từ @shift.OpenedAt.ToString("HH:mm"))</span>
+                        <span style="color: #a5d6a7;">|</span>
+                        <span style="font-size: 13px; font-weight: 700; color: #1b5e20;">Đầu ca: @shift.OpeningCash.ToString("N0") đ</span>
+                    </div>
+                    <button type="button" class="btn outline" style="padding: 6px 14px; font-size: 12.5px; font-weight: 700; background: #ffffff; border-color: #66bb6a; color: #1b5e20; white-space: nowrap;" onclick="document.getElementById('modal-close-shift').showModal()">
+                        Kết ca
+                    </button>
+                </div>
+            }
+            else
+            {
+                <div style="background: #fff3e0; border: 1.5px solid #ffb74d; border-radius: 10px; padding: 10px 18px; display: inline-flex; align-items: center; gap: 14px; white-space: nowrap;">
+                    <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #f57c00; flex-shrink: 0;"></span>
+                    <div style="display: flex; align-items: center; gap: 10px; white-space: nowrap;">
+                        <span style="font-size: 12.5px; color: #e65100; font-weight: 800;">CHƯA MỞ CA THU NGÂN</span>
+                        <span style="color: #ffcc80;">|</span>
+                        <span style="font-size: 12.5px; color: #bf360c; font-weight: 600;">Mở ca để đối chiếu tiền mặt</span>
+                    </div>
+                    <button type="button" class="btn primary" style="padding: 6px 14px; font-size: 12.5px; font-weight: 700; white-space: nowrap;" onclick="document.getElementById('modal-open-shift').showModal()">
+                        Mở ca ngay
+                    </button>
+                </div>
+            }
+
+            <a class="btn outline" asp-action="Index" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; padding: 10px 16px; font-size: 13px; font-weight: 600; white-space: nowrap;">
+                @await Html.PartialAsync("_AdminIcon", "refresh") Đổi bệnh nhân / Làm mới
+            </a>
+        </div>
+    </header>
+
+    @if (TempData["SuccessMessage"] is string success)
+    {
+        <div style="background: #e8f5e9; color: #1b5e20; border: 1px solid #c8e6c9; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; font-size: 14px; font-weight: 600;">
+            ✓ @success
+        </div>
+    }
+    @if (TempData["ErrorMessage"] is string error)
+    {
+        <div style="background: #ffebee; color: #b71c1c; border: 1px solid #ffcdd2; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; font-size: 14px; font-weight: 600;">
+            ✕ @error
+        </div>
+    }
+
+    <!-- KHỐI TRA CỨU BỆNH NHÂN ĐẾN QUẦY (1 CỘT TOÀN MÀN HÌNH, CHỈ TRA CỨU MÃ BN & CCCD CHO HỒ SƠ CHƯA ĐÓNG TIỀN) -->
+    <section style="background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 18px 20px; margin-bottom: 20px; box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);">
+        <form asp-action="Index" method="get" style="display: flex; gap: 10px; align-items: center;">
+            <div style="flex: 1; position: relative;">
+                <input id="cashier-search" name="search" value="@search" maxlength="60" class="form-control"
+                       placeholder="🔍 Quét mã vạch hoặc nhập Mã bệnh nhân (VD: 00000001, BN0006) hoặc Số CCCD (12 số) để tra cứu hồ sơ chưa đóng tiền..."
+                       style="width: 100%; padding: 11px 16px; border: 1.5px solid #94a3b8; border-radius: 8px; font-size: 14.5px; font-weight: 500; color: #0f172a;" />
+            </div>
+            <button class="btn primary" type="submit" style="padding: 11px 24px; font-size: 14px; font-weight: 700; border-radius: 8px; white-space: nowrap;">
+                🔍 Tra cứu hồ sơ
+            </button>
+            @if (!string.IsNullOrWhiteSpace(search) || selectedId > 0)
+            {
+                <a asp-action="Index" class="btn outline" style="padding: 11px 16px; font-size: 13.5px; font-weight: 600; text-decoration: none; border-radius: 8px; white-space: nowrap;">
+                    ✕ Xóa tra cứu
+                </a>
+            }
+        </form>
+
+        @if (!string.IsNullOrWhiteSpace(search) && Model.Count == 0 && selected == null)
+        {
+            <div style="margin-top: 12px; background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; padding: 10px 14px; border-radius: 8px; font-size: 13.5px; font-weight: 600;">
+                ⚠️ Không tìm thấy hồ sơ viện phí chưa đóng tiền nào khớp với Mã BN / Số CCCD "<strong>@search</strong>" (Hồ sơ không tồn tại hoặc đã thanh toán).
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(search) && Model.Count > 1)
+        {
+            <div style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed #e2e8f0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <span style="font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.3px;">
+                    📋 Kết quả khớp từ khóa "@search" (@Model.Count hồ sơ):
+                </span>
+                @foreach (var item in Model)
+                {
+                    bool isCur = item.AppointmentId == selectedId;
+                    decimal diff = item.PatientPayAmount - item.DepositBalance;
+                    string statusTag;
+                    string badgeBg;
+                    string badgeColor;
+
+                    if (item.InvoiceStatus == HIS.Domain.InvoiceStatus.Paid)
+                    {
+                        statusTag = $"✓ Đã tất toán ({item.PatientPayAmount:N0} đ)";
+                        badgeBg = isCur ? "#15803d" : "#f0fdf4";
+                        badgeColor = isCur ? "#ffffff" : "#15803d";
+                    }
+                    else if (item.DepositBalance > 0 && diff < 0)
+                    {
+                        statusTag = $"💵 Hoàn tạm ứng: {Math.Abs(diff):N0} đ";
+                        badgeBg = isCur ? "#0284c7" : "#f0f9ff";
+                        badgeColor = isCur ? "#ffffff" : "#0369a1";
+                    }
+                    else if (item.DepositBalance > 0 && diff > 0)
+                    {
+                        statusTag = $"💰 Thu thêm: {diff:N0} đ";
+                        badgeBg = isCur ? "#dc2626" : "#fef2f2";
+                        badgeColor = isCur ? "#ffffff" : "#b91c1c";
+                    }
+                    else
+                    {
+                        statusTag = $"💳 Cần thu: {item.PatientPayAmount:N0} đ";
+                        badgeBg = isCur ? "#0f172a" : "#f8fafc";
+                        badgeColor = isCur ? "#ffffff" : "#334155";
+                    }
+
+                    <button type="button"
+                            onclick="selectAppointment(@item.AppointmentId, this)"
+                            class="patient-quick-chip"
+                            id="app-card-@item.AppointmentId"
+                            data-id="@item.AppointmentId"
+                            style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 20px; border: 1.5px solid @(isCur ? "#0284c7" : "#cbd5e1"); background: @(isCur ? "#e0f2fe" : "#ffffff"); cursor: pointer; font-size: 12.5px; transition: all 0.15s;">
+                        <strong style="color: #0f172a;">@item.PatientName</strong>
+                        <span style="color: #64748b; font-family: monospace; font-size: 11.5px;">(@item.PatientCode)</span>
+                        <span id="app-chip-status-@item.AppointmentId" style="background: @badgeBg; color: @badgeColor; font-weight: 700; font-size: 11px; padding: 2px 8px; border-radius: 12px;">
+                            @statusTag
+                        </span>
+                    </button>
+                }
+            </div>
+        }
+    </section>
+
+    <!-- KHỐI NỘI DUNG CHÍNH TOÀN MÀN HÌNH (100% WIDTH): BẢNG KÊ VIỆN PHÍ, BHYT, TẠM ỨNG & QUYẾT TOÁN -->
+    <section id="right-detail-container" style="background: #ffffff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 24px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); min-height: 460px; transition: opacity 0.15s ease;">
+        @if (selected != null)
+        {
+            @await Html.PartialAsync("_InvoiceDetail", selected)
+        }
+        else if (string.IsNullOrWhiteSpace(search))
+        {
+            <div style="text-align: center; padding: 56px 24px; color: #475569; background: #f8fafc; border: 1.5px dashed #cbd5e1; border-radius: 12px;">
+                <div style="font-size: 42px; margin-bottom: 12px;">🏥</div>
+                <h3 style="font-size: 18px; font-weight: 800; color: #1e293b; margin: 0 0 8px;">Quầy thu viện phí, BHYT &amp; tất toán tạm ứng</h3>
+                <p style="font-size: 14px; color: #64748b; margin: 0 auto 20px; max-width: 580px; line-height: 1.6;">
+                    Khi người bệnh đến quầy thanh toán, vui lòng nhập <strong>Mã bệnh nhân (Mã BN)</strong> hoặc <strong>Số CCCD</strong> vào thanh tra cứu phía trên để mở bảng kê các hồ sơ viện phí chưa thanh toán.
+                </p>
+                <div style="display: inline-grid; grid-template-columns: repeat(2, minmax(240px, 300px)); gap: 14px; text-align: left;">
+                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px;">
+                        <div style="font-weight: 800; color: #0284c7; font-size: 13px; margin-bottom: 4px;">1. Thu tiền dịch vụ &amp; thuốc</div>
+                        <div style="font-size: 12px; color: #64748b; line-height: 1.45;">Tổng hợp công khám, cận lâm sàng, thuốc kê đơn, trừ BHYT &amp; tạm ứng. Hỗ trợ máy tính tiền thừa và quét VietQR.</div>
+                    </div>
+                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px;">
+                        <div style="font-weight: 800; color: #15803d; font-size: 13px; margin-bottom: 4px;">2. Hoàn trả tiền mặt cho người bệnh</div>
+                        <div style="font-size: 12px; color: #64748b; line-height: 1.45;">Tự động khấu trừ viện phí từ các phiếu tạm ứng đã nộp và chi hoàn số tiền thừa bằng tiền mặt tại quầy.</div>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div style="text-align: center; padding: 56px 24px; color: #64748b; background: #fff1f2; border: 1.5px dashed #fda4af; border-radius: 12px;">
+                <div style="font-size: 38px; margin-bottom: 10px;">🔍</div>
+                <h3 style="font-size: 16px; font-weight: 700; color: #9f1239; margin-bottom: 6px;">Không tìm thấy hồ sơ viện phí chưa đóng tiền</h3>
+                <p style="font-size: 13.5px; color: #881337; margin: 0 auto; max-width: 480px; line-height: 1.5;">
+                    Không tìm thấy hồ sơ viện phí chưa thanh toán nào khớp với Mã BN / Số CCCD <strong>"@search"</strong> (Hồ sơ không tồn tại hoặc đã được thanh toán hoàn tất).
+                </p>
+            </div>
+        }
+    </section>
+</div>
+
+<!-- Modal Mở ca làm việc -->
+<dialog id="modal-open-shift" style="border: none; border-radius: 10px; padding: 24px; max-width: 440px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+    <form asp-action="OpenShift" method="post">
+        <h3 style="margin-top: 0; font-size: 18px; color: #1a237e;">Mở ca thu ngân mới</h3>
+        <p style="font-size: 13px; color: #616161;">Nhập số tiền mặt đầu ca để phục vụ đối chiếu và trả lại tiền thừa / hoàn tạm ứng cho người bệnh.</p>
+        
+        <div style="margin-bottom: 14px;">
+            <label style="font-size: 12px; font-weight: 700; display: block; margin-bottom: 4px;">Tiền mặt đầu ca (VNĐ):</label>
+            <input type="number" name="openingCash" value="10000000" min="0" step="100000" class="form-control" style="width: 100%; padding: 8px 12px; font-size: 15px; font-weight: 700;" required />
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button type="button" class="btn outline" onclick="document.getElementById('modal-open-shift').close()">Hủy</button>
+            <button type="submit" class="btn primary">Xác nhận mở ca</button>
+        </div>
+    </form>
+</dialog>
+
+<!-- Modal Kết thúc ca -->
+@if (shift != null)
+{
+    <dialog id="modal-close-shift" style="border: none; border-radius: 10px; padding: 24px; max-width: 480px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+        <form asp-action="CloseShift" method="post">
+            <input type="hidden" name="shiftId" value="@shift.Id" />
+            <h3 style="margin-top: 0; font-size: 18px; color: #c62828;">Kết thúc ca làm việc</h3>
+            <p style="font-size: 13px; color: #616161;">Kiểm đếm tiền mặt thực tế tại quầy để hệ thống đối soát chênh lệch tự động.</p>
+
+            <div style="background: #f5f5f5; padding: 10px 14px; border-radius: 6px; margin-bottom: 14px; font-size: 13px;">
+                <div>Tiền đầu ca: <strong>@shift.OpeningCash.ToString("N0") đ</strong></div>
+                <div>Thời gian mở: @shift.OpenedAt.ToString("HH:mm, dd/MM/yyyy")</div>
+            </div>
+
+            <div style="margin-bottom: 14px;">
+                <label style="font-size: 12px; font-weight: 700; display: block; margin-bottom: 4px;">Tiền mặt thực đếm tại quầy (VNĐ):</label>
+                <input type="number" name="countedCash" min="0" step="1000" class="form-control" style="width: 100%; padding: 8px 12px; font-size: 15px; font-weight: 700; color: #1b5e20;" required />
+            </div>
+
+            <div style="margin-bottom: 18px;">
+                <label style="font-size: 12px; font-weight: 700; display: block; margin-bottom: 4px;">Ghi chú bàn giao ca:</label>
+                <textarea name="note" class="form-control" rows="2" placeholder="Ghi chú thêm nếu có tiền rách, tạm ứng chưa hoàn..." style="width: 100%; padding: 8px 12px; font-size: 13px;"></textarea>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn outline" onclick="document.getElementById('modal-close-shift').close()">Hủy</button>
+                <button type="submit" class="btn primary" style="background: #c62828; border-color: #c62828;">Xác nhận kết ca</button>
+            </div>
+        </form>
+    </dialog>
+}
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        var isShiftOpen = @(shift != null ? "true" : "false");
+        var currentSettleMethod = 'Cash';
+        var detailLoadSeq = 0;
+        var settleQrSeq = 0;
+
+        function getAntiForgeryToken() {
+            return document.querySelector('#anti-forgery-token-holder input[name="__RequestVerificationToken"]')?.value || '';
+        }
+
+        @if (TempData["SuccessMessage"] is string swalSuccess)
+        {
+            <text>
+            document.addEventListener('DOMContentLoaded', function() {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Thành công',
+                    text: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(swalSuccess)),
+                    confirmButtonColor: '#15803d',
+                    timer: 3000,
+                    timerProgressBar: true
+                });
+            });
+            </text>
+        }
+        @if (TempData["ErrorMessage"] is string swalError)
+        {
+            <text>
+            document.addEventListener('DOMContentLoaded', function() {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Thông báo lỗi',
+                    text: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(swalError)),
+                    confirmButtonColor: '#dc2626'
+                });
+            });
+            </text>
+        }
+
+        // 1. CHỌN HỒ SƠ BỆNH NHÂN QUA AJAX (KHÔNG RELOAD TRANG)
+        function selectAppointment(appId, chipElem) {
+            if (!appId) return Promise.resolve();
+            const reqSeq = ++detailLoadSeq;
+
+            document.querySelectorAll('.patient-quick-chip').forEach(function(el) {
+                el.style.borderColor = '#cbd5e1';
+                el.style.background = '#ffffff';
+            });
+            if (chipElem) {
+                chipElem.style.borderColor = '#0284c7';
+                chipElem.style.background = '#e0f2fe';
+            }
+
+            try {
+                var url = new URL(window.location.href);
+                url.searchParams.set('selectedId', appId);
+                window.history.replaceState({ selectedId: appId }, '', url.toString());
+            } catch (e) { }
+
+            var container = document.getElementById('right-detail-container');
+            if (container) {
+                container.style.opacity = '0.5';
+                container.style.pointerEvents = 'none';
+            }
+
+            var fetchUrl = '@Url.Action("GetDetailPartial", "Cashier", new { area = "Staff" })?appointmentId=' + appId;
+            return fetch(fetchUrl)
+                .then(function(res) {
+                    if (!res.ok) throw new Error('Không thể tải chi tiết hồ sơ viện phí.');
+                    return res.text();
+                })
+                .then(function(html) {
+                    if (reqSeq !== detailLoadSeq) return;
+                    if (container) {
+                        container.innerHTML = html;
+                        container.style.opacity = '1';
+                        container.style.pointerEvents = 'auto';
+                        initInvoiceDetailScripts();
+                    }
+                })
+                .catch(function(err) {
+                    if (reqSeq !== detailLoadSeq) return;
+                    if (container) {
+                        container.innerHTML = '<div style="color: #dc2626; padding: 40px 20px; text-align: center; font-size: 14px;">Lỗi tải dữ liệu: ' + err.message + '</div>';
+                        container.style.opacity = '1';
+                        container.style.pointerEvents = 'auto';
+                    }
+                });
+        }
+
+        function initInvoiceDetailScripts() {
+            currentSettleMethod = 'Cash';
+            var netDiffElem = document.getElementById('val-net-diff');
+            if (netDiffElem) {
+                var netDiff = parseFloat(netDiffElem.getAttribute('data-net')) || 0;
+                if (netDiff > 0) {
+                    setCashGiven(netDiff, netDiff);
+                }
+            }
+        }
+
+        // 2. MÁY TÍNH TIỀN MẶT THU NGÂN (CASH CALCULATOR)
+        function calculateCashChange(requiredAmount) {
+            var input = document.getElementById('calc-cash-given');
+            var changeBox = document.getElementById('calc-change-box');
+            var changeLabel = document.getElementById('calc-change-label');
+            var changeAmount = document.getElementById('calc-change-amount');
+            var changeWords = document.getElementById('calc-change-words');
+
+            if (!input || !changeAmount) return;
+
+            var given = parseFloat(input.value) || 0;
+            var change = given - requiredAmount;
+
+            if (given <= 0) {
+                changeLabel.innerText = 'Tiền thối lại cho khách:';
+                changeAmount.innerText = '0 đ';
+                changeAmount.style.color = '#64748b';
+                changeWords.innerText = '(Chưa nhập tiền khách đưa)';
+                if (changeBox) {
+                    changeBox.style.borderColor = '#cbd5e1';
+                    changeBox.style.background = '#ffffff';
+                }
+                return;
+            }
+
+            if (change >= 0) {
+                changeLabel.innerText = '✓ TIỀN THỐI LẠI CHO KHÁCH:';
+                changeAmount.innerText = Number(change).toLocaleString('vi-VN') + ' đ';
+                changeAmount.style.color = '#15803d';
+                changeWords.innerText = '(' + numberToVietnameseWords(Math.round(change)) + ')';
+                if (changeBox) {
+                    changeBox.style.borderColor = '#86efac';
+                    changeBox.style.background = '#f0fdf4';
+                }
+            } else {
+                var shortage = Math.abs(change);
+                changeLabel.innerText = '⚠️ CÒN THIẾU (KHÁCH ĐƯA CHƯA ĐỦ):';
+                changeAmount.innerText = Number(shortage).toLocaleString('vi-VN') + ' đ';
+                changeAmount.style.color = '#dc2626';
+                changeWords.innerText = '(Thiếu ' + numberToVietnameseWords(Math.round(shortage)) + ')';
+                if (changeBox) {
+                    changeBox.style.borderColor = '#fca5a5';
+                    changeBox.style.background = '#fef2f2';
+                }
+            }
+        }
+
+        function setCashGiven(val, requiredAmount) {
+            var input = document.getElementById('calc-cash-given');
+            if (input) {
+                input.value = val;
+                calculateCashChange(requiredAmount);
+            }
+        }
+
+        function addCashGiven(val, requiredAmount) {
+            var input = document.getElementById('calc-cash-given');
+            if (input) {
+                var current = parseFloat(input.value) || 0;
+                input.value = current + val;
+                calculateCashChange(requiredAmount);
+            }
+        }
+
+        function clearCashGiven(requiredAmount) {
+            var input = document.getElementById('calc-cash-given');
+            if (input) {
+                input.value = '';
+                calculateCashChange(requiredAmount);
+                input.focus();
+            }
+        }
+
+        // 3. CHUYỂN ĐỔI PHƯƠNG THỨC THU TIỀN (TIỀN MẶT / VIETQR) KHI THU THÊM VIỆN PHÍ
+        function selectSettleMethod(method) {
+            currentSettleMethod = method;
+            var btnCash = document.getElementById('btn-settle-cash');
+            var btnBank = document.getElementById('btn-settle-bank');
+            var calcPanel = document.getElementById('settle-cash-calc-panel');
+            var qrPanel = document.getElementById('settle-vietqr-panel');
+
+            if (btnCash && btnBank) {
+                if (method === 'Cash') {
+                    btnCash.style.borderColor = '#0284c7';
+                    btnCash.style.background = '#f0f9ff';
+                    btnBank.style.borderColor = '#cbd5e1';
+                    btnBank.style.background = '#ffffff';
+                    if (calcPanel) calcPanel.style.display = 'block';
+                    if (qrPanel) qrPanel.style.display = 'none';
+                } else {
+                    btnBank.style.borderColor = '#0284c7';
+                    btnBank.style.background = '#f0f9ff';
+                    btnCash.style.borderColor = '#cbd5e1';
+                    btnCash.style.background = '#ffffff';
+                    if (calcPanel) calcPanel.style.display = 'none';
+                    if (qrPanel) {
+                        qrPanel.style.display = 'block';
+                        loadSettleVietQr();
+                    }
+                }
+            }
+        }
+
+        async function loadSettleVietQr() {
+            const reqSeq = ++settleQrSeq;
+            var container = document.getElementById('current-invoice-data-container');
+            var appId = container ? parseInt(container.getAttribute('data-appointment-id')) : 0;
+            if (!appId) return;
+
+            var netDiffElem = document.getElementById('val-net-diff');
+            var netDiff = netDiffElem ? Math.max(0, parseFloat(netDiffElem.getAttribute('data-net')) || 0) : 0;
+            if (netDiff <= 0) return;
+
+            var img = document.getElementById('settle-qr-img');
+            if (img) img.removeAttribute('src');
+
+            try {
+                var url = '@Url.Action("GenerateQr", "Cashier", new { area = "Staff" })?appointmentId=' + appId + '&customAmount=' + netDiff;
+                var res = await fetch(url);
+                var data = await res.json();
+                var activeContainer = document.getElementById('current-invoice-data-container');
+                var activeAppId = activeContainer ? parseInt(activeContainer.getAttribute('data-appointment-id')) : 0;
+                if (reqSeq !== settleQrSeq || activeAppId !== appId) return;
+
+                if (res.ok && data.qrDataUri) {
+                    img = document.getElementById('settle-qr-img');
+                    if (img) img.src = data.qrDataUri;
+                    var bTitle = document.getElementById('settle-qr-bank');
+                    if (bTitle) bTitle.innerText = 'Ngân hàng: ' + data.bankName + ' (' + data.bankCode + ')';
+                    var acc = document.getElementById('settle-qr-acc');
+                    if (acc) acc.innerText = data.accountNumber;
+                    var holder = document.getElementById('settle-qr-holder');
+                    if (holder) holder.innerText = data.accountHolder;
+                    var amt = document.getElementById('settle-qr-amount');
+                    if (amt) amt.innerText = Number(data.amount).toLocaleString('vi-VN') + ' đ';
+                    var msg = document.getElementById('settle-qr-msg');
+                    if (msg) msg.innerText = data.message;
+                }
+            } catch (err) {
+                console.error('Không thể tạo mã VietQR quyết toán:', err);
+            }
+        }
+
+        function copyText(text) {
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(function() {
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'success',
+                    title: 'Đã sao chép: ' + text,
+                    showConfirmButton: false,
+                    timer: 1800,
+                    timerProgressBar: true
+                });
+            }).catch(function() {
+                prompt('Sao chép nội dung:', text);
+            });
+        }
+
+        // 4. THỰC HIỆN QUYẾT TOÁN VIỆN PHÍ & HOÀN TIỀN MẶT TẠM ỨNG DƯ
+        async function submitSettleDischarge(appId) {
+            if (!isShiftOpen) {
+                await Swal.fire({
+                    icon: 'warning',
+                    title: 'Chưa mở ca thu ngân',
+                    text: 'Vui lòng mở ca thu ngân trước khi thực hiện thu tiền & quyết toán.',
+                    confirmButtonText: 'Mở ca ngay',
+                    confirmButtonColor: '#0284c7'
+                });
+                document.getElementById('modal-open-shift').showModal();
+                return;
+            }
+
+            var refInput = document.getElementById('settle-ref-code');
+            var refCode = refInput ? refInput.value.trim() : null;
+            var noteInput = document.getElementById('settle-reason-note');
+            var note = noteInput ? noteInput.value.trim() : null;
+            var approvedByInput = document.getElementById('settle-approved-by');
+            var approvedBy = approvedByInput ? approvedByInput.value.trim() : null;
+
+            var netElem = document.getElementById('val-net-diff');
+            var netDiffVal = netElem ? parseFloat(netElem.getAttribute('data-net') || '0') : 0;
+
+            if (netDiffVal > 0 && currentSettleMethod === 'Cash') {
+                var cashGivenInput = document.getElementById('calc-cash-given');
+                var cashGivenVal = cashGivenInput ? parseFloat(cashGivenInput.value) : 0;
+                if (cashGivenVal > 0 && cashGivenVal < netDiffVal) {
+                    await Swal.fire({
+                        icon: 'warning',
+                        title: 'Tiền khách đưa chưa đủ',
+                        text: 'Số tiền khách đưa (' + cashGivenVal.toLocaleString('vi-VN') + ' đ) đang ít hơn số tiền cần thu thêm (' + netDiffVal.toLocaleString('vi-VN') + ' đ). Vui lòng kiểm tra lại!',
+                        confirmButtonColor: '#0284c7'
+                    });
+                    cashGivenInput.focus();
+                    return;
+                }
+            }
+
+            if (netDiffVal > 0 && currentSettleMethod === 'BankTransfer' && !refCode) {
+                await Swal.fire({
+                    icon: 'warning',
+                    title: 'Thiếu mã giao dịch ngân hàng',
+                    text: 'Vui lòng nhập mã chuẩn chi / giao dịch ngân hàng trước khi xác nhận.',
+                    confirmButtonColor: '#0284c7'
+                });
+                if (refInput) refInput.focus();
+                return;
+            }
+
+            if (netDiffVal < 0) {
+                if (!approvedBy) {
+                    await Swal.fire({
+                        icon: 'warning',
+                        title: 'Thiếu thông tin người duyệt',
+                        text: 'Vui lòng nhập họ tên Người duyệt hoàn tiền (Bác sĩ / Trưởng ca thu ngân).',
+                        confirmButtonColor: '#0284c7'
+                    });
+                    if (approvedByInput) approvedByInput.focus();
+                    return;
+                }
+            }
+
+            var confirmRes = await Swal.fire({
+                icon: 'question',
+                title: netDiffVal < 0 ? 'Xác nhận hoàn trả tiền thừa?' : 'Xác nhận thu tiền & quyết toán?',
+                html: netDiffVal < 0
+                    ? 'Xác nhận cấn trừ viện phí và <b>CHI HOÀN TIỀN MẶT ' + Math.abs(netDiffVal).toLocaleString('vi-VN') + ' đ</b> cho người bệnh?<br/><small style="color:#475569;">Người duyệt: ' + approvedBy + '</small>'
+                    : (netDiffVal > 0
+                        ? 'Xác nhận thu đủ <b>' + netDiffVal.toLocaleString('vi-VN') + ' đ</b> (' + (currentSettleMethod === 'BankTransfer' ? 'Chuyển khoản VietQR' : 'Tiền mặt') + ') và hoàn tất quyết toán viện phí?'
+                        : 'Xác nhận cấn trừ tạm ứng đủ 100% và hoàn tất quyết toán viện phí?'),
+                showCancelButton: true,
+                confirmButtonText: '✓ Xác nhận ngay',
+                cancelButtonText: 'Hủy',
+                confirmButtonColor: netDiffVal < 0 ? '#0284c7' : '#15803d',
+                cancelButtonColor: '#64748b'
+            });
+
+            if (!confirmRes.isConfirmed) {
+                return;
+            }
+
+            var btn = document.getElementById('btn-settle-discharge');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = '⏳ Đang xử lý quyết toán...';
+            }
+
+            // Khi hoàn tiền cho khách (netDiffVal < 0), luôn chi hoàn bằng Tiền mặt (0)
+            var finalMethod = netDiffVal < 0 ? 0 : (currentSettleMethod === 'BankTransfer' ? 1 : 0);
+
+            try {
+                var token = getAntiForgeryToken();
+                var postUrl = '@Url.Action("SettleDischarge", "Cashier", new { area = "Staff" })';
+                var res = await fetch(postUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': token
+                    },
+                    body: JSON.stringify({
+                        appointmentId: appId,
+                        method: finalMethod,
+                        referenceCode: refCode,
+                        note: note,
+                        approvedBy: approvedBy,
+                        cashierAccountId: 0
+                    })
+                });
+
+                var data = null;
+                try {
+                    data = await res.json();
+                } catch (e) {
+                    throw new Error('Máy chủ phản hồi không đúng định dạng. Vui lòng kiểm tra lại ca thu ngân.');
+                }
+
+                if (res.ok && data.success) {
+                    var chipStatus = document.getElementById('app-chip-status-' + appId);
+                    if (chipStatus) {
+                        chipStatus.style.background = '#15803d';
+                        chipStatus.style.color = '#ffffff';
+                        chipStatus.innerText = '✓ Đã tất toán';
+                    }
+
+                    await selectAppointment(appId, document.getElementById('app-card-' + appId));
+
+                    await Swal.fire({
+                        icon: 'success',
+                        title: netDiffVal < 0 ? 'Hoàn tiền & Quyết toán thành công!' : 'Thu viện phí thành công!',
+                        text: data.message || 'Hồ sơ viện phí đã được quyết toán hoàn tất.',
+                        showCancelButton: true,
+                        confirmButtonText: '🖨️ In bảng kê & Hóa đơn',
+                        cancelButtonText: 'Đóng',
+                        confirmButtonColor: '#0284c7',
+                        cancelButtonColor: '#64748b'
+                    }).then(function(result) {
+                        if (result.isConfirmed) {
+                            printDischargeSettlement();
+                        }
+                    });
+                } else {
+                    await Swal.fire({
+                        icon: 'error',
+                        title: 'Không thể quyết toán',
+                        text: data ? data.message : 'Không thể thực hiện quyết toán.',
+                        confirmButtonColor: '#dc2626'
+                    });
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerText = 'Thử lại';
+                    }
+                }
+            } catch (err) {
+                await Swal.fire({
+                    icon: 'error',
+                    title: 'Lỗi kết nối',
+                    text: err.message,
+                    confirmButtonColor: '#dc2626'
+                });
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = 'Thử lại';
+                }
+            }
+        }
+
+        // 5. ĐỌC TIỀN BẰNG CHỮ TIẾNG VIỆT
+        function numberToVietnameseWords(n) {
+            if (!n || isNaN(n) || n === 0) return 'Không đồng';
+            if (n < 0) return 'Âm ' + numberToVietnameseWords(-n);
+
+            var units = ['', 'nghìn', 'triệu', 'tỷ', 'nghìn tỷ', 'triệu tỷ'];
+            var numbers = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín'];
+
+            function readThreeDigits(num, hasHigherGroup) {
+                var h = Math.floor(num / 100);
+                var t = Math.floor((num % 100) / 10);
+                var u = num % 10;
+                var res = '';
+
+                if (h > 0 || hasHigherGroup) {
+                    res += numbers[h] + ' trăm ';
+                }
+
+                if (t === 0 && u === 0) {
+                    return res.trim();
+                }
+
+                if (t === 0 && u > 0) {
+                    res += (hasHigherGroup || h > 0 ? 'lẻ ' : '') + numbers[u];
+                    return res.trim();
+                }
+
+                if (t === 1) {
+                    res += 'mười ';
+                } else if (t > 1) {
+                    res += numbers[t] + ' mươi ';
+                }
+
+                if (u === 1) {
+                    res += t > 1 ? 'mốt' : 'một';
+                } else if (u === 5) {
+                    res += t > 0 ? 'lăm' : 'năm';
+                } else if (u > 0) {
+                    res += numbers[u];
+                }
+
+                return res.trim();
+            }
+
+            var groups = [];
+            var temp = Math.floor(n);
+            while (temp > 0) {
+                groups.push(temp % 1000);
+                temp = Math.floor(temp / 1000);
+            }
+
+            var parts = [];
+            for (var i = groups.length - 1; i >= 0; i--) {
+                var g = groups[i];
+                if (g > 0) {
+                    var s = readThreeDigits(g, i < groups.length - 1);
+                    parts.push(s + ' ' + units[i]);
+                }
+            }
+
+            var result = parts.join(' ').replace(/\s+/g, ' ').trim();
+            if (!result) return 'Không đồng';
+            return result.charAt(0).toUpperCase() + result.slice(1) + ' đồng chẵn.';
+        }
+
+        // 6. IN BẢNG KÊ QUYẾT TOÁN VIỆN PHÍ & HÓA ĐƠN XUẤT VIỆN (MẪU C40-HD / BYT)
+        function printDischargeSettlement() {
+            var container = document.getElementById('current-invoice-data-container');
+            if (!container) {
+                Swal.fire({ icon: 'warning', title: 'Chưa có thông tin', text: 'Chưa có thông tin lượt khám để in bảng kê.', confirmButtonColor: '#0284c7' });
+                return;
+            }
+
+            var patientName = container.getAttribute('data-patient-name') || 'Người bệnh';
+            var patientCode = container.getAttribute('data-patient-code') || '';
+            var patientPhone = container.getAttribute('data-patient-phone') || '';
+            var nationalId = container.getAttribute('data-patient-cccd') || container.getAttribute('data-national-id') || '';
+            var address = container.getAttribute('data-patient-address') || container.getAttribute('data-address') || '';
+            var diagnosis = container.getAttribute('data-diagnosis') || '';
+            var cardNum = container.getAttribute('data-card-number') || '';
+            var coveragePct = container.getAttribute('data-coverage-pct') || '0';
+            var appCode = container.getAttribute('data-appointment-code') || '';
+            var dept = container.getAttribute('data-department') || 'Khám bệnh';
+            var doctor = container.getAttribute('data-doctor') || 'Phụ trách chuyên môn';
+            var examDate = container.getAttribute('data-exam-date') || '';
+            var invoiceNum = container.getAttribute('data-invoice-number') || 'Chưa lập';
+            var cashierName = container.getAttribute('data-cashier-name') || '@(shift?.CashierName ?? "Thu ngân")';
+
+            var totalAmount = parseFloat(container.getAttribute('data-total-amount')) || 0;
+            var insuranceCovered = parseFloat(container.getAttribute('data-insurance-covered')) || 0;
+            var patientAmount = parseFloat(container.getAttribute('data-patient-amount')) || 0;
+            var depositBal = parseFloat(container.getAttribute('data-deposit-balance')) || 0;
+            var netDiff = patientAmount - depositBal;
+
+            var printWin = window.open('', '_blank', 'width=950,height=800');
+            if (!printWin) {
+                Swal.fire({ icon: 'warning', title: 'Trình duyệt chặn Popup', text: 'Vui lòng cho phép popup trên trình duyệt để in bảng kê.', confirmButtonColor: '#0284c7' });
+                return;
+            }
+
+            var nowStr = new Date().toLocaleString('vi-VN');
+            var balanceWord = numberToVietnameseWords(Math.round(Math.abs(netDiff > 0 ? netDiff : (netDiff < 0 ? Math.abs(netDiff) : patientAmount))));
+
+            var rows = document.querySelectorAll('#right-detail-container table tbody tr');
+            var itemsHtml = '';
+            if (rows.length > 0) {
+                var stt = 1;
+                rows.forEach(function(r) {
+                    var cells = r.querySelectorAll('td');
+                    if (cells.length >= 8) {
+                        itemsHtml += `
+                            <tr>
+                                <td style="text-align: center; border: 1px solid #333; padding: 4px 6px;">${stt++}</td>
+                                <td style="border: 1px solid #333; padding: 4px 6px;">${cells[1].innerText.trim()}</td>
+                                <td style="text-align: center; border: 1px solid #333; padding: 4px 6px;">${cells[2].innerText.trim()}</td>
+                                <td style="text-align: right; border: 1px solid #333; padding: 4px 6px;">${cells[3].innerText.trim()}</td>
+                                <td style="text-align: right; border: 1px solid #333; padding: 4px 6px;">${cells[4].innerText.trim()}</td>
+                                <td style="text-align: right; border: 1px solid #333; padding: 4px 6px;">${cells[6].innerText.trim()}</td>
+                                <td style="text-align: right; border: 1px solid #333; padding: 4px 6px; font-weight: bold;">${cells[7].innerText.trim()}</td>
+                            </tr>`;
+                    }
+                });
+            }
+            if (!itemsHtml) {
+                itemsHtml = `<tr><td colspan="7" style="text-align: center; border: 1px solid #333; padding: 8px;">Không có dịch vụ/thuốc phát sinh</td></tr>`;
+            }
+
+            var content = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Bảng kê quyết toán viện phí - ${patientName}</title>
+    <style>
+        body { font-family: 'Times New Roman', serif; font-size: 13px; line-height: 1.4; color: #000; padding: 20px; }
+        .header { display: flex; justify-content: space-between; margin-bottom: 12px; }
+        .header-left { text-align: left; }
+        .header-right { text-align: right; }
+        .title { text-align: center; font-size: 17px; font-weight: bold; margin: 15px 0 5px; text-transform: uppercase; }
+        .sub-title { text-align: center; font-style: italic; margin-bottom: 15px; font-size: 12px; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 15px; margin-bottom: 14px; font-size: 13px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 12px; }
+        th { background: #f2f2f2; border: 1px solid #333; padding: 5px 6px; font-weight: bold; }
+        .sec-title { font-weight: bold; margin: 10px 0 4px; font-size: 13px; text-transform: uppercase; }
+        .summary-box { border: 1.5px solid #333; padding: 10px; margin: 12px 0; background: #fafafa; font-size: 13px; }
+        .signatures { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; margin-top: 30px; page-break-inside: avoid; }
+        .sig-title { font-weight: bold; margin-bottom: 60px; }
+        @@media print {
+            body { padding: 0; }
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <strong>SỞ Y TẾ TP. HỒ CHÍ MINH</strong><br />
+            <strong>BỆNH VIỆN ĐA KHOA MEDICARE</strong><br />
+            <span>Phòng Tài chính - Kế toán</span>
+        </div>
+        <div class="header-right">
+            <strong>Mẫu số: C40-HD / BYT</strong><br />
+            <span>Số HĐ: <strong>${invoiceNum}</strong></span><br />
+            <span>Mã BN: <strong>${patientCode}</strong></span><br />
+            <span>Ngày in: ${nowStr}</span>
+        </div>
+    </div>
+
+    <div class="title">BẢNG KÊ QUYẾT TOÁN VIỆN PHÍ & HÓA ĐƠN XUẤT VIỆN</div>
+    <div class="sub-title">(Kèm theo phiếu thanh toán ra viện / kết thúc đợt điều trị)</div>
+
+    <div class="info-grid">
+        <div>Họ và tên người bệnh: <strong>${patientName}</strong></div>
+        <div>Mã người bệnh: <strong>${patientCode}</strong></div>
+        <div>Số CCCD / ĐDCN: <strong>${nationalId || '—'}</strong></div>
+        <div>Số điện thoại: <strong>${patientPhone || '—'}</strong></div>
+        <div style="grid-column: span 2;">Địa chỉ: <strong>${address || '—'}</strong></div>
+        <div style="grid-column: span 2;">Chẩn đoán lâm sàng: <strong>${diagnosis || 'Khám chuyên khoa'}</strong></div>
+        <div>Mã thẻ BHYT: <strong>${cardNum ? cardNum : 'Không có'}</strong> (Mức hưởng: ${coveragePct}%)</div>
+        <div>Lượt khám / Đợt điều trị: <strong>${appCode || '—'}</strong> (${examDate})</div>
+        <div>Khoa / Phòng: <strong>${dept}</strong></div>
+        <div>Bác sĩ điều trị: <strong>${doctor}</strong></div>
+    </div>
+
+    <div class="sec-title">I. Bảng kê chi tiết dịch vụ viện phí & thuốc điều trị</div>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 35px;">STT</th>
+                <th>Nội dung dịch vụ / Thuốc điều trị</th>
+                <th style="width: 45px;">SL</th>
+                <th style="width: 80px;">Đơn giá</th>
+                <th style="width: 90px;">Thành tiền</th>
+                <th style="width: 85px;">BHYT trả</th>
+                <th style="width: 95px;">BN cùng trả</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${itemsHtml}
+        </tbody>
+        <tfoot>
+            <tr style="font-weight: bold; background: #f9f9f9;">
+                <td colspan="4" style="text-align: right; border: 1px solid #333; padding: 5px 6px;">TỔNG CỘNG:</td>
+                <td style="text-align: right; border: 1px solid #333; padding: 5px 6px;">${totalAmount.toLocaleString('vi-VN')}</td>
+                <td style="text-align: right; border: 1px solid #333; padding: 5px 6px;">${insuranceCovered.toLocaleString('vi-VN')}</td>
+                <td style="text-align: right; border: 1px solid #333; padding: 5px 6px;">${patientAmount.toLocaleString('vi-VN')}</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <div class="summary-box">
+        <div style="font-weight: bold; margin-bottom: 6px; font-size: 13.5px; border-bottom: 1px dashed #999; padding-bottom: 4px;">II. TỔNG HỢP CÂN ĐỐI TÀI CHÍNH QUYẾT TOÁN:</div>
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 4px 10px;">
+            <div>1. Tổng chi phí khám & điều trị:</div>
+            <div style="text-align: right; font-weight: bold;">${totalAmount.toLocaleString('vi-VN')} đ</div>
+            <div>2. Quỹ BHYT chi trả:</div>
+            <div style="text-align: right; font-weight: bold; color: #15803d;">- ${insuranceCovered.toLocaleString('vi-VN')} đ</div>
+            <div>3. Người bệnh cùng chi trả (Viện phí thực tế):</div>
+            <div style="text-align: right; font-weight: bold;">${patientAmount.toLocaleString('vi-VN')} đ</div>
+            <div>4. Tiền tạm ứng đã nộp:</div>
+            <div style="text-align: right; font-weight: bold;">${depositBal.toLocaleString('vi-VN')} đ</div>
+            <div style="font-size: 13.5px; font-weight: bold; border-top: 1px solid #333; padding-top: 4px;">5. KẾT QUẢ QUYẾT TOÁN CÂN ĐỐI:</div>
+            <div style="font-size: 13.5px; font-weight: bold; text-align: right; border-top: 1px solid #333; padding-top: 4px;">
+                ${netDiff > 0 ? ('BN nộp thêm: ' + Number(netDiff).toLocaleString('vi-VN') + ' đ') : (netDiff < 0 ? ('Hoàn tiền mặt cho BN: ' + Number(Math.abs(netDiff)).toLocaleString('vi-VN') + ' đ') : 'Cấn trừ đủ 100%')}
+            </div>
+        </div>
+        <div style="margin-top: 6px; font-style: italic;">
+            (Bằng chữ: <strong>${balanceWord}</strong>)
+        </div>
+    </div>
+
+    <div class="signatures">
+        <div>
+            <div class="sig-title">NGƯỜI BỆNH / ĐẠI DIỆN<br /><span style="font-weight: normal; font-size: 11px;">(Ký, ghi rõ họ tên)</span></div>
+            <div><strong>${patientName}</strong></div>
+        </div>
+        <div>
+            <div class="sig-title">THU NGÂN LẬP BẢNG<br /><span style="font-weight: normal; font-size: 11px;">(Ký, ghi rõ họ tên)</span></div>
+            <div><strong>${cashierName}</strong></div>
+        </div>
+        <div>
+            <div class="sig-title">NGƯỜI DUYỆT / KẾ TOÁN<br /><span style="font-weight: normal; font-size: 11px;">(Ký, ghi rõ họ tên)</span></div>
+            <div><strong>${doctor}</strong></div>
+        </div>
+    </div>
+
+    <div class="no-print" style="margin-top: 30px; text-align: center;">
+        <button onclick="window.print()" style="padding: 10px 24px; font-size: 14px; font-weight: bold; background: #0284c7; color: #fff; border: none; border-radius: 6px; cursor: pointer;">
+            🖨️ In bảng quyết toán ngay
+        </button>
+    </div>
+</body>
+</html>`;
+
+            printWin.document.open();
+            printWin.document.write(content);
+            printWin.document.close();
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            initInvoiceDetailScripts();
+        });
+    </script>
+}

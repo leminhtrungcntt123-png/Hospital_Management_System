@@ -20,3 +20,7 @@ appsettings.Development.json
 Thumbs.db
 .init
 .vs/
+*.log
+scratch/
+*.bak
+*.tmp

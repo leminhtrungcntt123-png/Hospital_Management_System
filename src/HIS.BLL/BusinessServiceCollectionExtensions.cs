@@ -26,6 +26,9 @@ public static class BusinessServiceCollectionExtensions
         services.AddOptions<EmailOptions>()
             .Bind(configuration.GetSection(EmailOptions.SectionName));
 
+        services.AddOptions<BillingOptions>()
+            .Bind(configuration.GetSection(BillingOptions.SectionName));
+
         services.AddValidatorsFromAssembly(typeof(BusinessServiceCollectionExtensions).Assembly);
 
         services.AddScoped<IAuthService, AuthService>();
@@ -37,6 +40,8 @@ public static class BusinessServiceCollectionExtensions
         services.AddScoped<IScheduleChangeService, ScheduleChangeService>();
         services.AddScoped<IQueueService, QueueService>();
         services.AddScoped<IReceptionService, ReceptionService>();
+        services.AddScoped<IBillingService, BillingService>();
+        services.AddScoped<ICashierShiftService, CashierShiftService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IDepartmentService, DepartmentService>();
         services.AddScoped<IDoctorService, DoctorService>();

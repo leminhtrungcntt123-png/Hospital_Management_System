@@ -38,7 +38,7 @@ public class AccountController : Controller
         {
             return RedirectToAction("Login", "Account");
         }
-        return RedirectToDashboard(User.FindFirst(ClaimTypes.Role)?.Value);
+        return RedirectToDashboard(ResolveDashboardRole(User));
     }
 
     [HttpGet]
@@ -50,7 +50,7 @@ public class AccountController : Controller
             {
                 return Redirect(returnUrl);
             }
-            return RedirectToDashboard(User.FindFirst(ClaimTypes.Role)?.Value);
+            return RedirectToDashboard(ResolveDashboardRole(User));
         }
 
         return View(new LoginViewModel { ReturnUrl = returnUrl });
@@ -74,6 +74,7 @@ public class AccountController : Controller
         {
             "DOCTOR" or "DOC" => "DOCTOR",
             "NURSE" => "NURSE",
+            "ACCOUNTANT" or "CASHIER" => "ACCOUNTANT",
             "DEPT_HEAD" or "DEPARTMENT_HEAD" => "DEPARTMENT_HEAD",
             "PATIENT" => "PATIENT",
             _ => "ADMIN"
@@ -172,6 +173,21 @@ public class AccountController : Controller
                 }
             }
         }
+        else if (targetRole == "ACCOUNTANT")
+        {
+            var accountantAcc = await db.Accounts
+                .Where(a => a.Username == "ketoan" || (a.RoleId == (int)RoleId.Nurse && a.Username != "nurse_lan"))
+                .OrderByDescending(a => a.Username == "ketoan")
+                .FirstOrDefaultAsync();
+            if (accountantAcc == null)
+            {
+                return NotFound("Không tìm thấy tài khoản thu ngân / kế toán (ketoan).");
+            }
+
+            accountId = accountantAcc.Id;
+            username = accountantAcc.Username;
+            fullName = "Thu ngân / Kế toán";
+        }
         else if (targetRole == "PATIENT")
         {
             var patientAcc = await db.Accounts.FirstOrDefaultAsync(a => a.RoleId == (int)RoleId.Patient);
@@ -187,9 +203,15 @@ public class AccountController : Controller
         {
             new(ClaimTypes.NameIdentifier, accountId.ToString()),
             new(ClaimTypes.Name, username),
-            new(ClaimTypes.Role, targetRole),
+            // Giữ claim Role đầu tiên khớp với DB Role (NURSE cho tài khoản ketoan) để AccountStatusCookieOptions xác thực hợp lệ.
+            new(ClaimTypes.Role, targetRole == "ACCOUNTANT" ? "NURSE" : targetRole),
             new("FullName", fullName)
         };
+
+        if (targetRole == "ACCOUNTANT")
+        {
+            claims.Add(new Claim(ClaimTypes.Role, "ACCOUNTANT"));
+        }
 
         if (!string.IsNullOrEmpty(doctorId))
         {
@@ -253,6 +275,12 @@ public class AccountController : Controller
             new("FullName", string.IsNullOrWhiteSpace(auth.FullName) ? auth.Username : auth.FullName)
         };
 
+        bool isCashierAccount = string.Equals(auth.Username, "ketoan", StringComparison.OrdinalIgnoreCase);
+        if (isCashierAccount)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, "ACCOUNTANT"));
+        }
+
         if (!string.IsNullOrEmpty(auth.DepartmentName))
         {
             claims.Add(new Claim("DepartmentName", auth.DepartmentName));
@@ -274,7 +302,7 @@ public class AccountController : Controller
             return Redirect(model.ReturnUrl);
         }
 
-        return RedirectToDashboard(auth.Role);
+        return RedirectToDashboard(isCashierAccount ? "ACCOUNTANT" : auth.Role);
     }
 
     [HttpPost]
@@ -429,6 +457,17 @@ public class AccountController : Controller
             && !path.StartsWith(Url.Content("~/Account/Logout"), StringComparison.OrdinalIgnoreCase);
     }
 
+    private static string? ResolveDashboardRole(ClaimsPrincipal user)
+    {
+        if (user.IsInRole("ACCOUNTANT")
+            || string.Equals(user.Identity?.Name, "ketoan", StringComparison.OrdinalIgnoreCase))
+        {
+            return "ACCOUNTANT";
+        }
+
+        return user.FindFirst(ClaimTypes.Role)?.Value;
+    }
+
     private IActionResult RedirectToDashboard(string? role)
     {
         return (role?.Trim().ToUpperInvariant()) switch
@@ -437,7 +476,7 @@ public class AccountController : Controller
             "DEPARTMENT_HEAD" or "DEPT_HEAD" => RedirectToAction("Index", "Schedule", new { area = "Staff" }),
             "DOCTOR" => RedirectToAction("Index", "Consultation", new { area = "Staff" }),
             "NURSE" => RedirectToAction("Index", "Reception", new { area = "Staff" }),
-            "CASHIER" => RedirectToAction("Index", "Cashier", new { area = "Staff" }),
+            "ACCOUNTANT" or "CASHIER" => RedirectToAction("Index", "Cashier", new { area = "Staff" }),
             "PATIENT" => RedirectToAction("Index", "Booking", new { area = "Patient" }),
             _ => RedirectToAction("Index", "Home")
         };
