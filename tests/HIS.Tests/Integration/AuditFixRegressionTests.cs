@@ -157,6 +157,7 @@ public class AuditFixRegressionTests
 
         db.AddRange(deptA, deptB, roomA, roomA2, headA, headB, doctor, nurse, bidSchedule, approvedTargetSchedule, rejectedSchedule, slot, expiredPending, readyNormal, readyUrgent);
         await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
 
         var deptService = new DepartmentHeadService(db, clock);
 
@@ -187,11 +188,11 @@ public class AuditFixRegressionTests
         Assert.True(expired.IsSuccess);
         Assert.Equal(1, expired.Value);
 
-        await db.Entry(expiredPending).ReloadAsync();
-        await db.Entry(slot).ReloadAsync();
-        Assert.Equal((int)AppointmentStatusId.Expired, expiredPending.StatusId);
-        Assert.Equal(0, slot.BookedCount);
-        Assert.Equal(SlotStatus.Available, slot.Status);
+        var reloadedPending = await db.Appointments.AsNoTracking().SingleAsync(a => a.Id == expiredPending.Id);
+        var reloadedSlot = await db.AppointmentSlots.AsNoTracking().SingleAsync(s => s.Id == slot.Id);
+        Assert.Equal((int)AppointmentStatusId.Expired, reloadedPending.StatusId);
+        Assert.Equal(0, reloadedSlot.BookedCount);
+        Assert.Equal(SlotStatus.Available, reloadedSlot.Status);
     }
 
     private sealed class AuditClock : TimeProvider
