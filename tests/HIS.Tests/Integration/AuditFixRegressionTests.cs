@@ -39,6 +39,9 @@ public class AuditFixRegressionTests
         var docAcc = new Account { Username = "doc_a1", PasswordHash = "x", RoleId = 3, IsActive = true };
         var doctor = new Doctor { Account = docAcc, Department = deptA, FullName = "BS A1" };
 
+        var nurseAcc = new Account { Username = "nurse_qa", PasswordHash = "x", RoleId = 4, IsActive = true };
+        var nurse = new Nurse { Account = nurseAcc, Department = deptA, FullName = "Điều dưỡng QA" };
+
         var workDate = new DateOnly(2026, 11, 20);
         var bidSchedule = new DoctorSchedule
         {
@@ -111,6 +114,7 @@ public class AuditFixRegressionTests
             HoldUntil = clock.GetLocalNow().DateTime.AddMinutes(-5)
         };
 
+        var now = clock.GetLocalNow().DateTime;
         var readyNormal = new Appointment
         {
             AppointmentCode = "Q001",
@@ -120,7 +124,15 @@ public class AuditFixRegressionTests
             Room = roomA,
             StatusId = (int)AppointmentStatusId.ReadyForDoctor,
             PriorityLevel = 0,
-            QueueNumber = "O01"
+            QueueNumber = "O01",
+            CreatedAt = now,
+            VitalSigns = new VitalSigns
+            {
+                RecordedByNurse = nurse,
+                Temperature = 36.5m,
+                Pulse = 75,
+                RecordedAt = now
+            }
         };
 
         var readyUrgent = new Appointment
@@ -132,10 +144,18 @@ public class AuditFixRegressionTests
             Room = roomA,
             StatusId = (int)AppointmentStatusId.ReadyForDoctor,
             PriorityLevel = 2,
-            QueueNumber = "O02"
+            QueueNumber = "O02",
+            CreatedAt = now,
+            VitalSigns = new VitalSigns
+            {
+                RecordedByNurse = nurse,
+                Temperature = 36.8m,
+                Pulse = 82,
+                RecordedAt = now
+            }
         };
 
-        db.AddRange(deptA, deptB, roomA, roomA2, headA, headB, doctor, bidSchedule, approvedTargetSchedule, rejectedSchedule, slot, expiredPending, readyNormal, readyUrgent);
+        db.AddRange(deptA, deptB, roomA, roomA2, headA, headB, doctor, nurse, bidSchedule, approvedTargetSchedule, rejectedSchedule, slot, expiredPending, readyNormal, readyUrgent);
         await db.SaveChangesAsync();
 
         var deptService = new DepartmentHeadService(db, clock);
