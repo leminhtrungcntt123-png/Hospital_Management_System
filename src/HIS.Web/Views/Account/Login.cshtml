@@ -32,17 +32,28 @@
             @if (TempData["SuccessMessage"] != null)
             {
                 <div class="his-alert-success" role="alert">
-                    ✅ @TempData["SuccessMessage"]
+                    <svg class="his-alert-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                    </svg>
+                    <span>@TempData["SuccessMessage"]</span>
                 </div>
             }
 
             @if (!ViewData.ModelState.IsValid && ViewData.ModelState[string.Empty]?.Errors.Count > 0)
             {
                 <div class="his-alert-error" role="alert">
-                    @foreach (var error in ViewData.ModelState[string.Empty]!.Errors)
-                    {
-                        <div>⚠️ @error.ErrorMessage</div>
-                    }
+                    <svg class="his-alert-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    <div class="his-alert-body">
+                        @foreach (var error in ViewData.ModelState[string.Empty]!.Errors)
+                        {
+                            <div>@error.ErrorMessage</div>
+                        }
+                    </div>
                 </div>
             }
 
@@ -63,7 +74,7 @@
                        autocomplete="username"
                        autofocus />
             </div>
-            <span asp-validation-for="Username" class="his-field-error"></span>
+            <span asp-validation-for="Username" class="his-field-error" id="login-username-error"></span>
 
             <!-- Input Mật khẩu -->
             <div class="his-input-group">
@@ -86,7 +97,7 @@
                     </svg>
                 </button>
             </div>
-            <span asp-validation-for="Password" class="his-field-error"></span>
+            <span asp-validation-for="Password" class="his-field-error" id="login-password-error"></span>
 
             <!-- Ghi nhớ & Quên mật khẩu -->
             <div class="his-form-options">
@@ -100,7 +111,9 @@
             </div>
 
             <!-- Nút Đăng nhập -->
-            <button type="submit" class="his-btn-solid">Đăng Nhập</button>
+            <button type="submit" class="his-btn-solid" id="btnLoginSubmit">
+                <span class="his-btn-text">Đăng Nhập</span>
+            </button>
         </form>
 
 
@@ -115,7 +128,6 @@
         <p class="his-form-subtitle">Tài khoản dành cho người khám</p>
 
         <form id="registerForm">
-            <div id="regAlert" class="auth-register-alert his-alert-error"></div>
             <div class="his-input-group">
                 <span class="his-input-icon">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -125,12 +137,20 @@
                 </span>
                 <input id="reg-fullname" class="his-input-field" aria-label="Họ và tên bệnh nhân" placeholder="Họ và tên bệnh nhân" required />
             </div>
-            <div class="his-registration-details">
-                <label for="regDateOfBirth">
-                    Ngày sinh
-                    <input id="regDateOfBirth" type="date" class="his-input-field" required />
-                </label>
+            <span class="his-field-error" id="reg-fullname-error"></span>
+
+            <div class="his-input-group">
+                <span class="his-input-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                </span>
+                <input id="regDateOfBirth" type="date" class="his-input-field" aria-label="Ngày sinh" placeholder="Ngày sinh" required />
             </div>
+            <span class="his-field-error" id="regDateOfBirth-error"></span>
 
             <div class="his-input-group">
                 <span class="his-input-icon">
@@ -140,6 +160,7 @@
                 </span>
                 <input id="reg-phone" type="tel" class="his-input-field" aria-label="Số điện thoại liên hệ" placeholder="Số điện thoại liên hệ" required />
             </div>
+            <span class="his-field-error" id="reg-phone-error"></span>
 
             <div class="his-input-group">
                 <span class="his-input-icon">
@@ -150,6 +171,7 @@
                 </span>
                 <input id="reg-email" type="email" class="his-input-field" aria-label="Địa chỉ email liên hệ" placeholder="Địa chỉ email liên hệ" autocomplete="email" required />
             </div>
+            <span class="his-field-error" id="reg-email-error"></span>
 
             <div class="his-input-group">
                 <span class="his-input-icon">
@@ -160,6 +182,7 @@
                 </span>
                 <input id="reg-username" class="his-input-field" aria-label="Tên tài khoản mong muốn" placeholder="Tên tài khoản mong muốn" autocomplete="username" required />
             </div>
+            <span class="his-field-error" id="reg-username-error"></span>
 
             <div class="his-input-group">
                 <span class="his-input-icon">
@@ -176,8 +199,11 @@
                     </svg>
                 </button>
             </div>
+            <span class="his-field-error" id="reg-password-error"></span>
 
-            <button type="submit" class="his-btn-solid">Đăng Ký Tài Khoản</button>
+            <button type="submit" class="his-btn-solid" id="btnRegisterSubmit">
+                <span class="his-btn-text">Đăng Ký Tài Khoản</span>
+            </button>
         </form>
 
         <div class="his-mobile-switch">
@@ -203,7 +229,18 @@
             <button type="button" class="his-btn-outline" id="btnGoLogin">Đăng Nhập</button>
         </div>
     </div>
+
+    <!-- 4. LỚP PHỦ LOADING SPINNER (VÒNG XOAY ĐANG TẢI) -->
+    <div class="his-loading-overlay" id="hisLoadingOverlay" aria-hidden="true" style="display: none;">
+        <div class="his-loading-content">
+            <div class="his-spinner-circle"></div>
+            <div class="his-loading-title">Đang Đăng Nhập</div>
+            <div class="his-loading-subtitle" id="hisLoadingMessage">Hệ thống đang xác thực danh tính...</div>
+        </div>
+    </div>
 </div>
+
+<div class="his-toast-container" id="hisToastContainer" aria-live="polite"></div>
 
 <partial name="_ForgotPasswordModal" />
 
