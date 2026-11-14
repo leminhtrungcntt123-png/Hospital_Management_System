@@ -100,21 +100,22 @@ function homePage() {
 }
 
 function doctorCard(doctor) {
-    const canBook = !config.authenticated || config.role === 'PATIENT';
+    const illustrative = doctor.kind === 'illustration';
+    const canBook = !illustrative && (!config.authenticated || config.role === 'PATIENT');
     return `<article class="doctor-card">${doctorPhoto(doctor)}
-        <div class="doctor-card-body"><span class="catalog-badge">${esc(doctor.department)}</span><h3>${esc(doctor.name)}</h3>
+        <div class="doctor-card-body"><span class="catalog-badge ${illustrative ? 'illustration' : ''}">${illustrative ? 'Hồ sơ minh hoạ' : esc(doctor.department || 'Bác sĩ trong hệ thống')}</span><h3>${esc(doctor.name)}</h3>
             <ul class="doctor-card-meta"><li>${icon('stethoscope')}<span>${esc(doctor.specialty || 'Thông tin chuyên môn đang được cập nhật.')}</span></li><li>${icon('building')}<span>${esc(doctor.department)}</span></li>${doctorCareerSummary(doctor)}</ul>
             <div class="doctor-card-actions">${canBook ? link('Xem lịch khám', 'public/booking?doctorId=' + encodeURIComponent(doctor.id), 'calendar', 'btn primary') : ''}
-                ${link('Xem hồ sơ','public/doctor/' + encodeURIComponent(doctor.id), 'arrow', 'text-link')}
+                ${link(illustrative ? 'Xem hồ sơ minh hoạ' : 'Xem hồ sơ', 'public/doctor/' + encodeURIComponent(doctor.id), 'arrow', 'text-link')}
             </div>
         </div></article>`;
 }
 
 function doctorPhoto(doctor = {}) {
-    const portrait = doctor.avatar;
+    const portrait = doctor.avatar || doctor.illustration || (typeof doctorIllustrations !== 'undefined' ? doctorIllustrations[doctor.name] : null);
     return `<figure class="doctor-portrait doctor-photo">${
         portrait
-            ? `<img src="${esc(config.assetBase + portrait)}" alt="Ảnh chân dung ${esc(doctor.name)}" width="640" height="800" loading="lazy" decoding="async" />`
+            ? `<img src="${esc(config.assetBase + portrait)}" alt="Ảnh chân dung minh hoạ cho ${esc(doctor.name)}" width="640" height="800" loading="lazy" decoding="async" />`
             : `<span class="doctor-initials" aria-hidden="true">${esc(initials(doctor.name)) || icon('stethoscope')}</span>`
-    }</figure>`;
+    }<figcaption>Ảnh minh hoạ</figcaption></figure>`;
 }
