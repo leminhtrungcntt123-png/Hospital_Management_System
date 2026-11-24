@@ -57,7 +57,8 @@ public sealed class ManagementController(
     public Task<IActionResult> Report(DateOnly? from, DateOnly? to, CancellationToken ct) => ExecuteAsync(async () =>
     {
         var today = DateOnly.FromDateTime(clock.GetLocalNow().DateTime);
-        return Ok(await reports.GetRevenueAsync(ActorId, from ?? new DateOnly(today.Year, today.Month, 1), to ?? today, ct));
+        var defaultFrom = today.AddDays(-6);
+        return Ok(await reports.GetRevenueAsync(ActorId, from ?? defaultFrom, to ?? today, ct));
     });
 
     [HttpGet("Revenue.csv")]
@@ -84,6 +85,26 @@ public sealed class ManagementController(
             return Ok(new { message = "Đã cập nhật trạng thái tài khoản." });
         });
 
+    [HttpPost("Accounts/Update")]
+    public Task<IActionResult> UpdateAccount([FromBody] AdminUpdateAccountRequest request, CancellationToken ct) =>
+        ExecuteAsync(async () =>
+        {
+            var password = string.IsNullOrWhiteSpace(request.Password) ? null : request.Password;
+            if (password is not null
+                && (password.Length < 8 || System.Text.Encoding.UTF8.GetByteCount(password) > 72))
+            {
+                throw new ArgumentException("Mật khẩu mới cần từ 8 ký tự và không vượt quá 72 byte UTF-8.");
+            }
+            if (string.IsNullOrWhiteSpace(request.FullName) || request.FullName.Trim().Length < 2)
+            {
+                throw new ArgumentException("Họ tên cần từ 2 ký tự.");
+            }
+            if (request.RoleId <= 0) throw new ArgumentException("Vui lòng chọn vai trò.");
+
+            var updated = await staff.UpdateStaffAsync(request.Id, password, request.FullName, request.RoleId, request.IsActive, ct);
+            return Ok(new { id = updated.Id, message = "Đã cập nhật tài khoản." });
+        });
+
     [HttpPost("Departments")]
     public Task<IActionResult> CreateDepartment([FromBody] DepartmentCreateRequest request, CancellationToken ct) =>
         ExecuteAsync(async () =>
@@ -103,6 +124,39 @@ public sealed class ManagementController(
                 id = department.Id,
                 message = "Đã thêm phòng ban."
             });
+        });
+
+    [HttpPost("Departments/Update")]
+    public Task<IActionResult> UpdateDepartment([FromBody] AdminUpdateDepartmentRequest request, CancellationToken ct) =>
+        ExecuteAsync(async () =>
+        {
+            AdminValidate(new DepartmentCreateRequest { Name = request.Name, Description = request.Description });
+            DepartmentListItemDto department;
+            try
+            {
+                department = await departments.UpdateDepartmentAsync(request.Id, request.Name, request.Description, ct);
+            }
+            catch (InvalidOperationException error)
+            {
+                throw new AdminOperationException(error.Message);
+            }
+            return Ok(new { id = department.Id, message = "Đã cập nhật phòng ban." });
+        });
+
+    [HttpPost("Departments/Delete")]
+    public Task<IActionResult> DeleteDepartment([FromBody] AdminDeleteDepartmentRequest request, CancellationToken ct) =>
+        ExecuteAsync(async () =>
+        {
+            bool success;
+            try
+            {
+                success = await departments.DeleteDepartmentAsync(request.DepartmentId, ct);
+            }
+            catch (InvalidOperationException error)
+            {
+                throw new AdminOperationException(error.Message);
+            }
+            return success ? Ok(new { message = "Đã xóa phòng ban." }) : NotFound(new { message = "Phòng ban không tồn tại." });
         });
 
     [HttpPost("Decision")]
@@ -137,6 +191,21 @@ public sealed class ManagementController(
             AdminValidate(request);
             var id = await catalog.CreateRoomAsync(request, ct);
             return Ok(new { id, message = "Đã thêm phòng khám mới." });
+        });
+
+    [HttpPost("Rooms/Update")]
+    public Task<IActionResult> UpdateRoom([FromBody] AdminUpdateRoomRequest request, CancellationToken ct) =>
+        ExecuteAsync(async () =>
+        {
+            var payload = new CreateRoomRequest
+            {
+                DepartmentId = request.DepartmentId,
+                RoomName = request.RoomName,
+                RoomNumber = request.RoomNumber
+            };
+            AdminValidate(payload);
+            var id = await catalog.UpdateRoomAsync(request.Id, payload, ct);
+            return Ok(new { id, message = "Đã cập nhật phòng khám." });
         });
 
     [HttpPost("Rooms/Delete")]
@@ -220,6 +289,8 @@ public sealed class ManagementController(
             ? await departmentHead.GetStaffInDepartmentAsync(selectedDeptId, ct)
             : [];
 
+        var board = await departmentHead.GetSchedulingBoardAsync(weekStart, weekEnd, ct);
+
         return Ok(new
         {
             selectedDeptId,
@@ -232,7 +303,8 @@ public sealed class ManagementController(
             dutyShifts = deptDutyShifts,
             doctors = deptDoctors,
             staff = deptStaff,
-            rooms = deptRooms
+            rooms = deptRooms,
+            board
         });
     });
 
@@ -349,6 +421,10 @@ public sealed class ManagementController(
     public sealed record AdminReallocateShiftRequest(int OldScheduleId, DateOnly TargetDate, ExamShift TargetShift, int TargetRoomId);
     public sealed record AdminUpsertScheduleRequest(int? Id, int DoctorId, int DepartmentId, int? RoomId, DateOnly WorkDate, ExamShift Shift, int MaxPatients, int OnlineSlots, string? DoctorNote);
     public sealed record AdminDeleteScheduleRequest(int ScheduleId, int DepartmentId);
+    public sealed record AdminUpdateRoomRequest(int Id, int DepartmentId, string RoomName, string RoomNumber);
+    public sealed record AdminUpdateDepartmentRequest(int Id, string Name, string? Description);
+    public sealed record AdminDeleteDepartmentRequest(int DepartmentId);
+    public sealed record AdminUpdateAccountRequest(int Id, string FullName, int RoleId, string? Password, bool IsActive);
 
     private async Task<IActionResult> ExecuteAsync(Func<Task<IActionResult>> operation)
     {
@@ -375,7 +451,11 @@ public sealed class ManagementController(
             logger.LogWarning("Admin operation failed: {Type}", error.GetType().Name);
             return BadRequest(new { message = "Chưa thực hiện được thao tác. Hãy kiểm tra dữ liệu và thử lại." });
         }
-        catch (Exception error) when (error is not OperationCanceledException)
+        catch (OperationCanceledException)
+        {
+            return StatusCode(499);
+        }
+        catch (Exception error)
         {
             logger.LogError("Admin request failed: {Type}", error.GetType().Name);
             return StatusCode(503, new { message = "Chưa kết nối được dữ liệu quản trị. Vui lòng thử lại sau." });

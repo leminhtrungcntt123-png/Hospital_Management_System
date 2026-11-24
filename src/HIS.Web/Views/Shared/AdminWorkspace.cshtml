@@ -1,393 +1,703 @@
 @{
     ViewData["Title"] = "Quản trị bệnh viện";
     var home = Url.Action("Index", "Home", new { area = "" });
+    var userFullName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? "Admin";
+    var initials = userFullName.Length >= 2 ? userFullName.Substring(0, 2).ToUpper() : "AD";
 }
 
-<div class="admin-workspace staff-app"
+<div class="admin-workspace"
      data-api="@Url.Action("Index", "Management", new { area = "Admin" })"
      data-section="@(ViewData["AdminSection"] ?? "dashboard")">
-    <aside class="admin-sidebar sidebar" id="admin-sidebar" aria-label="Điều hướng quản trị">
-        <div>
-            <a class="admin-brand brand-link" href="@home" aria-label="MediCare, về trang chủ">
-                <span class="brand">
-                    <span class="brand-mark">@await Html.PartialAsync("_AdminIcon", "plus")</span>
-                    <span>MediCare<sup>+</sup></span>
-                </span>
+
+    <!-- ====================================================================
+         SIDEBAR: HIS WHITE & GREEN THEME (BALANCED SPACING & COMPACT DESIGN)
+         ==================================================================== -->
+    <aside class="admin-sidebar" id="admin-sidebar" aria-label="Điều hướng quản trị">
+        <div class="sidebar-top">
+            <!-- Brand Group -->
+            <a class="admin-brand" href="@home" title="HIS MediCare - Về trang chủ">
+                <div class="brand-logo-box">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <span class="brand-title">HIS <em>MediCare</em></span>
+                </div>
             </a>
-            <div class="workspace">
-                @await Html.PartialAsync("_AdminIcon", "building")
-                <span>
-                    <strong>Bệnh viện MediCare</strong>
-                    <small>Quản trị viên</small>
-                </span>
-            </div>
         </div>
+
+        <!-- Navigation Menu with balanced, harmonious spacing -->
         <nav class="staff-nav" aria-label="Chức năng quản trị">
             <div class="nav-group">
-                <span>ĐIỀU HÀNH</span>
-                <a href="#dashboard" data-section="dashboard">
+                <span class="nav-group-title">ĐIỀU HÀNH</span>
+                <a href="#dashboard" data-section="dashboard" class="nav-item">
                     @await Html.PartialAsync("_AdminIcon", "grid")
-                    <span>Tổng quan &amp; doanh thu</span>
+                    <span>Tổng quan</span>
                 </a>
-                <a href="#requests" data-section="requests">
-                    @await Html.PartialAsync("_AdminIcon", "calendar")
+                <a href="#requests" data-section="requests" class="nav-item">
+                    @await Html.PartialAsync("_AdminIcon", "swap")
                     <span>Nghỉ / đổi ca</span>
                 </a>
-                <a href="#scheduling" data-section="scheduling">
-                    @await Html.PartialAsync("_AdminIcon", "calendar")
+                <a href="#scheduling" data-section="scheduling" class="nav-item">
+                    @await Html.PartialAsync("_AdminIcon", "calendar-check")
                     <span>Phân &amp; duyệt ca</span>
                 </a>
-                <a href="#audit" data-section="audit">
-                    @await Html.PartialAsync("_AdminIcon", "clipboard")
+                <a href="#audit" data-section="audit" class="nav-item">
+                    @await Html.PartialAsync("_AdminIcon", "history")
                     <span>Nhật ký truy vết</span>
                 </a>
             </div>
+
             <div class="nav-group">
-                <span>QUẢN TRỊ</span>
-                <a href="#departments" data-section="departments">
+                <span class="nav-group-title">QUẢN TRỊ</span>
+                <a href="#departments" data-section="departments" class="nav-item">
                     @await Html.PartialAsync("_AdminIcon", "building")
                     <span>Phòng ban</span>
                 </a>
-                <a href="#rooms" data-section="rooms">
-                    @await Html.PartialAsync("_AdminIcon", "building")
+                <a href="#rooms" data-section="rooms" class="nav-item">
+                    @await Html.PartialAsync("_AdminIcon", "door")
                     <span>Phòng khám</span>
                 </a>
-                <a href="#services" data-section="services">
-                    @await Html.PartialAsync("_AdminIcon", "pulse")
+                <a href="#services" data-section="services" class="nav-item">
+                    @await Html.PartialAsync("_AdminIcon", "tag")
                     <span>Dịch vụ &amp; bảng giá</span>
                 </a>
-                <a href="#medications" data-section="medications">
-                    @await Html.PartialAsync("_AdminIcon", "wallet")
+                <a href="#medications" data-section="medications" class="nav-item">
+                    @await Html.PartialAsync("_AdminIcon", "pill")
                     <span>Danh mục thuốc</span>
                 </a>
-                <a href="#staff" data-section="staff">
+                <a href="#staff" data-section="staff" class="nav-item">
                     @await Html.PartialAsync("_AdminIcon", "users")
                     <span>Nhân sự</span>
                 </a>
-                <a href="#doctors" data-section="doctors">
+                <a href="#doctors" data-section="doctors" class="nav-item">
                     @await Html.PartialAsync("_AdminIcon", "stethoscope")
                     <span>Danh sách bác sĩ</span>
                 </a>
-                <a href="#accounts" data-section="accounts">
+                <a href="#accounts" data-section="accounts" class="nav-item">
                     @await Html.PartialAsync("_AdminIcon", "shield")
-                    <span>Tài khoản</span>
+                    <span>Tài khoản &amp; phân quyền</span>
                 </a>
             </div>
         </nav>
+
+        <!-- Sidebar Bottom User Profile -->
         <div class="sidebar-bottom">
-            <a class="btn portal-link" href="@home">
-                @await Html.PartialAsync("_AdminIcon", "external")
-                <span>Cổng bệnh nhân</span>
-            </a>
-            <div>
-                <span><i></i>MediCare HIS</span>
+            <div class="sidebar-user-card">
+                <div class="user-avatar" title="@userFullName">@initials</div>
+                <div class="user-details">
+                    <strong class="user-name">@userFullName</strong>
+                    <span class="user-role">Quản trị viên</span>
+                </div>
+                <form asp-area="" asp-controller="Account" asp-action="Logout" method="post" class="sidebar-logout-form">
+                    <button class="logout-icon-btn" type="submit" title="Đăng xuất hệ thống" aria-label="Đăng xuất">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" y1="12" x2="9" y2="12"></line>
+                        </svg>
+                    </button>
+                </form>
             </div>
         </div>
     </aside>
-    <button class="admin-sidebar-scrim sidebar-scrim" type="button" aria-label="Đóng điều hướng" hidden></button>
 
+    <!-- Mobile scrim backdrop -->
+    <button class="admin-sidebar-scrim" type="button" aria-label="Đóng điều hướng" hidden></button>
+
+    <!-- ====================================================================
+         MAIN CONTENT AREA
+         ==================================================================== -->
     <div class="admin-content">
-        <header class="admin-topbar staff-topbar">
-            <button class="icon-btn mobile-only" id="admin-menu-toggle" type="button"
-                    aria-label="Mở điều hướng" aria-controls="admin-sidebar" aria-expanded="false">
-                @await Html.PartialAsync("_AdminIcon", "menu")
-            </button>
-            <div class="staff-breadcrumb">
-                <span>Quản trị viên</span>
-                <i>/</i>
-                <strong id="admin-breadcrumb">Tổng quan &amp; doanh thu</strong>
+        <!-- TOPBAR HEADER -->
+        <header class="admin-topbar">
+            <div class="topbar-left">
+                <button class="icon-btn mobile-only" id="admin-menu-toggle" type="button"
+                        aria-label="Mở điều hướng" aria-controls="admin-sidebar" aria-expanded="false">
+                    @await Html.PartialAsync("_AdminIcon", "menu")
+                </button>
+                <div class="staff-breadcrumb">
+                    <span class="bc-root">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                        Quản trị
+                    </span>
+                    <span class="bc-sep">›</span>
+                    <strong class="bc-current" id="admin-breadcrumb">Tổng quan</strong>
+                </div>
             </div>
-            <div class="admin-session">
-                <span class="admin-identity">@(User.FindFirst("FullName")?.Value ?? User.Identity?.Name)</span>
-                <form asp-area="" asp-controller="Account" asp-action="Logout" method="post">
-                    <button class="btn button secondary sm small-button" type="submit">Đăng xuất</button>
-                </form>
+
+            <div class="topbar-right">
+                <!-- Quick Search Input -->
+                <div class="topbar-search">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input type="text" placeholder="Tìm kiếm nhanh..." id="admin-quick-search" />
+                    <kbd>Ctrl K</kbd>
+                </div>
+
+                <!-- Date Range Display Pill -->
+                <div class="topbar-date-pill">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    <span>@DateTime.Now.ToString("dd/MM/yyyy")</span>
+                </div>
+
+                <!-- Admin Session -->
+                <div class="admin-session">
+                    <div class="session-avatar">@initials</div>
+                    <span class="admin-identity">@userFullName</span>
+                </div>
             </div>
         </header>
 
+        <!-- MAIN VIEWPORT -->
         <main class="staff-main">
+            <!-- PAGE HEADING -->
             <div class="admin-heading">
-                <div>
-                    <p class="eyebrow">ĐIỀU HÀNH BỆNH VIỆN</p>
-                    <h1 id="page-title">Tổng quan &amp; doanh thu</h1>
-                    <p id="page-description">
-                        Theo dõi số lượt tiếp nhận và dòng tiền theo thời gian.
-                    </p>
+                <div class="heading-content">
+                    <h1 id="page-title">Tổng quan</h1>
+                    <p id="page-description" hidden></p>
                 </div>
-                <button class="btn button secondary" id="refresh-data" type="button">@await Html.PartialAsync("_AdminIcon", "refresh")<span>Làm mới</span></button>
+                <div class="heading-actions">
+                    <form id="report-filter" class="dashboard-filter">
+                        <div class="date-input-group">
+                            <label>
+                                <span class="input-label-text">Từ ngày</span>
+                                <input name="from" type="date" required />
+                            </label>
+                            <span class="date-arrow">→</span>
+                            <label>
+                                <span class="input-label-text">Đến ngày</span>
+                                <input name="to" type="date" required />
+                            </label>
+                        </div>
+                        <button class="btn button primary" type="submit">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            <span>Xem báo cáo</span>
+                        </button>
+                    </form>
+                    <button class="btn button secondary" id="refresh-data" type="button">
+                        @await Html.PartialAsync("_AdminIcon", "refresh")
+                        <span>Làm mới</span>
+                    </button>
+                </div>
             </div>
 
-            <div id="admin-message" role="status" aria-live="polite" hidden></div>
+            <!-- NOTIFICATION MESSAGE BANNER (TOAST) -->
+            <div id="admin-message" class="admin-toast" role="status" aria-live="polite" hidden>
+                <div class="toast-icon"></div>
+                <div class="toast-body">
+                    <strong class="toast-title">Thông báo</strong>
+                    <span class="toast-text"></span>
+                </div>
+                <button type="button" class="toast-close" aria-label="Đóng thông báo">×</button>
+            </div>
             <div id="admin-token" hidden>@Html.AntiForgeryToken()</div>
 
+            <!-- ================================================================
+                 1. PANEL: TỔNG QUAN & DOANH THU (DASHBOARD)
+                 ================================================================ -->
             <section data-panel="dashboard" aria-label="Báo cáo doanh thu">
-                <form id="report-filter" class="filter-bar">
-                    <label>
-                        Từ ngày
-                        <input name="from" type="date" required />
-                    </label>
-                    <label>
-                        Đến ngày
-                        <input name="to" type="date" required />
-                    </label>
-                    <button class="btn button primary" type="submit">Xem báo cáo</button>
-                    <button class="btn button secondary" id="export-revenue" type="button">
-                        @await Html.PartialAsync("_AdminIcon", "download")<span>Xuất CSV / Excel</span>
-                    </button>
-                </form>
-                <p class="definition">
-                    Doanh thu thực thu = tạm ứng + thanh toán − hoàn tiền. Lượng khách tính theo
-                    lượt đã tiếp nhận; một người khám nhiều lần được tính nhiều lượt.
-                </p>
+                <!-- KPI STATS CARDS -->
                 <div class="admin-stats" id="report-stats" aria-live="polite"></div>
-                <div class="card chart-card">
-                    <div class="card-heading">
-                        <h2>Doanh thu theo ngày</h2>
-                        <span>Tiền thực thu · VNĐ</span>
+
+                <!-- CHARTS ROW: BIỂU ĐỒ CỘT 7 NGÀY & BIỂU ĐỒ TRÒN CƠ CẤU -->
+                <div class="dashboard-charts-grid">
+                    <!-- CỘT TRÁI: BIỂU ĐỒ DOANH THU 7 NGÀY -->
+                    <div class="card chart-card">
+                        <div class="card-heading">
+                            <div class="heading-title-group">
+                                <div class="card-title-icon green">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="18" y1="20" x2="18" y2="10"></line>
+                                        <line x1="12" y1="20" x2="12" y2="4"></line>
+                                        <line x1="6" y1="20" x2="6" y2="14"></line>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h2>Doanh thu theo ngày</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="revenue-chart-wrapper">
+                            <div id="revenue-chart-y" class="chart-y-axis" aria-hidden="true"></div>
+                            <div id="revenue-chart" class="revenue-chart"></div>
+                        </div>
                     </div>
-                    <div id="revenue-chart" class="revenue-chart"></div>
+
+                    <!-- CỘT PHẢI: BIỂU ĐỒ TRÒN CƠ CẤU THEO KHOA -->
+                    <div class="card donut-card">
+                        <div class="card-heading">
+                            <div class="heading-title-group">
+                                <div class="card-title-icon green">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <path d="M12 2a10 10 0 0 1 10 10h-10z"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h2>Phân bổ lượt khám</h2>
+                                    <p class="card-subtitle">Cơ cấu tiếp nhận theo chuyên khoa</p>
+                                </div>
+                            </div>
+                            <span class="badge badge-neutral" id="donut-total-badge">0 lượt</span>
+                        </div>
+                        <div class="donut-chart-container">
+                            <div class="donut-chart-visual">
+                                <svg class="donut-svg" viewBox="0 0 160 160" width="150" height="150">
+                                    <circle class="donut-bg" cx="80" cy="80" r="56" fill="none" stroke="#e2e8f0" stroke-width="22" />
+                                    <g id="donut-segments"></g>
+                                </svg>
+                                <div class="donut-center-label">
+                                    <span class="donut-center-num" id="donut-center-total">0</span>
+                                    <span class="donut-center-text">Lượt khám</span>
+                                </div>
+                            </div>
+                            <div class="donut-legend" id="donut-legend"></div>
+                        </div>
+                    </div>
                 </div>
-                <div class="card">
-                    <div class="card-heading">
-                        <h2>Chi tiết theo thời gian</h2>
-                        <span id="report-period"></span>
+
+                <!-- TWO COLUMN / GRID LAYOUT FOR TABLES -->
+                <div class="dashboard-tables-grid">
+                    <!-- TABLE 1: BẢNG KÊ CHI TIẾT THEO THỜI GIAN -->
+                    <div class="card">
+                        <div class="card-heading">
+                            <div class="heading-title-group">
+                                <div class="card-title-icon green">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h2>Chi tiết theo thời gian</h2>
+                                </div>
+                            </div>
+                            <div class="card-heading-actions">
+                                <span id="report-period" class="badge badge-neutral"></span>
+                                <button class="btn button secondary sm small-button" id="export-revenue" type="button">
+                                    @await Html.PartialAsync("_AdminIcon", "download")
+                                    <span>Xuất CSV</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="table-scroll" id="report-table"></div>
+                        <div id="report-pagination" class="report-pager" hidden></div>
                     </div>
-                    <div class="table-scroll" id="report-table"></div>
-                    <div id="report-pagination" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; border-top:1px solid var(--border, #e2e8f0);" hidden></div>
-                </div>
-                <div class="card">
-                    <div class="card-heading">
-                        <h2>Lượt tiếp nhận &amp; doanh thu theo chuyên khoa</h2>
-                        <span>Số liệu thống kê trong kỳ</span>
+
+                    <!-- TABLE 2: DOANH THU THEO KHOA -->
+                    <div class="card">
+                        <div class="card-heading">
+                            <div class="heading-title-group">
+                                <div class="card-title-icon green">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M4 22V4h16v18 M2 22h20 M8 8h1 M15 8h1 M8 12h1 M15 12h1 M10 22v-6h4v6"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h2>Doanh thu theo chuyên khoa</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="table-scroll" id="department-stats-table"></div>
                     </div>
-                    <div class="table-scroll" id="department-stats-table"></div>
                 </div>
             </section>
 
+            <!-- ================================================================
+                 2. PANEL: NGHỈ / ĐỔI CA (REQUESTS)
+                 ================================================================ -->
             <section data-panel="requests" aria-label="Yêu cầu nghỉ và đổi ca" hidden>
-                <p class="definition">
-                    Duyệt trước khi ca bắt đầu. Hệ thống chuyển lịch sang khung giờ còn chỗ trong khoa;
-                    lịch không còn chỗ được đánh dấu cần đặt lại và gửi thông báo. Khung giờ cũ được khóa
-                    để giữ lịch sử.
-                </p>
                 <div class="card">
-                    <div class="card-heading" style="flex-wrap:wrap; gap:10px;">
+                    <div class="card-heading" style="flex-wrap:wrap; gap:12px;">
+                        <div class="heading-title-group">
+                            <div class="card-title-icon blue">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                            </div>
+                            <div>
+                                <h2>Yêu cầu nghỉ &amp; đổi ca trực</h2>
+                                <p class="card-subtitle">Hiển thị tối đa 200 đề nghị ca trực gần nhất</p>
+                            </div>
+                        </div>
                         <div style="display:flex; gap:8px; flex-wrap:wrap;" id="requests-status-tabs">
                             <button type="button" class="btn button primary sm" data-req-filter="all">Tất cả</button>
                             <button type="button" class="btn button secondary sm" data-req-filter="Pending">Chờ duyệt</button>
                             <button type="button" class="btn button secondary sm" data-req-filter="Approved">Đã duyệt</button>
                             <button type="button" class="btn button secondary sm" data-req-filter="Rejected">Từ chối</button>
                         </div>
-                        <span>Hiển thị tối đa 200 đề nghị gần nhất</span>
                     </div>
                     <div class="table-scroll" id="requests-table"></div>
                 </div>
             </section>
 
+            <!-- ================================================================
+                 3. PANEL: PHÂN & DUYỆT CA (SCHEDULING)
+                 ================================================================ -->
             <section data-panel="scheduling" aria-label="Phân và duyệt ca khám" hidden>
-                <div class="section-actions">
-                    <div class="section-filter-group">
-                        <label class="filter-dropdown-label" for="scheduling-dept">
-                            Khoa chuyên môn:
+                <div class="sched-hero">
+                    <div class="sched-hero-left">
+                        <label class="sched-dept" for="scheduling-dept">
+                            <span>Khoa</span>
                             <select id="scheduling-dept"></select>
                         </label>
-                    </div>
-                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                        <button class="btn button secondary" id="open-create-period" type="button">+ Tạo kỳ đăng ký</button>
-                        <button class="btn button primary" id="publish-period-btn" type="button" hidden>Xuất bản kỳ &amp; Sinh Slot</button>
-                        <button class="btn button primary" id="open-upsert-schedule" type="button">+ Xếp lịch trực tiếp</button>
-                    </div>
-                </div>
-                <div class="card" id="active-period-card" style="padding:14px 18px; margin-bottom:14px;">
-                    <div id="active-period-info">Đang tải thông tin kỳ đăng ký...</div>
-                </div>
-                <div class="card" style="padding:16px; margin-bottom:14px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
-                        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; font-size:13px;">
-                            <strong>Lưới ca trực đợt đăng ký:</strong>
-                            <span>⚪ Đang trống (0 phòng)</span>
-                            <span>🟢 Còn chỗ</span>
-                            <span>🔴 Cạnh tranh cao</span>
-                            <span class="badge reject">🔥 Ca Hot</span>
+                        <div class="sched-weeknav" id="sched-weeknav" role="group" aria-label="Chuyển tuần">
+                            <button type="button" class="sched-nav" id="sched-prev-week" aria-label="Tuần trước">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                            </button>
+                            <button type="button" class="sched-range" id="sched-this-week" title="Về tuần hiện tại">Tuần này</button>
+                            <button type="button" class="sched-nav" id="sched-next-week" aria-label="Tuần sau">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                            </button>
                         </div>
-                        <small style="color:#64748b;">Nhấp vào bất kỳ ca nào trên lưới để tải Bảng Ma trận quyết định bên dưới</small>
+                        <span class="sched-period-pill is-none" id="sched-period-pill">Chưa có kỳ đăng ký</span>
                     </div>
-                    <div id="demand-grid-board" style="display:grid; grid-auto-flow:column; grid-auto-columns:minmax(200px, 1fr); gap:10px; overflow-x:auto; padding-bottom:6px;"></div>
+                    <div class="sched-hero-actions">
+                        <button type="button" class="btn button secondary sm" id="sched-generate-slots" title="Sinh slot khám trực tuyến cho tuần và khoa đang chọn" hidden>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line><path d="M12 13v6M9 16h6"></path></svg>
+                            <span>Sinh slot</span>
+                        </button>
+                        <button class="btn button secondary sm" id="publish-period-btn" type="button" hidden>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                            <span>Công bố &amp; Sinh slot</span>
+                        </button>
+                        <button class="btn button primary sm" id="open-create-period" type="button">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line><line x1="12" y1="14" x2="12" y2="18"></line><line x1="10" y1="16" x2="14" y2="16"></line></svg>
+                            <span>Mở đợt đăng ký</span>
+                        </button>
+                    </div>
                 </div>
-                <div class="card" id="inline-decision-matrix" style="padding:16px; margin-bottom:14px;">
-                    <div class="card-heading" style="padding:0 0 12px 0; border-bottom:1px solid #e2e8f0; margin-bottom:12px;">
-                        <div>
-                            <h2 style="margin:0;">Bảng xếp hạng ưu tiên xét duyệt ca (Decision Matrix)</h2>
-                            <small id="dm-selected-label" style="color:#0284c7; font-weight:600;">Chọn một ô ca trên lưới để xem chi tiết</small>
+
+                <div class="sched-kpis" id="sched-kpis"></div>
+
+                <div class="sched-board" id="sched-board">
+                    <div class="sched-board-head">
+                        <div class="sched-board-tabs" role="tablist" aria-label="Khu vực phân lịch">
+                            <button type="button" role="tab" data-sched-view="progress" class="is-active" aria-selected="true">Tiến độ theo khoa</button>
+                            <button type="button" role="tab" data-sched-view="roster" aria-selected="false">Lưới lịch chi tiết</button>
                         </div>
-                        <span id="dm-rooms-count" style="font-size:13px; font-weight:600; color:#334155;"></span>
+                        <div class="sched-board-tools" id="sched-board-tools" hidden>
+                            <span class="sched-board-meta" id="roster-meta"></span>
+                            <label class="wk-search">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                <input type="search" id="roster-search" placeholder="Tìm bác sĩ…" aria-label="Tìm bác sĩ trong lịch" />
+                            </label>
+                            <button class="btn button primary sm" id="open-upsert-schedule" type="button" title="Thêm ca khám cho bác sĩ trong khoa đang chọn">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                                <span>Thêm ca</span>
+                            </button>
+                        </div>
                     </div>
-                    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
-                        <label style="display:flex; align-items:center; gap:6px; font-size:13px;">
-                            Ngày:
-                            <input type="date" id="dm-date" />
+                    <div class="sched-pane" id="sched-view-progress">
+                        <div id="dept-progress"></div>
+                    </div>
+
+                    <div class="sched-pane" id="sched-view-roster" hidden>
+                        <div id="dept-schedules-grid"></div>
+                        <div class="sched-legend-row">
+                            <div class="sched-legend">
+                                <span class="sched-legend-title">Ca làm việc</span>
+                                <span><i class="lg-swatch lg-morning"></i>Ca sáng</span>
+                                <span><i class="lg-swatch lg-afternoon"></i>Ca chiều</span>
+                                <span><i class="lg-swatch lg-night"></i>Trực đêm</span>
+                                <span><i class="lg-swatch lg-pending"></i>Chờ duyệt</span>
+                            </div>
+                            <span class="sched-footnote">Bấm ca để sửa · Nút × trên ca để hủy · Bấm ô trống (dấu +) để xếp ca · Giờ Việt Nam (GMT+7)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sched-pane assign-layout" id="sched-view-assign" hidden>
+                    <div class="sched-card assign-form">
+                        <header class="assign-head">
+                            <div>
+                                <h3>Thông tin ca làm việc</h3>
+                                <p>Các trường có dấu * là bắt buộc.</p>
+                            </div>
+                            <button type="button" class="btn button secondary sm" id="assign-back">← Về lịch làm việc</button>
+                        </header>
+                        <div class="assign-grid">
+                            <label>
+                                Ngày làm việc *
+                                <input type="date" id="assign-date" required />
+                            </label>
+                            <label>
+                                Ca làm việc *
+                                <select id="assign-shift">
+                                    <option value="0">Ca sáng · 07:30 – 11:30</option>
+                                    <option value="1">Ca chiều · 13:00 – 16:30</option>
+                                </select>
+                            </label>
+                            <label>
+                                Địa điểm *
+                                <select id="assign-room"></select>
+                            </label>
+                            <label>
+                                Lặp lại
+                                <select id="assign-repeat">
+                                    <option value="1">Không lặp lại</option>
+                                    <option value="2">2 tuần</option>
+                                    <option value="3">3 tuần</option>
+                                    <option value="4">4 tuần</option>
+                                </select>
+                            </label>
+                        </div>
+                        <div class="assign-doctors">
+                            <div class="assign-doctors-head">
+                                <h4>Chọn bác sĩ *</h4>
+                                <span id="assign-count">Đã chọn 0 bác sĩ</span>
+                            </div>
+                            <label class="wk-search assign-search">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                <input type="search" id="assign-search" placeholder="Tìm tên bác sĩ trong khoa…" aria-label="Tìm bác sĩ để phân lịch" />
+                            </label>
+                            <div id="assign-doctor-list" class="assign-doctor-list"></div>
+                        </div>
+                        <label class="assign-note">
+                            Ghi chú (không bắt buộc)
+                            <textarea id="assign-note" rows="2" maxlength="200" placeholder="Thêm ghi chú cho bác sĩ…"></textarea>
                         </label>
-                        <label style="display:flex; align-items:center; gap:6px; font-size:13px;">
-                            Ca:
-                            <select id="dm-shift">
-                                <option value="0">Sáng (07:30 - 11:30)</option>
-                                <option value="1">Chiều (13:00 - 16:30)</option>
-                            </select>
-                        </label>
+                        <p class="assign-error" id="assign-error" role="alert" hidden></p>
                     </div>
-                    <div class="table-scroll" id="dm-table"></div>
+                    <div class="sched-card assign-summary">
+                        <h3>Tóm tắt phân lịch</h3>
+                        <div id="assign-summary"></div>
+                        <div class="assign-actions">
+                            <button type="button" class="btn button secondary" id="assign-cancel">Hủy</button>
+                            <button type="button" class="btn button primary" id="assign-save">Lưu phân lịch</button>
+                        </div>
+                        <p class="assign-hint">Lịch sẽ được hiển thị ngay sau khi lưu.</p>
+                    </div>
                 </div>
-                <div class="card">
-                    <div class="card-heading" style="flex-wrap:wrap; gap:10px;">
-                        <div>
-                            <h2 style="margin:0;">Lịch khám trong tuần</h2>
-                            <small style="color:#64748b;">Nhấp vào ca khám để xem hoặc chỉnh sửa Quota tiếp nhận (Tổng chỉ tiêu / Đặt online / Khám tại quầy)</small>
+
+                <div class="sched-pane req-layout" id="sched-view-requests" hidden>
+                    <div class="sched-card req-card">
+                        <div class="req-head">
+                            <div class="req-tabs" role="tablist" aria-label="Trạng thái yêu cầu">
+                                <button type="button" data-req-status="pending" class="is-active" aria-selected="true">Chờ duyệt <b id="req-count-pending">0</b></button>
+                                <button type="button" data-req-status="approved" aria-selected="false">Đã duyệt <b id="req-count-approved">0</b></button>
+                            </div>
+                            <span class="req-week" id="req-week-label">—</span>
+                            <label class="wk-search req-search">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                <input type="search" id="req-search" placeholder="Tìm bác sĩ…" aria-label="Tìm bác sĩ trong yêu cầu" />
+                            </label>
+                            <button type="button" class="btn button secondary sm" id="req-back">← Về lịch làm việc</button>
                         </div>
-                        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                            <button type="button" class="btn button secondary sm" id="sched-prev-week">← Tuần trước</button>
-                            <button type="button" class="btn button secondary sm" id="sched-this-week">Tuần hiện tại</button>
-                            <button type="button" class="btn button secondary sm" id="sched-next-week">Tuần sau →</button>
-                            <button type="button" class="btn button secondary sm" id="sched-generate-slots">⚡ Sinh slot tuần này</button>
-                            <span style="font-size:12px; color:#64748b; background:#f8fafc; padding:4px 10px; border-radius:6px; border:1px solid #e2e8f0;">
-                                Sáng: 07:30-11:30 · Chiều: 13:00-16:30 · Tối: 18:00-07:00
-                            </span>
-                        </div>
+                        <div id="req-list" class="req-list"></div>
+                        <div class="req-foot" id="req-foot"></div>
                     </div>
-                    <div class="table-scroll" id="dept-schedules-grid"></div>
+                    <div class="sched-card req-detail" id="req-detail"></div>
                 </div>
             </section>
 
+            <!-- ================================================================
+                 4. PANEL: PHÒNG BAN (DEPARTMENTS)
+                 ================================================================ -->
             <section data-panel="departments" aria-label="Danh sách phòng ban" hidden>
                 <div class="section-actions">
                     <div class="section-filter-group">
-                        <span>Khoa / đơn vị chuyên môn của bệnh viện</span>
                         <label class="filter-dropdown-label" for="filter-department">
-                            Lọc phòng ban:
+                            <span>Lọc phòng ban:</span>
                             <select id="filter-department">
                                 <option value="">Tất cả phòng ban</option>
                             </select>
                         </label>
                     </div>
                     <button class="btn button primary" data-open="department-dialog" type="button">
-                        + Thêm phòng ban
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        <span>Thêm phòng ban</span>
                     </button>
                 </div>
-                <div class="card"><div class="table-scroll" id="departments-table"></div></div>
+                <div class="card">
+                    <div class="table-scroll" id="departments-table"></div>
+                </div>
             </section>
 
+            <!-- ================================================================
+                 5. PANEL: NHÂN SỰ (STAFF)
+                 ================================================================ -->
             <section data-panel="staff" aria-label="Danh sách nhân sự" hidden>
                 <div class="section-actions">
-                    <span>Bác sĩ, y tá và trưởng khoa</span>
+                    <div class="section-filter-group">
+                        <span>Danh mục bác sĩ, y tá, điều dưỡng và ban quản lý</span>
+                    </div>
                     <button class="btn button primary" id="new-staff" type="button">
-                        + Thêm nhân sự
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+                        <span>Thêm nhân sự</span>
                     </button>
                 </div>
-                <p class="definition">
-                    Hồ sơ nhân sự được tạo cùng tài khoản để bảo đảm liên kết đúng vai trò và phòng
-                    ban.
-                </p>
-                <div class="card"><div class="table-scroll" id="staff-table"></div></div>
+                <div class="card">
+                    <div class="table-scroll" id="staff-table"></div>
+                </div>
             </section>
 
+            <!-- ================================================================
+                 6. PANEL: DANH SÁCH BÁC SĨ (DOCTORS)
+                 ================================================================ -->
             <section data-panel="doctors" aria-label="Danh sách bác sĩ" hidden>
                 <div class="card">
                     <div class="card-heading">
-                        <h2>Đội ngũ bác sĩ</h2>
-                        <span>Thông tin nhân sự, không bao gồm bệnh án</span>
+                        <div class="heading-title-group">
+                            <div class="card-title-icon green">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3v5a5 5 0 0 0 10 0V3 M3 3h4 M13 3h4 M10 13v3a5 5 0 0 0 10 0v-2 M22 11a2 2 0 1 1-4 0 2 2 0 0 1 4 0"></path></svg>
+                            </div>
+                            <div>
+                                <h2>Đội ngũ bác sĩ chuyên khoa</h2>
+                                <p class="card-subtitle">Thông tin học hàm, học vị, chứng chỉ và khoa chuyên môn</p>
+                            </div>
+                        </div>
                     </div>
                     <div class="table-scroll" id="doctors-table"></div>
                 </div>
             </section>
 
+            <!-- ================================================================
+                 7. PANEL: TÀI KHOẢN & PHÂN QUYỀN (ACCOUNTS)
+                 ================================================================ -->
             <section data-panel="accounts" aria-label="Danh sách tài khoản" hidden>
                 <div class="section-actions">
-                    <span>Quản lý quyền truy cập và trạng thái hoạt động</span>
+                    <div class="section-filter-group">
+                        <span>Quản lý quyền truy cập, kích hoạt và bảo mật người dùng</span>
+                    </div>
                     <button class="btn button primary" id="new-account" type="button">
-                        + Tạo tài khoản
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 3 7v5c0 5 9 9 9 9s9-4 9-9V7z"/><line x1="12" y1="8" x2="12" y2="14"/><line x1="9" y1="11" x2="15" y2="11"/></svg>
+                        <span>Tạo tài khoản</span>
                     </button>
                 </div>
-                <div class="card"><div class="table-scroll" id="accounts-table"></div></div>
+                <div class="card">
+                    <div class="table-scroll" id="accounts-table"></div>
+                </div>
             </section>
 
+            <!-- ================================================================
+                 8. PANEL: PHÒNG KHÁM (ROOMS)
+                 ================================================================ -->
             <section data-panel="rooms" aria-label="Danh sách phòng khám" hidden>
                 <div class="section-actions">
                     <div class="section-filter-group">
-                        <span>Phòng khám / buồng bệnh theo khoa chuyên môn</span>
                         <label class="filter-dropdown-label" for="filter-room-department">
-                            Khoa chuyên môn:
+                            <span>Khoa chuyên môn:</span>
                             <select id="filter-room-department">
                                 <option value="">Tất cả khoa chuyên môn</option>
                             </select>
                         </label>
                     </div>
                     <button class="btn button primary" data-open="room-dialog" type="button">
-                        + Thêm phòng khám
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        <span>Thêm phòng khám</span>
                     </button>
                 </div>
-                <div class="card"><div class="table-scroll" id="rooms-table"></div></div>
+                <div class="card">
+                    <div class="table-scroll" id="rooms-table"></div>
+                </div>
             </section>
 
+            <!-- ================================================================
+                 9. PANEL: DỊCH VỤ & BẢNG GIÁ (SERVICES)
+                 ================================================================ -->
             <section data-panel="services" aria-label="Dịch vụ y tế và bảng giá" hidden>
                 <div class="section-actions">
-                    <span>Danh mục dịch vụ khám, xét nghiệm và chẩn đoán</span>
+                    <div class="section-filter-group">
+                        <span>Danh mục dịch vụ kỹ thuật, xét nghiệm, chẩn đoán hình ảnh</span>
+                    </div>
                     <button class="btn button primary" data-open="service-dialog" id="new-service" type="button">
-                        + Thêm dịch vụ y tế
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        <span>Thêm dịch vụ y tế</span>
                     </button>
                 </div>
-                <div class="card"><div class="table-scroll" id="services-table"></div></div>
+                <div class="card">
+                    <div class="table-scroll" id="services-table"></div>
+                </div>
             </section>
 
+            <!-- ================================================================
+                 10. PANEL: DANH MỤC THUỐC (MEDICATIONS)
+                 ================================================================ -->
             <section data-panel="medications" aria-label="Danh mục thuốc" hidden>
                 <div class="section-actions">
-                    <span>Danh mục thuốc, hoạt chất và đơn giá</span>
+                    <div class="section-filter-group">
+                        <span>Danh mục dược phẩm, biệt dược, hoạt chất và đơn giá</span>
+                    </div>
                     <button class="btn button primary" data-open="medication-dialog" id="new-medication" type="button">
-                        + Thêm thuốc
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        <span>Thêm thuốc</span>
                     </button>
                 </div>
-                <div class="card"><div class="table-scroll" id="medications-table"></div></div>
+                <div class="card">
+                    <div class="table-scroll" id="medications-table"></div>
+                </div>
             </section>
 
+            <!-- ================================================================
+                 11. PANEL: NHẬT KÝ TRUY VẾT (AUDIT)
+                 ================================================================ -->
             <section data-panel="audit" aria-label="Nhật ký truy vết bảo mật" hidden>
-                <form id="audit-filter" class="filter-bar" style="margin-bottom: 20px;">
-                    <label>
-                        Từ ngày
-                        <input name="from" type="date" />
-                    </label>
-                    <label>
-                        Đến ngày
-                        <input name="to" type="date" />
-                    </label>
-                    <label>
-                        Loại hành động
-                        <select name="action">
-                            <option value="">Tất cả hành động</option>
-                            <option value="VIEW_RECORD">Xem bệnh án (VIEW_RECORD)</option>
-                            <option value="CREATE_RECORD">Lưu bệnh án (CREATE_RECORD)</option>
-                            <option value="CHECK_IN_WEB">Tiếp nhận hẹn trước (CHECK_IN_WEB)</option>
-                            <option value="REGISTER_WALK_IN">Tiếp nhận tại quầy (REGISTER_WALK_IN)</option>
-                            <option value="ADMIN_CREATE_ACCOUNT">Tạo tài khoản (ADMIN_CREATE_ACCOUNT)</option>
-                            <option value="ADMIN_ACTIVATE_ACCOUNT">Kích hoạt tài khoản</option>
-                            <option value="ADMIN_DEACTIVATE_ACCOUNT">Khóa tài khoản</option>
-                            <option value="ADMIN_APPROVE_SCHEDULE">Duyệt ca trực</option>
-                            <option value="ADMIN_REJECT_SCHEDULE">Từ chối ca trực</option>
-                            <option value="AdminLogin">Đăng nhập</option>
-                        </select>
-                    </label>
-                    <label>
-                        Tìm kiếm nhanh
-                        <input name="search" type="search" placeholder="Tên nhân sự, IP, bệnh nhân..." />
-                    </label>
-                    <button class="btn button primary" type="submit">Lọc nhật ký</button>
-                    <button class="btn button secondary" id="reset-audit" type="button">Đặt lại</button>
-                </form>
+                <div class="card filter-card" style="margin-bottom: 20px;">
+                    <form id="audit-filter" class="filter-bar">
+                        <div class="date-input-group">
+                            <label>
+                                <span class="input-label-text">Từ ngày</span>
+                                <input name="from" type="date" />
+                            </label>
+                            <span class="date-arrow">→</span>
+                            <label>
+                                <span class="input-label-text">Đến ngày</span>
+                                <input name="to" type="date" />
+                            </label>
+                        </div>
+                        <label>
+                            <span class="input-label-text">Loại hành động</span>
+                            <select name="action">
+                                <option value="">Tất cả hành động</option>
+                                <option value="VIEW_RECORD">Xem bệnh án (VIEW_RECORD)</option>
+                                <option value="CREATE_RECORD">Lưu bệnh án (CREATE_RECORD)</option>
+                                <option value="CHECK_IN_WEB">Tiếp nhận hẹn trước (CHECK_IN_WEB)</option>
+                                <option value="REGISTER_WALK_IN">Tiếp nhận tại quầy (REGISTER_WALK_IN)</option>
+                                <option value="ADMIN_CREATE_ACCOUNT">Tạo tài khoản (ADMIN_CREATE_ACCOUNT)</option>
+                                <option value="ADMIN_ACTIVATE_ACCOUNT">Kích hoạt tài khoản</option>
+                                <option value="ADMIN_DEACTIVATE_ACCOUNT">Khóa tài khoản</option>
+                                <option value="ADMIN_APPROVE_SCHEDULE">Duyệt ca trực</option>
+                                <option value="ADMIN_REJECT_SCHEDULE">Từ chối ca trực</option>
+                                <option value="AdminLogin">Đăng nhập</option>
+                            </select>
+                        </label>
+                        <label>
+                            <span class="input-label-text">Tìm kiếm nhanh</span>
+                            <input name="search" type="search" placeholder="Tên nhân sự, IP, bệnh nhân..." />
+                        </label>
+                        <div class="filter-actions">
+                            <button class="btn button primary" type="submit">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                <span>Lọc nhật ký</span>
+                            </button>
+                            <button class="btn button secondary" id="reset-audit" type="button">Đặt lại</button>
+                        </div>
+                    </form>
+                </div>
 
                 <div class="card">
                     <div class="card-heading">
-                        <div>
-                            <h2>Nhật ký truy vết hệ thống (Audit Trail)</h2>
-                            <span>Ghi nhận thời gian, địa chỉ IP và hành vi truy cập bệnh án / phân quyền</span>
+                        <div class="heading-title-group">
+                            <div class="card-title-icon blue">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 3 7v5c0 5 9 9 9 9s9-4 9-9V7z"/><path d="M9 12l2 2 4-4"/></svg>
+                            </div>
+                            <div>
+                                <h2>Nhật ký truy vết hệ thống (Audit Trail)</h2>
+                                <p class="card-subtitle">Ghi nhận thời gian, địa chỉ IP và hành vi truy cập bệnh án / phân quyền</p>
+                            </div>
                         </div>
-                        <span id="audit-count" class="status">Đang tải...</span>
+                        <span id="audit-count" class="badge badge-neutral">Đang tải...</span>
                     </div>
                     <div class="table-scroll" id="audit-table"></div>
                 </div>
@@ -396,8 +706,12 @@
     </div>
 </div>
 
+<!-- ========================================================================
+     MODAL DIALOGS
+     ======================================================================== -->
 <dialog id="department-dialog" aria-labelledby="department-title">
     <form id="department-form">
+        <input type="hidden" name="id" value="" />
         <div class="dialog-heading">
             <div>
                 <p class="eyebrow">CƠ CẤU BỆNH VIỆN</p>
@@ -423,6 +737,7 @@
 
 <dialog id="account-dialog" aria-labelledby="account-title">
     <form id="account-form">
+        <input type="hidden" name="id" value="" />
         <div class="dialog-heading">
             <div>
                 <p class="eyebrow">QUẢN LÝ TRUY CẬP</p>
@@ -443,7 +758,7 @@
                 />
             </label>
             <label>
-                Mật khẩu ban đầu *
+                <span id="account-password-label">Mật khẩu ban đầu *</span>
                 <input
                     name="password"
                     type="password"
@@ -457,7 +772,7 @@
                 Vai trò *
                 <select name="roleId" required></select>
             </label>
-            <label>
+            <label data-email-field>
                 Email
                 <input name="email" type="email" maxlength="100" />
             </label>
@@ -477,6 +792,13 @@
                 Điện thoại người khám *
                 <input name="phoneNumber" type="tel" maxlength="15" />
             </label>
+            <label data-status-field>
+                Trạng thái truy cập
+                <span class="check-row">
+                    <input name="isActive" type="checkbox" checked />
+                    Đang hoạt động
+                </span>
+            </label>
         </div>
         <p class="definition" id="account-hint">
             Tài khoản mới được kích hoạt sau khi tạo. Mật khẩu không được hiển thị trong danh sách.
@@ -484,13 +806,14 @@
         <p class="form-error" role="alert"></p>
         <div class="dialog-actions">
             <button type="button" class="btn button secondary" data-close>Hủy</button>
-            <button class="btn button primary" type="submit">Tạo tài khoản</button>
+            <button class="btn button primary" type="submit" id="account-submit">Tạo tài khoản</button>
         </div>
     </form>
 </dialog>
 
 <dialog id="room-dialog" aria-labelledby="room-title">
     <form id="room-form">
+        <input type="hidden" name="id" value="" />
         <div class="dialog-heading">
             <div>
                 <p class="eyebrow">CƠ CẤU BỆNH VIỆN</p>
@@ -543,7 +866,7 @@
                 Tên dịch vụ kỹ thuật *
                 <input name="name" placeholder="VD: Siêu âm Doppler màu tim" maxlength="150" required />
             </label>
-            <label style="grid-column: span 2; display: flex; align-items: center; gap: 8px;">
+            <label class="check-field" style="grid-column: span 2;">
                 <input name="isActive" type="checkbox" checked />
                 <span>Đang áp dụng khám / chỉ định viện phí</span>
             </label>
@@ -587,7 +910,7 @@
                 Đơn giá (VNĐ) *
                 <input name="price" type="number" min="0" max="1000000000" step="any" required />
             </label>
-            <label style="display: flex; align-items: center; gap: 8px; margin-top: 24px;">
+            <label class="check-field" style="grid-column: span 2;">
                 <input name="isActive" type="checkbox" checked />
                 <span>Cho phép kê đơn</span>
             </label>
@@ -645,27 +968,13 @@
     </form>
 </dialog>
 
-<dialog id="decision-matrix-dialog" aria-labelledby="decision-matrix-title" style="max-width:860px; width:95vw;">
-    <div class="dialog-heading">
-        <div>
-            <p class="eyebrow">MA TRẬN QUYẾT ĐỊNH DUYỆT CA</p>
-            <h2 id="decision-matrix-title">Xét duyệt bác sĩ &amp; gán phòng</h2>
-        </div>
-        <button type="button" data-close aria-label="Đóng">×</button>
-    </div>
-    <div id="decision-matrix-body" style="max-height:65vh; overflow:auto;"></div>
-    <div class="dialog-actions" style="margin-top:14px;">
-        <button type="button" class="btn button secondary" data-close>Đóng</button>
-    </div>
-</dialog>
-
 <dialog id="upsert-schedule-dialog" aria-labelledby="upsert-schedule-title">
     <form id="upsert-schedule-form">
         <input type="hidden" name="id" value="" />
         <div class="dialog-heading">
             <div>
                 <p class="eyebrow">PHÂN CÔNG LỊCH KHÁM</p>
-                <h2 id="upsert-schedule-title">Xếp lịch trực tiếp</h2>
+                <h2 id="upsert-schedule-title">Chỉnh sửa ca khám</h2>
             </div>
             <button type="button" data-close aria-label="Đóng">×</button>
         </div>
@@ -708,6 +1017,23 @@
             <button class="btn button primary" type="submit">Lưu lịch khám</button>
         </div>
     </form>
+</dialog>
+
+<dialog id="admin-confirm-dialog" aria-labelledby="admin-confirm-title" style="max-width: 440px;">
+    <div class="dialog-heading">
+        <div>
+            <p class="eyebrow">XÁC NHẬN THAO TÁC</p>
+            <h2 id="admin-confirm-title">Xác nhận</h2>
+        </div>
+        <button type="button" data-close aria-label="Đóng">×</button>
+    </div>
+    <div class="confirm-body" style="padding: 16px 0; color: #475569;">
+        <p id="admin-confirm-msg" style="margin: 0; font-size: 14px; line-height: 1.5;"></p>
+    </div>
+    <div class="dialog-actions">
+        <button type="button" class="btn button secondary" data-confirm-cancel>Hủy</button>
+        <button type="button" class="btn button primary" id="admin-confirm-ok">Đồng ý</button>
+    </div>
 </dialog>
 
 <script src="~/js/admin-management.js" asp-append-version="true" defer></script>

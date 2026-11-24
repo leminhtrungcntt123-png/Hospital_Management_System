@@ -15,7 +15,7 @@ public partial class StaffService
 
     public async Task<IReadOnlyList<AdminAccountRow>> GetAdminStaffAsync(int actorId, CancellationToken ct = default) =>
         (await GetAdminAccountsAsync(actorId, ct))
-            .Where(account => account.Role is "DOCTOR" or "NURSE" or "DEPARTMENT_HEAD").ToList();
+            .Where(account => account.Role is "DOCTOR" or "NURSE" or "DEPARTMENT_HEAD" or "ACCOUNTANT").ToList();
 
     public async Task<IReadOnlyList<AdminRoleOption>> GetAdminRolesAsync(int actorId, CancellationToken ct = default)
     {
@@ -72,7 +72,7 @@ public partial class StaffService
 
             var role = await _context.Roles.SingleOrDefaultAsync(role => role.Id == request.RoleId, ct);
             AdminRules.Require(role != null, "Vai trò không tồn tại.");
-            AdminRules.Require(role!.Code is "ADMIN" or "DOCTOR" or "NURSE" or "DEPARTMENT_HEAD" or "PATIENT",
+            AdminRules.Require(role!.Code is "ADMIN" or "DOCTOR" or "NURSE" or "DEPARTMENT_HEAD" or "PATIENT" or "ACCOUNTANT",
                 "Vai trò này chưa được hỗ trợ tại màn quản trị.");
 
             if (role!.Code is "DOCTOR" or "NURSE" or "DEPARTMENT_HEAD")
