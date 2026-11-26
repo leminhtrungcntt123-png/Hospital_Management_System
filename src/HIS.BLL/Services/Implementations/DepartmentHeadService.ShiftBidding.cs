@@ -300,165 +300,177 @@ public partial class DepartmentHeadService
 
     public async Task<DecisionMatrixResultDto> GetDecisionMatrixAsync(int departmentId, DateOnly workDate, ExamShift shift, CancellationToken ct = default)
     {
-        int totalActiveRooms = await _context.ClinicRooms
-            .CountAsync(r => r.DepartmentId == departmentId && r.IsActive, ct);
-
-        var schedules = await _context.DoctorSchedules
-            .Include(s => s.Doctor)
-                .ThenInclude(d => d.Account)
-            .Include(s => s.Room)
-            .Where(s => s.DepartmentId == departmentId
-                && s.WorkDate == workDate
-                && s.Shift == shift
-                && (s.Status == DoctorScheduleStatus.Bidding || s.Status == DoctorScheduleStatus.Approved))
-            .ToListAsync(ct);
-
-        var assignedRoomIds = schedules
-            .Where(s => s.Status == DoctorScheduleStatus.Approved && s.RoomId.HasValue)
-            .Select(s => s.RoomId!.Value)
-            .ToHashSet();
-
-        var availableRooms = await _context.ClinicRooms
-            .AsNoTracking()
-            .Where(r => r.DepartmentId == departmentId && r.IsActive && !assignedRoomIds.Contains(r.Id))
-            .OrderBy(r => r.RoomNumber)
-            .Select(r => new ClinicRoomDto(r.Id, r.DepartmentId, r.RoomName, r.RoomNumber))
-            .ToListAsync(ct);
-
-        bool isHot = schedules.Any(s => s.IsHotShift) || schedules.Count > totalActiveRooms;
-
-        var morningStart = workDate.ToDateTime(new TimeOnly(6, 0));
-        var noon = workDate.ToDateTime(new TimeOnly(12, 0));
-        var prevWeekStart = workDate.AddDays(-7);
-        var prevWeekEnd = workDate.AddDays(-1);
-        var lookbackStart = workDate.AddDays(-14);
-        var weekStart = workDate.AddDays(-((int)workDate.DayOfWeek == 0 ? 6 : (int)workDate.DayOfWeek - 1));
-        var weekEnd = weekStart.AddDays(6);
-
-        var doctorIds = schedules.Select(s => s.DoctorId).Distinct().ToList();
-        var accountIds = schedules.Select(s => s.Doctor.AccountId).Distinct().ToList();
-
-        var nightDutyAccountIds = shift == ExamShift.Morning && accountIds.Count > 0
-            ? (await _context.DutyShifts
-                .AsNoTracking()
-                .Where(d => accountIds.Contains(d.AccountId)
-                    && d.Status == DutyShiftStatus.Approved
-                    && d.EndTime >= morningStart
-                    && d.StartTime <= noon)
-                .Select(d => d.AccountId)
-                .Distinct()
-                .ToListAsync(ct)).ToHashSet()
-            : new HashSet<int>();
-
-        var recentHotSchedules = doctorIds.Count > 0
-            ? await _context.DoctorSchedules
-                .AsNoTracking()
-                .Where(ds => doctorIds.Contains(ds.DoctorId)
-                    && ds.IsHotShift
-                    && ds.WorkDate >= lookbackStart && ds.WorkDate < workDate
-                    && (ds.Status == DoctorScheduleStatus.Rejected
-                        || ds.Status == DoctorScheduleStatus.Reallocated
-                        || (ds.Status == DoctorScheduleStatus.Approved && ds.WorkDate >= prevWeekStart && ds.WorkDate <= prevWeekEnd)))
-                .Select(ds => new { ds.DoctorId, ds.Status })
-                .ToListAsync(ct)
-            : [];
-
-        var rejectedHotDoctorIds = recentHotSchedules
-            .Where(x => x.Status == DoctorScheduleStatus.Rejected || x.Status == DoctorScheduleStatus.Reallocated)
-            .Select(x => x.DoctorId)
-            .ToHashSet();
-
-        var approvedHotDoctorIds = recentHotSchedules
-            .Where(x => x.Status == DoctorScheduleStatus.Approved)
-            .Select(x => x.DoctorId)
-            .ToHashSet();
-
-        var weeklyApprovedCounts = doctorIds.Count > 0
-            ? await _context.DoctorSchedules
-                .AsNoTracking()
-                .Where(ds => doctorIds.Contains(ds.DoctorId)
-                    && ds.Status == DoctorScheduleStatus.Approved
-                    && ds.WorkDate >= weekStart && ds.WorkDate <= weekEnd)
-                .GroupBy(ds => ds.DoctorId)
-                .Select(g => new { DoctorId = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.DoctorId, x => x.Count, ct)
-            : new Dictionary<int, int>();
-
-        var followUpCounts = doctorIds.Count > 0
-            ? await _context.MedicalRecords
-                .AsNoTracking()
-                .Where(mr => doctorIds.Contains(mr.DoctorId) && mr.FollowUpDate == workDate)
-                .GroupBy(mr => mr.DoctorId)
-                .Select(g => new { DoctorId = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.DoctorId, x => x.Count, ct)
-            : new Dictionary<int, int>();
-
-        var candidates = new List<DecisionMatrixCandidateDto>();
-
-        foreach (var s in schedules)
+        try
         {
-            var doc = s.Doctor;
-            bool hasNightDutyConflict = nightDutyAccountIds.Contains(doc.AccountId);
-
-            int rotationScore;
-            string rotationBadge;
-            if (rejectedHotDoctorIds.Contains(doc.Id))
+            if (ct.IsCancellationRequested)
             {
-                rotationScore = 2;
-                rotationBadge = "Đền bù ca Hot (⭐⭐)";
-            }
-            else if (!approvedHotDoctorIds.Contains(doc.Id))
-            {
-                rotationScore = 1;
-                rotationBadge = "Ưu tiên luân phiên (⭐)";
-            }
-            else
-            {
-                rotationScore = 0;
-                rotationBadge = "Đã duyệt ca Hot tuần trước";
+                return new DecisionMatrixResultDto(departmentId, workDate, shift, 0, false, [], []);
             }
 
-            int approvedShiftsThisPeriod = weeklyApprovedCounts.GetValueOrDefault(doc.Id);
-            int continuityOfCareCount = followUpCounts.GetValueOrDefault(doc.Id);
+            int totalActiveRooms = await _context.ClinicRooms
+                .CountAsync(r => r.DepartmentId == departmentId && r.IsActive, ct);
 
-            candidates.Add(new DecisionMatrixCandidateDto(
-                s.Id,
-                doc.Id,
-                doc.FullName,
-                doc.Specialty,
-                doc.AcademicTitle,
-                doc.EmploymentType,
-                s.RoomId,
-                s.Room?.RoomNumber,
-                s.Status,
-                s.DoctorNote,
-                s.ReallocatedFromId,
-                hasNightDutyConflict,
-                rotationScore,
-                rotationBadge,
-                approvedShiftsThisPeriod,
-                doc.MinShiftsPerWeek,
-                doc.MaxShiftsPerWeek,
-                continuityOfCareCount
-            ));
+            var schedules = await _context.DoctorSchedules
+                .Include(s => s.Doctor)
+                    .ThenInclude(d => d.Account)
+                .Include(s => s.Room)
+                .Where(s => s.DepartmentId == departmentId
+                    && s.WorkDate == workDate
+                    && s.Shift == shift
+                    && (s.Status == DoctorScheduleStatus.Bidding || s.Status == DoctorScheduleStatus.Approved))
+                .ToListAsync(ct);
+
+            var assignedRoomIds = schedules
+                .Where(s => s.Status == DoctorScheduleStatus.Approved && s.RoomId.HasValue)
+                .Select(s => s.RoomId!.Value)
+                .ToHashSet();
+
+            var availableRooms = await _context.ClinicRooms
+                .AsNoTracking()
+                .Where(r => r.DepartmentId == departmentId && r.IsActive && !assignedRoomIds.Contains(r.Id))
+                .OrderBy(r => r.RoomNumber)
+                .Select(r => new ClinicRoomDto(r.Id, r.DepartmentId, r.RoomName, r.RoomNumber))
+                .ToListAsync(ct);
+
+            bool isHot = schedules.Any(s => s.IsHotShift) || schedules.Count > totalActiveRooms;
+
+            var morningStart = workDate.ToDateTime(new TimeOnly(6, 0));
+            var noon = workDate.ToDateTime(new TimeOnly(12, 0));
+            var prevWeekStart = workDate.AddDays(-7);
+            var prevWeekEnd = workDate.AddDays(-1);
+            var lookbackStart = workDate.AddDays(-14);
+            var weekStart = workDate.AddDays(-((int)workDate.DayOfWeek == 0 ? 6 : (int)workDate.DayOfWeek - 1));
+            var weekEnd = weekStart.AddDays(6);
+
+            var doctorIds = schedules.Select(s => s.DoctorId).Distinct().ToList();
+            var accountIds = schedules.Select(s => s.Doctor.AccountId).Distinct().ToList();
+
+            var nightDutyAccountIds = shift == ExamShift.Morning && accountIds.Count > 0
+                ? (await _context.DutyShifts
+                    .AsNoTracking()
+                    .Where(d => accountIds.Contains(d.AccountId)
+                        && d.Status == DutyShiftStatus.Approved
+                        && d.EndTime >= morningStart
+                        && d.StartTime <= noon)
+                    .Select(d => d.AccountId)
+                    .Distinct()
+                    .ToListAsync(ct)).ToHashSet()
+                : new HashSet<int>();
+
+            var recentHotSchedules = doctorIds.Count > 0
+                ? await _context.DoctorSchedules
+                    .AsNoTracking()
+                    .Where(ds => doctorIds.Contains(ds.DoctorId)
+                        && ds.IsHotShift
+                        && ds.WorkDate >= lookbackStart && ds.WorkDate < workDate
+                        && (ds.Status == DoctorScheduleStatus.Rejected
+                            || ds.Status == DoctorScheduleStatus.Reallocated
+                            || (ds.Status == DoctorScheduleStatus.Approved && ds.WorkDate >= prevWeekStart && ds.WorkDate <= prevWeekEnd)))
+                    .Select(ds => new { ds.DoctorId, ds.Status })
+                    .ToListAsync(ct)
+                : [];
+
+            var rejectedHotDoctorIds = recentHotSchedules
+                .Where(x => x.Status == DoctorScheduleStatus.Rejected || x.Status == DoctorScheduleStatus.Reallocated)
+                .Select(x => x.DoctorId)
+                .ToHashSet();
+
+            var approvedHotDoctorIds = recentHotSchedules
+                .Where(x => x.Status == DoctorScheduleStatus.Approved)
+                .Select(x => x.DoctorId)
+                .ToHashSet();
+
+            var weeklyApprovedCounts = doctorIds.Count > 0
+                ? await _context.DoctorSchedules
+                    .AsNoTracking()
+                    .Where(ds => doctorIds.Contains(ds.DoctorId)
+                        && ds.Status == DoctorScheduleStatus.Approved
+                        && ds.WorkDate >= weekStart && ds.WorkDate <= weekEnd)
+                    .GroupBy(ds => ds.DoctorId)
+                    .Select(g => new { DoctorId = g.Key, Count = g.Count() })
+                    .ToDictionaryAsync(x => x.DoctorId, x => x.Count, ct)
+                : new Dictionary<int, int>();
+
+            var followUpCounts = doctorIds.Count > 0
+                ? await _context.MedicalRecords
+                    .AsNoTracking()
+                    .Where(mr => doctorIds.Contains(mr.DoctorId) && mr.FollowUpDate == workDate)
+                    .GroupBy(mr => mr.DoctorId)
+                    .Select(g => new { DoctorId = g.Key, Count = g.Count() })
+                    .ToDictionaryAsync(x => x.DoctorId, x => x.Count, ct)
+                : new Dictionary<int, int>();
+
+            var candidates = new List<DecisionMatrixCandidateDto>();
+
+            foreach (var s in schedules)
+            {
+                var doc = s.Doctor;
+                bool hasNightDutyConflict = nightDutyAccountIds.Contains(doc.AccountId);
+
+                int rotationScore;
+                string rotationBadge;
+                if (rejectedHotDoctorIds.Contains(doc.Id))
+                {
+                    rotationScore = 2;
+                    rotationBadge = "Đền bù ca Hot (⭐⭐)";
+                }
+                else if (!approvedHotDoctorIds.Contains(doc.Id))
+                {
+                    rotationScore = 1;
+                    rotationBadge = "Ưu tiên luân phiên (⭐)";
+                }
+                else
+                {
+                    rotationScore = 0;
+                    rotationBadge = "Đã duyệt ca Hot tuần trước";
+                }
+
+                int approvedShiftsThisPeriod = weeklyApprovedCounts.GetValueOrDefault(doc.Id);
+                int continuityOfCareCount = followUpCounts.GetValueOrDefault(doc.Id);
+
+                candidates.Add(new DecisionMatrixCandidateDto(
+                    s.Id,
+                    doc.Id,
+                    doc.FullName,
+                    doc.Specialty,
+                    doc.AcademicTitle,
+                    doc.EmploymentType,
+                    s.RoomId,
+                    s.Room?.RoomNumber,
+                    s.Status,
+                    s.DoctorNote,
+                    s.ReallocatedFromId,
+                    hasNightDutyConflict,
+                    rotationScore,
+                    rotationBadge,
+                    approvedShiftsThisPeriod,
+                    doc.MinShiftsPerWeek,
+                    doc.MaxShiftsPerWeek,
+                    continuityOfCareCount
+                ));
+            }
+
+            var sortedCandidates = candidates
+                .OrderBy(c => c.HasNightDutyConflict)
+                .ThenByDescending(c => c.RotationPriorityScore)
+                .ThenBy(c => c.ApprovedShiftsThisPeriod)
+                .ThenByDescending(c => c.ContinuityOfCareFollowUpCount)
+                .ToList();
+
+            return new DecisionMatrixResultDto(
+                departmentId,
+                workDate,
+                shift,
+                totalActiveRooms,
+                isHot,
+                sortedCandidates,
+                availableRooms
+            );
         }
-
-        var sortedCandidates = candidates
-            .OrderBy(c => c.HasNightDutyConflict)
-            .ThenByDescending(c => c.RotationPriorityScore)
-            .ThenBy(c => c.ApprovedShiftsThisPeriod)
-            .ThenByDescending(c => c.ContinuityOfCareFollowUpCount)
-            .ToList();
-
-        return new DecisionMatrixResultDto(
-            departmentId,
-            workDate,
-            shift,
-            totalActiveRooms,
-            isHot,
-            sortedCandidates,
-            availableRooms
-        );
+        catch (OperationCanceledException)
+        {
+            return new DecisionMatrixResultDto(departmentId, workDate, shift, 0, false, [], []);
+        }
     }
 
     public async Task<Result> ApproveShiftAsync(ApproveShiftRequest request, CancellationToken ct = default)
