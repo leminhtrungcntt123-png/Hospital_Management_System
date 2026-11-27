@@ -112,20 +112,57 @@
                                     <span class="status-badge @(isCompleted ? "ok" : "warn")">@lab.Status</span>
                                 </td>
                                 <td class="right">
-                                    <button type="button" class="btn outline sm"
-                                            data-patient="@lab.PatientName"
-                                            data-code="@lab.PatientCode"
-                                            data-age="@lab.Age"
-                                            data-service="@lab.ServiceName"
-                                            data-time="@lab.OrderTime.ToString("dd/MM/yyyy HH:mm")"
-                                            data-status="@lab.Status"
-                                            data-result="@(string.IsNullOrWhiteSpace(lab.ResultData) ? "Chưa có kết quả xét nghiệm từ phòng lab." : lab.ResultData)"
-                                            onclick="openLabResultModalFromBtn(this)">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px;">
-                                            <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12"></path><circle cx="12" cy="12" r="3"></circle>
-                                        </svg>
-                                        Xem kết quả
-                                    </button>
+                                    <div style="display:inline-flex; gap:6px; align-items:center;">
+                                        <button type="button" class="btn outline sm"
+                                                data-lab-order-id="@lab.LabOrderId"
+                                                data-record-id="@lab.MedicalRecordId"
+                                                data-appt-status="@lab.AppointmentStatusId"
+                                                data-patient="@lab.PatientName"
+                                                data-code="@lab.PatientCode"
+                                                data-age="@lab.Age"
+                                                data-service="@lab.ServiceName"
+                                                data-time="@lab.OrderTime.ToString("dd/MM/yyyy HH:mm")"
+                                                data-status="@lab.Status"
+                                                data-raw-result="@(lab.ResultData ?? "")"
+                                                data-result="@(string.IsNullOrWhiteSpace(lab.ResultData) ? "Chưa có kết quả xét nghiệm từ phòng lab." : lab.ResultData)"
+                                                data-symptoms="@(lab.Symptoms ?? "")"
+                                                data-clinical-exam="@(lab.ClinicalExamination ?? "")"
+                                                data-icd="@(lab.PrimaryDiagnosisCode ?? "")"
+                                                data-diag="@(lab.PrimaryDiagnosisDesc ?? "")"
+                                                data-secondary="@(lab.SecondaryDiagnosis ?? "")"
+                                                data-conclusion="@(lab.Conclusion ?? "")"
+                                                onclick="openLabResultModalFromBtn(this)">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px;">
+                                                <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12"></path><circle cx="12" cy="12" r="3"></circle>
+                                            </svg>
+                                            @(isCompleted ? "Xem / Sửa KQ" : "Nhập kết quả")
+                                        </button>
+                                        @if (lab.MedicalRecordId > 0)
+                                        {
+                                            <a asp-action="PrintLabSlip" asp-route-recordId="@lab.MedicalRecordId" target="_blank" class="btn outline sm" title="Xuất phiếu chỉ định để bệnh nhân qua Lễ tân đóng tạm ứng">
+                                                Xuất phiếu CĐ
+                                            </a>
+                                        }
+                                        @if (lab.AppointmentStatusId == (int)HIS.Domain.AppointmentStatusId.InProgress && lab.MedicalRecordId > 0)
+                                        {
+                                            <button type="button" class="btn primary sm"
+                                                    data-record-id="@lab.MedicalRecordId"
+                                                    data-patient="@lab.PatientName"
+                                                    data-code="@lab.PatientCode"
+                                                    data-age="@lab.Age"
+                                                    data-service="@lab.ServiceName"
+                                                    data-result="@(string.IsNullOrWhiteSpace(lab.ResultData) ? "Chưa có kết quả" : lab.ResultData)"
+                                                    data-symptoms="@(lab.Symptoms ?? "")"
+                                                    data-clinical-exam="@(lab.ClinicalExamination ?? "")"
+                                                    data-icd="@(lab.PrimaryDiagnosisCode ?? "")"
+                                                    data-diag="@(lab.PrimaryDiagnosisDesc ?? "")"
+                                                    data-secondary="@(lab.SecondaryDiagnosis ?? "")"
+                                                    data-conclusion="@(lab.Conclusion ?? "")"
+                                                    onclick="openCompleteAfterLabModalFromBtn(this)">
+                                                Chẩn đoán &amp; Hoàn tất
+                                            </button>
+                                        }
+                                    </div>
                                 </td>
                             </tr>
                         }
@@ -148,25 +185,90 @@
         <div class="app-dialog-card">
             <div class="app-dialog-header">
                 <div>
-                    <h3>Kết quả xét nghiệm</h3>
+                    <h3>Kết quả chỉ định cận lâm sàng</h3>
                     <small id="dialog-lab-patient">Người khám: —</small>
                 </div>
                 <button type="button" class="app-dialog-close" onclick="closeAppDialog('labResultDialog')" title="Đóng (Esc)">✕</button>
             </div>
-            <div class="app-dialog-body">
-                <div class="detail-box">
-                    <div><strong>Dịch vụ:</strong> <span id="dialog-lab-service">—</span></div>
-                    <div><strong>Thời gian chỉ định:</strong> <span id="dialog-lab-time">—</span></div>
-                    <div><strong>Trạng thái:</strong> <span id="dialog-lab-status">—</span></div>
+            <form method="post" asp-action="SaveLabResult">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="labOrderId" id="dialog-lab-order-id" />
+                <div class="app-dialog-body">
+                    <div class="detail-box">
+                        <div><strong>Dịch vụ:</strong> <span id="dialog-lab-service">—</span></div>
+                        <div><strong>Thời gian chỉ định:</strong> <span id="dialog-lab-time">—</span></div>
+                        <div><strong>Trạng thái:</strong> <span id="dialog-lab-status">—</span></div>
+                    </div>
+                    <div class="record-section">
+                        <label for="dialog-lab-result-input"><strong>Nhập / Cập nhật kết quả cận lâm sàng *</strong></label>
+                        <textarea name="resultText" id="dialog-lab-result-input" class="form-control" rows="4" maxlength="2000" required placeholder="Nhập kết quả chụp CT, nội soi, xét nghiệm..."></textarea>
+                    </div>
                 </div>
-                <div class="record-section">
-                    <strong>Chi tiết kết quả:</strong>
-                    <div id="dialog-lab-result-text" class="result-box">—</div>
+                <div class="app-dialog-footer" style="display:flex; justify-content:space-between; gap:8px;">
+                    <button type="button" class="btn outline sm" onclick="closeAppDialog('labResultDialog')">Đóng</button>
+                    <div style="display:flex; gap:8px;">
+                        <button type="button" class="btn outline sm" id="btn-jump-complete-after-lab" style="display:none;" onclick="openCompleteAfterLabFromResultDialog()">
+                            Chẩn đoán tiếp &amp; Hoàn tất
+                        </button>
+                        <button type="submit" class="btn primary sm">Lưu kết quả</button>
+                    </div>
                 </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="app-dialog-backdrop" id="completeAfterLabDialog" onclick="handleDialogBackdropClick(event, 'completeAfterLabDialog')">
+        <div class="app-dialog-card lg">
+            <div class="app-dialog-header">
+                <div>
+                    <h3>Chẩn đoán tiếp &amp; Hoàn tất khám</h3>
+                    <small id="complete-lab-patient">Bệnh nhân: —</small>
+                </div>
+                <button type="button" class="app-dialog-close" onclick="closeAppDialog('completeAfterLabDialog')" title="Đóng (Esc)">✕</button>
             </div>
-            <div class="app-dialog-footer">
-                <button type="button" class="btn outline sm" onclick="closeAppDialog('labResultDialog')">Đóng</button>
-            </div>
+            <form method="post" asp-action="CompleteRecordAfterLabs">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="MedicalRecordId" id="complete-lab-record-id" />
+                <div class="app-dialog-body">
+                    <div class="detail-box">
+                        <div><strong>Triệu chứng ban đầu:</strong> <span id="complete-lab-symptoms">—</span></div>
+                        <div><strong>Khám lâm sàng:</strong> <span id="complete-lab-clinical">—</span></div>
+                        <div><strong>Kết quả chỉ định gần nhất:</strong> <span id="complete-lab-result">—</span></div>
+                    </div>
+                    <div class="form-grid" style="margin-top:12px;">
+                        <div class="field">
+                            <label for="complete-icd">Mã chẩn đoán (ICD-10) *</label>
+                            <input id="complete-icd" name="PrimaryDiagnosisCode" maxlength="20" placeholder="Ví dụ: K29" required />
+                        </div>
+                        <div class="field">
+                            <label for="complete-diagnosis">Chẩn đoán chính *</label>
+                            <input id="complete-diagnosis" name="PrimaryDiagnosisDesc" maxlength="255" placeholder="Nhập chẩn đoán sau kết quả chỉ định" required />
+                        </div>
+                        <div class="field span-2">
+                            <label for="complete-secondary">Chẩn đoán phụ (nếu có)</label>
+                            <input id="complete-secondary" name="SecondaryDiagnosis" maxlength="255" placeholder="Nhập bệnh lý kèm theo" />
+                        </div>
+                    </div>
+
+                    <div class="record-section" style="margin-top:12px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <strong>Kê đơn thuốc</strong>
+                            <button type="button" class="btn outline sm" onclick="addMedicationRow('medicationsListLab', 'noMedicationsNoticeLab')">+ Thêm thuốc</button>
+                        </div>
+                        <div id="medicationsListLab" class="dynamic-list" style="display:none;"></div>
+                        <p id="noMedicationsNoticeLab" class="muted" style="margin:6px 0;">Chưa kê thuốc nào.</p>
+                    </div>
+
+                    <div class="field" style="margin-top:12px;">
+                        <label for="complete-conclusion">Kết luận &amp; Lời dặn</label>
+                        <textarea id="complete-conclusion" name="Conclusion" rows="3" maxlength="500" placeholder="Hướng điều trị, hẹn tái khám..."></textarea>
+                    </div>
+                </div>
+                <div class="app-dialog-footer">
+                    <button type="button" class="btn outline sm" onclick="closeAppDialog('completeAfterLabDialog')">Hủy</button>
+                    <button type="submit" class="btn primary sm">Hoàn tất khám</button>
+                </div>
+            </form>
         </div>
     </div>
 }
@@ -1211,7 +1313,7 @@ else
                         </fieldset>
 
                         <div class="clinical-actions">
-                            <span>Hoàn tất sẽ tạo hóa đơn thu phí.</span>
+                            <span id="consult-submit-hint">Hoàn tất sẽ tạo hóa đơn thu phí.</span>
                             <button type="submit" class="btn primary" id="btn-submit-exam" @(isInProgress ? "" : "disabled")>Hoàn tất khám</button>
                         </div>
                     </form>
@@ -1529,15 +1631,55 @@ else
             });
         }
 
+        let activeLabDataset = null;
+
         function openLabResultModalFromBtn(btn) {
             const d = btn.dataset;
+            activeLabDataset = { ...d };
+            document.getElementById('dialog-lab-order-id').value = d.labOrderId || '';
             document.getElementById('dialog-lab-patient').textContent = `Người khám: ${d.patient} (${d.code} · ${d.age} tuổi)`;
             document.getElementById('dialog-lab-service').textContent = d.service;
             document.getElementById('dialog-lab-time').textContent = d.time;
             document.getElementById('dialog-lab-status').textContent = d.status;
-            document.getElementById('dialog-lab-result-text').textContent = d.result;
+            document.getElementById('dialog-lab-result-input').value = d.rawResult || '';
+
+            const jumpBtn = document.getElementById('btn-jump-complete-after-lab');
+            if (jumpBtn) {
+                const canComplete = Number(d.apptStatus) === @((int)HIS.Domain.AppointmentStatusId.InProgress) && Number(d.recordId) > 0;
+                jumpBtn.style.display = canComplete ? 'inline-flex' : 'none';
+            }
 
             openAppDialog('labResultDialog');
+        }
+
+        function populateCompleteAfterLabModal(d) {
+            document.getElementById('complete-lab-record-id').value = d.recordId || '';
+            document.getElementById('complete-lab-patient').textContent = `Bệnh nhân: ${d.patient} (${d.code} · ${d.age} tuổi)`;
+            document.getElementById('complete-lab-symptoms').textContent = d.symptoms || '—';
+            document.getElementById('complete-lab-clinical').textContent = d.clinicalExam || '—';
+            document.getElementById('complete-lab-result').textContent = `${d.service || ''}: ${d.rawResult || d.result || 'Chưa có kết quả'}`;
+            document.getElementById('complete-icd').value = d.icd || '';
+            document.getElementById('complete-diagnosis').value = d.diag || '';
+            document.getElementById('complete-secondary').value = d.secondary || '';
+            document.getElementById('complete-conclusion').value = d.conclusion || '';
+
+            const medList = document.getElementById('medicationsListLab');
+            if (medList) medList.innerHTML = '';
+            reindexMedications('medicationsListLab', 'noMedicationsNoticeLab');
+        }
+
+        function openCompleteAfterLabModalFromBtn(btn) {
+            populateCompleteAfterLabModal(btn.dataset);
+            openAppDialog('completeAfterLabDialog');
+        }
+
+        function openCompleteAfterLabFromResultDialog() {
+            if (!activeLabDataset) return;
+            const liveResult = (document.getElementById('dialog-lab-result-input')?.value || '').trim();
+            const data = { ...activeLabDataset, rawResult: liveResult || activeLabDataset.rawResult };
+            closeAppDialog('labResultDialog');
+            populateCompleteAfterLabModal(data);
+            openAppDialog('completeAfterLabDialog');
         }
 
         // --- 3. XỬ LÝ TÌM KIẾM & XEM PHIẾU BỆNH ÁN (RECORDS) ---
@@ -1765,6 +1907,25 @@ else
             reindexClinicalServices();
         }
 
+        function updateConsultSubmitState() {
+            const list = document.getElementById('servicesList');
+            const submitBtn = document.getElementById('btn-submit-exam');
+            const hint = document.getElementById('consult-submit-hint');
+            const icdInput = document.getElementById('icd');
+            const diagInput = document.getElementById('diagnosis');
+            if (!list || !submitBtn) return;
+
+            const hasLabs = list.querySelectorAll('.clinical-service-item').length > 0;
+            submitBtn.textContent = hasLabs ? 'Chuyển chờ kết quả chỉ định' : 'Hoàn tất khám';
+            if (hint) {
+                hint.textContent = hasLabs
+                    ? 'Ca khám sẽ tạm giữ để chờ kết quả chỉ định; bác sĩ hoàn tất chẩn đoán và kê đơn ở tab Chỉ định & kết quả.'
+                    : 'Hoàn tất sẽ tạo hóa đơn thu phí.';
+            }
+            if (icdInput) icdInput.required = !hasLabs;
+            if (diagInput) diagInput.required = !hasLabs;
+        }
+
         function reindexClinicalServices() {
             const list = document.getElementById('servicesList');
             const notice = document.getElementById('noServicesNotice');
@@ -1773,6 +1934,7 @@ else
             if (rows.length === 0) {
                 list.style.display = 'none';
                 if (notice) notice.style.display = 'block';
+                updateConsultSubmitState();
                 return;
             }
             rows.forEach((row, idx) => {
@@ -1781,11 +1943,12 @@ else
                 if (select) select.name = `LabOrders[${idx}].ServiceId`;
                 if (note) note.name = `LabOrders[${idx}].Note`;
             });
+            updateConsultSubmitState();
         }
 
-        function addMedicationRow() {
-            const list = document.getElementById('medicationsList');
-            const notice = document.getElementById('noMedicationsNotice');
+        function addMedicationRow(listId = 'medicationsList', noticeId = 'noMedicationsNotice') {
+            const list = document.getElementById(listId);
+            const notice = document.getElementById(noticeId);
             if (!list) return;
             list.style.display = 'block';
             if (notice) notice.style.display = 'none';
@@ -1813,14 +1976,14 @@ else
             dosage.className = 'med-item-dosage dynamic-row-field wide';
             dosage.placeholder = 'Liều dùng (vd: 2 viên/ngày chia 2 lần sau ăn)...';
 
-            row.append(select, qty, dosage, createRemoveRowButton(reindexMedications));
+            row.append(select, qty, dosage, createRemoveRowButton(() => reindexMedications(listId, noticeId)));
             list.appendChild(row);
-            reindexMedications();
+            reindexMedications(listId, noticeId);
         }
 
-        function reindexMedications() {
-            const list = document.getElementById('medicationsList');
-            const notice = document.getElementById('noMedicationsNotice');
+        function reindexMedications(listId = 'medicationsList', noticeId = 'noMedicationsNotice') {
+            const list = document.getElementById(listId);
+            const notice = document.getElementById(noticeId);
             if (!list) return;
             const rows = list.querySelectorAll('.prescription-med-item');
             if (rows.length === 0) {

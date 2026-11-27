@@ -1,0 +1,261 @@
+@model HIS.Web.Areas.Staff.Models.LabSlipViewModel
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Phiếu chỉ định cận lâm sàng - @Model.AppointmentCode</title>
+    <style>
+        body {
+            font-family: "Segoe UI", Arial, sans-serif;
+            background: #f1f5f9;
+            color: #0f172a;
+            margin: 0;
+            padding: 24px;
+        }
+        .slip-toolbar {
+            max-width: 780px;
+            margin: 0 auto 14px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        .slip-btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            color: #0f172a;
+        }
+        .slip-btn.primary {
+            background: #0d6535;
+            border-color: #0d6535;
+            color: #fff;
+        }
+        .slip-sheet {
+            max-width: 780px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 32px 36px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
+        }
+        .slip-header {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 2px solid #0d6535;
+            padding-bottom: 14px;
+            margin-bottom: 18px;
+        }
+        .slip-org h2 {
+            margin: 0 0 4px;
+            font-size: 16px;
+            color: #0d6535;
+        }
+        .slip-org p {
+            margin: 0;
+            font-size: 12px;
+            color: #475569;
+        }
+        .slip-meta {
+            text-align: right;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+        .slip-title {
+            text-align: center;
+            margin: 0 0 18px;
+            font-size: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px 20px;
+            font-size: 13px;
+            margin-bottom: 18px;
+            padding: 12px 14px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+        }
+        .info-grid .full {
+            grid-column: 1 / -1;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            margin-bottom: 16px;
+        }
+        th, td {
+            border: 1px solid #cbd5e1;
+            padding: 9px 10px;
+            text-align: left;
+        }
+        th {
+            background: #f1f5f9;
+            font-weight: 700;
+        }
+        .num {
+            text-align: right;
+        }
+        .center {
+            text-align: center;
+        }
+        .total-row td {
+            font-weight: 700;
+            background: #f0fdf4;
+            color: #0d6535;
+        }
+        .notice-box {
+            padding: 12px 14px;
+            border-left: 4px solid #0d6535;
+            background: #f0fdf4;
+            font-size: 13px;
+            line-height: 1.5;
+            margin-bottom: 24px;
+        }
+        .sign-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 28px;
+            font-size: 13px;
+        }
+        .sign-box {
+            text-align: center;
+            width: 240px;
+        }
+        .sign-box .role {
+            font-weight: 700;
+            margin-bottom: 54px;
+        }
+        @@media print {
+            body {
+                background: #fff;
+                padding: 0;
+            }
+            .slip-toolbar {
+                display: none;
+            }
+            .slip-sheet {
+                box-shadow: none;
+                padding: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="slip-toolbar">
+        <button type="button" class="slip-btn" onclick="downloadSlipHtml()">Tải file phiếu (.html)</button>
+        <button type="button" class="slip-btn primary" onclick="window.print()">In / Lưu PDF</button>
+    </div>
+
+    <div class="slip-sheet" id="slipSheet">
+        <div class="slip-header">
+            <div class="slip-org">
+                <h2>BỆNH VIỆN ĐA KHOA MEDICARE</h2>
+                <p>Khoa: @Model.DepartmentName</p>
+            </div>
+            <div class="slip-meta">
+                <div><strong>Mã lịch khám:</strong> @Model.AppointmentCode</div>
+                <div><strong>Mã bệnh nhân:</strong> @Model.PatientCode</div>
+                <div><strong>Ngày chỉ định:</strong> @Model.CreatedAt.ToString("dd/MM/yyyy HH:mm")</div>
+            </div>
+        </div>
+
+        <h1 class="slip-title">Phiếu Chỉ Định Cận Lâm Sàng</h1>
+
+        <div class="info-grid">
+            <div><strong>Họ và tên:</strong> @Model.PatientName</div>
+            <div><strong>Tuổi / Giới tính:</strong> @Model.Age tuổi · @Model.Gender</div>
+            <div><strong>Số điện thoại:</strong> @(string.IsNullOrWhiteSpace(Model.PhoneNumber) ? "—" : Model.PhoneNumber)</div>
+            <div><strong>Bác sĩ chỉ định:</strong> @Model.DoctorName</div>
+            <div class="full"><strong>Địa chỉ:</strong> @(string.IsNullOrWhiteSpace(Model.Address) ? "—" : Model.Address)</div>
+            @if (!string.IsNullOrWhiteSpace(Model.Symptoms) || !string.IsNullOrWhiteSpace(Model.ClinicalExamination))
+            {
+                <div class="full">
+                    <strong>Tóm tắt lâm sàng:</strong>
+                    @string.Join(" · ", new[] { Model.Symptoms, Model.ClinicalExamination }.Where(x => !string.IsNullOrWhiteSpace(x)))
+                </div>
+            }
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th class="center" style="width:46px;">STT</th>
+                    <th>Tên dịch vụ / Xét nghiệm</th>
+                    <th>Ghi chú lâm sàng</th>
+                    <th class="num" style="width:140px;">Đơn giá (VNĐ)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Items.Count == 0)
+                {
+                    <tr>
+                        <td colspan="4" class="center">Không có dịch vụ chỉ định nào.</td>
+                    </tr>
+                }
+                else
+                {
+                    for (var i = 0; i < Model.Items.Count; i++)
+                    {
+                        var item = Model.Items[i];
+                        <tr>
+                            <td class="center">@(i + 1)</td>
+                            <td><strong>@item.ServiceName</strong></td>
+                            <td>@(string.IsNullOrWhiteSpace(item.Note) ? "—" : item.Note)</td>
+                            <td class="num">@item.Price.ToString("N0") đ</td>
+                        </tr>
+                    }
+                }
+                <tr class="total-row">
+                    <td colspan="3" class="num">Tổng tiền dịch vụ cần đóng tạm ứng:</td>
+                    <td class="num">@Model.TotalAmount.ToString("N0") đ</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="notice-box">
+            <strong>Hướng dẫn thanh toán tạm ứng:</strong> Người bệnh mang phiếu này tới quầy <strong>Lễ tân / Thu ngân</strong>, đọc mã bệnh nhân <strong>@Model.PatientCode</strong> để đóng tạm ứng số tiền <strong>@Model.TotalAmount.ToString("N0") đ</strong> trước khi thực hiện cận lâm sàng. Khoản tạm ứng này sẽ được tự động cấn trừ khi quyết toán cuối ca khám.
+        </div>
+
+        <div class="sign-row">
+            <div class="sign-box">
+                <div class="role">Người bệnh / Người nhà</div>
+                <div>(Ký, ghi rõ họ tên)</div>
+            </div>
+            <div class="sign-box">
+                <div class="role">Bác sĩ chỉ định</div>
+                <div><strong>@Model.DoctorName</strong></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function downloadSlipHtml() {
+            const clone = document.documentElement.cloneNode(true);
+            const toolbar = clone.querySelector('.slip-toolbar');
+            if (toolbar) toolbar.remove();
+            const html = '<!DOCTYPE html>\n' + clone.outerHTML;
+            const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'PhieuChiDinh_@(Model.AppointmentCode).html';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>

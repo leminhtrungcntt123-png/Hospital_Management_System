@@ -65,3 +65,16 @@ public record CreateMedicalRecordRequest
         IpAddress = ipAddress;
     }
 }
+
+public sealed class CompleteRecordAfterLabsRequest
+{
+    public int MedicalRecordId { get; set; }
+    public int DoctorId { get; set; }
+    public string? PrimaryDiagnosisCode { get; set; }
+    public string? PrimaryDiagnosisDesc { get; set; }
+    public string? SecondaryDiagnosis { get; set; }
+    public string? Conclusion { get; set; }
+    public string? PrescriptionNote { get; set; }
+    public string? IpAddress { get; set; }
+    public List<CreatePrescriptionItemDto> PrescriptionItems { get; set; } = [];
+}

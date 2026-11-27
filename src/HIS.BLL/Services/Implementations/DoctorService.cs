@@ -246,9 +246,12 @@ public class DoctorService : IDoctorService
         }
 
         // Tạo các chỉ định cận lâm sàng nếu có
-        if (request.LabOrders != null && request.LabOrders.Count > 0)
+        var validLabs = (request.LabOrders ?? []).Where(l => l.ServiceId > 0).ToList();
+        bool waitingForLabs = validLabs.Count > 0;
+
+        if (waitingForLabs)
         {
-            foreach (var lab in request.LabOrders.Where(l => l.ServiceId > 0))
+            foreach (var lab in validLabs)
             {
                 _context.LabOrders.Add(new LabOrder
                 {
@@ -261,8 +264,8 @@ public class DoctorService : IDoctorService
             }
         }
 
-        // Tạo đơn thuốc và các chi tiết thuốc nếu có
-        if (request.PrescriptionItems != null && request.PrescriptionItems.Count > 0)
+        // Tạo đơn thuốc và các chi tiết thuốc nếu có (khi hoàn tất khám luôn)
+        if (!waitingForLabs && request.PrescriptionItems != null && request.PrescriptionItems.Count > 0)
         {
             var validMeds = request.PrescriptionItems.Where(p => p.MedicationId > 0 && p.Quantity > 0).ToList();
             if (validMeds.Count > 0)
@@ -290,11 +293,11 @@ public class DoctorService : IDoctorService
             }
         }
 
-        // Chuyển trạng thái lượt khám sang Completed và ghi nhận lịch sử trạng thái
-        if (oldStatus != AppointmentStatusId.Completed)
+        // Chỉ chuyển sang Completed khi không có chỉ định chờ kết quả; nếu có chỉ định giữ InProgress để bác sĩ chẩn đoán tiếp ở tab Chỉ định & kết quả
+        appointment.UpdatedAt = now;
+        if (!waitingForLabs && oldStatus != AppointmentStatusId.Completed)
         {
             appointment.StatusId = (int)AppointmentStatusId.Completed;
-            appointment.UpdatedAt = now;
 
             _context.AppointmentStatusHistories.Add(new AppointmentStatusHistory
             {
@@ -308,5 +311,151 @@ public class DoctorService : IDoctorService
 
         await _context.SaveChangesAsync(cancellationToken);
         return record.Id;
+    }
+
+    public async Task<Result> SaveLabResultAsync(int doctorAccountId, int labOrderId, string resultText, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(resultText))
+        {
+            return Result.Failure("Validation", "Vui lòng nhập nội dung kết quả cận lâm sàng.");
+        }
+
+        var doctor = await _context.Doctors.AsNoTracking().FirstOrDefaultAsync(d => d.AccountId == doctorAccountId, cancellationToken);
+        var deptHead = doctor == null
+            ? await _context.DepartmentHeads.AsNoTracking().FirstOrDefaultAsync(dh => dh.AccountId == doctorAccountId, cancellationToken)
+            : null;
+        if (doctor == null && deptHead == null)
+        {
+            return Result.Failure("Forbidden", "Tài khoản không có quyền cập nhật kết quả chỉ định.");
+        }
+
+        var departmentId = doctor?.DepartmentId ?? deptHead!.DepartmentId;
+        var labOrder = await _context.LabOrders
+            .Include(l => l.LabResult)
+            .Include(l => l.MedicalRecord).ThenInclude(r => r.Doctor)
+            .FirstOrDefaultAsync(l => l.Id == labOrderId, cancellationToken);
+
+        if (labOrder == null)
+        {
+            return Result.Failure("NotFound", "Không tìm thấy phiếu chỉ định cận lâm sàng.");
+        }
+
+        if (labOrder.MedicalRecord.Doctor.DepartmentId != departmentId)
+        {
+            return Result.Failure("Forbidden", "Chỉ định này thuộc khoa khác.");
+        }
+
+        var now = _timeProvider.GetLocalNow().DateTime;
+        if (labOrder.LabResult == null)
+        {
+            _context.LabResults.Add(new LabResult
+            {
+                OrderId = labOrder.Id,
+                Result = resultText.Trim(),
+                PerformedBy = doctorAccountId,
+                RecordedAt = now
+            });
+        }
+        else
+        {
+            labOrder.LabResult.Result = resultText.Trim();
+            labOrder.LabResult.PerformedBy = doctorAccountId;
+            labOrder.LabResult.RecordedAt = now;
+        }
+
+        labOrder.Status = LabOrderStatus.Completed;
+        await _context.SaveChangesAsync(cancellationToken);
+        return Result.Success();
+    }
+
+    public async Task<Result> CompleteRecordAfterLabsAsync(CompleteRecordAfterLabsRequest request, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.PrimaryDiagnosisCode) || string.IsNullOrWhiteSpace(request.PrimaryDiagnosisDesc))
+        {
+            return Result.Failure("Validation", "Vui lòng nhập đầy đủ mã ICD-10 và chẩn đoán chính.");
+        }
+
+        var doctor = await _context.Doctors.AsNoTracking().FirstOrDefaultAsync(d => d.Id == request.DoctorId, cancellationToken);
+        if (doctor == null)
+        {
+            return Result.Failure("NotFound", "Không tìm thấy thông tin bác sĩ.");
+        }
+
+        var record = await _context.MedicalRecords
+            .Include(r => r.Appointment)
+            .FirstOrDefaultAsync(r => r.Id == request.MedicalRecordId, cancellationToken);
+
+        if (record == null)
+        {
+            return Result.Failure("NotFound", "Không tìm thấy hồ sơ bệnh án.");
+        }
+
+        if (record.Appointment.DepartmentId != doctor.DepartmentId || record.DoctorId != doctor.Id)
+        {
+            return Result.Failure("Forbidden", "Bạn không có quyền hoàn tất bệnh án này.");
+        }
+
+        if (record.Appointment.StatusId != (int)AppointmentStatusId.InProgress
+            || !AppointmentStateMachine.CanTransition(AppointmentStatusId.InProgress, AppointmentStatusId.Completed))
+        {
+            return Result.Failure("InvalidState", "Ca khám này đã được hoàn tất hoặc không ở trạng thái chờ kết quả.");
+        }
+
+        var now = _timeProvider.GetLocalNow().DateTime;
+        record.PrimaryDiagnosisCode = request.PrimaryDiagnosisCode.Trim();
+        record.PrimaryDiagnosisDesc = request.PrimaryDiagnosisDesc.Trim();
+        record.SecondaryDiagnosis = string.IsNullOrWhiteSpace(request.SecondaryDiagnosis) ? null : request.SecondaryDiagnosis.Trim();
+        record.Conclusion = string.IsNullOrWhiteSpace(request.Conclusion) ? "Đã hoàn tất khám sau cận lâm sàng" : request.Conclusion.Trim();
+        record.UpdatedAt = now;
+
+        var validMeds = (request.PrescriptionItems ?? []).Where(p => p.MedicationId > 0 && p.Quantity > 0).ToList();
+        if (validMeds.Count > 0)
+        {
+            var prescription = new Prescription
+            {
+                MedicalRecordId = record.Id,
+                PrescribedDate = DateOnly.FromDateTime(now),
+                Note = string.IsNullOrWhiteSpace(request.PrescriptionNote) ? null : request.PrescriptionNote.Trim()
+            };
+            _context.Prescriptions.Add(prescription);
+
+            foreach (var med in validMeds)
+            {
+                _context.PrescriptionItems.Add(new PrescriptionItem
+                {
+                    Prescription = prescription,
+                    MedicationId = med.MedicationId,
+                    Quantity = med.Quantity,
+                    Dosage = string.IsNullOrWhiteSpace(med.Dosage) ? null : med.Dosage.Trim(),
+                    DurationDays = med.DurationDays,
+                    UsageInstructions = string.IsNullOrWhiteSpace(med.UsageInstructions) ? null : med.UsageInstructions.Trim()
+                });
+            }
+        }
+
+        record.Appointment.StatusId = (int)AppointmentStatusId.Completed;
+        record.Appointment.UpdatedAt = now;
+
+        _context.AppointmentStatusHistories.Add(new AppointmentStatusHistory
+        {
+            AppointmentId = record.AppointmentId,
+            OldStatusId = (int)AppointmentStatusId.InProgress,
+            NewStatusId = (int)AppointmentStatusId.Completed,
+            PerformedBy = doctor.AccountId,
+            ChangedAt = now
+        });
+
+        _context.AccessLogs.Add(new AccessLog
+        {
+            AccountId = doctor.AccountId,
+            PatientId = record.Appointment.PatientId,
+            MedicalRecordId = record.Id,
+            Action = "UPDATE_RECORD",
+            OccurredAt = now,
+            IpAddress = request.IpAddress
+        });
+
+        await _context.SaveChangesAsync(cancellationToken);
+        return Result.Success();
     }
 }
