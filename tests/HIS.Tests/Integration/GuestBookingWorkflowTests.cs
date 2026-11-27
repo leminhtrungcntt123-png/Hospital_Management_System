@@ -166,7 +166,11 @@ public static class GuestBookingScenario
         Assert.Contains("appointmentCode", await booked.Content.ReadAsStringAsync());
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/Booking/Confirm", request)).StatusCode);
         request.StartTime = request.StartTime.AddHours(10);
-        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/Booking/Confirm", request)).StatusCode);
+        for (var i = 0; i < 16; i++)
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/Booking/Confirm", request)).StatusCode);
+        }
+
         Assert.Equal(HttpStatusCode.TooManyRequests, (await client.PostAsJsonAsync("/Booking/Confirm", request)).StatusCode);
     }
 

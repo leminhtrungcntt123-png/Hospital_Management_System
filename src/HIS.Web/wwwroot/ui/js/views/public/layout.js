@@ -31,7 +31,10 @@ function publicShell() {
     ];
     return `<div class="public-app hospital-portal">
         <a class="skip-link" href="#portal-main">Đến nội dung chính</a>
-        <div class="utility-bar"><div><span>${icon('building')}Bệnh viện MediCare</span><span>Chăm sóc bạn và gia đình</span></div></div>
+        <div class="utility-bar"><div><span>${icon('building')}Bệnh viện MediCare</span><span>Chăm sóc bạn và gia đình</span>
+            ${config.authenticated && config.role === 'PATIENT'
+                ? link('Lịch hẹn của tôi', 'patient/appointments', 'clock')
+                : ''}</div></div>
         <header class="public-header"><div class="header-inner">
             ${link(brand(), 'public/home', '', 'brand-link')}
             <nav id="portal-navigation" class="public-nav ${ui.mobileMenu ? 'open' : ''}" aria-label="Điều hướng chính">

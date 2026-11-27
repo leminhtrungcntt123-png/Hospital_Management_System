@@ -20,6 +20,119 @@ public sealed class GuestBookingService(
     private DateTime Now => DateTime.SpecifyKind(clock.GetLocalNow().DateTime, DateTimeKind.Unspecified);
     private DateOnly Today => DateOnly.FromDateTime(Now);
 
+    public async Task<Result<IReadOnlyList<DateOnly>>> GetAvailableDatesAsync(
+        int doctorId,
+        int days = 7,
+        CancellationToken ct = default)
+    {
+        if (doctorId <= 0)
+        {
+            return Result.Failure<IReadOnlyList<DateOnly>>("InvalidDoctor", "Vui lòng chọn bác sĩ hợp lệ.");
+        }
+
+        var maxDaysAhead = Math.Max(1, options.Value.SlotGenerationDaysAhead);
+        var windowDays = Math.Clamp(days, 1, maxDaysAhead + 1);
+        var startDate = Today;
+        var endDate = Today.AddDays(Math.Min(windowDays - 1, maxDaysAhead));
+
+        var schedules = await db.DoctorSchedules
+            .AsNoTracking()
+            .Include(s => s.Room)
+            .Include(s => s.Doctor)
+            .Where(s => s.DoctorId == doctorId
+                && s.Doctor.Account.IsActive
+                && s.Doctor.Account.Role.Code == "DOCTOR"
+                && s.RoomId.HasValue
+                && s.Room != null
+                && s.Room.DepartmentId == s.Doctor.DepartmentId
+                && s.Status == DoctorScheduleStatus.Approved
+                && s.WorkDate >= startDate
+                && s.WorkDate <= endDate
+                && !db.ScheduleExceptions.Any(e => e.DoctorId == doctorId
+                    && e.Date == s.WorkDate
+                    && e.Status == ScheduleExceptionStatus.Approved
+                    && (e.Shift == null || e.Shift == s.Shift)))
+            .OrderBy(s => s.WorkDate)
+            .ThenBy(s => s.StartTime)
+            .ToListAsync(ct);
+
+        if (schedules.Count == 0)
+        {
+            return Result.Success<IReadOnlyList<DateOnly>>(Array.Empty<DateOnly>());
+        }
+
+        var rangeStart = startDate.ToDateTime(TimeOnly.MinValue);
+        var rangeEnd = endDate.AddDays(1).ToDateTime(TimeOnly.MinValue);
+        var slots = await db.AppointmentSlots
+            .AsNoTracking()
+            .Where(s => s.DoctorId == doctorId && s.StartTime >= rangeStart && s.StartTime < rangeEnd)
+            .ToListAsync(ct);
+
+        var slotsByDate = slots
+            .GroupBy(s => DateOnly.FromDateTime(s.StartTime))
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var availableDates = new List<DateOnly>();
+        foreach (var group in schedules.GroupBy(s => s.WorkDate).OrderBy(g => g.Key))
+        {
+            var date = group.Key;
+            slotsByDate.TryGetValue(date, out var daySlots);
+            daySlots ??= [];
+
+            var hasAvailableSlot = false;
+            foreach (var schedule in group)
+            {
+                var start = date.ToDateTime(schedule.StartTime);
+                var end = date.ToDateTime(schedule.EndTime);
+                if (schedule.SlotDurationMinutes <= 0 || end <= start)
+                {
+                    continue;
+                }
+
+                var count = (int)((end - start).TotalMinutes / schedule.SlotDurationMinutes);
+                if (count <= 0)
+                {
+                    continue;
+                }
+
+                for (var index = 0; index < count; index++)
+                {
+                    var time = start.AddMinutes(index * schedule.SlotDurationMinutes);
+                    if (time <= Now)
+                    {
+                        continue;
+                    }
+
+                    var existing = daySlots.SingleOrDefault(s => s.StartTime == time);
+                    if (existing != null && (existing.Status != SlotStatus.Available || existing.RoomId != schedule.RoomId
+                        || existing.EndTime != time.AddMinutes(schedule.SlotDurationMinutes)))
+                    {
+                        continue;
+                    }
+
+                    var available = (existing?.Capacity ?? 1) - (existing?.BookedCount ?? 0);
+                    if (available > 0)
+                    {
+                        hasAvailableSlot = true;
+                        break;
+                    }
+                }
+
+                if (hasAvailableSlot)
+                {
+                    break;
+                }
+            }
+
+            if (hasAvailableSlot)
+            {
+                availableDates.Add(date);
+            }
+        }
+
+        return Result.Success<IReadOnlyList<DateOnly>>(availableDates);
+    }
+
     public async Task<Result<IReadOnlyList<GuestBookingSlot>>> GetSlotsAsync(
         int doctorId,
         DateOnly date,
@@ -88,6 +201,35 @@ public sealed class GuestBookingService(
             }
         }
         return Result.Success<IReadOnlyList<GuestBookingSlot>>(result);
+    }
+
+    public async Task<Result<int>> GetSlotRemainingAsync(
+        int scheduleId,
+        DateTime startTime,
+        CancellationToken ct = default)
+    {
+        if (scheduleId <= 0 || startTime == default)
+        {
+            return Result.Failure<int>("SlotUnavailable", "Lịch khám không còn khả dụng. Hãy chọn lại.");
+        }
+
+        var normalizedStart = DateTime.SpecifyKind(startTime, DateTimeKind.Unspecified);
+        var schedule = await db.DoctorSchedules
+            .AsNoTracking()
+            .SingleOrDefaultAsync(s => s.Id == scheduleId, ct);
+        if (schedule == null)
+        {
+            return Result.Failure<int>("SlotUnavailable", "Lịch khám không còn khả dụng. Hãy chọn lại.");
+        }
+
+        var available = await GetSlotsAsync(schedule.DoctorId, DateOnly.FromDateTime(normalizedStart), ct);
+        var choice = available.Value?.SingleOrDefault(s => s.ScheduleId == scheduleId && s.StartTime == normalizedStart);
+        if (!available.IsSuccess || choice == null || choice.Remaining <= 0)
+        {
+            return Result.Failure<int>("SlotUnavailable", "Khung giờ khám đã trôi qua hoặc vừa hết chỗ. Hãy chọn lại khung giờ khác.");
+        }
+
+        return Result.Success(choice.Remaining);
     }
 
     public async Task<Result<GuestBookingReceipt>> ConfirmAsync(
@@ -198,6 +340,18 @@ public sealed class GuestBookingService(
                         CreatedAt = Now
                     };
                 }
+                var contactEmail = string.IsNullOrWhiteSpace(request.Email)
+                    ? null
+                    : request.Email.Trim().ToLowerInvariant();
+                if (contactEmail == null && request.BookedByAccountId.HasValue)
+                {
+                    contactEmail = await db.Accounts
+                        .AsNoTracking()
+                        .Where(a => a.Id == request.BookedByAccountId.Value)
+                        .Select(a => a.Email)
+                        .FirstOrDefaultAsync(ct);
+                }
+
                 var appointment = new Appointment
                 {
                     AppointmentCode = "HIS-" + Today.ToString("yyyyMMdd") + "-" + RandomNumberGenerator.GetString("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", 6),
@@ -210,6 +364,7 @@ public sealed class GuestBookingService(
                     BookingChannel = BookingChannel.Web,
                     VisitType = VisitType.Scheduled,
                     BookedBy = request.BookedByAccountId,
+                    ContactEmail = contactEmail,
                     Reason = string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim(),
                     CreatedAt = Now,
                     UpdatedAt = Now

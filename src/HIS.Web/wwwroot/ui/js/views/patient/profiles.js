@@ -377,17 +377,7 @@ async function submitAddRelative() {
     }
 }
 
-function appointmentsPage() {
-    return `${heading('Lịch hẹn của tôi', 'Theo dõi trạng thái lịch khám và thông tin tiếp nhận.', link('Đặt lịch khám', 'public/booking', 'plus', 'btn primary'))}
-        ${unavailableNotice()}${pendingTable('Danh sách lịch hẹn', ['Mã lịch', 'Người khám', 'Bác sĩ / phòng', 'Ngày giờ', 'Trạng thái'])}`;
-}
-
 function recordsPage() {
     return `${heading('Hồ sơ sức khỏe', 'Bệnh án, kết quả và đơn thuốc được cung cấp theo quyền truy cập của tài khoản.')}
         ${unavailableNotice()}${pendingTable('Hồ sơ khám bệnh', ['Ngày khám', 'Người khám', 'Chuyên khoa', 'Bác sĩ', 'Kết quả'])}`;
-}
-
-function notificationsPage() {
-    return `${heading('Thông báo', 'Theo dõi cập nhật về lịch hẹn và hồ sơ của bạn.', unavailableButton('Đánh dấu đã đọc', 'check'))}
-        ${unavailableNotice()}${pendingTable('Thông báo của bạn', ['Thời gian', 'Nội dung', 'Trạng thái'])}`;
 }

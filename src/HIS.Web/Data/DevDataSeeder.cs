@@ -26,6 +26,7 @@ public static class DevDataSeeder
 
         try
         {
+            await db.Database.ExecuteSqlRawAsync("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS contact_email character varying(100);");
             var passwordHash = BCrypt.Net.BCrypt.HashPassword(defaultPassword);
 
             // 1. TÀI KHOẢN ADMIN

@@ -1,9 +1,14 @@
 let guestBooking;
 function resetGuestBooking() {
+    const presetDoctorId = config.selectedDoctorId || '';
     guestBooking = {
-        doctorId: config.selectedDoctorId || '',
+        doctorId: presetDoctorId,
         department: '',
-        date: config.bookingMinDate || '',
+        date: '',
+        availableDates: [],
+        datesStatus: 'idle',
+        datesError: '',
+        showCustomDate: false,
         slots: [],
         selected: '',
         status: 'idle',
@@ -22,7 +27,7 @@ function resetGuestBooking() {
             patientId: null,
         },
         step: 'form', // 'form' or 'confirm'
-        bookingMethod: 'dept', // 'dept' or 'doctor'
+        bookingMethod: presetDoctorId ? 'doctor' : 'dept', // 'dept' or 'doctor'
         bookFor: 'self',
         agreePolicy: false,
         otpCode: '',
@@ -36,13 +41,58 @@ function resetGuestBooking() {
 resetGuestBooking();
 
 function ensureGuestSlots() {
-    if (
-        catalog.status === 'ready' &&
-        guestBooking.doctorId &&
-        guestBooking.date &&
-        guestBooking.status === 'idle'
-    )
+    if (catalog.status !== 'ready') return;
+    if (guestBooking.doctorId && !guestBooking.department) {
+        const doc = catalog.doctors.find((d) => String(d.id) === guestBooking.doctorId);
+        if (doc?.department) {
+            guestBooking.department = doc.department;
+            render();
+            return;
+        }
+    }
+    if (guestBooking.doctorId && guestBooking.datesStatus === 'idle') {
+        loadGuestAvailableDates();
+    }
+    if (guestBooking.doctorId && guestBooking.date && guestBooking.status === 'idle') {
         loadGuestSlots();
+    }
+}
+
+async function loadGuestAvailableDates() {
+    const key = guestBooking.doctorId;
+    if (!key) return;
+    guestBooking.datesStatus = 'loading';
+    guestBooking.datesError = '';
+    guestBooking.availableDates = [];
+    render();
+    try {
+        const query = new URLSearchParams({
+            doctorId: guestBooking.doctorId,
+            days: '7',
+        });
+        const response = await fetch(
+            (config.bookingAvailableDatesUrl || '/Booking/AvailableDates') + '?' + query,
+            {
+                credentials: 'same-origin',
+                cache: 'no-store',
+            },
+        );
+        const body = await response.json();
+        if (!response.ok || !Array.isArray(body.dates)) {
+            throw new Error(body.message || 'Chưa tải được ngày khám khả dụng. Vui lòng thử lại.');
+        }
+        if (key !== guestBooking.doctorId) return;
+        guestBooking.availableDates = body.dates;
+        guestBooking.datesStatus = 'ready';
+        if (body.dates.length === 0) {
+            guestBooking.showCustomDate = true;
+        }
+    } catch (error) {
+        if (key !== guestBooking.doctorId) return;
+        guestBooking.datesStatus = 'error';
+        guestBooking.datesError = error.message;
+    }
+    render();
 }
 
 async function loadGuestSlots() {
@@ -75,6 +125,60 @@ async function loadGuestSlots() {
     render();
 }
 
+function switchBookingMethod(method) {
+    if (guestBooking.submitting || guestBooking.bookingMethod === method) return;
+    guestBooking.bookingMethod = method;
+    guestBooking.department = '';
+    guestBooking.doctorId = '';
+    guestBooking.date = '';
+    guestBooking.availableDates = [];
+    guestBooking.datesStatus = 'idle';
+    guestBooking.datesError = '';
+    guestBooking.showCustomDate = false;
+    guestBooking.slots = [];
+    guestBooking.selected = '';
+    guestBooking.status = 'idle';
+    guestBooking.error = '';
+    render();
+}
+
+function selectBookingDate(isoDate) {
+    if (guestBooking.submitting || !isoDate) return;
+    guestBooking.showCustomDate = false;
+    changeGuestChoice('date', isoDate);
+}
+
+function openCustomDatePicker() {
+    if (guestBooking.submitting) return;
+    guestBooking.showCustomDate = true;
+    render();
+    setTimeout(() => {
+        const input = document.getElementById('guest-custom-date');
+        if (input) {
+            input.focus();
+            if (typeof input.showPicker === 'function') {
+                try {
+                    input.showPicker();
+                } catch {
+                    // Trình duyệt chặn showPicker ngoài cử chỉ trực tiếp
+                }
+            }
+        }
+    }, 30);
+}
+
+function formatBookingDayCard(isoDate) {
+    const parts = String(isoDate).split('-').map(Number);
+    if (parts.length !== 3 || parts.some(isNaN)) {
+        return { weekday: '', dayMonth: isoDate };
+    }
+    const d = new Date(parts[0], parts[1] - 1, parts[2]);
+    const weekdays = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+    const dd = String(parts[2]).padStart(2, '0');
+    const mm = String(parts[1]).padStart(2, '0');
+    return { weekday: weekdays[d.getDay()], dayMonth: `${dd}/${mm}` };
+}
+
 function changeGuestChoice(field, value) {
     if (guestBooking.submitting) return;
     if (field === 'slot') {
@@ -86,8 +190,28 @@ function changeGuestChoice(field, value) {
     if (field === 'department') {
         guestBooking.department = value;
         guestBooking.doctorId = '';
-    } else if (field === 'doctor') guestBooking.doctorId = value;
-    else if (field === 'date') guestBooking.date = value;
+        guestBooking.date = '';
+        guestBooking.availableDates = [];
+        guestBooking.datesStatus = 'idle';
+        guestBooking.datesError = '';
+        guestBooking.showCustomDate = false;
+    } else if (field === 'doctor') {
+        guestBooking.doctorId = value;
+        if (guestBooking.bookingMethod === 'doctor') {
+            const doc = catalog.doctors.find((d) => String(d.id) === value);
+            guestBooking.department = doc?.department || '';
+        }
+        guestBooking.date = '';
+        guestBooking.availableDates = [];
+        guestBooking.datesStatus = 'idle';
+        guestBooking.datesError = '';
+        guestBooking.showCustomDate = false;
+    } else if (field === 'date') {
+        guestBooking.date = value;
+        if (value && guestBooking.availableDates.includes(value)) {
+            guestBooking.showCustomDate = false;
+        }
+    }
     guestBooking.slots = [];
     guestBooking.selected = '';
     guestBooking.error = '';
@@ -244,7 +368,7 @@ function proceedToConfirmation() {
         render();
         return;
     }
-    if (!p.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.email.trim())) {
+    if (!config.authenticated && (!p.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.email.trim()))) {
         guestBooking.error = 'Vui lòng nhập địa chỉ Email chính xác để nhận mã OTP và phiếu hẹn.';
         render();
         return;
@@ -275,6 +399,16 @@ async function requestBookingOtp() {
 
     if (!guestBooking.agreePolicy) {
         guestBooking.error = 'Vui lòng tích đồng ý với Chính sách bảo vệ dữ liệu cá nhân của MediCare.';
+        render();
+        return;
+    }
+
+    if (config.authenticated) {
+        guestBooking.otpSending = true;
+        guestBooking.error = '';
+        render();
+        await submitGuestBooking(null);
+        guestBooking.otpSending = false;
         render();
         return;
     }
@@ -326,6 +460,9 @@ async function requestBookingOtp() {
 
         openOtpModal();
     } catch (err) {
+        if (/hết chỗ|trôi qua|không còn khả dụng|giữ chỗ/i.test(err.message)) {
+            await loadGuestSlots();
+        }
         guestBooking.error = err.message;
     } finally {
         guestBooking.otpSending = false;
@@ -435,19 +572,77 @@ async function submitGuestBooking(otpOverride) {
             throw new Error(body.message || 'Chưa thể xác nhận lịch. Vui lòng thử lại sau.');
         guestBooking.receipt = body.receipt;
         guestBooking.submitting = false;
+        if (typeof patientAppointmentsState !== 'undefined') {
+            patientAppointmentsState.status = 'idle';
+        }
         render();
         document.querySelector('.booking-receipt h1, .booking-error')?.focus();
         return true;
     } catch (error) {
-        guestBooking.error = error.message;
         guestBooking.submitting = false;
+        if (/hết chỗ|trôi qua|không còn khả dụng|thay đổi/i.test(error.message)) {
+            await loadGuestSlots();
+        }
+        guestBooking.error = error.message;
         render();
         return false;
     }
 }
 
+function guestDatesMarkup() {
+    if (!guestBooking.doctorId) return '';
+
+    if (guestBooking.datesStatus === 'loading') {
+        return '<p class="slot-empty" role="status">Đang tải các ngày khám khả dụng trong 7 ngày gần nhất…</p>';
+    }
+    if (guestBooking.datesStatus === 'error') {
+        return `<p class="slot-empty" role="alert">${esc(guestBooking.datesError || 'Chưa tải được danh sách ngày khám.')}</p><button type="button" class="btn outline mt-2" onclick="loadGuestAvailableDates()">Tải lại ngày khám</button>`;
+    }
+
+    const dates = guestBooking.availableDates || [];
+    const isCustomSelected = Boolean(guestBooking.date && !dates.includes(guestBooking.date));
+    const customLabel = isCustomSelected ? formatBookingDayCard(guestBooking.date) : null;
+    const calendarSvg = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`;
+
+    return `
+        ${
+            dates.length === 0
+                ? '<p class="slot-empty mb-2">Bác sĩ hiện chưa có lịch trống trong 7 ngày gần nhất. Vui lòng chọn <strong>Ngày khác</strong> để kiểm tra thêm lịch trống.</p>'
+                : ''
+        }
+        <div class="booking-date-grid" role="group" aria-label="Chọn ngày khám">
+            ${dates
+                .map((iso) => {
+                    const { weekday, dayMonth } = formatBookingDayCard(iso);
+                    const active = guestBooking.date === iso;
+                    return `<button type="button" class="booking-date-card ${active ? 'active' : ''}" onclick="selectBookingDate('${esc(iso)}')" aria-pressed="${active ? 'true' : 'false'}">
+                        <span class="date-weekday">${esc(weekday)}</span>
+                        <strong class="date-daymonth">${esc(dayMonth)}</strong>
+                    </button>`;
+                })
+                .join('')}
+            <button type="button" class="booking-date-card booking-date-card-other ${isCustomSelected || guestBooking.showCustomDate ? 'active' : ''}" onclick="openCustomDatePicker()">
+                <span class="date-weekday">${isCustomSelected ? esc(customLabel.weekday) : 'Ngày khác'}</span>
+                ${
+                    isCustomSelected
+                        ? `<strong class="date-daymonth">${esc(customLabel.dayMonth)}</strong>`
+                        : `<span class="date-other-icon">${calendarSvg}</span>`
+                }
+            </button>
+        </div>
+        ${
+            guestBooking.showCustomDate
+                ? `<div class="custom-date-picker-row">
+                    <label for="guest-custom-date">Chọn ngày khám khác</label>
+                    <input id="guest-custom-date" data-booking-choice="date" type="date" value="${esc(guestBooking.date)}" min="${esc(config.bookingMinDate)}" max="${esc(config.bookingMaxDate)}" />
+                </div>`
+                : ''
+        }
+    `;
+}
+
 function guestSlotsMarkup() {
-    if (!guestBooking.doctorId) return '<p class="slot-empty">Chọn bác sĩ để xem khung giờ.</p>';
+    if (!guestBooking.doctorId || !guestBooking.date) return '';
     if (guestBooking.status === 'loading')
         return '<p class="slot-empty" role="status">Đang tải khung giờ…</p>';
     if (guestBooking.status === 'error')
@@ -496,7 +691,7 @@ function guestBookingPage() {
     <div class="medicare-booking-wrapper">
         <div class="medicare-booking-header">
             <h1>Đặt lịch khám</h1>
-            <p>Vui lòng điền thông tin để chúng tôi có thể hỗ trợ bạn tốt nhất (Không cần đăng nhập).</p>
+            <p>${config.authenticated ? 'Vui lòng kiểm tra và xác nhận thông tin đặt lịch khám của bạn.' : 'Vui lòng điền thông tin để chúng tôi có thể hỗ trợ bạn tốt nhất (Không cần đăng nhập).'}</p>
         </div>
 
         <div class="medicare-booking-body">
@@ -510,17 +705,17 @@ function guestBookingPage() {
                     <div class="section-subtitle">Chọn chuyên khoa, bác sĩ và thời gian phù hợp với bạn.</div>
 
                     <!-- Phương thức khám -->
-                    <label class="form-label-title">Phương thức khám *</label>
+                    <label class="form-label-title">Phương thức khám <span class="req-star">*</span></label>
                     <div class="method-cards-grid">
                         <label class="method-card ${guestBooking.bookingMethod === 'dept' ? 'active' : ''}">
-                            <input type="radio" name="bookingMethod" value="dept" ${guestBooking.bookingMethod === 'dept' ? 'checked' : ''} onchange="guestBooking.bookingMethod='dept'; render();" />
+                            <input type="radio" name="bookingMethod" value="dept" ${guestBooking.bookingMethod === 'dept' ? 'checked' : ''} onchange="switchBookingMethod('dept')" />
                             <div class="method-card-content">
                                 <strong>Tôi chưa rõ nên khám bác sĩ nào</strong>
                                 <span>Chọn chuyên khoa, hệ thống gợi ý danh sách bác sĩ phù hợp</span>
                             </div>
                         </label>
                         <label class="method-card ${guestBooking.bookingMethod === 'doctor' ? 'active' : ''}">
-                            <input type="radio" name="bookingMethod" value="doctor" ${guestBooking.bookingMethod === 'doctor' ? 'checked' : ''} onchange="guestBooking.bookingMethod='doctor'; render();" />
+                            <input type="radio" name="bookingMethod" value="doctor" ${guestBooking.bookingMethod === 'doctor' ? 'checked' : ''} onchange="switchBookingMethod('doctor')" />
                             <div class="method-card-content">
                                 <strong>Tôi đã biết bác sĩ muốn khám</strong>
                                 <span>Tìm nhanh và đặt lịch trực tiếp với bác sĩ bạn đã chọn</span>
@@ -529,45 +724,67 @@ function guestBookingPage() {
                     </div>
 
                     <!-- Chuyên khoa & Bác sĩ -->
+                    ${
+                        guestBooking.bookingMethod === 'dept'
+                            ? `
                     <div class="form-row-2">
                         <div class="field">
-                            <label for="guest-department">Chuyên khoa</label>
-                            <select id="guest-department" data-booking-choice="department">
-                                <option value="">Tất cả chuyên khoa</option>
+                            <label for="guest-department">Chuyên khoa <span class="req-star">*</span></label>
+                            <select id="guest-department" data-booking-choice="department" required>
+                                <option value="">Chọn chuyên khoa</option>
                                 ${catalog.departments.map((dept) => `<option value="${esc(dept.name)}" ${guestBooking.department === dept.name ? 'selected' : ''}>${esc(dept.name)}</option>`).join('')}
                             </select>
                         </div>
                         <div class="field">
-                            <label for="guest-doctor">Bác sĩ *</label>
-                            <select id="guest-doctor" data-booking-choice="doctor" required>
-                                <option value="">Chọn bác sĩ</option>
-                                ${doctors.map((doctor) => `<option value="${esc(doctor.id)}" ${guestBooking.doctorId === String(doctor.id) ? 'selected' : ''}>${esc(doctor.name)} (${esc(doctor.department || '')})</option>`).join('')}
+                            <label for="guest-doctor">Bác sĩ</label>
+                            <select id="guest-doctor" data-booking-choice="doctor" class="${!guestBooking.department ? 'booking-control-muted' : ''}" ${!guestBooking.department ? 'disabled' : ''} required>
+                                ${
+                                    !guestBooking.department
+                                        ? '<option value="">Chọn chuyên khoa trước</option>'
+                                        : `<option value="">Chọn bác sĩ</option>${doctors.map((doctor) => `<option value="${esc(doctor.id)}" ${guestBooking.doctorId === String(doctor.id) ? 'selected' : ''}>${esc(doctor.name)}</option>`).join('')}`
+                                }
                             </select>
                         </div>
-                    </div>
+                    </div>`
+                            : `
+                    <div class="form-row-2">
+                        <div class="field">
+                            <label for="guest-doctor">Bác sĩ <span class="req-star">*</span></label>
+                            <select id="guest-doctor" data-booking-choice="doctor" required>
+                                <option value="">Chọn bác sĩ</option>
+                                ${catalog.doctors.map((doctor) => `<option value="${esc(doctor.id)}" ${guestBooking.doctorId === String(doctor.id) ? 'selected' : ''}>${esc(doctor.name)}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="guest-department-readonly">Chuyên khoa</label>
+                            <input id="guest-department-readonly" type="text" class="booking-control-muted" value="${esc(selectedDoctor?.department || guestBooking.department || '')}" placeholder="Chuyên khoa" disabled readonly />
+                        </div>
+                    </div>`
+                    }
 
+                    <!-- Ngày khám (hiện sau khi đã chọn bác sĩ) -->
                     ${
-                        selectedDoctor
-                            ? `<div class="selected-doctor-summary mt-3 p-3 bg-light rounded d-flex align-items-center gap-3">
-                                <div>
-                                    <h2 style="font-size:16px; margin:0 0 4px 0;">${esc(selectedDoctor.name)}</h2>
-                                    <p class="text-muted small mb-0">${esc(selectedDoctor.specialty || '')} · ${esc(selectedDoctor.department || '')}</p>
-                                </div>
-                            </div>`
+                        guestBooking.doctorId
+                            ? `
+                    <div class="booking-step-block mt-3">
+                        <label class="form-label-title">Ngày khám <span class="req-star">*</span></label>
+                        <p class="booking-helper-text">Dưới đây là các ngày khám khả dụng trong 7 ngày gần nhất. Nếu không có lịch phù hợp với bạn, vui lòng chọn Ngày khác để kiểm tra thêm lịch trống.</p>
+                        ${guestDatesMarkup()}
+                    </div>`
                             : ''
                     }
 
-                    <!-- Ngày khám -->
-                    <div class="field mt-3">
-                        <label for="guest-date">Ngày khám *</label>
-                        <input id="guest-date" data-booking-choice="date" type="date" value="${esc(guestBooking.date)}" min="${esc(config.bookingMinDate)}" max="${esc(config.bookingMaxDate)}" required />
-                    </div>
-
-                    <!-- Giờ khám (Slots) -->
+                    <!-- Giờ khám (hiện sau khi đã chọn ngày khám) -->
+                    ${
+                        guestBooking.doctorId && guestBooking.date
+                            ? `
                     <fieldset class="guest-slot-picker mt-3">
-                        <legend>Giờ khám (Ca 30 phút) *</legend>
+                        <legend>Giờ khám <span class="req-star">*</span></legend>
+                        <p class="booking-helper-text">Tổng đài viên MediCare sẽ liên hệ xác nhận thông tin thời gian dựa theo đăng ký và điều chỉnh nếu cần thiết.</p>
                         ${guestSlotsMarkup()}
-                    </fieldset>
+                    </fieldset>`
+                            : ''
+                    }
 
                     <!-- Phí khám dự kiến -->
                     <div class="medicare-fee-bar">
@@ -623,8 +840,8 @@ function guestBookingPage() {
 
                     <div class="form-row-2 mt-3">
                         <div class="field">
-                            <label for="guest-email">Địa chỉ Email (để nhận mã OTP và phiếu hẹn) *</label>
-                            <input id="guest-email" name="email" data-booking-field type="email" value="${esc(p.email || '')}" placeholder="name@example.com" required />
+                            <label for="guest-email">${config.authenticated ? 'Địa chỉ Email (để nhận phiếu hẹn)' : 'Địa chỉ Email (để nhận mã OTP và phiếu hẹn) *'}</label>
+                            <input id="guest-email" name="email" data-booking-field type="email" value="${esc(p.email || '')}" placeholder="name@example.com" ${config.authenticated ? '' : 'required'} />
                         </div>
                         <div class="field">
                             <label for="guest-code">Mã y tế (nếu có)</label>
@@ -698,7 +915,7 @@ function renderBookingConfirmationStep() {
             <!-- Checkbox cam kết chính sách -->
             <label class="confirm-policy-check mt-4">
                 <input type="checkbox" id="agreePolicyCheck" ${guestBooking.agreePolicy ? 'checked' : ''} onchange="guestBooking.agreePolicy = this.checked; render();" />
-                <span>Tôi đồng ý với <a href="#/public/guide" target="_blank">Chính sách bảo vệ dữ liệu cá nhân</a> của MediCare và chấp nhận để MediCare xử lý dữ liệu cá nhân của tôi theo quy định của pháp luật để bảo vệ dữ liệu cá nhân.</span>
+                <span>Tôi đồng ý với <a href="${esc(routeUrl('public/guide'))}" data-route="public/guide">Chính sách bảo vệ dữ liệu cá nhân</a> của MediCare và chấp nhận để MediCare xử lý dữ liệu cá nhân của tôi theo quy định của pháp luật để bảo vệ dữ liệu cá nhân.</span>
             </label>
 
             <!-- Buttons -->

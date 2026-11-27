@@ -26,6 +26,7 @@ public class AppointmentConfiguration : IEntityTypeConfiguration<Appointment>
         builder.Property(e => e.PriorityLevel).HasDefaultValue(0);
         builder.Property(e => e.QueueNumber).HasMaxLength(10);
         builder.Property(e => e.Reason).HasMaxLength(255);
+        builder.Property(e => e.ContactEmail).HasMaxLength(100);
         builder.Property(e => e.HoldUntil).HasColumnType("timestamp without time zone");
         builder.Property(e => e.CheckedInAt).HasColumnType("timestamp without time zone");
         builder.Property(e => e.CalledAt).HasColumnType("timestamp without time zone");

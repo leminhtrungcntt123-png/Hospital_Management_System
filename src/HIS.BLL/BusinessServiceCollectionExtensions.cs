@@ -34,6 +34,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.AddScoped<IPatientProfileService, PatientProfileService>();
+        services.AddScoped<IPatientPortalService, PatientPortalService>();
         services.AddScoped<IPatientAccessService, PatientAccessService>();
         services.AddScoped<IGuestBookingService, GuestBookingService>();
         services.AddScoped<ISlotGenerationService, SlotGenerationService>();

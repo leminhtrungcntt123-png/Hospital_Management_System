@@ -28,7 +28,18 @@ public sealed class WorkspaceController : Controller
         {
             return Forbid();
         }
+        ViewData["Title"] = page switch
+        {
+            "dashboard" => "Bàn làm việc",
+            "vitals" => "Sinh hiệu",
+            "patients" => "Người khám",
+            "labs" => "Chỉ định & kết quả",
+            "records" => "Bệnh án",
+            "exceptions" => "Nghỉ / đổi ca",
+            _ => "Không gian làm việc"
+        };
+        ViewData["ActiveStaffPage"] = page;
         ViewData["MediCareRoute"] = "staff/" + page;
-        return View("~/Views/Shared/MediCarePage.cshtml");
+        return View("~/Views/Workspace/Staff.cshtml");
     }
 }

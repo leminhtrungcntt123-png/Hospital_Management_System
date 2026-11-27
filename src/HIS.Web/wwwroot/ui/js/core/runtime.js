@@ -1,10 +1,15 @@
 function render() {
+    const appEl = $('#app');
+    const contentOnly = appEl?.dataset?.staffContentOnly === 'true';
     const bookingFocus = ui.route === 'public/booking' ? document.activeElement?.id : null;
-    document.title = 'MediCare — ' + (pageTitles[ui.route] || 'Chăm sóc sức khỏe');
-    $('#app').innerHTML =
-        ui.route.startsWith('public/') || ui.route.startsWith('patient/')
+    if (!contentOnly) {
+        document.title = 'MediCare — ' + (pageTitles[ui.route] || 'Chăm sóc sức khỏe');
+    }
+    appEl.innerHTML = contentOnly
+        ? staffContent()
+        : (ui.route.startsWith('public/') || ui.route.startsWith('patient/')
             ? publicShell()
-            : staffShell();
+            : staffShell());
     syncHeroCarousel();
     if (ui.route === 'public/booking' || ui.route === 'patient/booking') ensureGuestSlots();
     if (bookingFocus) document.getElementById(bookingFocus)?.focus();

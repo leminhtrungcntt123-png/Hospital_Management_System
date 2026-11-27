@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using HIS.BLL.DTOs;
@@ -32,6 +33,23 @@ public class BookingController(
     }
 
     [HttpGet]
+    public async Task<IActionResult> AvailableDates(int doctorId, int days = 7, CancellationToken ct = default)
+    {
+        if (doctorId <= 0) return BadRequest(new { message = "Bác sĩ không hợp lệ." });
+        try
+        {
+            var result = await booking.GetAvailableDatesAsync(doctorId, days, ct);
+            if (!result.IsSuccess) return BadRequest(new { message = result.Error.Message });
+            var dates = result.Value!.Select(d => d.ToString("yyyy-MM-dd")).ToList();
+            return Json(new { dates });
+        }
+        catch (OperationCanceledException)
+        {
+            return new EmptyResult();
+        }
+    }
+
+    [HttpGet]
     public async Task<IActionResult> Slots(int doctorId, DateOnly date, CancellationToken ct)
     {
         if (!ModelState.IsValid) return BadRequest(new { message = "Ngày khám không hợp lệ." });
@@ -55,6 +73,36 @@ public class BookingController(
         }
 
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+        var slotCheck = await booking.GetSlotRemainingAsync(request.ScheduleId, request.StartTime, ct);
+        if (!slotCheck.IsSuccess)
+        {
+            return BadRequest(new { message = slotCheck.Error.Message });
+        }
+
+        var holdKey = SlotHoldKey(request.ScheduleId, request.StartTime);
+        var holds = cache.GetOrCreate(holdKey, entry =>
+        {
+            entry.SlidingExpiration = TimeSpan.FromMinutes(10);
+            return new ConcurrentDictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+        })!;
+
+        var utcNow = DateTime.UtcNow;
+        foreach (var kvp in holds)
+        {
+            if (kvp.Value <= utcNow)
+            {
+                holds.TryRemove(kvp.Key, out _);
+            }
+        }
+
+        var otherHolds = holds.Count(kvp => !string.Equals(kvp.Key, normalizedEmail, StringComparison.OrdinalIgnoreCase));
+        if (slotCheck.Value - otherHolds <= 0)
+        {
+            return BadRequest(new { message = "Khung giờ này vừa có người giữ chỗ chờ xác thực OTP. Vui lòng chọn khung giờ khác hoặc thử lại sau ít phút." });
+        }
+
+        holds[normalizedEmail] = utcNow.AddMinutes(5);
+
         var otpCode = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
         var cacheKey = $"booking_otp:{normalizedEmail}";
 
@@ -98,15 +146,17 @@ public class BookingController(
     {
         if (!ModelState.IsValid || request == null) return BadRequest(new { message = "Kiểm tra họ tên, ngày sinh và số điện thoại người khám." });
 
-        request.BookedByAccountId = null;
-        if (User.Identity?.IsAuthenticated == true && int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var accountId))
+        int? authenticatedAccountId = null;
+        if (User.Identity?.IsAuthenticated == true && int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var parsedAccountId))
         {
-            request.BookedByAccountId = accountId;
+            authenticatedAccountId = parsedAccountId;
         }
+        var isAuthenticated = authenticatedAccountId.HasValue;
+        request.BookedByAccountId = authenticatedAccountId;
 
         var isTestEnvironment = env.IsEnvironment("Testing");
         string? cacheKey = null;
-        if (!isTestEnvironment || !string.IsNullOrWhiteSpace(request.Email) || !string.IsNullOrWhiteSpace(request.OtpCode))
+        if (!isAuthenticated && (!isTestEnvironment || !string.IsNullOrWhiteSpace(request.Email) || !string.IsNullOrWhiteSpace(request.OtpCode)))
         {
             if (string.IsNullOrWhiteSpace(request.Email) || !request.Email.Contains('@'))
             {
@@ -141,7 +191,47 @@ public class BookingController(
                 {
                     cache.Remove(cacheKey);
                 }
-                return Json(new { receipt = result.Value });
+
+                if (!string.IsNullOrWhiteSpace(request.Email))
+                {
+                    var holdKey = SlotHoldKey(request.ScheduleId, request.StartTime);
+                    if (cache.TryGetValue<ConcurrentDictionary<string, DateTime>>(holdKey, out var holds) && holds != null)
+                    {
+                        holds.TryRemove(request.Email.Trim().ToLowerInvariant(), out _);
+                    }
+                }
+
+                var receipt = result.Value!;
+                var receiptEmail = !string.IsNullOrWhiteSpace(request.Email)
+                    ? request.Email.Trim()
+                    : User.FindFirstValue(ClaimTypes.Email);
+
+                if (!string.IsNullOrWhiteSpace(receiptEmail) && !isTestEnvironment)
+                {
+                    var receiptBody = $@"
+<div style=""font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; border: 1px solid #cbe4ee; border-radius: 12px; background: #ffffff;"">
+    <h2 style=""color: #007d9f; margin: 0 0 8px 0;"">Phiếu xác nhận đặt lịch khám — MediCare</h2>
+    <p style=""color: #4b677a; font-size: 14px; margin: 0 0 16px 0;"">Lịch khám của bạn đã được ghi nhận thành công.</p>
+    <div style=""background: #f0f8fb; padding: 16px; border-radius: 8px; margin-bottom: 16px;"">
+        <p style=""margin: 0 0 6px 0;""><strong>Mã lịch hẹn:</strong> <span style=""color: #007d9f; font-size: 18px;"">{System.Net.WebUtility.HtmlEncode(receipt.AppointmentCode)}</span></p>
+        <p style=""margin: 0 0 6px 0;""><strong>Người khám:</strong> {System.Net.WebUtility.HtmlEncode(receipt.PatientName)}</p>
+        <p style=""margin: 0 0 6px 0;""><strong>Bác sĩ:</strong> {System.Net.WebUtility.HtmlEncode(receipt.DoctorName)} ({System.Net.WebUtility.HtmlEncode(receipt.Department)})</p>
+        <p style=""margin: 0 0 6px 0;""><strong>Thời gian:</strong> {receipt.StartTime:HH:mm} – {receipt.EndTime:HH:mm} ngày {receipt.StartTime:dd/MM/yyyy}</p>
+        <p style=""margin: 0;""><strong>Phòng khám:</strong> {System.Net.WebUtility.HtmlEncode(receipt.Room)}</p>
+    </div>
+    <p style=""font-size: 12px; color: #627d92; margin: 0;"">Vui lòng mang theo giấy tờ tùy thân / BHYT và cung cấp mã lịch hẹn tại quầy tiếp nhận khi đến khám.</p>
+</div>";
+                    try
+                    {
+                        await emailSender.SendEmailAsync(receiptEmail, $"[MediCare] Phiếu hẹn khám {receipt.AppointmentCode}", receiptBody, ct);
+                    }
+                    catch (Exception emailEx) when (emailEx is not OperationCanceledException)
+                    {
+                        logger.LogWarning(emailEx, "Không thể gửi email phiếu hẹn {AppointmentCode} tới {Email}", receipt.AppointmentCode, receiptEmail);
+                    }
+                }
+
+                return Json(new { receipt });
             }
             return BadRequest(new { message = result.Error.Message });
         }
@@ -158,4 +248,7 @@ public class BookingController(
             return StatusCode(503, new { message = msg });
         }
     }
+
+    private static string SlotHoldKey(int scheduleId, DateTime startTime) =>
+        $"slot_hold:{scheduleId}:{DateTime.SpecifyKind(startTime, DateTimeKind.Unspecified):yyyyMMddHHmm}";
 }
