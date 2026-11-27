@@ -274,4 +274,64 @@ public class SlotGenerationService : ISlotGenerationService
             return Result<int>.Success(expiredAppointments.Count);
         });
     }
+
+    public async Task<Result<int>> ExpireStaleActiveVisitsAsync(CancellationToken ct = default)
+    {
+        bool isRetry = false;
+        return await _context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            if (isRetry)
+            {
+                _context.ChangeTracker.Clear();
+            }
+            isRetry = true;
+
+            await using var tx = await _context.Database.BeginTransactionAsync(ct);
+            if (_context.Database.IsNpgsql())
+            {
+                await _context.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(77019, 2)", ct);
+            }
+
+            var now = DateTime.SpecifyKind(_timeProvider.GetLocalNow().DateTime, DateTimeKind.Unspecified);
+            var todayStart = now.Date;
+            int[] activeStatuses =
+            [
+                (int)AppointmentStatusId.CheckedIn,
+                (int)AppointmentStatusId.ReadyForDoctor,
+                (int)AppointmentStatusId.InProgress
+            ];
+
+            var staleVisits = await _context.Appointments
+                .Where(a => activeStatuses.Contains(a.StatusId)
+                    && !a.AppointmentCode.StartsWith("DEP-")
+                    && ((a.Slot != null && a.Slot.StartTime < todayStart)
+                        || (a.Slot == null && (a.CheckedInAt ?? a.CreatedAt) < todayStart)))
+                .ToListAsync(ct);
+
+            if (staleVisits.Count == 0)
+            {
+                await tx.RollbackAsync(ct);
+                return Result<int>.Success(0);
+            }
+
+            foreach (var app in staleVisits)
+            {
+                var oldStatus = app.StatusId;
+                app.StatusId = (int)AppointmentStatusId.Expired;
+                app.UpdatedAt = now;
+
+                _context.AppointmentStatusHistories.Add(new AppointmentStatusHistory
+                {
+                    AppointmentId = app.Id,
+                    OldStatusId = oldStatus,
+                    NewStatusId = (int)AppointmentStatusId.Expired,
+                    ChangedAt = now
+                });
+            }
+
+            await _context.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+            return Result<int>.Success(staleVisits.Count);
+        });
+    }
 }

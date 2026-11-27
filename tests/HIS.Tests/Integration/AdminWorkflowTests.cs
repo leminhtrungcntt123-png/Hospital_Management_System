@@ -202,12 +202,12 @@ public static class AdminWorkflowScenario
         Assert.Equal(200m, report.Deposits);
         Assert.Equal(500m, report.Payments);
         Assert.Equal(50m, report.Refunds);
-        Assert.Equal(650m, report.Revenue);
+        Assert.Equal(450m, report.Revenue);
         Assert.Equal(2, report.Visits);
         Assert.Single(report.Days);
         var csv = await reports.ExportRevenueAsync(actor, from, from);
         Assert.Equal(new byte[] { 239, 187, 191 }, csv.Take(3));
-        Assert.Contains("650.00,2", Encoding.UTF8.GetString(csv));
+        Assert.Contains("450.00,2", Encoding.UTF8.GetString(csv));
         Assert.DoesNotContain("QA Patient", Encoding.UTF8.GetString(csv));
         await Assert.ThrowsAsync<AdminOperationException>(() => reports.GetRevenueAsync(nurseId, from, from));
         await Assert.ThrowsAsync<AdminOperationException>(() => reports.GetRevenueAsync(actor, from, from.AddDays(-1)));

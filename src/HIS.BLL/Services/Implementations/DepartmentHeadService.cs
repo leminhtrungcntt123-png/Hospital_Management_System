@@ -1109,19 +1109,22 @@ public partial class DepartmentHeadService : IDepartmentHeadService
         if (departmentId.HasValue && departmentId.Value > 0)
         {
             var deptPatientIds = await _context.Appointments
-                .Where(a => a.DepartmentId == departmentId.Value)
+                .Where(a => a.DepartmentId == departmentId.Value
+                    || (a.DepartmentId == null && a.Doctor != null && a.Doctor.DepartmentId == departmentId.Value))
                 .Select(a => a.PatientId)
                 .Distinct()
                 .ToListAsync(ct);
 
-            if (deptPatientIds.Count > 0)
+            if (deptPatientIds.Count == 0)
             {
-                query = query.Where(p => deptPatientIds.Contains(p.Id));
+                return [];
             }
+
+            query = query.Where(p => deptPatientIds.Contains(p.Id));
         }
 
-        var today = DateOnly.FromDateTime(DateTime.Today);
-        var list = await query
+        var today = DateOnly.FromDateTime(LocalNow);
+        return await query
             .OrderBy(p => p.FullName)
             .Select(p => new DepartmentPatientListItemDto(
                 p.Id,
@@ -1134,25 +1137,5 @@ public partial class DepartmentHeadService : IDepartmentHeadService
                 p.Address
             ))
             .ToListAsync(ct);
-
-        if (list.Count == 0)
-        {
-            list = await _context.Patients
-                .AsNoTracking()
-                .OrderBy(p => p.FullName)
-                .Select(p => new DepartmentPatientListItemDto(
-                    p.Id,
-                    $"BN{p.Id:D4}",
-                    p.FullName,
-                    p.Gender == Gender.Male ? "Nam" : p.Gender == Gender.Female ? "Nữ" : "Khác",
-                    p.DateOfBirth,
-                    today.Year - p.DateOfBirth.Year - (today < new DateOnly(today.Year, p.DateOfBirth.Month, p.DateOfBirth.Day) ? 1 : 0),
-                    p.PhoneNumber,
-                    p.Address
-                ))
-                .ToListAsync(ct);
-        }
-
-        return list;
     }
 }

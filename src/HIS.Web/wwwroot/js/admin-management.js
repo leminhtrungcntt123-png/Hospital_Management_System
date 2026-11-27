@@ -305,26 +305,62 @@
         );
     }
 
+    function syncReportFilterInputs(filter) {
+        const mode = filter.elements.mode?.value || 'week';
+        const anchorInput = filter.elements.anchor;
+        const yearSelect = filter.elements.year;
+        const useYearPicker = mode === 'month' || mode === 'year';
+        if (anchorInput) anchorInput.hidden = useYearPicker;
+        if (yearSelect) yearSelect.hidden = !useYearPicker;
+        filter.querySelectorAll('[data-report-mode]').forEach((btn) => {
+            btn.classList.toggle('active', btn.dataset.reportMode === mode);
+        });
+    }
+
     async function loadReport(withFilter = true) {
         const version = ++reportVersion;
         const filter = find('#report-filter');
-
-        // Khởi tạo mặc định 7 ngày gần nhất nếu chưa chọn ngày
-        if (!filter.elements.from.value || !filter.elements.to.value) {
-            const today = new Date();
-            const past7 = new Date();
-            past7.setDate(today.getDate() - 6);
-            filter.elements.to.value = today.toISOString().slice(0, 10);
-            filter.elements.from.value = past7.toISOString().slice(0, 10);
+        const todayIso = new Date().toISOString().slice(0, 10);
+        if (!filter.elements.anchor.value) {
+            filter.elements.anchor.value = todayIso;
         }
+        if (!filter.elements.mode.value) {
+            filter.elements.mode.value = 'week';
+        }
+        syncReportFilterInputs(filter);
 
-        const query = withFilter ? '?' + new URLSearchParams(new FormData(filter)) : '';
-        const report = await request('Report' + query);
+        const mode = withFilter ? filter.elements.mode.value : 'week';
+        const anchor =
+            mode === 'month' || mode === 'year'
+                ? `${filter.elements.year.value || todayIso.slice(0, 4)}-01-01`
+                : filter.elements.anchor.value || todayIso;
+
+        const report = await request(
+            `Report?mode=${encodeURIComponent(mode)}&anchor=${encodeURIComponent(anchor)}`,
+        );
         if (version !== reportVersion) return;
 
         filter.elements.from.value = report.from;
         filter.elements.to.value = report.to;
-        find('#report-period').textContent = `${date(report.from)} – ${date(report.to)}`;
+
+        const chartTitle = find('#revenue-chart-title');
+        if (chartTitle) {
+            chartTitle.textContent =
+                mode === 'month'
+                    ? `Doanh thu 12 tháng năm ${anchor.slice(0, 4)}`
+                    : mode === 'year'
+                      ? `Doanh thu 5 năm (${report.from.slice(0, 4)}–${report.to.slice(0, 4)})`
+                      : 'Doanh thu 7 ngày trong tuần';
+        }
+
+        find('#report-period').textContent =
+            mode === 'day'
+                ? `Ngày ${date(report.from)}`
+                : mode === 'month'
+                  ? `Năm ${anchor.slice(0, 4)}`
+                  : mode === 'year'
+                    ? `${report.from.slice(0, 4)} – ${report.to.slice(0, 4)}`
+                    : `${date(report.from)} – ${date(report.to)}`;
         const statConfig = [
             {
                 label: 'Doanh thu thực thu',
@@ -361,8 +397,15 @@
             )
             .join('');
 
-        const maximum = Math.max(1, ...report.days.map((day) => Math.abs(day.revenue)));
-        const rawMaximum = Math.max(0, ...report.days.map((day) => Math.abs(day.revenue)));
+        const bars = report.buckets || (report.days || []).map((d) => ({
+            label: date(d.date).slice(0, 5),
+            fullLabel: date(d.date),
+            revenue: d.revenue,
+            visits: d.visits,
+        }));
+
+        const maximum = Math.max(1, ...bars.map((item) => Math.abs(item.revenue)));
+        const rawMaximum = Math.max(0, ...bars.map((item) => Math.abs(item.revenue)));
         const axis = find('#revenue-chart-y');
         if (axis) {
             if (rawMaximum <= 0) {
@@ -375,32 +418,35 @@
                     .join('');
             }
         }
-        find('#revenue-chart').classList.toggle('is-empty', rawMaximum <= 0);
+        const chartEl = find('#revenue-chart');
+        chartEl.classList.toggle('is-empty', rawMaximum <= 0);
+        chartEl.classList.toggle('is-compact', bars.length > 7);
         const barTones = ['#86efac', '#4ade80', '#22c55e', '#16a34a', '#15803d', '#107c41', '#0d6535'];
-        find('#revenue-chart').innerHTML = report.days
-            .map((day, index) => {
-                const isZero = day.revenue === 0;
-                const pct = isZero ? 2 : Math.max(6, Math.round((Math.abs(day.revenue) / maximum) * 100));
+        chartEl.innerHTML = bars
+            .map((item, index) => {
+                const isZero = item.revenue === 0;
+                const pct = isZero ? 2 : Math.max(6, Math.round((Math.abs(item.revenue) / maximum) * 100));
                 const barHeight = isZero ? '3px' : pct + '%';
-                const formattedRev = money(day.revenue) + ' ₫';
+                const formattedRev = money(item.revenue) + ' ₫';
                 const tone = barTones[index % barTones.length];
-                return /* HTML */ `<div class="chart-day" title="${escape(date(day.date) + ': ' + formattedRev + ' · ' + day.visits + ' lượt')}">
+                return /* HTML */ `<div class="chart-day" title="${escape(item.fullLabel + ': ' + formattedRev + ' · ' + item.visits + ' lượt')}">
                     <span class="chart-bar-tooltip">${formattedRev}</span>
                     <div class="chart-bar-wrap">
                         <div
-                            class="chart-bar ${day.revenue < 0 ? 'negative' : isZero ? 'zero-rev' : ''}"
+                            class="chart-bar ${item.revenue < 0 ? 'negative' : isZero ? 'zero-rev' : ''}"
                             style="height:${barHeight}; --bar-tone:${tone}"
                         ></div>
                     </div>
-                    <span class="chart-day-label">${escape(date(day.date).slice(0, 5))}</span>
+                    <span class="chart-day-label">${escape(item.label)}</span>
                 </div>`;
             })
             .join('');
-        reportDays = report.days || [];
+        reportDays = [...bars].reverse();
         renderReportPage(1);
 
         try {
-            const deptStats = await request('DepartmentStats' + query);
+            const deptQuery = `?from=${encodeURIComponent(report.from)}&to=${encodeURIComponent(report.to)}`;
+            const deptStats = await request('DepartmentStats' + deptQuery);
             renderDonutChart(deptStats);
             table(
                 '#department-stats-table',
@@ -483,13 +529,15 @@
         const startIndex = (reportPage - 1) * REPORT_PAGE_SIZE;
         const pageDays = reportDays.slice(startIndex, startIndex + REPORT_PAGE_SIZE);
 
+        const mode = find('#report-filter')?.elements.mode?.value || 'week';
+        const periodCol = mode === 'month' ? 'Tháng' : mode === 'year' ? 'Năm' : 'Ngày';
         table(
             '#report-table',
-            ['Ngày', 'Lượt khám', 'Thực thu'],
-            pageDays.map((day) => [
-                escape(date(day.date)),
-                /* HTML */ `<span class="number">${escape(money(day.visits))}</span>`,
-                /* HTML */ `<span class="number ${day.revenue > 0 ? 'money-pos' : ''}">${escape(money(day.revenue))} ₫</span>`,
+            [periodCol, 'Lượt khám', 'Thực thu'],
+            pageDays.map((item) => [
+                escape(item.fullLabel || date(item.date)),
+                /* HTML */ `<span class="number">${escape(money(item.visits))}</span>`,
+                /* HTML */ `<span class="number ${item.revenue > 0 ? 'money-pos' : ''}">${escape(money(item.revenue))} ₫</span>`,
             ]),
         );
 
@@ -1207,12 +1255,34 @@
         }
     });
 
+    find('#report-filter')?.addEventListener('click', (e) => {
+        const modeBtn = e.target.closest('[data-report-mode]');
+        if (!modeBtn) return;
+        const filter = find('#report-filter');
+        filter.elements.mode.value = modeBtn.dataset.reportMode;
+        syncReportFilterInputs(filter);
+        loadReport(true).catch((error) => notify(error.message, true));
+    });
+
+    find('#report-filter')?.addEventListener('change', (e) => {
+        if (e.target.name === 'anchor' || e.target.name === 'year') {
+            loadReport(true).catch((error) => notify(error.message, true));
+        }
+    });
+
     find('#export-revenue').addEventListener('click', async () => {
-        if (!find('#report-filter').reportValidity()) return;
+        const filter = find('#report-filter');
+        if (!filter.reportValidity()) return;
+        const fromVal = filter.elements.from.value;
+        const toVal = filter.elements.to.value;
+        const mode = filter.elements.mode?.value || 'week';
+        if (mode === 'year') {
+            return notify('Xuất CSV chi tiết theo ngày hỗ trợ tối đa 1 năm; hãy chuyển sang Tuần hoặc Tháng để xuất.', true);
+        }
         const button = find('#export-revenue');
         button.disabled = true;
         try {
-            const query = new URLSearchParams(new FormData(find('#report-filter')));
+            const query = new URLSearchParams({ from: fromVal, to: toVal });
             const response = await fetch(api + '/Revenue.csv?' + query, {
                 credentials: 'same-origin',
                 cache: 'no-store',

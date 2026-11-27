@@ -957,7 +957,37 @@ svg.icon {
     gap: 8px;
 }
 
-.dashboard-filter .date-input-group input[type="date"] {
+.period-mode-group {
+    display: inline-flex;
+    align-items: center;
+    background: #f1f5f9;
+    border: 1px solid var(--admin-line);
+    border-radius: 8px;
+    padding: 2px;
+    gap: 2px;
+}
+
+.period-mode-btn {
+    border: none;
+    background: transparent;
+    color: var(--admin-muted);
+    font-size: 12px;
+    font-weight: 600;
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.period-mode-btn.active {
+    background: #ffffff;
+    color: #107c41;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.dashboard-filter .date-input-group input[type="date"],
+.dashboard-filter .date-input-group select {
     height: 32px;
     padding: 2px 8px;
     font-size: 12px;
@@ -1181,6 +1211,15 @@ svg.icon {
     background-image: linear-gradient(to top, #eef3f0 1px, transparent 1px);
     background-size: 100% 25%;
     background-position: 0 100%;
+}
+
+.revenue-chart.is-compact {
+    gap: 6px;
+}
+
+.revenue-chart.is-compact .chart-day {
+    min-width: 24px;
+    max-width: 48px;
 }
 
 .revenue-chart.is-empty::after {

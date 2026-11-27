@@ -57,9 +57,14 @@ public sealed class ManagementController(
     }));
 
     [HttpGet("Report")]
-    public Task<IActionResult> Report(DateOnly? from, DateOnly? to, CancellationToken ct) => ExecuteAsync(async () =>
+    public Task<IActionResult> Report(DateOnly? from, DateOnly? to, string? mode, DateOnly? anchor, CancellationToken ct) => ExecuteAsync(async () =>
     {
         var today = DateOnly.FromDateTime(clock.GetLocalNow().DateTime);
+        if (!string.IsNullOrWhiteSpace(mode))
+        {
+            return Ok(await reports.GetRevenueSeriesAsync(ActorId, mode, anchor ?? today, ct));
+        }
+
         var defaultFrom = today.AddDays(-6);
         return Ok(await reports.GetRevenueAsync(ActorId, from ?? defaultFrom, to ?? today, ct));
     });

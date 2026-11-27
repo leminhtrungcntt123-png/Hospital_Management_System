@@ -13,4 +13,5 @@ public interface ISlotGenerationService
     Task<Result<SlotGenerationResultDto>> GenerateSlotsAsync(DateOnly startDate, DateOnly endDate, int? departmentId = null, CancellationToken ct = default);
     Task<IReadOnlyList<AppointmentSlotItemDto>> SearchSlotsAsync(SlotSearchRequest request, CancellationToken ct = default);
     Task<Result<int>> ExpirePendingHoldsAsync(CancellationToken ct = default);
+    Task<Result<int>> ExpireStaleActiveVisitsAsync(CancellationToken ct = default);
 }

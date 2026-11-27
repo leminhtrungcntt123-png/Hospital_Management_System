@@ -25,6 +25,7 @@ public class HoldExpirationWorker : BackgroundService
                 using var scope = _scopeFactory.CreateScope();
                 var slotService = scope.ServiceProvider.GetRequiredService<ISlotGenerationService>();
                 await slotService.ExpirePendingHoldsAsync(stoppingToken);
+                await slotService.ExpireStaleActiveVisitsAsync(stoppingToken);
             }
             catch (NotImplementedException)
             {
