@@ -17,13 +17,10 @@
 
     var currentPatient = Model.ActivePatient ?? (Model.QueuePatients.Count > 0 ? Model.QueuePatients[0] : null);
 
-    // Tên trong DB có thể đã có sẵn tiền tố "BS." — chỉ thêm khi còn thiếu để không bị "BS. BS."
     string WithBs(string? name) => string.IsNullOrWhiteSpace(name)
         ? ""
         : (name.TrimStart().StartsWith("BS.", StringComparison.OrdinalIgnoreCase) ? name.Trim() : "BS. " + name.Trim());
 
-    // Tính ngày Thứ Hai đến Chủ Nhật theo tuần được chọn (hỗ trợ weekOffset)
-    // "Hôm nay" theo giờ Việt Nam (cùng nguồn với controller), không theo múi giờ máy chủ
     var now = Clock.GetLocalNow().DateTime.Date;
     int diff = (7 + (now.DayOfWeek - DayOfWeek.Monday)) % 7;
     var mondayThisWeek = now.AddDays(-diff);
@@ -37,64 +34,57 @@
 
 @if (TempData["SuccessMessage"] != null)
 {
-    <div style="background:#f0fdf4; border:1px solid #bbf7d0; color:#166534; padding:12px 16px; border-radius:8px; margin-bottom:16px; font-size:13px; display:flex; align-items:center; gap:10px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;flex-shrink:0;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+    <div class="flash-banner ok">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
         <span>@TempData["SuccessMessage"]</span>
     </div>
 }
 @if (TempData["ErrorMessage"] != null)
 {
-    <div style="background:#fef2f2; border:1px solid #fecaca; color:#991b1b; padding:12px 16px; border-radius:8px; margin-bottom:16px; font-size:13px; display:flex; align-items:center; gap:10px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;flex-shrink:0;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+    <div class="flash-banner err">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
         <span>@TempData["ErrorMessage"]</span>
     </div>
 }
 
 @if (tab == "labs")
 {
-    <!-- 1. GIAO DIỆN CHỈ ĐỊNH & KẾT QUẢ -->
     <div class="page-heading">
         <div>
             <h1>Chỉ định & kết quả</h1>
-            <p>Theo dõi các chỉ định thuộc phiếu khám do bạn phụ trách.</p>
         </div>
     </div>
 
-    <section class="card" style="background:#fff; border:1px solid #e2ebf3; border-radius:10px; overflow:hidden;">
-        <!-- Checkbox lọc trạng thái -->
-        <div style="border-bottom:1px solid #e5edf5; padding:14px 18px; display:flex; align-items:center; gap:20px; background:#fbfcfe;">
-            <span style="font-size:12px; font-weight:700; color:#142d4a;">Lọc trạng thái:</span>
-            <label style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#334155; cursor:pointer;">
+    <section class="card">
+        <div class="consult-toolbar">
+            <span class="filter-label">Lọc trạng thái:</span>
+            <label class="filter-check">
                 <input type="checkbox" id="chk-lab-all" checked onchange="toggleLabFilter('all')" />
-                <span style="font-weight:600;">Tất cả</span>
+                Tất cả
             </label>
-            <label style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#334155; cursor:pointer;">
+            <label class="filter-check">
                 <input type="checkbox" id="chk-lab-pending" onchange="toggleLabFilter('pending')" />
-                <span>Chờ kết quả</span>
+                Chờ kết quả
             </label>
-            <label style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#334155; cursor:pointer;">
+            <label class="filter-check">
                 <input type="checkbox" id="chk-lab-completed" onchange="toggleLabFilter('completed')" />
-                <span>Đã có kết quả</span>
+                Đã có kết quả
             </label>
-        </div>
-
-        <!-- Tìm kiếm theo tên người khám -->
-        <div style="padding:14px 18px;">
-            <input type="text" id="search-lab-input" onkeyup="filterLabTable()" placeholder="Tìm theo người khám…" style="width:280px; padding:8px 14px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;" />
+            <input type="text" id="search-lab-input" class="search-input push-right" onkeyup="filterLabTable()" placeholder="Tìm theo người khám…" />
         </div>
 
         <div class="table-wrap">
-            <table class="table" style="width:100%; margin:0; border-collapse:collapse;">
-                <thead style="background:#f8fafc; border-bottom:1px solid #e5edf5; font-size:12px; color:#596a7c;">
+            <table class="consult-table">
+                <thead>
                     <tr>
-                        <th style="padding:12px 18px; text-align:left;">Người khám</th>
-                        <th style="padding:12px 14px; text-align:left;">Dịch vụ</th>
-                        <th style="padding:12px 14px; text-align:left;">Ngày chỉ định</th>
-                        <th style="padding:12px 14px; text-align:left;">Trạng thái</th>
-                        <th style="padding:12px 18px; text-align:right;">Thao tác</th>
+                        <th>Người khám</th>
+                        <th>Dịch vụ</th>
+                        <th>Ngày chỉ định</th>
+                        <th>Trạng thái</th>
+                        <th class="right">Thao tác</th>
                     </tr>
                 </thead>
-                <tbody id="lab-table-body" style="font-size:13px;">
+                <tbody id="lab-table-body">
                     @if (Model.LabOrders.Count > 0)
                     {
                         @foreach (var lab in Model.LabOrders)
@@ -103,29 +93,26 @@
                             if (initials.Length > 2) initials = initials.Substring(initials.Length - 2);
                             var isCompleted = lab.Status.Contains("Đã có kết quả") || lab.Status == "COMPLETED";
 
-                            <tr class="lab-row" data-status="@(isCompleted ? "COMPLETED" : "PENDING")" data-name="@lab.PatientName.ToLower()" style="border-bottom:1px solid #f1f5f9;">
-                                <td style="padding:14px 18px;">
-                                    <div style="display:flex; align-items:center; gap:10px;">
-                                        <div class="avatar" style="width:32px; height:32px; border-radius:50%; background:#e0f2fe; color:#0369a1; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:11px;">@initials</div>
+                            <tr class="lab-row" data-status="@(isCompleted ? "COMPLETED" : "PENDING")" data-name="@lab.PatientName.ToLower()">
+                                <td>
+                                    <div class="cell-main">
+                                        <div class="avatar-sm">@initials</div>
                                         <div>
-                                            <strong class="patient-name" style="color:#0f172a; display:block;">@lab.PatientName</strong>
-                                            <small style="color:#596a7c; font-size:11px;">@lab.PatientCode · @lab.Age tuổi</small>
+                                            <strong>@lab.PatientName</strong>
+                                            <small>@lab.PatientCode · @lab.Age tuổi</small>
                                         </div>
                                     </div>
                                 </td>
-                                <td style="padding:14px 14px;">
-                                    <span style="font-weight:500; color:#1e293b;">@lab.ServiceName</span>
-                                    <small style="display:block; color:#596a7c; font-size:11px;">@lab.Note</small>
+                                <td>
+                                    <span>@lab.ServiceName</span>
+                                    <small class="cell-sub">@lab.Note</small>
                                 </td>
-                                <td style="padding:14px 14px; color:#334155;">@lab.OrderTime.ToString("dd/MM/yyyy · HH:mm")</td>
-                                <td style="padding:14px 14px;">
-                                    <span style="background:@(isCompleted ? "#dcfce7" : "#fef3c7"); color:@(isCompleted ? "#15803d" : "#b45309"); font-size:11px; padding:4px 10px; border-radius:50px; font-weight:600; display:inline-block;">
-                                        @lab.Status
-                                    </span>
+                                <td>@lab.OrderTime.ToString("dd/MM/yyyy · HH:mm")</td>
+                                <td>
+                                    <span class="status-badge @(isCompleted ? "ok" : "warn")">@lab.Status</span>
                                 </td>
-                                <td style="padding:14px 18px; text-align:right;">
+                                <td class="right">
                                     <button type="button" class="btn outline sm"
-                                            style="font-size:11px; padding:5px 12px; border-radius:6px; border:1px solid #cbd5e1; background:#fff; color:#334155; display:inline-flex; align-items:center; gap:4px; cursor:pointer;"
                                             data-patient="@lab.PatientName"
                                             data-code="@lab.PatientCode"
                                             data-age="@lab.Age"
@@ -134,10 +121,10 @@
                                             data-status="@lab.Status"
                                             data-result="@(string.IsNullOrWhiteSpace(lab.ResultData) ? "Chưa có kết quả xét nghiệm từ phòng lab." : lab.ResultData)"
                                             onclick="openLabResultModalFromBtn(this)">
-                                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;">
-                                            <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12 M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0"></path>
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px;">
+                                            <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12"></path><circle cx="12" cy="12" r="3"></circle>
                                         </svg>
-                                        <span>Xem kết quả</span>
+                                        Xem kết quả
                                     </button>
                                 </td>
                             </tr>
@@ -146,8 +133,9 @@
                     else
                     {
                         <tr>
-                            <td colspan="5" style="text-align:center; padding:40px; color:#64748b;">
-                                Hiện chưa có chỉ định xét nghiệm nào được tạo trong hệ thống.
+                            <td colspan="5" class="table-empty">
+                                @await Html.PartialAsync("_AdminIcon", "clipboard")
+                                <div>Chưa có chỉ định xét nghiệm nào.</div>
                             </td>
                         </tr>
                     }
@@ -156,60 +144,57 @@
         </div>
     </section>
 
-    <!-- Dialog Xem kết quả xét nghiệm (Popup gọn gàng, có nút ✕) -->
     <div class="app-dialog-backdrop" id="labResultDialog" onclick="handleDialogBackdropClick(event, 'labResultDialog')">
         <div class="app-dialog-card">
             <div class="app-dialog-header">
                 <div>
-                    <h3 style="font-size:15px; margin:0; font-weight:700; color:#fff;">Kết quả xét nghiệm & Cận lâm sàng</h3>
-                    <small style="opacity:0.8; font-size:11px;" id="dialog-lab-patient">Người khám: —</small>
+                    <h3>Kết quả xét nghiệm</h3>
+                    <small id="dialog-lab-patient">Người khám: —</small>
                 </div>
                 <button type="button" class="app-dialog-close" onclick="closeAppDialog('labResultDialog')" title="Đóng (Esc)">✕</button>
             </div>
             <div class="app-dialog-body">
-                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px 14px; margin-bottom:16px;">
-                    <div style="margin-bottom:6px;"><strong>Dịch vụ:</strong> <span id="dialog-lab-service">—</span></div>
-                    <div style="margin-bottom:6px;"><strong>Thời gian chỉ định:</strong> <span id="dialog-lab-time">—</span></div>
-                    <div><strong>Trạng thái:</strong> <span id="dialog-lab-status" class="badge" style="background:#dcfce7; color:#15803d; font-size:11px; padding:3px 8px; border-radius:50px;">—</span></div>
+                <div class="detail-box">
+                    <div><strong>Dịch vụ:</strong> <span id="dialog-lab-service">—</span></div>
+                    <div><strong>Thời gian chỉ định:</strong> <span id="dialog-lab-time">—</span></div>
+                    <div><strong>Trạng thái:</strong> <span id="dialog-lab-status">—</span></div>
                 </div>
-                <div>
-                    <label style="font-weight:700; color:#1e293b; display:block; margin-bottom:6px;">Chi tiết kết quả xét nghiệm:</label>
-                    <div id="dialog-lab-result-text" style="background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:12px; min-height:80px; white-space:pre-wrap; color:#334155; line-height:1.5;">—</div>
+                <div class="record-section">
+                    <strong>Chi tiết kết quả:</strong>
+                    <div id="dialog-lab-result-text" class="result-box">—</div>
                 </div>
             </div>
             <div class="app-dialog-footer">
-                <button type="button" class="btn outline sm" onclick="closeAppDialog('labResultDialog')" style="border:1px solid #cbd5e1; background:#fff; color:#334155; padding:6px 16px; border-radius:6px; font-size:12px; cursor:pointer;">Đóng</button>
+                <button type="button" class="btn outline sm" onclick="closeAppDialog('labResultDialog')">Đóng</button>
             </div>
         </div>
     </div>
 }
 else if (tab == "records")
 {
-    <!-- 2. GIAO DIỆN BỆNH ÁN TRONG KHOA -->
     <div class="page-heading">
         <div>
             <h1>Bệnh án trong khoa</h1>
-            <p>Xem hồ sơ trong phạm vi chuyên môn. Chỉ bác sĩ phụ trách được chỉnh sửa phiếu của mình.</p>
         </div>
     </div>
 
-    <section class="card" style="background:#fff; border:1px solid #e2ebf3; border-radius:10px; overflow:hidden;">
-        <div style="padding:16px 18px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e5edf5;">
-            <input type="text" id="search-record-input" onkeyup="filterRecordTable()" placeholder="Tìm người khám hoặc kết luận…" style="width:320px; padding:8px 14px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;" />
-            <span id="record-count-badge" style="font-size:12px; color:#596a7c; font-weight:600;">@Model.MedicalRecords.Count phiếu khám</span>
+    <section class="card">
+        <div class="consult-toolbar">
+            <input type="text" id="search-record-input" class="search-input" onkeyup="filterRecordTable()" placeholder="Tìm người khám hoặc kết luận…" />
+            <span id="record-count-badge" class="count-badge push-right">@Model.MedicalRecords.Count phiếu khám</span>
         </div>
         <div class="table-wrap">
-            <table class="table" style="width:100%; margin:0; border-collapse:collapse;">
-                <thead style="background:#f8fafc; border-bottom:1px solid #e5edf5; font-size:12px; color:#596a7c;">
+            <table class="consult-table">
+                <thead>
                     <tr>
-                        <th style="padding:12px 18px; text-align:left;">Người khám</th>
-                        <th style="padding:12px 14px; text-align:left;">Ngày khám</th>
-                        <th style="padding:12px 14px; text-align:left;">Bác sĩ</th>
-                        <th style="padding:12px 14px; text-align:left;">Kết luận</th>
-                        <th style="padding:12px 18px; text-align:right;">Thao tác</th>
+                        <th>Người khám</th>
+                        <th>Ngày khám</th>
+                        <th>Bác sĩ</th>
+                        <th>Kết luận</th>
+                        <th class="right">Thao tác</th>
                     </tr>
                 </thead>
-                <tbody id="record-table-body" style="font-size:13px;">
+                <tbody id="record-table-body">
                     @if (Model.MedicalRecords.Count > 0)
                     {
                         @foreach (var rec in Model.MedicalRecords)
@@ -217,22 +202,21 @@ else if (tab == "records")
                             var initials = string.Join("", rec.PatientName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(s => s[0])).ToUpper();
                             if (initials.Length > 2) initials = initials.Substring(initials.Length - 2);
 
-                            <tr class="record-row" data-text="@(rec.PatientName.ToLower() + " " + rec.Diagnosis.ToLower() + " " + rec.Conclusion.ToLower())" style="border-bottom:1px solid #f1f5f9;">
-                                <td style="padding:14px 18px;">
-                                    <div style="display:flex; align-items:center; gap:10px;">
-                                        <div class="avatar" style="width:32px; height:32px; border-radius:50%; background:#e0f2fe; color:#0369a1; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:11px;">@initials</div>
+                            <tr class="record-row" data-text="@(rec.PatientName.ToLower() + " " + rec.Diagnosis.ToLower() + " " + rec.Conclusion.ToLower())">
+                                <td>
+                                    <div class="cell-main">
+                                        <div class="avatar-sm">@initials</div>
                                         <div>
-                                            <strong style="color:#0f172a; display:block;">@rec.PatientName</strong>
-                                            <small style="color:#596a7c; font-size:11px;">@rec.PatientCode · @rec.Age tuổi</small>
+                                            <strong>@rec.PatientName</strong>
+                                            <small>@rec.PatientCode · @rec.Age tuổi</small>
                                         </div>
                                     </div>
                                 </td>
-                                <td style="padding:14px 14px; color:#334155;">@rec.DateTime.ToString("dd/MM/yyyy · HH:mm")</td>
-                                <td style="padding:14px 14px; color:#334155;">@rec.DoctorName</td>
-                                <td style="padding:14px 14px; color:#334155;">@rec.Diagnosis</td>
-                                <td style="padding:14px 18px; text-align:right;">
+                                <td>@rec.DateTime.ToString("dd/MM/yyyy · HH:mm")</td>
+                                <td>@rec.DoctorName</td>
+                                <td>@rec.Diagnosis</td>
+                                <td class="right">
                                     <button type="button" class="btn outline sm"
-                                            style="font-size:11px; padding:5px 12px; border-radius:6px; border:1px solid #cbd5e1; background:#fff; color:#334155; display:inline-flex; align-items:center; gap:4px; cursor:pointer;"
                                             data-id="@rec.RecordId"
                                             data-patient="@rec.PatientName"
                                             data-code="@rec.PatientCode"
@@ -247,10 +231,10 @@ else if (tab == "records")
                                             data-diagnosis="@rec.Diagnosis"
                                             data-conclusion="@rec.Conclusion"
                                             onclick="openRecordModalFromBtn(this)">
-                                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;">
-                                            <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12 M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0"></path>
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px;">
+                                            <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12"></path><circle cx="12" cy="12" r="3"></circle>
                                         </svg>
-                                        <span>Xem phiếu</span>
+                                        Xem phiếu
                                     </button>
                                 </td>
                             </tr>
@@ -259,8 +243,9 @@ else if (tab == "records")
                     else
                     {
                         <tr>
-                            <td colspan="5" style="text-align:center; padding:40px; color:#64748b;">
-                                Hiện chưa có hồ sơ bệnh án nào được ghi nhận.
+                            <td colspan="5" class="table-empty">
+                                @await Html.PartialAsync("_AdminIcon", "clipboard")
+                                <div>Chưa có hồ sơ bệnh án nào.</div>
                             </td>
                         </tr>
                     }
@@ -269,19 +254,17 @@ else if (tab == "records")
         </div>
     </section>
 
-    <!-- Dialog Xem phiếu khám bệnh án chi tiết (Popup gọn gàng, có nút ✕) -->
     <div class="app-dialog-backdrop" id="recordDetailDialog" onclick="handleDialogBackdropClick(event, 'recordDetailDialog')">
         <div class="app-dialog-card lg">
             <div class="app-dialog-header">
                 <div>
-                    <h3 style="font-size:15px; margin:0; font-weight:700; color:#fff;">Phiếu khám bệnh chuyên khoa</h3>
-                    <small style="opacity:0.8; font-size:11px;" id="dialog-record-header-sub">Mã hồ sơ: —</small>
+                    <h3>Phiếu khám bệnh</h3>
+                    <small id="dialog-record-header-sub">Mã hồ sơ: —</small>
                 </div>
                 <button type="button" class="app-dialog-close" onclick="closeAppDialog('recordDetailDialog')" title="Đóng (Esc)">✕</button>
             </div>
             <div class="app-dialog-body">
-                <!-- Thông tin hành chính bệnh nhân & bác sĩ -->
-                <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:10px 16px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px; margin-bottom:18px;">
+                <div class="detail-box detail-grid">
                     <div><strong>Họ và tên:</strong> <span id="dialog-record-patient">—</span></div>
                     <div><strong>Ngày giờ khám:</strong> <span id="dialog-record-date">—</span></div>
                     <div><strong>Tuổi / Giới tính:</strong> <span id="dialog-record-age-gender">—</span></div>
@@ -290,34 +273,31 @@ else if (tab == "records")
                     <div><strong>Mã lượt hẹn:</strong> <span id="dialog-record-code">—</span></div>
                 </div>
 
-                <!-- Nội dung chuyên môn -->
-                <div style="display:flex; flex-direction:column; gap:14px;">
+                <div class="record-section">
+                    <strong>1. Triệu chứng / lý do khám</strong>
+                    <div id="dialog-record-symptoms" class="result-box">—</div>
+                </div>
+                <div class="record-section">
+                    <strong>2. Khám lâm sàng</strong>
+                    <div id="dialog-record-exam" class="result-box">—</div>
+                </div>
+                <div class="record-icd-row record-section">
                     <div>
-                        <strong style="color:#0f172a; display:block; margin-bottom:4px;">1. Triệu chứng lâm sàng / Lý do khám:</strong>
-                        <div id="dialog-record-symptoms" style="background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:10px; color:#334155; line-height:1.4;">—</div>
-                    </div>
-                    <div>
-                        <strong style="color:#0f172a; display:block; margin-bottom:4px;">2. Khám lâm sàng & diễn biến:</strong>
-                        <div id="dialog-record-exam" style="background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:10px; color:#334155; line-height:1.4;">—</div>
-                    </div>
-                    <div style="display:grid; grid-template-columns:130px 1fr; gap:12px;">
-                        <div>
-                            <strong style="color:#0f172a; display:block; margin-bottom:4px;">Mã ICD-10:</strong>
-                            <div id="dialog-record-icd" style="background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:10px; font-weight:700; color:#0369a1;">—</div>
-                        </div>
-                        <div>
-                            <strong style="color:#0f172a; display:block; margin-bottom:4px;">Chẩn đoán chính:</strong>
-                            <div id="dialog-record-diagnosis" style="background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:10px; color:#334155; line-height:1.4;">—</div>
-                        </div>
+                        <strong>Mã ICD-10</strong>
+                        <div id="dialog-record-icd" class="result-box" style="min-height:0;">—</div>
                     </div>
                     <div>
-                        <strong style="color:#0f172a; display:block; margin-bottom:4px;">3. Kết luận điều trị & Lời dặn của bác sĩ:</strong>
-                        <div id="dialog-record-conclusion" style="background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:10px; color:#334155; line-height:1.4;">—</div>
+                        <strong>Chẩn đoán chính</strong>
+                        <div id="dialog-record-diagnosis" class="result-box" style="min-height:0;">—</div>
                     </div>
+                </div>
+                <div class="record-section">
+                    <strong>3. Kết luận & lời dặn</strong>
+                    <div id="dialog-record-conclusion" class="result-box">—</div>
                 </div>
             </div>
             <div class="app-dialog-footer">
-                <button type="button" class="btn outline sm" onclick="closeAppDialog('recordDetailDialog')" style="border:1px solid #cbd5e1; background:#fff; color:#334155; padding:6px 16px; border-radius:6px; font-size:12px; cursor:pointer;">Đóng</button>
+                <button type="button" class="btn outline sm" onclick="closeAppDialog('recordDetailDialog')">Đóng</button>
             </div>
         </div>
     </div>
@@ -331,340 +311,259 @@ else if (tab == "schedule")
     var currentClaimId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
     int.TryParse(currentClaimId, out var currentAccId);
 
-    <!-- 3. GIAO DIỆN LỊCH LÀM VIỆC CỦA TÔI -->
     <div class="page-heading">
         <div>
             <h1>Lịch làm việc của tôi</h1>
-            <p>Theo dõi chi tiết ca khám sáng, chiều và ca trực đêm cá nhân trong tuần.</p>
         </div>
         <div class="heading-actions">
-            <a href="?tab=exceptions" class="btn outline" style="border:1px solid #cbd5e1; padding:8px 16px; border-radius:6px; color:#334155; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:6px; text-decoration:none;">
-                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
-                    <circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>
-                </svg>
-                <span>+ Đề nghị nghỉ / đổi ca</span>
+            <span class="room-pill-fixed">
+                @await Html.PartialAsync("_AdminIcon", "door") Phòng @docDisplayRoom
+            </span>
+            <a href="?tab=exceptions" class="btn outline">
+                @await Html.PartialAsync("_AdminIcon", "clock") Đề nghị nghỉ / đổi ca
             </a>
         </div>
     </div>
 
-    <!-- Thanh điều hướng tuần và ghi chú màu sắc -->
-    <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px; background:#fff; border:1px solid #e2ebf3; border-radius:10px; padding:10px 16px; margin-bottom:16px;">
-        <div style="display:flex; align-items:center; gap:10px;">
-            <button type="button" onclick="changeWeek(-1)" title="Tuần trước" style="background:#f1f5f9; border:none; width:30px; height:30px; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#334155; transition:background 0.15s;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
-                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    <div class="week-nav">
+        <div class="week-controls">
+            <button type="button" class="icon-btn-sm" onclick="changeWeek(-1)" title="Tuần trước" aria-label="Tuần trước">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
             </button>
-            <div style="display:flex; align-items:center; gap:8px;">
-                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;color:#079bc9;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                <strong style="font-size:13px; color:#0f172a;">@monday.ToString("dd/MM/yyyy") – @sunday.ToString("dd/MM/yyyy")</strong>
-            </div>
-            <button type="button" onclick="changeWeek(1)" title="Tuần kế tiếp" style="background:#f1f5f9; border:none; width:30px; height:30px; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#334155; transition:background 0.15s;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
-                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            <span class="week-range">
+                @await Html.PartialAsync("_AdminIcon", "calendar")
+                @monday.ToString("dd/MM/yyyy") – @sunday.ToString("dd/MM/yyyy")
+            </span>
+            <button type="button" class="icon-btn-sm" onclick="changeWeek(1)" title="Tuần kế tiếp" aria-label="Tuần kế tiếp">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </button>
             @if (Model.WeekOffset != 0)
             {
-                <button type="button" onclick="resetWeek()" style="background:#e0f2fe; border:1px solid #bae6fd; color:#0369a1; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:700; cursor:pointer; margin-left:4px;">
-                    Về tuần này
-                </button>
+                <button type="button" class="back-week" onclick="resetWeek()">Về tuần này</button>
             }
-        </div>
-
-        <div style="display:flex; align-items:center; gap:14px; font-size:11px; color:#475569; flex-wrap:wrap;">
-            <span style="display:inline-flex; align-items:center; gap:5px;"><span style="width:10px;height:10px;background:#f0fdfa;border-left:3px solid #0d9488;border-radius:2px;"></span> Ca sáng (07:30–11:30)</span>
-            <span style="display:inline-flex; align-items:center; gap:5px;"><span style="width:10px;height:10px;background:#f5f3ff;border-left:3px solid #7c3aed;border-radius:2px;"></span> Ca chiều (13:00–16:30)</span>
-            <span style="display:inline-flex; align-items:center; gap:5px;"><span style="width:10px;height:10px;background:#0f172a;border-left:3px solid #38bdf8;border-radius:2px;"></span> Trực đêm (18:00–07:00)</span>
-            <span style="display:inline-flex; align-items:center; gap:5px;"><span style="width:10px;height:10px;background:#fff5e5;border-left:3px solid #f59e0b;border-radius:2px;"></span> Đã duyệt nghỉ / Đổi ca</span>
         </div>
     </div>
 
-    <!-- Bảng lưới Lịch khám trong tuần (7 ngày) -->
-    <section class="card" style="background:#fff; border:1px solid #e2ebf3; border-radius:10px; overflow:hidden; margin-bottom:24px;">
-        <div class="card-header" style="border-bottom:1px solid #e5edf5; padding:14px 20px; display:flex; justify-content:space-between; align-items:center; background:#fafcff;">
-            <div style="display:flex; align-items:center; gap:12px;">
-                <div class="avatar" style="width:36px; height:36px; border-radius:50%; background:#e0f2fe; color:#0369a1; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; border:1px solid #bae6fd;">@docDisplayInit</div>
-                <div>
-                    <h2 style="font-size:14px; margin:0; font-weight:700; color:#142d4a; display:flex; align-items:center; gap:8px;">
-                        <span>@docDisplayName</span>
-                        <span style="font-size:11px; font-weight:600; background:#f1f5f9; color:#475569; padding:2px 8px; border-radius:12px;">Phòng: @docDisplayRoom</span>
-                    </h2>
-                    <small style="color:#596a7c; font-size:11px;">@deptDisplayName</small>
-                </div>
-            </div>
-            <span style="font-size:11px; color:#64748b; background:#f8fafc; border:1px solid #e2e8f0; padding:4px 10px; border-radius:6px;">
-                Tuần: @monday.ToString("dd/MM") – @sunday.ToString("dd/MM/yyyy")
-            </span>
+    <div class="sched-subtabs" role="tablist" aria-label="Khu vực lịch làm việc">
+        <button type="button" role="tab" class="is-active" aria-selected="true" data-consult-pane="week" onclick="switchConsultPane('week')">Lịch làm việc</button>
+        <button type="button" role="tab" aria-selected="false" data-consult-pane="bidding" onclick="switchConsultPane('bidding')">Đăng ký ca khám</button>
+    </div>
+
+    <section class="card consult-pane" id="consult-pane-week">
+        <div class="wk-table-shell">
+            <table class="wk-table">
+                <thead>
+                    <tr>
+                        <th class="wk-shift-col">Ca</th>
+                        @{
+                            var currentDocId = Model.SelectedDoctorId ?? Model.CurrentDoctorId;
+                            var dayTitles = new[] { "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ Nhật" };
+                            for (int i = 0; i < 7; i++)
+                            {
+                                var headDate = monday.AddDays(i);
+                                var headToday = headDate.Date == now.Date;
+                                var headWeekend = headDate.DayOfWeek == DayOfWeek.Saturday || headDate.DayOfWeek == DayOfWeek.Sunday;
+                                <th class="wk-day @(headToday ? "is-today" : "") @(headWeekend ? "is-weekend" : "")">
+                                    <span class="wk-day-name">@dayTitles[i]</span>
+                                    <span class="wk-day-date">@headDate.ToString("dd/MM")</span>
+                                    @if (headToday)
+                                    {
+                                        <span class="wk-today-badge">Hôm nay</span>
+                                    }
+                                </th>
+                            }
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="wk-row-top">
+                        <td class="wk-shift-label is-morning">Sáng</td>
+                        @{
+                            for (int i = 0; i < 7; i++)
+                            {
+                                var dayDate = monday.AddDays(i);
+                                var curDate = DateOnly.FromDateTime(dayDate);
+                                var isToday = dayDate.Date == now.Date;
+                                var isWeekend = dayDate.DayOfWeek == DayOfWeek.Saturday || dayDate.DayOfWeek == DayOfWeek.Sunday;
+
+                                var schedMorning = Model.DoctorSchedules.FirstOrDefault(s =>
+                                    s.WorkDate == curDate &&
+                                    s.Shift == ExamShift.Morning &&
+                                    (!s.DoctorId.HasValue || s.DoctorId.Value == currentDocId || s.DoctorName == docDisplayName));
+
+                                var approvedLeaveMorning = Model.Exceptions.FirstOrDefault(e =>
+                                    e.Date == curDate &&
+                                    (e.Shift == ExamShift.Morning || e.Shift == null) &&
+                                    (e.DoctorId == currentDocId || (e.DoctorId == null && !Model.IsDepartmentHead)) &&
+                                    e.Status.Contains("duyệt") && !e.Status.Contains("Từ") && !e.Status.Contains("Chờ"));
+
+                                var pendingLeaveMorning = Model.Exceptions.FirstOrDefault(e =>
+                                    e.Date == curDate &&
+                                    (e.Shift == ExamShift.Morning || e.Shift == null) &&
+                                    (e.DoctorId == currentDocId || (e.DoctorId == null && !Model.IsDepartmentHead)) &&
+                                    e.Status.Contains("Chờ"));
+
+                                var coveringSwapMorning = Model.Exceptions.FirstOrDefault(e =>
+                                    e.Date == curDate &&
+                                    (e.Shift == ExamShift.Morning || e.Shift == null) &&
+                                    e.ReplacementDoctorId.HasValue && e.ReplacementDoctorId.Value == currentDocId &&
+                                    e.DoctorId != currentDocId &&
+                                    e.Status.Contains("duyệt") && !e.Status.Contains("Từ") && !e.Status.Contains("Chờ"));
+
+                                var dayDutyShifts = Model.DutyShifts.Where(d => DateOnly.FromDateTime(d.StartTime) == curDate).ToList();
+                                var myDutyNight = dayDutyShifts.FirstOrDefault(d =>
+                                    d.AccountId == currentAccId ||
+                                    (!string.IsNullOrEmpty(d.StaffName) && (d.StaffName.Contains(docDisplayName) || docDisplayName.Contains(d.StaffName))));
+
+                                <td class="wk-cell @(isToday ? "is-today" : "") @(isWeekend ? "is-weekend" : "")">
+                                    <div class="wk-stack">
+                                        @if (coveringSwapMorning != null)
+                                        {
+                                            <div class="wk-pill is-cover" title="Trực thay ca đổi: @coveringSwapMorning.Reason">
+                                                <span class="wk-pill-room">Trực thay</span>
+                                                <span class="wk-pill-time">07:30–11:30</span>
+                                            </div>
+                                        }
+                                        else if (approvedLeaveMorning != null)
+                                        {
+                                            <div class="wk-pill is-leave" title="Lý do: @approvedLeaveMorning.Reason">
+                                                <span class="wk-pill-room">@(approvedLeaveMorning.Type.Contains("Swap") || approvedLeaveMorning.Type.Contains("Đổi") ? "Đã đổi ca" : "Nghỉ phép")</span>
+                                                <span class="wk-pill-time">Đã duyệt</span>
+                                            </div>
+                                        }
+                                        else if (pendingLeaveMorning != null)
+                                        {
+                                            <div class="wk-pill is-pending" title="Lý do: @pendingLeaveMorning.Reason — Chờ Trưởng khoa duyệt">
+                                                <span class="wk-pill-room">@(pendingLeaveMorning.Type.Contains("Swap") || pendingLeaveMorning.Type.Contains("Đổi") ? "Xin đổi ca" : "Xin nghỉ phép")</span>
+                                                <span class="wk-pill-flag">· Chờ duyệt</span>
+                                            </div>
+                                        }
+                                        else if (schedMorning != null)
+                                        {
+                                            <div class="wk-pill is-morning" title="Ca sáng @schedMorning.StartTime.ToString("HH:mm")–@schedMorning.EndTime.ToString("HH:mm") · Phòng @schedMorning.RoomNumber">
+                                                <span class="wk-pill-room">P.@schedMorning.RoomNumber</span>
+                                                <span class="wk-pill-time">@schedMorning.StartTime.ToString("HH:mm")–@schedMorning.EndTime.ToString("HH:mm")</span>
+                                            </div>
+                                            @if (myDutyNight != null)
+                                            {
+                                                <span class="wk-duty" title="Trực đêm · @myDutyNight.Note">Trực đêm</span>
+                                            }
+                                        }
+                                        else if (myDutyNight != null)
+                                        {
+                                            <span class="wk-duty" title="Trực đêm · @myDutyNight.Note">Trực đêm</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="wk-none @(isWeekend ? "is-weekend" : "is-past")">@(isWeekend ? "Nghỉ cuối tuần" : "—")</span>
+                                        }
+                                    </div>
+                                </td>
+                            }
+                        }
+                    </tr>
+                    <tr class="wk-row-bottom">
+                        <td class="wk-shift-label is-afternoon">Chiều</td>
+                        @{
+                            for (int i = 0; i < 7; i++)
+                            {
+                                var dayDate = monday.AddDays(i);
+                                var curDate = DateOnly.FromDateTime(dayDate);
+                                var isToday = dayDate.Date == now.Date;
+                                var isWeekend = dayDate.DayOfWeek == DayOfWeek.Saturday || dayDate.DayOfWeek == DayOfWeek.Sunday;
+
+                                var schedAfternoon = Model.DoctorSchedules.FirstOrDefault(s =>
+                                    s.WorkDate == curDate &&
+                                    s.Shift == ExamShift.Afternoon &&
+                                    (!s.DoctorId.HasValue || s.DoctorId.Value == currentDocId || s.DoctorName == docDisplayName));
+
+                                var approvedLeaveAfternoon = Model.Exceptions.FirstOrDefault(e =>
+                                    e.Date == curDate &&
+                                    (e.Shift == ExamShift.Afternoon || e.Shift == null) &&
+                                    (e.DoctorId == currentDocId || (e.DoctorId == null && !Model.IsDepartmentHead)) &&
+                                    e.Status.Contains("duyệt") && !e.Status.Contains("Từ") && !e.Status.Contains("Chờ"));
+
+                                var pendingLeaveAfternoon = Model.Exceptions.FirstOrDefault(e =>
+                                    e.Date == curDate &&
+                                    (e.Shift == ExamShift.Afternoon || e.Shift == null) &&
+                                    (e.DoctorId == currentDocId || (e.DoctorId == null && !Model.IsDepartmentHead)) &&
+                                    e.Status.Contains("Chờ"));
+
+                                var coveringSwapAfternoon = Model.Exceptions.FirstOrDefault(e =>
+                                    e.Date == curDate &&
+                                    (e.Shift == ExamShift.Afternoon || e.Shift == null) &&
+                                    e.ReplacementDoctorId.HasValue && e.ReplacementDoctorId.Value == currentDocId &&
+                                    e.DoctorId != currentDocId &&
+                                    e.Status.Contains("duyệt") && !e.Status.Contains("Từ") && !e.Status.Contains("Chờ"));
+
+                                <td class="wk-cell @(isToday ? "is-today" : "") @(isWeekend ? "is-weekend" : "")">
+                                    <div class="wk-stack">
+                                        @if (coveringSwapAfternoon != null)
+                                        {
+                                            <div class="wk-pill is-cover" title="Trực thay ca đổi: @coveringSwapAfternoon.Reason">
+                                                <span class="wk-pill-room">Trực thay</span>
+                                                <span class="wk-pill-time">13:00–16:30</span>
+                                            </div>
+                                        }
+                                        else if (approvedLeaveAfternoon != null)
+                                        {
+                                            <div class="wk-pill is-leave" title="Lý do: @approvedLeaveAfternoon.Reason">
+                                                <span class="wk-pill-room">@(approvedLeaveAfternoon.Type.Contains("Swap") || approvedLeaveAfternoon.Type.Contains("Đổi") ? "Đã đổi ca" : "Nghỉ phép")</span>
+                                                <span class="wk-pill-time">Đã duyệt</span>
+                                            </div>
+                                        }
+                                        else if (pendingLeaveAfternoon != null)
+                                        {
+                                            <div class="wk-pill is-pending" title="Lý do: @pendingLeaveAfternoon.Reason — Chờ Trưởng khoa duyệt">
+                                                <span class="wk-pill-room">@(pendingLeaveAfternoon.Type.Contains("Swap") || pendingLeaveAfternoon.Type.Contains("Đổi") ? "Xin đổi ca" : "Xin nghỉ phép")</span>
+                                                <span class="wk-pill-flag">· Chờ duyệt</span>
+                                            </div>
+                                        }
+                                        else if (schedAfternoon != null)
+                                        {
+                                            <div class="wk-pill is-afternoon" title="Ca chiều @schedAfternoon.StartTime.ToString("HH:mm")–@schedAfternoon.EndTime.ToString("HH:mm") · Phòng @schedAfternoon.RoomNumber">
+                                                <span class="wk-pill-room">P.@schedAfternoon.RoomNumber</span>
+                                                <span class="wk-pill-time">@schedAfternoon.StartTime.ToString("HH:mm")–@schedAfternoon.EndTime.ToString("HH:mm")</span>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="wk-none @(isWeekend ? "is-weekend" : "is-past")">@(isWeekend ? "Nghỉ cuối tuần" : "—")</span>
+                                        }
+                                    </div>
+                                </td>
+                            }
+                        }
+                    </tr>
+                </tbody>
+            </table>
         </div>
+    </section>
 
-        <div style="overflow-x:auto;">
-            <div style="display:grid; grid-template-columns:repeat(7, minmax(130px, 1fr)); min-width:880px; gap:1px; background:#e2e8f0;">
-                @{
-                    var dayTitles = new[] { "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ Nhật" };
-                    for (int i = 0; i < 7; i++)
+    <section class="card consult-pane" id="consult-pane-bidding" hidden>
+        <div class="bidding-section">
+
+            <div class="bidding-header">
+                <h2>Đăng ký ca khám</h2>
+                @if (Model.ActivePeriod != null)
+                {
+                    var (pillClass, pillText) = Model.ActivePeriod.Status switch
                     {
-                        var dayDate = monday.AddDays(i);
-                        var curDate = DateOnly.FromDateTime(dayDate);
-                        var isToday = dayDate.Date == now.Date;
-                        var dOfWeek = dayDate.DayOfWeek;
-
-                        var currentDocId = Model.SelectedDoctorId ?? 0;
-
-                        // Lịch khám cấu hình từ Model.DoctorSchedules
-                        var schedMorning = Model.DoctorSchedules.FirstOrDefault(s =>
-                            s.WorkDate == curDate &&
-                            s.Shift == ExamShift.Morning &&
-                            (!s.DoctorId.HasValue || s.DoctorId.Value == currentDocId || s.DoctorName == docDisplayName));
-
-                        var schedAfternoon = Model.DoctorSchedules.FirstOrDefault(s =>
-                            s.WorkDate == curDate &&
-                            s.Shift == ExamShift.Afternoon &&
-                            (!s.DoctorId.HasValue || s.DoctorId.Value == currentDocId || s.DoctorName == docDisplayName));
-
-                        // Tìm ngoại lệ ĐÃ DUYỆT (bác sĩ nghỉ / đổi ca của chính bác sĩ này)
-                        var approvedLeaveMorning = Model.Exceptions.FirstOrDefault(e =>
-                            e.Date == curDate &&
-                            (e.Shift == ExamShift.Morning || e.Shift == null) &&
-                            (e.DoctorId == currentDocId || (e.DoctorId == null && !Model.IsDepartmentHead)) &&
-                            e.Status.Contains("duyệt") && !e.Status.Contains("Từ") && !e.Status.Contains("Chờ"));
-
-                        var approvedLeaveAfternoon = Model.Exceptions.FirstOrDefault(e =>
-                            e.Date == curDate &&
-                            (e.Shift == ExamShift.Afternoon || e.Shift == null) &&
-                            (e.DoctorId == currentDocId || (e.DoctorId == null && !Model.IsDepartmentHead)) &&
-                            e.Status.Contains("duyệt") && !e.Status.Contains("Từ") && !e.Status.Contains("Chờ"));
-
-                        // Tìm ngoại lệ ĐANG CHỜ DUYỆT (Pending) của chính bác sĩ này
-                        var pendingLeaveMorning = Model.Exceptions.FirstOrDefault(e =>
-                            e.Date == curDate &&
-                            (e.Shift == ExamShift.Morning || e.Shift == null) &&
-                            (e.DoctorId == currentDocId || (e.DoctorId == null && !Model.IsDepartmentHead)) &&
-                            e.Status.Contains("Chờ"));
-
-                        var pendingLeaveAfternoon = Model.Exceptions.FirstOrDefault(e =>
-                            e.Date == curDate &&
-                            (e.Shift == ExamShift.Afternoon || e.Shift == null) &&
-                            (e.DoctorId == currentDocId || (e.DoctorId == null && !Model.IsDepartmentHead)) &&
-                            e.Status.Contains("Chờ"));
-
-                        // Ca đổi mà bác sĩ này là người nhận trực thay (ReplacementDoctorId)
-                        var coveringSwapMorning = Model.Exceptions.FirstOrDefault(e =>
-                            e.Date == curDate &&
-                            (e.Shift == ExamShift.Morning || e.Shift == null) &&
-                            e.ReplacementDoctorId.HasValue && e.ReplacementDoctorId.Value == currentDocId &&
-                            e.DoctorId != currentDocId &&
-                            e.Status.Contains("duyệt") && !e.Status.Contains("Từ") && !e.Status.Contains("Chờ"));
-
-                        var coveringSwapAfternoon = Model.Exceptions.FirstOrDefault(e =>
-                            e.Date == curDate &&
-                            (e.Shift == ExamShift.Afternoon || e.Shift == null) &&
-                            e.ReplacementDoctorId.HasValue && e.ReplacementDoctorId.Value == currentDocId &&
-                            e.DoctorId != currentDocId &&
-                            e.Status.Contains("duyệt") && !e.Status.Contains("Từ") && !e.Status.Contains("Chờ"));
-
-                        // Lịch trực đêm trong ngày (khoa hoặc chính bác sĩ)
-                        var dayDutyShifts = Model.DutyShifts.Where(d => DateOnly.FromDateTime(d.StartTime) == curDate).ToList();
-                        var myDutyNight = dayDutyShifts.FirstOrDefault(d =>
-                            d.AccountId == currentAccId ||
-                            (!string.IsNullOrEmpty(d.StaffName) && (d.StaffName.Contains(docDisplayName) || docDisplayName.Contains(d.StaffName))));
-
-                        bool hasAnyShift = schedMorning != null || schedAfternoon != null ||
-                                           approvedLeaveMorning != null || approvedLeaveAfternoon != null ||
-                                           pendingLeaveMorning != null || pendingLeaveAfternoon != null ||
-                                           coveringSwapMorning != null || coveringSwapAfternoon != null ||
-                                           dayDutyShifts.Count > 0;
-
-                        <div style="background:#fff; display:flex; flex-direction:column; @(isToday ? "outline:2px solid #079bc9; outline-offset:-2px; z-index:1;" : "")">
-                            <!-- Header ngày -->
-                            <div style="padding:10px 8px; text-align:center; border-bottom:1px solid #eef3f7; @(isToday ? "background:#f0fdfa;" : "background:#f8fafc;")">
-                                <div style="font-size:11px; @(isToday ? "color:#0d9488; font-weight:700;" : "color:#64748b;")">@dayTitles[i]</div>
-                                <strong style="font-size:13px; @(isToday ? "color:#0f766e; font-weight:800;" : "color:#0f172a;")">@dayDate.ToString("dd/MM")</strong>
-                                @if (isToday)
-                                {
-                                    <div style="font-size:10px; color:#079bc9; font-weight:700; margin-top:2px;">Hôm nay</div>
-                                }
-                            </div>
-
-                            <!-- Body các ca khám / trực -->
-                            <div style="padding:8px; display:flex; flex-direction:column; gap:6px; flex:1; min-height:130px; @(isToday ? "background:#fafefe;" : "background:#fff;")">
-                                <!-- 1. CA SÁNG -->
-                                @if (coveringSwapMorning != null)
-                                {
-                                    <div style="background:#eff6ff; border-left:3px solid #3b82f6; border-radius:6px; padding:6px 7px; text-align:left;" title="Trực thay ca đổi: @coveringSwapMorning.Reason">
-                                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                                            <strong style="font-size:11px; color:#1e40af;">Ca sáng</strong>
-                                            <span style="font-size:9px; background:#dbeafe; color:#1d4ed8; padding:1px 5px; border-radius:4px; font-weight:700;">Trực thay</span>
-                                        </div>
-                                        <small style="color:#2563eb; font-size:10px; font-weight:600; display:block; margin-top:2px;">
-                                            07:30–11:30
-                                        </small>
-                                    </div>
-                                }
-                                else if (approvedLeaveMorning != null)
-                                {
-                                    <div style="background:#fff5e5; border-left:3px solid #f59e0b; border-radius:6px; padding:6px 7px; text-align:left;" title="Lý do: @approvedLeaveMorning.Reason">
-                                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                                            <strong style="font-size:11px; color:#78350f;">Ca sáng</strong>
-                                            <span style="font-size:9px; background:#fed7aa; color:#9a3412; padding:1px 5px; border-radius:4px; font-weight:700;">Đã duyệt</span>
-                                        </div>
-                                        <small style="color:#b45309; font-size:10px; font-weight:600; display:block; margin-top:2px;">
-                                            @(approvedLeaveMorning.Type.Contains("Swap") || approvedLeaveMorning.Type.Contains("Đổi") ? "Đã đổi ca" : "Đã duyệt nghỉ")
-                                        </small>
-                                        @if (!string.IsNullOrEmpty(approvedLeaveMorning.ReplacementDoctorName))
-                                        {
-                                            <div style="font-size:9px; color:#92400e; margin-top:2px;">(BS. @approvedLeaveMorning.ReplacementDoctorName.Split(' ').Last() thay)</div>
-                                        }
-                                    </div>
-                                }
-                                else if (pendingLeaveMorning != null)
-                                {
-                                    <div style="background:#fef3c7; border-left:3px solid #d97706; border-radius:6px; padding:6px 7px; text-align:left;" title="Lý do: @pendingLeaveMorning.Reason - Chờ Trưởng khoa duyệt">
-                                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                                            <strong style="font-size:11px; color:#92400e;">Ca sáng</strong>
-                                            <span style="font-size:9px; background:#fde68a; color:#78350f; padding:1px 5px; border-radius:4px; font-weight:700;">Chờ duyệt</span>
-                                        </div>
-                                        <small style="color:#b45309; font-size:10px; font-weight:600; display:block; margin-top:2px;">
-                                            @(pendingLeaveMorning.Type.Contains("Swap") || pendingLeaveMorning.Type.Contains("Đổi") ? "Xin đổi ca" : "Xin nghỉ phép")
-                                        </small>
-                                    </div>
-                                }
-                                else if (schedMorning != null)
-                                {
-                                    <div style="background:#f0fdfa; border-left:3px solid #0d9488; border-radius:6px; padding:6px 7px;">
-                                        <strong style="display:block; font-size:11px; color:#0f766e;">Ca sáng</strong>
-                                        <small style="color:#0d9488; font-size:10px; font-weight:600;">@schedMorning.StartTime.ToString("HH:mm")–@schedMorning.EndTime.ToString("HH:mm")</small>
-                                    </div>
-                                }
-
-                                <!-- 2. CA CHIỀU -->
-                                @if (coveringSwapAfternoon != null)
-                                {
-                                    <div style="background:#eff6ff; border-left:3px solid #3b82f6; border-radius:6px; padding:6px 7px; text-align:left;" title="Trực thay ca đổi: @coveringSwapAfternoon.Reason">
-                                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                                            <strong style="font-size:11px; color:#1e40af;">Ca chiều</strong>
-                                            <span style="font-size:9px; background:#dbeafe; color:#1d4ed8; padding:1px 5px; border-radius:4px; font-weight:700;">Trực thay</span>
-                                        </div>
-                                        <small style="color:#2563eb; font-size:10px; font-weight:600; display:block; margin-top:2px;">
-                                            13:00–16:30
-                                        </small>
-                                    </div>
-                                }
-                                else if (approvedLeaveAfternoon != null)
-                                {
-                                    <div style="background:#fff5e5; border-left:3px solid #f59e0b; border-radius:6px; padding:6px 7px; text-align:left;" title="Lý do: @approvedLeaveAfternoon.Reason">
-                                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                                            <strong style="font-size:11px; color:#78350f;">Ca chiều</strong>
-                                            <span style="font-size:9px; background:#fed7aa; color:#9a3412; padding:1px 5px; border-radius:4px; font-weight:700;">Đã duyệt</span>
-                                        </div>
-                                        <small style="color:#b45309; font-size:10px; font-weight:600; display:block; margin-top:2px;">
-                                            @(approvedLeaveAfternoon.Type.Contains("Swap") || approvedLeaveAfternoon.Type.Contains("Đổi") ? "Đã đổi ca" : "Đã duyệt nghỉ")
-                                        </small>
-                                        @if (!string.IsNullOrEmpty(approvedLeaveAfternoon.ReplacementDoctorName))
-                                        {
-                                            <div style="font-size:9px; color:#92400e; margin-top:2px;">(BS. @approvedLeaveAfternoon.ReplacementDoctorName.Split(' ').Last() thay)</div>
-                                        }
-                                    </div>
-                                }
-                                else if (pendingLeaveAfternoon != null)
-                                {
-                                    <div style="background:#fef3c7; border-left:3px solid #d97706; border-radius:6px; padding:6px 7px; text-align:left;" title="Lý do: @pendingLeaveAfternoon.Reason - Chờ Trưởng khoa duyệt">
-                                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                                            <strong style="font-size:11px; color:#92400e;">Ca chiều</strong>
-                                            <span style="font-size:9px; background:#fde68a; color:#78350f; padding:1px 5px; border-radius:4px; font-weight:700;">Chờ duyệt</span>
-                                        </div>
-                                        <small style="color:#b45309; font-size:10px; font-weight:600; display:block; margin-top:2px;">
-                                            @(pendingLeaveAfternoon.Type.Contains("Swap") || pendingLeaveAfternoon.Type.Contains("Đổi") ? "Xin đổi ca" : "Xin nghỉ phép")
-                                        </small>
-                                    </div>
-                                }
-                                else if (schedAfternoon != null)
-                                {
-                                    <div style="background:#f5f3ff; border-left:3px solid #7c3aed; border-radius:6px; padding:6px 7px;">
-                                        <strong style="display:block; font-size:11px; color:#5b21b6;">Ca chiều</strong>
-                                        <small style="color:#7c3aed; font-size:10px; font-weight:600;">@schedAfternoon.StartTime.ToString("HH:mm")–@schedAfternoon.EndTime.ToString("HH:mm")</small>
-                                    </div>
-                                }
-
-                                <!-- 3. CA TRỰC ĐÊM TRONG Ô LƯỚI LỊCH LÀM VIỆC -->
-                                @if (myDutyNight != null)
-                                {
-                                    <div style="background:#0f172a; border-left:3px solid #38bdf8; color:#f8fafc; border-radius:6px; padding:6px 7px; text-align:left; margin-top:auto;" title="Ca trực đêm: @myDutyNight.Note · Phân công: @myDutyNight.StaffName">
-                                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                                            <strong style="color:#38bdf8; font-size:10px; font-weight:700; display:flex; align-items:center; gap:4px;">
-                                                <span>🌙</span> Trực đêm
-                                            </strong>
-                                            <span style="font-size:9px; color:#94a3b8; background:#1e293b; padding:1px 4px; border-radius:4px;">18:00–07:00</span>
-                                        </div>
-                                        <div style="font-size:9px; color:#cbd5e1; margin-top:2px; display:flex; justify-content:space-between; align-items:center; gap:4px;">
-                                            <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="@myDutyNight.Note">@myDutyNight.Note</span>
-                                            <span style="background:#0284c7; color:#fff; font-size:8px; padding:1px 4px; border-radius:3px; font-weight:700; flex-shrink:0;">Bạn trực</span>
-                                        </div>
-                                    </div>
-                                }
-                                else if (dayDutyShifts.Count > 0)
-                                {
-                                    var dutyStaffNames = string.Join(", ", dayDutyShifts.Select(s => s.StaffName.Split(' ').Last()));
-                                    var firstDuty = dayDutyShifts[0];
-                                    <div style="background:#0f172a; border-left:3px solid #38bdf8; color:#f8fafc; border-radius:6px; padding:6px 7px; text-align:left; margin-top:auto;" title="Trực đêm khoa: @string.Join(", ", dayDutyShifts.Select(s => s.StaffName)) · @firstDuty.Note">
-                                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                                            <strong style="color:#38bdf8; font-size:10px; font-weight:700; display:flex; align-items:center; gap:4px;">
-                                                <span>🌙</span> Trực đêm
-                                            </strong>
-                                            <span style="font-size:9px; color:#94a3b8; background:#1e293b; padding:1px 4px; border-radius:4px;">18:00–07:00</span>
-                                        </div>
-                                        <div style="font-size:9px; color:#94a3b8; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="@string.Join(", ", dayDutyShifts.Select(s => s.StaffName))">
-                                            @dutyStaffNames
-                                        </div>
-                                    </div>
-                                }
-
-                                @if (!hasAnyShift)
-                                {
-                                    <div style="color:#94a3b8; font-size:11px; text-align:center; padding-top:40px;">
-                                        @(dOfWeek == DayOfWeek.Saturday || dOfWeek == DayOfWeek.Sunday ? "Nghỉ cuối tuần" : "Không có lịch khám")
-                                    </div>
-                                }
-                            </div>
-                        </div>
-                    }
+                        SchedulingPeriodStatus.Open when Model.ActivePeriod.IsOpenForBidding => ("open", "Đang mở đăng ký"),
+                        SchedulingPeriodStatus.Open => ("closed", "Đã đóng đăng ký"),
+                        SchedulingPeriodStatus.Reviewing => ("review", "Đang xét duyệt"),
+                        SchedulingPeriodStatus.Published => ("published", "Đã xuất bản lịch"),
+                        _ => ("closed", "Đã đóng")
+                    };
+                    <div class="period-info">
+                        <span class="period-pill @pillClass">@pillText</span>
+                        <div class="period-meta">Kỳ @Model.ActivePeriod.Name · @Model.ActivePeriod.StartDate.ToString("dd/MM") – @Model.ActivePeriod.EndDate.ToString("dd/MM/yyyy")</div>
+                    </div>
                 }
-            </div>
-        </div>
-
-        <!-- ========================================================================= -->
-        <!-- KHU VỰC BÁC SĨ TỰ ĐĂNG KÝ CA KHÁM (SHIFT BIDDING) DƯỚI LỊCH LÀM VIỆC -->
-        <!-- ========================================================================= -->
-        <div style="margin-top:32px; border-top:2px dashed #e2e8f0; padding-top:28px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                <div>
-                    <h2 style="font-size:18px; font-weight:750; color:#142d4a; margin:0 0 4px; display:flex; align-items:center; gap:8px;">
-                        <span>📝</span> Đăng ký ca khám tự chọn (Shift Bidding)
-                    </h2>
-                   
-                </div>
-                <div>
-                    @if (Model.ActivePeriod != null)
-                    {
-                        var periodBadgeColor = Model.ActivePeriod.Status switch
-                        {
-                            SchedulingPeriodStatus.Open => ("#dcfce7", "#15803d", "🟢 Cổng đang mở"),
-                            SchedulingPeriodStatus.Reviewing => ("#fef3c7", "#b45309", "🟡 Đang xét duyệt"),
-                            SchedulingPeriodStatus.Published => ("#e0f2fe", "#0369a1", "🔵 Đã xuất bản lịch"),
-                            _ => ("#f1f5f9", "#475569", "Đã đóng")
-                        };
-                        <div style="text-align:right;">
-                            <span style="background:@periodBadgeColor.Item1; color:@periodBadgeColor.Item2; font-size:12px; font-weight:700; padding:4px 10px; border-radius:20px;">
-                                @periodBadgeColor.Item3
-                            </span>
-                            <div style="font-size:11px; color:#64748b; margin-top:4px;">
-                                Kỳ: <strong>@Model.ActivePeriod.Name</strong> (@Model.ActivePeriod.StartDate.ToString("dd/MM") - @Model.ActivePeriod.EndDate.ToString("dd/MM/yyyy"))
-                            </div>
-                        </div>
-                    }
-                    else
-                    {
-                        <span style="background:#f1f5f9; color:#64748b; font-size:12px; font-weight:600; padding:4px 10px; border-radius:20px;">
-                            Chưa có kỳ đăng ký nào đang mở
-                        </span>
-                    }
-                </div>
+                else
+                {
+                    <span class="period-pill closed">Chưa có kỳ đăng ký</span>
+                }
             </div>
 
             @if (Model.DemandGrid != null && Model.ActivePeriod != null)
@@ -686,120 +585,59 @@ else if (tab == "schedule")
                 var isMinQuotaMet = totalBids >= minQuota;
                 var shiftsNeeded = Math.Max(0, minQuota - totalBids);
 
-                <!-- THẺ THEO DÕI ĐỊNH MỨC CA KHÁM CÁ NHÂN -->
-                <div style="background:#fff; border:1px solid #e2ebf3; border-radius:12px; padding:16px 20px; margin-bottom:14px; box-shadow:0 2px 8px rgba(0,0,0,0.03);">
-                    <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; margin-bottom:12px;">
-                        <div>
-                            <div style="display:flex; align-items:center; gap:8px;">
-                                <span style="font-size:18px;">🎯</span>
-                                <strong style="font-size:14px; color:#0f172a;">Tiến độ định mức tuần:</strong>
-                                <span style="font-size:15px; font-weight:800; color:#0369a1;">@totalBids / @minQuota - @maxQuota ca</span>
-                                @if (totalBids >= maxQuota)
-                                {
-                                    <span style="background:#e0f2fe; color:#0369a1; font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px; border:1px solid #bae6fd;">
-                                        🎉 Đã chọn tối đa toàn bộ ca trong tuần (@totalBids/@maxQuota ca)
-                                    </span>
-                                }
-                                else if (isMinQuotaMet)
-                                {
-                                    <span style="background:#dcfce7; color:#15803d; font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px; border:1px solid #bbf7d0;">
-                                        ✓ Đã đạt chỉ tiêu tối thiểu (@totalBids/@minQuota ca) · Có thể chọn thêm tối đa @(maxQuota - totalBids) ca
-                                    </span>
-                                }
-                                else
-                                {
-                                    <span style="background:#fef3c7; color:#b45309; font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px; border:1px solid #fde68a;">
-                                        ⚡ Cần đăng ký thêm @shiftsNeeded ca (chỉ tiêu tối thiểu: @minQuota ca/tuần)
-                                    </span>
-                                }
-                            </div>
-                            <div style="font-size:11px; color:#64748b; margin-top:2px;">Chỉ tiêu tuần: Chọn tối thiểu <strong>@minQuota ca</strong> và tối đa <strong>@maxQuota ca</strong> (toàn bộ ca trong tuần).</div>
+                <div class="quota-card">
+                    <div class="quota-row">
+                        <div class="quota-main">
+                            Định mức tuần
+                            <span class="quota-count">@totalBids / @minQuota – @maxQuota ca</span>
+                            @if (totalBids >= maxQuota)
+                            {
+                                <span class="quota-pill ok">Đã chọn đủ tối đa</span>
+                            }
+                            else if (isMinQuotaMet)
+                            {
+                                <span class="quota-pill ok">Đã đạt chỉ tiêu</span>
+                            }
+                            else
+                            {
+                                <span class="quota-pill warn">Còn thiếu @shiftsNeeded ca</span>
+                            }
                         </div>
-
-                        <!-- Các huy hiệu phân loại ca -->
-                        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                            <div style="background:#f0fdf4; border:1px solid #bbf7d0; padding:4px 10px; border-radius:6px; font-size:11px; display:flex; align-items:center; gap:5px;">
-                                <span style="width:7px; height:7px; border-radius:50%; background:#22c55e;"></span>
-                                <span style="color:#166534;">Đã duyệt:</span>
-                                <strong style="color:#15803d;">@approvedBids</strong>
-                            </div>
-                            <div style="background:#f0f9ff; border:1px solid #bae6fd; padding:4px 10px; border-radius:6px; font-size:11px; display:flex; align-items:center; gap:5px;">
-                                <span style="width:7px; height:7px; border-radius:50%; background:#0284c7;"></span>
-                                <span style="color:#0369a1;">Chờ duyệt:</span>
-                                <strong style="color:#0284c7;">@pendingBids</strong>
-                            </div>
-                            <div style="background:@(rejectedBids > 0 ? "#fef2f2" : "#f8fafc"); border:1px solid @(rejectedBids > 0 ? "#fca5a5" : "#e2e8f0"); padding:4px 10px; border-radius:6px; font-size:11px; display:flex; align-items:center; gap:5px;">
-                                <span style="width:7px; height:7px; border-radius:50%; background:@(rejectedBids > 0 ? "#ef4444" : "#94a3b8");"></span>
-                                <span style="color:@(rejectedBids > 0 ? "#991b1b" : "#64748b");">Không duyệt / Thất bại:</span>
-                                <strong style="color:@(rejectedBids > 0 ? "#b91c1c" : "#64748b");">@rejectedBids</strong>
-                            </div>
+                        <div class="quota-stats">
+                            <span><span class="dot" style="background:#22c55e;"></span>Đã duyệt: <strong>@approvedBids</strong></span>
+                            <span><span class="dot" style="background:#15803d;"></span>Chờ duyệt: <strong>@pendingBids</strong></span>
+                            <span><span class="dot" style="background:@(rejectedBids > 0 ? "#ef4444" : "#94a3b8");"></span>Không duyệt: <strong>@rejectedBids</strong></span>
                             @if (reallocatedBids > 0)
                             {
-                                <div style="background:#fefce8; border:1px solid #fde047; padding:4px 10px; border-radius:6px; font-size:11px; display:flex; align-items:center; gap:5px;">
-                                    <span style="width:7px; height:7px; border-radius:50%; background:#eab308;"></span>
-                                    <span style="color:#854d0e;">Điều chuyển:</span>
-                                    <strong style="color:#854d0e;">@reallocatedBids</strong>
-                                </div>
+                                <span><span class="dot" style="background:#eab308;"></span>Điều chuyển: <strong>@reallocatedBids</strong></span>
                             }
                         </div>
                     </div>
-
-                    <!-- Thanh Progress Bar định mức -->
-                    <div style="width:100%; height:7px; background:#e2e8f0; border-radius:4px; overflow:hidden;">
-                        <div style="width:@pctProgress%; height:100%; background:@(isMinQuotaMet ? "#10b981" : "#f59e0b"); border-radius:4px; transition:width 0.3s ease;"></div>
+                    <div class="quota-bar">
+                        <span style="width:@pctProgress%; background:@(isMinQuotaMet ? "#10b981" : "#f59e0b");"></span>
                     </div>
                 </div>
 
                 @if (rejectedBids > 0)
                 {
-                    <!-- CẢNH BÁO CA ĐĂNG KÝ THẤT BẠI VÀ HƯỚNG DẪN PICK CA KHÁC -->
-                    <div style="background:#fff1f2; border:1px solid #fecdd3; border-left:4px solid #e11d48; border-radius:10px; padding:14px 18px; margin-bottom:14px; display:flex; align-items:flex-start; gap:12px; box-shadow:0 1px 4px rgba(225,29,72,0.06);">
-                        <div style="font-size:20px; line-height:1; margin-top:1px;">⚠️</div>
-                        <div style="flex:1;">
-                            <strong style="color:#9f1239; font-size:13px; display:block; margin-bottom:3px;">
-                                Bạn có @rejectedBids ca đăng ký không thành công do buồng khám đã đủ bác sĩ
-                            </strong>
-                            <div style="color:#be123c; font-size:12px; line-height:1.5;">
-                                Ca khám bạn đã chọn đã vượt quá số buồng tiếp nhận của khoa (@Model.DemandGrid.TotalActiveRooms buồng) nên không thể phê duyệt.
-                                @if (Model.ActivePeriod.IsOpenForBidding)
-                                {
-                                    <span>
-                                        Vui lòng kiểm tra các ô <strong>còn chỗ (màu xanh lá 🟢 hoặc màu trắng ⚪)</strong> trong lịch bên dưới và bấm nút <strong>"+ Đăng ký"</strong> để chọn ca khám thay thế ngay, đảm bảo hoàn thành đủ định mức ca khám tuần của bạn!
-                                    </span>
-                                }
-                                else
-                                {
-                                    <span>
-                                        Kỳ đăng ký hiện đã đóng để Trưởng khoa sắp xếp. Vui lòng liên hệ Trưởng khoa nếu bạn cần hỗ trợ điều phối thêm buồng khám.
-                                    </span>
-                                }
-                            </div>
+                    <div class="reject-alert">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 9v4"></path><path d="M12 17h.01"></path><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg>
+                        <div>
+                            <strong>Có @rejectedBids ca đăng ký không thành công do hết buồng khám.</strong>
+                            @if (Model.ActivePeriod.IsOpenForBidding)
+                            {
+                                <span>Chọn ca còn chỗ (màu xanh) bên dưới để đăng ký thay thế.</span>
+                            }
+                            else
+                            {
+                                <span>Kỳ đăng ký đã đóng. Liên hệ Trưởng khoa để được hỗ trợ.</span>
+                            }
                         </div>
                     </div>
                 }
 
-                <div style="background:#fff; border:1px solid #e2ebf3; border-radius:12px; overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,0.03);">
-                    <!-- Chú thích Live Demand Visibility -->
-                    <div style="background:#f8fafc; border-bottom:1px solid #e2ebf3; padding:12px 20px; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; font-size:12px;">
-                        <div style="display:flex; align-items:center; gap:16px;">
-                            <span style="font-weight:700; color:#334155;">Độ cạnh tranh buồng khám:</span>
-                            <span style="display:inline-flex; align-items:center; gap:6px;">
-                                <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#f1f5f9; border:1px solid #cbd5e1;"></span> ⚪ Đang trống (0/@Model.DemandGrid.TotalActiveRooms phòng)
-                            </span>
-                            <span style="display:inline-flex; align-items:center; gap:6px;">
-                                <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#dcfce7; border:1px solid #86efac;"></span> 🟢 Còn chỗ (1..@Model.DemandGrid.TotalActiveRooms phòng)
-                            </span>
-                            <span style="display:inline-flex; align-items:center; gap:6px;">
-                                <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#fee2e2; border:1px solid #fca5a5;"></span> 🔴 Cạnh tranh cao (>@Model.DemandGrid.TotalActiveRooms phòng)
-                            </span>
-                        </div>
-                        <div style="color:#64748b;">
-                            Tổng số buồng khám khoa: <strong>@Model.DemandGrid.TotalActiveRooms buồng khả dụng</strong>
-                        </div>
-                    </div>
-
-                    <!-- Lưới các ngày trong kỳ đăng ký -->
-                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:1px; background:#e2e8f0;">
+                <div class="demand-card">
+                    <div class="demand-grid">
                         @{
                             var dates = Model.DemandGrid.Cells.Select(c => c.WorkDate).Distinct().OrderBy(d => d).ToList();
                         }
@@ -810,15 +648,14 @@ else if (tab == "schedule")
                             var isSunday = d.DayOfWeek == DayOfWeek.Sunday;
                             var isSaturday = d.DayOfWeek == DayOfWeek.Saturday;
 
-                            <div style="background:#fff; padding:14px; display:flex; flex-direction:column; gap:10px;">
-                                <div style="border-bottom:1px solid #f1f5f9; padding-bottom:8px; text-align:center;">
-                                    <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:@(isSunday ? "#ef4444" : isSaturday ? "#0284c7" : "#64748b");">
+                            <div class="demand-day">
+                                <div class="demand-day-head">
+                                    <div class="demand-dow @(isSunday ? "sunday" : isSaturday ? "saturday" : "")">
                                         @(d.DayOfWeek switch { DayOfWeek.Monday => "Thứ Hai", DayOfWeek.Tuesday => "Thứ Ba", DayOfWeek.Wednesday => "Thứ Tư", DayOfWeek.Thursday => "Thứ Năm", DayOfWeek.Friday => "Thứ Sáu", DayOfWeek.Saturday => "Thứ Bảy", _ => "Chủ Nhật" })
                                     </div>
-                                    <div style="font-size:15px; font-weight:800; color:#1e293b;">@d.ToString("dd/MM")</div>
+                                    <div class="demand-date">@d.ToString("dd/MM")</div>
                                 </div>
 
-                                <!-- CA SÁNG -->
                                 @if (morningCell != null)
                                 {
                                     var myBid = morningCell.Bidders.FirstOrDefault(b => b.DoctorId == Model.CurrentDoctorId);
@@ -829,55 +666,51 @@ else if (tab == "schedule")
                                         _ => ("#f8fafc", "#e2e8f0", "#64748b")
                                     };
 
-                                    <div style="background:@cellBg; border:1px solid @cellBorder; border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:6px;">
-                                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                                            <strong style="font-size:11px; color:#1e293b;">🌅 Ca Sáng</strong>
-                                            <span style="font-size:11px; font-weight:700; color:@cellText;">
-                                                @morningCell.CurrentBidders / @morningCell.TotalRooms phòng
-                                            </span>
+                                    <div class="demand-cell" style="background:@cellBg; border-color:@cellBorder;">
+                                        <div class="demand-cell-head">
+                                            <span class="demand-shift">Ca sáng</span>
+                                            <span class="demand-rooms" style="color:@cellText;">@morningCell.CurrentBidders / @morningCell.TotalRooms phòng</span>
                                         </div>
 
                                         @if (morningCell.IsHotShift)
                                         {
-                                            <span style="font-size:9px; background:#ffedd5; color:#c2410c; font-weight:700; padding:1px 5px; border-radius:4px; align-self:flex-start;">
-                                                🔥 Ca Hot
-                                            </span>
+                                            <span class="hot-badge">Hot</span>
                                         }
 
                                         @if (myBid != null)
                                         {
-                                            <div style="margin-top:4px; border-top:1px dashed @cellBorder; padding-top:6px;">
+                                            <div class="bid-state">
                                                 @if (myBid.Status == DoctorScheduleStatus.Bidding)
                                                 {
-                                                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                                                        <span style="font-size:10px; font-weight:700; color:#0284c7;">✓ Đã đăng ký</span>
+                                                    <div class="bid-cancel-row">
+                                                        <span class="bid-ok">Đã đăng ký</span>
                                                         @if (Model.ActivePeriod.IsOpenForBidding)
                                                         {
                                                             <form asp-action="CancelShiftBid" method="post" style="margin:0;">
                                                                 @Html.AntiForgeryToken()
                                                                 <input type="hidden" name="scheduleId" value="@myBid.ScheduleId" />
-                                                                <button type="submit" style="background:none; border:none; color:#ef4444; font-size:10px; cursor:pointer; text-decoration:underline;">Hủy</button>
+                                                                <button type="submit" class="link-cancel">Hủy</button>
                                                             </form>
                                                         }
                                                     </div>
                                                 }
                                                 else if (myBid.Status == DoctorScheduleStatus.Approved)
                                                 {
-                                                    <span style="font-size:10px; font-weight:700; color:#15803d;">🎉 Đã duyệt (P.@myBid.RoomNumber)</span>
+                                                    <span class="bid-ok">Đã duyệt · P.@myBid.RoomNumber</span>
                                                 }
                                                 else if (myBid.Status == DoctorScheduleStatus.Rejected)
                                                 {
-                                                    <div style="background:#fee2e2; border:1px solid #fca5a5; border-radius:6px; padding:4px 6px; margin-top:2px;">
-                                                        <span style="font-size:10px; font-weight:700; color:#b91c1c; display:block;">✕ Không duyệt (Hết buồng)</span>
+                                                    <div class="bid-rejected">
+                                                        Không duyệt (hết buồng)
                                                         @if (Model.ActivePeriod.IsOpenForBidding)
                                                         {
-                                                            <div style="font-size:9.5px; color:#dc2626; font-weight:600; margin-top:2px;">👉 Hãy chọn ca khác</div>
+                                                            <span class="hint">Chọn ca khác</span>
                                                         }
                                                     </div>
                                                 }
                                                 else if (myBid.Status == DoctorScheduleStatus.Reallocated)
                                                 {
-                                                    <span style="font-size:10px; font-weight:700; color:#854d0e;">↪ Đã điều chuyển</span>
+                                                    <span class="bid-reallocated">Đã điều chuyển</span>
                                                 }
                                             </div>
                                         }
@@ -885,22 +718,19 @@ else if (tab == "schedule")
                                         {
                                             @if (morningCell.ApprovedCount >= morningCell.TotalRooms)
                                             {
-                                                <div style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:4px; padding:4px 6px; margin-top:4px; text-align:center;">
-                                                    <span style="font-size:10px; font-weight:700; color:#dc2626;">🔒 Đã duyệt kín buồng (@morningCell.ApprovedCount/@morningCell.TotalRooms)</span>
-                                                </div>
+                                                <div class="bid-full">Kín buồng (@morningCell.ApprovedCount/@morningCell.TotalRooms)</div>
                                             }
                                             else
                                             {
-                                                <button type="button" onclick="openShiftBidModal('@Model.ActivePeriod.Id', '@d.ToString("yyyy-MM-dd")', '@((int)ExamShift.Morning)', 'Ca Sáng (07:30 - 11:30) ngày @d.ToString("dd/MM/yyyy")')"
-                                                        style="background:#079bc9; color:#fff; border:none; border-radius:4px; padding:4px 8px; font-size:11px; font-weight:600; cursor:pointer; margin-top:4px;">
-                                                    + Đăng ký
+                                                <button type="button" class="register-btn" onclick="openShiftBidModal('@Model.ActivePeriod.Id', '@d.ToString("yyyy-MM-dd")', '@((int)ExamShift.Morning)', 'Ca sáng (07:30–11:30) ngày @d.ToString("dd/MM/yyyy")')">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14 M5 12h14"></path></svg>
+                                                    Đăng ký
                                                 </button>
                                             }
                                         }
                                     </div>
                                 }
 
-                                <!-- CA CHIỀU -->
                                 @if (afternoonCell != null)
                                 {
                                     var myBid = afternoonCell.Bidders.FirstOrDefault(b => b.DoctorId == Model.CurrentDoctorId);
@@ -911,55 +741,51 @@ else if (tab == "schedule")
                                         _ => ("#f8fafc", "#e2e8f0", "#64748b")
                                     };
 
-                                    <div style="background:@cellBg; border:1px solid @cellBorder; border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:6px;">
-                                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                                            <strong style="font-size:11px; color:#1e293b;">🌤 Ca Chiều</strong>
-                                            <span style="font-size:11px; font-weight:700; color:@cellText;">
-                                                @afternoonCell.CurrentBidders / @afternoonCell.TotalRooms phòng
-                                            </span>
+                                    <div class="demand-cell" style="background:@cellBg; border-color:@cellBorder;">
+                                        <div class="demand-cell-head">
+                                            <span class="demand-shift">Ca chiều</span>
+                                            <span class="demand-rooms" style="color:@cellText;">@afternoonCell.CurrentBidders / @afternoonCell.TotalRooms phòng</span>
                                         </div>
 
                                         @if (afternoonCell.IsHotShift)
                                         {
-                                            <span style="font-size:9px; background:#ffedd5; color:#c2410c; font-weight:700; padding:1px 5px; border-radius:4px; align-self:flex-start;">
-                                                🔥 Ca Hot
-                                            </span>
+                                            <span class="hot-badge">Hot</span>
                                         }
 
                                         @if (myBid != null)
                                         {
-                                            <div style="margin-top:4px; border-top:1px dashed @cellBorder; padding-top:6px;">
+                                            <div class="bid-state">
                                                 @if (myBid.Status == DoctorScheduleStatus.Bidding)
                                                 {
-                                                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                                                        <span style="font-size:10px; font-weight:700; color:#0284c7;">✓ Đã đăng ký</span>
+                                                    <div class="bid-cancel-row">
+                                                        <span class="bid-ok">Đã đăng ký</span>
                                                         @if (Model.ActivePeriod.IsOpenForBidding)
                                                         {
                                                             <form asp-action="CancelShiftBid" method="post" style="margin:0;">
                                                                 @Html.AntiForgeryToken()
                                                                 <input type="hidden" name="scheduleId" value="@myBid.ScheduleId" />
-                                                                <button type="submit" style="background:none; border:none; color:#ef4444; font-size:10px; cursor:pointer; text-decoration:underline;">Hủy</button>
+                                                                <button type="submit" class="link-cancel">Hủy</button>
                                                             </form>
                                                         }
                                                     </div>
                                                 }
                                                 else if (myBid.Status == DoctorScheduleStatus.Approved)
                                                 {
-                                                    <span style="font-size:10px; font-weight:700; color:#15803d;">🎉 Đã duyệt (P.@myBid.RoomNumber)</span>
+                                                    <span class="bid-ok">Đã duyệt · P.@myBid.RoomNumber</span>
                                                 }
                                                 else if (myBid.Status == DoctorScheduleStatus.Rejected)
                                                 {
-                                                    <div style="background:#fee2e2; border:1px solid #fca5a5; border-radius:6px; padding:4px 6px; margin-top:2px;">
-                                                        <span style="font-size:10px; font-weight:700; color:#b91c1c; display:block;">✕ Không duyệt (Hết buồng)</span>
+                                                    <div class="bid-rejected">
+                                                        Không duyệt (hết buồng)
                                                         @if (Model.ActivePeriod.IsOpenForBidding)
                                                         {
-                                                            <div style="font-size:9.5px; color:#dc2626; font-weight:600; margin-top:2px;">👉 Hãy chọn ca khác</div>
+                                                            <span class="hint">Chọn ca khác</span>
                                                         }
                                                     </div>
                                                 }
                                                 else if (myBid.Status == DoctorScheduleStatus.Reallocated)
                                                 {
-                                                    <span style="font-size:10px; font-weight:700; color:#854d0e;">↪ Đã điều chuyển</span>
+                                                    <span class="bid-reallocated">Đã điều chuyển</span>
                                                 }
                                             </div>
                                         }
@@ -967,15 +793,13 @@ else if (tab == "schedule")
                                         {
                                             @if (afternoonCell.ApprovedCount >= afternoonCell.TotalRooms)
                                             {
-                                                <div style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:4px; padding:4px 6px; margin-top:4px; text-align:center;">
-                                                    <span style="font-size:10px; font-weight:700; color:#dc2626;">🔒 Đã duyệt kín buồng (@afternoonCell.ApprovedCount/@afternoonCell.TotalRooms)</span>
-                                                </div>
+                                                <div class="bid-full">Kín buồng (@afternoonCell.ApprovedCount/@afternoonCell.TotalRooms)</div>
                                             }
                                             else
                                             {
-                                                <button type="button" onclick="openShiftBidModal('@Model.ActivePeriod.Id', '@d.ToString("yyyy-MM-dd")', '@((int)ExamShift.Afternoon)', 'Ca Chiều (13:00 - 16:30) ngày @d.ToString("dd/MM/yyyy")')"
-                                                        style="background:#079bc9; color:#fff; border:none; border-radius:4px; padding:4px 8px; font-size:11px; font-weight:600; cursor:pointer; margin-top:4px;">
-                                                    + Đăng ký
+                                                <button type="button" class="register-btn" onclick="openShiftBidModal('@Model.ActivePeriod.Id', '@d.ToString("yyyy-MM-dd")', '@((int)ExamShift.Afternoon)', 'Ca chiều (13:00–16:30) ngày @d.ToString("dd/MM/yyyy")')">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14 M5 12h14"></path></svg>
+                                                    Đăng ký
                                                 </button>
                                             }
                                         }
@@ -988,117 +812,106 @@ else if (tab == "schedule")
             }
             else
             {
-                <div style="background:#fff; border:1px dashed #cbd5e1; border-radius:12px; padding:32px 20px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
-                    <div style="font-size:32px; margin-bottom:8px;">📅</div>
-                    <strong style="font-size:14px; color:#1e293b; display:block; margin-bottom:4px;">Chưa có kỳ đăng ký ca khám nào đang mở</strong>
-                    <p style="font-size:12px; color:#64748b; margin:0 auto; max-width:540px; line-height:1.5;">
-                        Khoa của bạn hiện chưa có đợt đăng ký ca khám (Shift Bidding) nào đang mở hoặc đợt trước đã hoàn tất điều phối và xuất bản. 
-                        Vui lòng chờ Trưởng khoa mở đợt đăng ký mới cho tuần tiếp theo.
-                    </p>
+                <div class="empty-period">
+                    @await Html.PartialAsync("_AdminIcon", "calendar")
+                    <strong>Chưa có kỳ đăng ký đang mở</strong>
+                    <p>Chờ Trưởng khoa mở đợt đăng ký cho tuần tiếp theo.</p>
                 </div>
             }
         </div>
-
-        <!-- Modal Dialog Đăng ký ca khám (Shift Bidding) -->
-        <div class="app-dialog-backdrop" id="shiftBidDialog" onclick="handleDialogBackdropClick(event, 'shiftBidDialog')">
-            <div class="app-dialog-card" style="max-width:440px;">
-                <form asp-action="RegisterShiftBid" method="post" style="margin:0;">
-                    @Html.AntiForgeryToken()
-                    <input type="hidden" name="periodId" id="bidModalPeriodId" />
-                    <input type="hidden" name="workDate" id="bidModalWorkDate" />
-                    <input type="hidden" name="shift" id="bidModalShift" />
-
-                    <div class="app-dialog-header">
-                        <h3 style="font-size:15px; margin:0; font-weight:700; color:#fff;">Đăng ký ca khám tự chọn</h3>
-                        <button type="button" class="app-dialog-close" onclick="closeAppDialog('shiftBidDialog')">✕</button>
-                    </div>
-                    <div class="app-dialog-body">
-                        <div style="background:#e0f2fe; border:1px solid #bae6fd; border-radius:8px; padding:12px; margin-bottom:14px; font-size:13px; color:#0369a1;">
-                            📅 Ca khám: <strong id="bidModalLabel">...</strong>
-                        </div>
-                        <div style="margin-bottom:14px;">
-                            <label style="display:block; font-weight:600; color:#1e293b; margin-bottom:4px; font-size:13px;">Ghi chú hoặc nguyện vọng (tùy chọn)</label>
-                            <textarea name="doctorNote" rows="3" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;" placeholder="Ví dụ: Mong muốn khám ca này do có hẹn bệnh nhân cũ..."></textarea>
-                        </div>
-                        <div style="font-size:11px; color:#64748b; line-height:1.5;">
-                            ⚠️ <em>Lưu ý: Nếu bạn vướng ca trực đêm hôm trước kéo sang sáng nay, hệ thống sẽ tự động kích hoạt luật Fatigue Mitigation và chặn đăng ký ca sáng.</em>
-                        </div>
-                    </div>
-                    <div class="app-dialog-footer">
-                        <button type="button" class="btn outline sm" onclick="closeAppDialog('shiftBidDialog')">Hủy</button>
-                        <button type="submit" class="btn primary sm" style="background:#079bc9; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-weight:600;">Xác nhận Đăng ký</button>
-                    </div>
-                </form>
-            </div>
-        </div>
     </section>
+
+    <div class="app-dialog-backdrop" id="shiftBidDialog" onclick="handleDialogBackdropClick(event, 'shiftBidDialog')">
+        <div class="app-dialog-card" style="max-width:440px;">
+            <form asp-action="RegisterShiftBid" method="post" style="margin:0;">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="periodId" id="bidModalPeriodId" />
+                <input type="hidden" name="workDate" id="bidModalWorkDate" />
+                <input type="hidden" name="shift" id="bidModalShift" />
+
+                <div class="app-dialog-header">
+                    <h3>Đăng ký ca khám</h3>
+                    <button type="button" class="app-dialog-close" onclick="closeAppDialog('shiftBidDialog')">✕</button>
+                </div>
+                <div class="app-dialog-body">
+                    <div class="dialog-summary">Ca khám: <strong id="bidModalLabel">...</strong></div>
+                    <div class="field-group">
+                        <label for="bid-note">Ghi chú (tùy chọn)</label>
+                        <textarea name="doctorNote" id="bid-note" rows="3" placeholder="Ví dụ: có hẹn bệnh nhân cũ..."></textarea>
+                    </div>
+                    <div class="dialog-hint">Nếu trực đêm hôm trước kéo sang sáng nay, hệ thống sẽ tự chặn đăng ký ca sáng.</div>
+                </div>
+                <div class="app-dialog-footer">
+                    <button type="button" class="btn outline sm" onclick="closeAppDialog('shiftBidDialog')">Hủy</button>
+                    <button type="submit" class="btn primary sm">Xác nhận đăng ký</button>
+                </div>
+            </form>
+        </div>
+    </div>
 }
 else if (tab == "exceptions")
 {
-    <!-- 4. GIAO DIỆN ĐỀ NGHỊ NGHỈ / ĐỔI CA -->
     <div class="page-heading">
         <div>
             <h1>Đề nghị nghỉ / đổi ca</h1>
-            <p>Gửi yêu cầu để trưởng khoa xác nhận trước khi thay đổi lịch khám.</p>
         </div>
         <div class="heading-actions">
-            <button type="button" class="btn primary" onclick="openAppDialog('createExceptionDialog'); toggleReplacementDoctorField();" style="background:#079bc9; color:#fff; border:none; padding:8px 18px; border-radius:6px; font-weight:600; font-size:13px; cursor:pointer;">
-                + Tạo đề nghị
+            <button type="button" class="btn primary" onclick="openAppDialog('createExceptionDialog'); toggleReplacementDoctorField();">
+                @await Html.PartialAsync("_AdminIcon", "plus") Tạo đề nghị
             </button>
         </div>
     </div>
 
-    <section class="card" style="background:#fff; border:1px solid #e2ebf3; border-radius:10px; overflow:hidden;">
-        <!-- Checkbox lọc trạng thái -->
-        <div style="border-bottom:1px solid #e5edf5; padding:14px 18px; display:flex; align-items:center; gap:20px; background:#fbfcfe;">
-            <span style="font-size:12px; font-weight:700; color:#142d4a;">Lọc trạng thái:</span>
-            <label style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#334155; cursor:pointer;">
+    <section class="card">
+        <div class="consult-toolbar">
+            <span class="filter-label">Lọc trạng thái:</span>
+            <label class="filter-check">
                 <input type="checkbox" id="chk-exc-all" checked onchange="toggleExcFilter('all')" />
-                <span style="font-weight:600;">Tất cả</span>
+                Tất cả
             </label>
-            <label style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#334155; cursor:pointer;">
+            <label class="filter-check">
                 <input type="checkbox" id="chk-exc-pending" onchange="toggleExcFilter('pending')" />
-                <span>Chờ duyệt</span>
+                Chờ duyệt
             </label>
-            <label style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#334155; cursor:pointer;">
+            <label class="filter-check">
                 <input type="checkbox" id="chk-exc-approved" onchange="toggleExcFilter('approved')" />
-                <span>Đã duyệt</span>
+                Đã duyệt
             </label>
-            <label style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#334155; cursor:pointer;">
+            <label class="filter-check">
                 <input type="checkbox" id="chk-exc-rejected" onchange="toggleExcFilter('rejected')" />
-                <span>Từ chối</span>
+                Từ chối
             </label>
         </div>
 
         <div class="table-wrap">
-            <table class="table" style="width:100%; margin:0; border-collapse:collapse;">
-                <thead style="background:#f8fafc; border-bottom:1px solid #e5edf5; font-size:12px; color:#596a7c;">
+            <table class="consult-table">
+                <thead>
                     <tr>
-                        <th style="padding:12px 18px; text-align:left;">Ngày xin nghỉ</th>
-                        <th style="padding:12px 14px; text-align:left;">Ca trực</th>
-                        <th style="padding:12px 14px; text-align:left;">Loại đề nghị</th>
-                        <th style="padding:12px 14px; text-align:left;">Bác sĩ thay thế</th>
-                        <th style="padding:12px 14px; text-align:left;">Lý do</th>
-                        <th style="padding:12px 18px; text-align:left;">Trạng thái</th>
+                        <th>Ngày xin nghỉ</th>
+                        <th>Ca trực</th>
+                        <th>Loại đề nghị</th>
+                        <th>Bác sĩ thay thế</th>
+                        <th>Lý do</th>
+                        <th>Trạng thái</th>
                     </tr>
                 </thead>
-                <tbody id="exc-table-body" style="font-size:13px;">
+                <tbody id="exc-table-body">
                     @if (Model.Exceptions.Count > 0)
                     {
                         @foreach (var ex in Model.Exceptions)
                         {
                             var statusNormalized = ex.Status.Contains("Chờ") ? "PENDING" : (ex.Status.Contains("duyệt") && !ex.Status.Contains("Từ")) ? "APPROVED" : "REJECTED";
-                            var (bg, col) = statusNormalized switch
+                            var badgeClass = statusNormalized switch
                             {
-                                "APPROVED" => ("#dcfce7", "#15803d"),
-                                "REJECTED" => ("#fee2e2", "#b91c1c"),
-                                _ => ("#fef3c7", "#b45309")
+                                "APPROVED" => "ok",
+                                "REJECTED" => "bad",
+                                _ => "warn"
                             };
 
-                            <tr class="exc-row" data-status="@statusNormalized" style="border-bottom:1px solid #f1f5f9;">
-                                <td style="padding:14px 18px; font-weight:600; color:#0f172a;">@ex.Date.ToString("dd/MM/yyyy")</td>
-                                <td style="padding:14px 14px; color:#334155;">@(ex.Shift == ExamShift.Morning ? "Ca sáng" : ex.Shift == ExamShift.Afternoon ? "Ca chiều" : "Cả ngày")</td>
-                                <td style="padding:14px 14px; color:#334155;">
+                            <tr class="exc-row" data-status="@statusNormalized">
+                                <td><strong>@ex.Date.ToString("dd/MM/yyyy")</strong></td>
+                                <td>@(ex.Shift == ExamShift.Morning ? "Ca sáng" : ex.Shift == ExamShift.Afternoon ? "Ca chiều" : "Cả ngày")</td>
+                                <td>
                                     @(ex.Type switch
                                     {
                                         "ShiftSwap" => "Đổi ca trực",
@@ -1108,12 +921,10 @@ else if (tab == "exceptions")
                                         _ => ex.Type
                                     })
                                 </td>
-                                <td style="padding:14px 14px; color:#334155;">@(ex.ReplacementDoctorName ?? "—")</td>
-                                <td style="padding:14px 14px; color:#334155;">@ex.Reason</td>
-                                <td style="padding:14px 18px;">
-                                    <span style="background:@bg; color:@col; font-size:11px; padding:4px 10px; border-radius:50px; font-weight:600; display:inline-block;">
-                                        @ex.Status
-                                    </span>
+                                <td>@(ex.ReplacementDoctorName ?? "—")</td>
+                                <td>@ex.Reason</td>
+                                <td>
+                                    <span class="status-badge @badgeClass">@ex.Status</span>
                                 </td>
                             </tr>
                         }
@@ -1121,11 +932,9 @@ else if (tab == "exceptions")
                     else
                     {
                         <tr id="exc-empty-row">
-                            <td colspan="6" style="text-align:center; padding:60px 20px;">
-                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:40px;height:40px;color:#94a3b8;margin-bottom:12px;">
-                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line>
-                                </svg>
-                                <div style="font-size:13px; color:#596a7c; font-weight:500;">Chưa có đề nghị trong mục này</div>
+                            <td colspan="6" class="table-empty">
+                                @await Html.PartialAsync("_AdminIcon", "calendar")
+                                <div>Chưa có đề nghị nào.</div>
                             </td>
                         </tr>
                     }
@@ -1134,56 +943,53 @@ else if (tab == "exceptions")
         </div>
     </section>
 
-    <!-- Dialog Form Tạo đề nghị nghỉ / đổi ca (Popup gọn gàng, có nút ✕) -->
     <div class="app-dialog-backdrop" id="createExceptionDialog" onclick="handleDialogBackdropClick(event, 'createExceptionDialog')">
         <div class="app-dialog-card">
             <form asp-area="Staff" asp-controller="Consultation" asp-action="CreateException" method="post" style="margin:0;">
                 <div class="app-dialog-header">
-                    <div>
-                        <h3 style="font-size:15px; margin:0; font-weight:700; color:#fff;">Tạo đề nghị nghỉ / đổi ca trực</h3>
-                    </div>
+                    <h3>Tạo đề nghị nghỉ / đổi ca</h3>
                     <button type="button" class="app-dialog-close" onclick="closeAppDialog('createExceptionDialog')" title="Đóng (Esc)">✕</button>
                 </div>
                 <div class="app-dialog-body">
-                    <div style="margin-bottom:14px;">
-                        <label style="display:block; font-weight:600; color:#1e293b; margin-bottom:4px;">Ngày xin nghỉ / đổi ca <span style="color:#ef4444;">*</span></label>
-                        <input type="date" name="date" class="form-control" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;" min="@now.ToString("yyyy-MM-dd")" required value="@now.AddDays(1).ToString("yyyy-MM-dd")" />
+                    <div class="field-group">
+                        <label for="exc-date">Ngày xin nghỉ / đổi ca <span class="req">*</span></label>
+                        <input type="date" name="date" id="exc-date" min="@now.ToString("yyyy-MM-dd")" required value="@now.AddDays(1).ToString("yyyy-MM-dd")" />
                     </div>
-                    <div style="margin-bottom:14px;">
-                        <label style="display:block; font-weight:600; color:#1e293b; margin-bottom:4px;">Ca trực ảnh hưởng</label>
-                        <select name="shift" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; background:#fff;">
-                            <option value="@ExamShift.Morning">Ca Sáng (07:30 – 11:30)</option>
-                            <option value="@ExamShift.Afternoon">Ca Chiều (13:00 – 16:30)</option>
-                            <option value="">Cả ngày (Sáng & Chiều)</option>
+                    <div class="field-group">
+                        <label for="exc-shift">Ca trực ảnh hưởng</label>
+                        <select name="shift" id="exc-shift">
+                            <option value="@ExamShift.Morning">Ca sáng (07:30–11:30)</option>
+                            <option value="@ExamShift.Afternoon">Ca chiều (13:00–16:30)</option>
+                            <option value="">Cả ngày</option>
                         </select>
                     </div>
-                    <div style="margin-bottom:14px;">
-                        <label style="display:block; font-weight:600; color:#1e293b; margin-bottom:4px;">Loại đề nghị</label>
-                        <select name="type" id="sel-exception-type" onchange="toggleReplacementDoctorField()" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; background:#fff;">
-                            <option value="@ScheduleExceptionType.Leave">Nghỉ phép cá nhân</option>
-                            <option value="@ScheduleExceptionType.ShiftSwap">Đổi ca trực với đồng nghiệp</option>
-                            <option value="@ScheduleExceptionType.Training">Đi công tác / Học tập nghiệp vụ</option>
-                            <option value="@ScheduleExceptionType.Surgery">Tham gia kíp phẫu thuật đặc biệt</option>
+                    <div class="field-group">
+                        <label for="sel-exception-type">Loại đề nghị</label>
+                        <select name="type" id="sel-exception-type" onchange="toggleReplacementDoctorField()">
+                            <option value="@ScheduleExceptionType.Leave">Nghỉ phép</option>
+                            <option value="@ScheduleExceptionType.ShiftSwap">Đổi ca trực</option>
+                            <option value="@ScheduleExceptionType.Training">Đào tạo / Công tác</option>
+                            <option value="@ScheduleExceptionType.Surgery">Kíp phẫu thuật</option>
                         </select>
                     </div>
-                    <div id="replacement-doctor-group" style="margin-bottom:14px; display:none;">
-                        <label style="display:block; font-weight:600; color:#1e293b; margin-bottom:4px;">Bác sĩ đổi ca cùng <span style="color:#ef4444;">*</span></label>
-                        <select name="replacementDoctorId" id="sel-replacement-doctor" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; background:#fff;">
+                    <div class="field-group" id="replacement-doctor-group" style="display:none;">
+                        <label for="sel-replacement-doctor">Bác sĩ đổi ca cùng <span class="req">*</span></label>
+                        <select name="replacementDoctorId" id="sel-replacement-doctor">
                             <option value="">-- Chọn bác sĩ nhận đổi ca --</option>
-                            @foreach (var doc in Model.AvailableDoctors)
+                            @foreach (var doc in Model.AvailableDoctors.Where(d => !string.Equals(d.FullName, Model.CurrentDoctorName, StringComparison.OrdinalIgnoreCase)))
                             {
                                 <option value="@doc.Id">@doc.FullName (@doc.Specialty)</option>
                             }
                         </select>
                     </div>
-                    <div style="margin-bottom:14px;">
-                        <label style="display:block; font-weight:600; color:#1e293b; margin-bottom:4px;">Lý do chi tiết <span style="color:#ef4444;">*</span></label>
-                        <textarea name="reason" rows="3" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; resize:vertical;" placeholder="Ghi rõ lý do đổi ca hoặc việc bận..." required></textarea>
+                    <div class="field-group">
+                        <label for="exc-reason">Lý do <span class="req">*</span></label>
+                        <textarea name="reason" id="exc-reason" rows="3" placeholder="Ghi rõ lý do đổi ca hoặc việc bận..." required></textarea>
                     </div>
                 </div>
                 <div class="app-dialog-footer">
-                    <button type="button" class="btn outline sm" onclick="closeAppDialog('createExceptionDialog')" style="border:1px solid #cbd5e1; background:#fff; color:#334155; padding:6px 16px; border-radius:6px; font-size:12px; cursor:pointer;">Hủy bỏ</button>
-                    <button type="submit" style="background:#079bc9; color:#fff; border:none; padding:6px 18px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer;">Gửi đề nghị</button>
+                    <button type="button" class="btn outline sm" onclick="closeAppDialog('createExceptionDialog')">Hủy bỏ</button>
+                    <button type="submit" class="btn primary sm">Gửi đề nghị</button>
                 </div>
             </form>
         </div>
@@ -1191,52 +997,38 @@ else if (tab == "exceptions")
 }
 else
 {
-    <!-- 5. GIAO DIỆN KHÁM BỆNH & KÊ ĐƠN -->
     <div class="page-heading">
         <div>
             <h1>Khám bệnh & kê đơn</h1>
-            @if (Model.IsDepartmentHead)
-            {
-                <p>@Model.DepartmentName · Trưởng khoa: @Model.CurrentDoctorName · Giám sát & Khám bệnh theo khoa.</p>
-            }
-            else
-            {
-                <p>@Model.DepartmentName · @WithBs(Model.CurrentDoctorName) · Phòng @Model.CurrentDoctorRoom · Chỉ chỉnh sửa phiếu do bạn phụ trách.</p>
-            }
         </div>
         <div class="heading-actions">
             @if (Model.IsDepartmentHead)
             {
-                <a href="@Url.Action("Index", "Schedule", new { area = "Staff" })" class="btn outline" style="border:1px solid #cbd5e1; padding:8px 16px; border-radius:6px; color:#334155; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:6px; text-decoration:none;">
-                    <span>Điều phối khoa</span>
+                <a href="@Url.Action("Index", "Schedule", new { area = "Staff" })" class="btn outline">
+                    @await Html.PartialAsync("_AdminIcon", "grid") Điều phối khoa
                 </a>
             }
             else
             {
-                <a href="?tab=schedule" class="btn outline" style="border:1px solid #cbd5e1; padding:8px 16px; border-radius:6px; color:#334155; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:6px; text-decoration:none;">
-                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
-                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line>
-                    </svg>
-                    <span>Lịch cá nhân</span>
+                <a href="?tab=schedule" class="btn outline">
+                    @await Html.PartialAsync("_AdminIcon", "calendar") Lịch cá nhân
                 </a>
             }
         </div>
     </div>
 
     <div class="clinical-layout">
-        <!-- Cột trái: Hàng đợi bệnh nhân từ Database -->
-        <aside class="card consultation-list" style="background:#fff; border:1px solid #e2ebf3; border-radius:10px; overflow:hidden;">
-            <div class="card-header" style="border-bottom:1px solid #e5edf5; padding:14px 16px; display:flex; justify-content:space-between; align-items:center;">
-                <h2 style="font-size:13px; font-weight:700; color:#142d4a; margin:0;">Danh sách chờ</h2>
-                <span style="font-size:11px; color:#596a7c; font-weight:500;">@Model.QueuePatients.Count lượt khám</span>
+        <aside class="card consultation-list">
+            <div class="card-header">
+                <h2>Danh sách chờ</h2>
+                <span style="font-size:11px; color:#64748b;">@Model.QueuePatients.Count lượt khám</span>
             </div>
 
             @if (Model.IsDepartmentHead)
             {
-                <div style="padding:10px 14px; background:#f8fafc; border-bottom:1px solid #e2e8f0;">
-                    <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">Lọc bệnh nhân theo Bác sĩ:</label>
-                    <select class="form-control" style="width:100%; font-size:12px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px; background:#fff;"
-                            onchange="window.location.href = '?tab=consultation&doctorId=' + this.value;">
+                <div class="doctor-filter">
+                    <label for="queue-doctor-filter">Lọc theo bác sĩ:</label>
+                    <select id="queue-doctor-filter" onchange="window.location.href = '?tab=consultation&doctorId=' + this.value;">
                         <option value="">-- Tất cả bác sĩ trong khoa --</option>
                         @foreach (var doc in Model.AvailableDoctors)
                         {
@@ -1247,7 +1039,7 @@ else
             }
             else
             {
-                <div style="padding:8px 14px; background:#f8fafc; border-bottom:1px solid #e2e8f0; font-size:11px; color:#64748b; display:flex; justify-content:space-between;">
+                <div class="queue-meta">
                     <span>Phòng: <strong>@Model.CurrentDoctorRoom</strong></span>
                     <span>Bác sĩ: <strong>@WithBs(Model.CurrentDoctorName)</strong></span>
                 </div>
@@ -1262,8 +1054,8 @@ else
                         var initials = string.Join("", p.PatientName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(s => s[0])).ToUpper();
                         if (initials.Length > 2) initials = initials.Substring(initials.Length - 2);
 
-                        <button type="button" 
-                                class="consultation-person @(isFirst ? "active" : "")" 
+                        <button type="button"
+                                class="consultation-person @(isFirst ? "active" : "")"
                                 data-id="@p.AppointmentId"
                                 data-name="@p.PatientName"
                                 data-code="@p.AppointmentCode"
@@ -1278,27 +1070,26 @@ else
                                 data-spo2="@(p.Spo2?.ToString() ?? "")"
                                 data-weight="@(p.Weight?.ToString() ?? "")"
                                 data-status="@p.StatusId"
-                                onclick="selectConsultPatient(this)"
-                                style="border:none; background:none; cursor:pointer; width:100%; border-bottom:1px solid #f1f5f9; text-align:left;">
-                            <div class="avatar" style="width:30px; height:30px; border-radius:50%; background:#e0f2fe; color:#0369a1; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:10px;">@initials</div>
+                                onclick="selectConsultPatient(this)">
+                            <div class="avatar">@initials</div>
                             <span>
                                 <strong>@p.PatientName</strong>
-                                <small>@p.QueueNumber · @(p.CheckedInAt?.ToString("HH:mm") ?? "Chờ vào") @(!string.IsNullOrEmpty(p.RoomNumber) ? $"· {p.RoomNumber}" : "")</small>
+                                <small>@p.QueueNumber · @(p.CheckedInAt?.ToString("HH:mm") ?? "Chờ vào")@(!string.IsNullOrEmpty(p.RoomNumber) ? $" · {p.RoomNumber}" : "")</small>
                                 @if (Model.IsDepartmentHead && !string.IsNullOrEmpty(p.DoctorName))
                                 {
-                                    <small style="color:#0284c7; font-size:10px; display:block;">@WithBs(p.DoctorName)</small>
+                                    <small style="color:#15803d; font-size:10px; display:block;">@WithBs(p.DoctorName)</small>
                                 }
                                 @if (p.StatusId == 3)
                                 {
-                                    <span class="badge queue-status-badge" style="background:#fef3c7; color:#92400e; font-size:10px; padding:2px 8px; border-radius:4px;">Chờ đo sinh hiệu</span>
+                                    <span class="queue-status-badge warn">Chờ đo sinh hiệu</span>
                                 }
                                 else if (p.StatusId == 5)
                                 {
-                                    <span class="badge queue-status-badge" style="background:#dcfce7; color:#166534; font-size:10px; padding:2px 8px; border-radius:4px;">Đang khám</span>
+                                    <span class="queue-status-badge ok">Đang khám</span>
                                 }
                                 else
                                 {
-                                    <span class="badge queue-status-badge" style="background:#e0f2fe; color:#0369a1; font-size:10px; padding:2px 8px; border-radius:4px;">Sẵn sàng khám</span>
+                                    <span class="queue-status-badge ok">Sẵn sàng khám</span>
                                 }
                             </span>
                         </button>
@@ -1307,44 +1098,33 @@ else
                 }
                 else
                 {
-                    <div style="padding:40px 16px; text-align:center; color:#64748b; font-size:12px;">
-                        <div style="font-size:24px; margin-bottom:8px;">🩺</div>
-                        Hiện không có bệnh nhân nào trong hàng đợi của ca này.
+                    <div class="queue-empty">
+                        @await Html.PartialAsync("_AdminIcon", "stethoscope")
+                        <div>Không có bệnh nhân chờ trong ca này.</div>
                     </div>
                 }
             </div>
         </aside>
 
-        <!-- Cột phải: Không gian làm việc khám bệnh từ Database -->
-        <section class="card consultation-workspace" style="background:#fff; border:1px solid #e2ebf3; border-radius:10px; overflow:hidden;">
+        <section class="card consultation-workspace">
             @if (currentPatient != null)
             {
-                <div class="card-header" style="border-bottom:1px solid #e5edf5; padding:16px 20px; display:flex; justify-content:space-between; align-items:center;">
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:#079bc9;">
-                            <path d="M5 3v5a5 5 0 0 0 10 0V3 M3 3h4 M13 3h4 M10 13v3a5 5 0 0 0 10 0v-2 M22 11a2 2 0 1 1-4 0 2 2 0 0 1 4 0"></path>
-                        </svg>
+                <div class="card-header">
+                    <div class="patient-head">
+                        @await Html.PartialAsync("_AdminIcon", "stethoscope")
                         <div>
-                            <h2 id="patient-name-display" style="font-size:16px; margin:0; font-weight:700; color:#142d4a;">@currentPatient.PatientName</h2>
-                            <span id="patient-info-display" style="font-size:11px; color:#596a7c;">@currentPatient.AppointmentCode · @currentPatient.Gender · @currentPatient.Age tuổi · @currentPatient.QueueNumber</span>
+                            <h2 id="patient-name-display">@currentPatient.PatientName</h2>
+                            <span id="patient-info-display" class="patient-meta">@currentPatient.AppointmentCode · @currentPatient.Gender · @currentPatient.Age tuổi · @currentPatient.QueueNumber</span>
                         </div>
                     </div>
-                    <button type="button" class="btn text-link" style="color:#079bc9; font-size:12px; display:flex; align-items:center; gap:4px; border:none; background:none; cursor:pointer;">
-                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
-                            <circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>
-                        </svg>
-                        <span>Lịch sử khám</span>
-                    </button>
                 </div>
 
                 <div class="clinical-inner">
-                    <!-- Thông báo dị ứng & lý do khám lấy từ Database -->
                     <div class="notice amber" id="patient-notice-display">
                         <strong>Dị ứng / Lưu ý:</strong> <span id="patient-allergy-display">@(string.IsNullOrWhiteSpace(currentPatient.Allergy) ? "Không ghi nhận" : currentPatient.Allergy)</span><br />
                         <span id="patient-reason-display">Lý do khám: @currentPatient.Reason</span>
                     </div>
 
-                    <!-- Sinh hiệu lấy trực tiếp từ Database -->
                     <div class="vitals-strip">
                         <div><small>Mạch</small><strong id="vital-pulse">@(currentPatient.Pulse.HasValue ? $"{currentPatient.Pulse} " : "— ")<span>l/p</span></strong></div>
                         <div><small>Huyết áp</small><strong id="vital-bp">@(currentPatient.BloodPressure != null ? $"{currentPatient.BloodPressure} " : "— ")<span>mmHg</span></strong></div>
@@ -1358,21 +1138,16 @@ else
                         var isUnmeasured = currentPatient.StatusId == 3 || !hasVitals;
                         var isInProgress = currentPatient.StatusId == 5;
                     }
-                    <!-- Hộp Bắt đầu khám -->
                     <div class="begin-exam" id="begin-exam-box" style="display:@(isInProgress ? "none" : "flex");">
                         <div>
-                            <h3 style="margin:0 0 4px; color:@(isUnmeasured ? "#d97706" : "#142d4a");">@(isUnmeasured ? "Chưa đo sinh hiệu" : "Bệnh nhân đã sẵn sàng")</h3>
-                            <p style="margin:0;">@(isUnmeasured ? "Bệnh nhân cần được điều dưỡng đo sinh hiệu trước khi bắt đầu khám." : "Bắt đầu khám để nhập phiếu và tạo chỉ định.")</p>
+                            <h3>@(isUnmeasured ? "Chưa đo sinh hiệu" : "Bệnh nhân đã sẵn sàng")</h3>
+                            <p>@(isUnmeasured ? "Cần điều dưỡng đo sinh hiệu trước khi khám." : "Bắt đầu khám để nhập phiếu và tạo chỉ định.")</p>
                         </div>
-                        <button type="button" class="btn primary" onclick="startExamNow()" @(isUnmeasured ? "disabled" : "") style="background:#079bc9; color:#fff; border:none; padding:8px 18px; border-radius:6px; font-weight:600; font-size:13px; display:inline-flex; align-items:center; gap:6px; cursor:@(isUnmeasured ? "not-allowed" : "pointer"); opacity:@(isUnmeasured ? "0.5" : "1");">
-                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
-                                <path d="M5 3v5a5 5 0 0 0 10 0V3 M3 3h4 M13 3h4 M10 13v3a5 5 0 0 0 10 0v-2 M22 11a2 2 0 1 1-4 0 2 2 0 0 1 4 0"></path>
-                            </svg>
-                            <span>Bắt đầu khám</span>
+                        <button type="button" class="btn primary" onclick="startExamNow()" @(isUnmeasured ? "disabled" : "")>
+                            @await Html.PartialAsync("_AdminIcon", "stethoscope") Bắt đầu khám
                         </button>
                     </div>
 
-                    <!-- Form bệnh án -->
                     <form id="consult-form" asp-action="CreateRecord" method="post" onsubmit="reindexClinicalServices(); reindexMedications();">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="AppointmentId" id="active-appointment-id" value="@currentPatient.AppointmentId" />
@@ -1384,20 +1159,20 @@ else
                             </div>
                             <div class="form-grid">
                                 <div class="field full">
-                                    <label for="allergies-input">Tiền sử dị ứng / Lưu ý y khoa</label>
-                                    <input id="allergies-input" name="Allergies" maxlength="500" value="@currentPatient.Allergy" placeholder="Ví dụ: Dị ứng Penicillin, Paracetamol, thức ăn biển... (nếu có)" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;" />
+                                    <label for="allergies-input">Tiền sử dị ứng / lưu ý y khoa</label>
+                                    <input id="allergies-input" name="Allergies" maxlength="500" value="@currentPatient.Allergy" placeholder="Dị ứng thuốc, thức ăn... (nếu có)" />
                                 </div>
                                 <div class="field full">
-                                    <label for="symptoms">Triệu chứng / Lý do khám *</label>
-                                    <textarea id="symptoms" name="Symptoms" rows="2" placeholder="Nhập triệu chứng, tiền sử..." required>@currentPatient.Reason</textarea>
+                                    <label for="symptoms">Triệu chứng / lý do khám *</label>
+                                    <textarea id="symptoms" name="Symptoms" rows="2" placeholder="Nhập triệu chứng..." required>@currentPatient.Reason</textarea>
                                 </div>
                                 <div class="field full">
                                     <label for="examination">Khám lâm sàng</label>
-                                    <textarea id="examination" name="ClinicalExamination" rows="2" placeholder="Khám tim mạch, hô hấp, tiêu hóa..."></textarea>
+                                    <textarea id="examination" name="ClinicalExamination" rows="2" placeholder="Tim mạch, hô hấp, tiêu hóa..."></textarea>
                                 </div>
                                 <div class="field">
                                     <label for="icd">Mã chẩn đoán (ICD-10)</label>
-                                    <input id="icd" name="PrimaryDiagnosisCode" maxlength="20" placeholder="Nhập mã khi có (vd: J00)" required />
+                                    <input id="icd" name="PrimaryDiagnosisCode" maxlength="20" placeholder="Ví dụ: J00" required />
                                 </div>
                                 <div class="field">
                                     <label for="diagnosis">Chẩn đoán chính *</label>
@@ -1412,51 +1187,42 @@ else
                             <div class="form-section-title">
                                 <span>02</span>
                                 <h3>Chỉ định cận lâm sàng</h3>
-                                <button type="button" class="btn text-link" style="color:#079bc9; font-size:12px; margin-left:auto; border:none; background:none; cursor:pointer;" onclick="addClinicalServiceRow()">
-                                    + Thêm chỉ định
-                                </button>
+                                <button type="button" class="btn text-link" onclick="addClinicalServiceRow()">+ Thêm chỉ định</button>
                             </div>
                             <div id="servicesList" style="display:none; margin-bottom:12px;"></div>
-                            <p id="noServicesNotice" class="empty-line" style="font-size:11px; color:#596a7c; padding:4px 0 12px; margin:0;">Chưa có chỉ định cận lâm sàng. Bấm "+ Thêm chỉ định" khi cần yêu cầu xét nghiệm, chẩn đoán hình ảnh từ danh mục bệnh viện.</p>
+                            <p id="noServicesNotice" class="empty-note">Chưa có chỉ định cận lâm sàng.</p>
 
                             <div class="form-section-title">
                                 <span>03</span>
-                                <h3>Đơn thuốc điều trị</h3>
-                                <button type="button" class="btn text-link" style="color:#079bc9; font-size:12px; margin-left:auto; border:none; background:none; cursor:pointer;" onclick="addMedicationRow()">
-                                    + Thêm thuốc
-                                </button>
+                                <h3>Đơn thuốc</h3>
+                                <button type="button" class="btn text-link" onclick="addMedicationRow()">+ Thêm thuốc</button>
                             </div>
                             <div id="medicationsList" style="display:none; margin-bottom:12px;"></div>
-                            <p id="noMedicationsNotice" class="field-help" style="font-size:11px; color:#718daa; margin:0 0 12px;">Chưa kê đơn thuốc. Bấm "+ Thêm thuốc" để chọn thuốc trong danh mục dược bệnh viện.</p>
+                            <p id="noMedicationsNotice" class="empty-note">Chưa kê đơn thuốc.</p>
 
                             <div class="form-section-title">
                                 <span>04</span>
                                 <h3>Kết luận & lời dặn</h3>
                             </div>
                             <div class="field full">
-                                <label for="conclusion">Kết luận / Hướng dẫn theo dõi</label>
-                                <textarea id="conclusion" name="Conclusion" rows="2" placeholder="Kê đơn thuốc điều trị ngoại trú, dặn dò chế độ dinh dưỡng, hẹn tái khám..."></textarea>
+                                <label for="conclusion">Kết luận / hướng dẫn theo dõi</label>
+                                <textarea id="conclusion" name="Conclusion" rows="2" placeholder="Hướng dẫn dùng thuốc, chế độ sinh hoạt, hẹn tái khám..."></textarea>
                             </div>
                         </fieldset>
 
-                        <div class="clinical-actions" style="margin-top:20px; display:flex; align-items:center; justify-content:space-between; border-top:1px solid #e0eaf3; padding-top:16px;">
-                            <span style="font-size:12px; color:#596a7c;">Hoàn tất sẽ tạo hóa đơn thu phí.</span>
-                            <!-- Đã xóa nút Lưu nháp và nút Xem bản mẫu 5 vai trò theo yêu cầu -->
-                            <div>
-                                <button type="submit" class="btn primary" id="btn-submit-exam" @(isInProgress ? "" : "disabled") style="background:#079bc9; color:#fff; border:none; padding:8px 24px; border-radius:6px; font-size:13px; font-weight:600; cursor:@(isInProgress ? "pointer" : "not-allowed");">
-                                    Hoàn tất khám
-                                </button>
-                            </div>
+                        <div class="clinical-actions">
+                            <span>Hoàn tất sẽ tạo hóa đơn thu phí.</span>
+                            <button type="submit" class="btn primary" id="btn-submit-exam" @(isInProgress ? "" : "disabled")>Hoàn tất khám</button>
                         </div>
                     </form>
                 </div>
             }
             else
             {
-                <div style="padding:60px 20px; text-align:center;">
-                    <div style="font-size:36px; margin-bottom:12px;">🩺</div>
-                    <h3 style="color:#111f38;">Không có bệnh nhân đang chờ</h3>
-                    <p style="font-size:12px; color:#596a7c;">Lượt khám sẽ xuất hiện sau khi nhân viên hoàn tất sinh hiệu.</p>
+                <div class="workspace-empty">
+                    @await Html.PartialAsync("_AdminIcon", "stethoscope")
+                    <h3>Không có bệnh nhân đang chờ</h3>
+                    <p>Lượt khám sẽ xuất hiện sau khi nhân viên hoàn tất sinh hiệu.</p>
                 </div>
             }
         </section>
@@ -1509,7 +1275,8 @@ else
                 const el = document.getElementById(fid);
                 return el && el.value.trim() !== '';
             });
-            return symptomsEdited || othersFilled;
+            const hasDynamicRows = document.querySelectorAll('#servicesList .clinical-service-item, #medicationsList .prescription-med-item').length > 0;
+            return symptomsEdited || othersFilled || hasDynamicRows;
         }
 
         function selectConsultPatient(btn) {
@@ -1563,6 +1330,12 @@ else
                     symptomsField.value = reason || '';
                     symptomsField.dataset.auto = reason || '';
                 }
+                const servicesList = document.getElementById('servicesList');
+                const medicationsList = document.getElementById('medicationsList');
+                if (servicesList) servicesList.innerHTML = '';
+                if (medicationsList) medicationsList.innerHTML = '';
+                reindexClinicalServices();
+                reindexMedications();
             }
 
             const pulseEl = document.getElementById('vital-pulse');
@@ -1628,7 +1401,7 @@ else
                     banner.style.display = 'flex';
                     if (bannerTitle) {
                         bannerTitle.textContent = 'Bệnh nhân đã sẵn sàng';
-                        bannerTitle.style.color = '#142d4a';
+                        bannerTitle.style.color = '#0f172a';
                     }
                     if (bannerDesc) {
                         bannerDesc.textContent = 'Bắt đầu khám để nhập phiếu và tạo chỉ định.';
@@ -1767,16 +1540,6 @@ else
             openAppDialog('labResultDialog');
         }
 
-        function openLabResultModal(patient, code, age, service, time, status, result) {
-            document.getElementById('dialog-lab-patient').textContent = `Người khám: ${patient} (${code} · ${age} tuổi)`;
-            document.getElementById('dialog-lab-service').textContent = service;
-            document.getElementById('dialog-lab-time').textContent = time;
-            document.getElementById('dialog-lab-status').textContent = status;
-            document.getElementById('dialog-lab-result-text').textContent = result;
-
-            openAppDialog('labResultDialog');
-        }
-
         // --- 3. XỬ LÝ TÌM KIẾM & XEM PHIẾU BỆNH ÁN (RECORDS) ---
         function filterRecordTable() {
             const keyword = (document.getElementById('search-record-input')?.value || '').toLowerCase().trim();
@@ -1804,7 +1567,7 @@ else
             document.getElementById('dialog-record-header-sub').textContent = `Mã hồ sơ: #BA-${d.id} | Lượt hẹn: ${d.code}`;
             document.getElementById('dialog-record-patient').textContent = d.patient;
             document.getElementById('dialog-record-date').textContent = d.date;
-            document.getElementById('dialog-record-age-gender').textContent = `${d.age} tuổi · Giới tính: ${d.gender}`;
+            document.getElementById('dialog-record-age-gender').textContent = `${d.age} tuổi · ${d.gender}`;
             document.getElementById('dialog-record-doctor').textContent = d.doctor;
             document.getElementById('dialog-record-dept').textContent = d.dept;
             document.getElementById('dialog-record-code').textContent = d.code;
@@ -1814,24 +1577,6 @@ else
             document.getElementById('dialog-record-icd').textContent = d.icd;
             document.getElementById('dialog-record-diagnosis').textContent = d.diagnosis;
             document.getElementById('dialog-record-conclusion').textContent = d.conclusion;
-
-            openAppDialog('recordDetailDialog');
-        }
-
-        function openRecordModal(id, patient, code, age, gender, date, doctor, dept, symptoms, exam, icd, diagnosis, conclusion) {
-            document.getElementById('dialog-record-header-sub').textContent = `Mã hồ sơ: #BA-${id} | Lượt hẹn: ${code}`;
-            document.getElementById('dialog-record-patient').textContent = patient;
-            document.getElementById('dialog-record-date').textContent = date;
-            document.getElementById('dialog-record-age-gender').textContent = `${age} tuổi · Giới tính: ${gender}`;
-            document.getElementById('dialog-record-doctor').textContent = doctor;
-            document.getElementById('dialog-record-dept').textContent = dept;
-            document.getElementById('dialog-record-code').textContent = code;
-
-            document.getElementById('dialog-record-symptoms').textContent = symptoms;
-            document.getElementById('dialog-record-exam').textContent = exam;
-            document.getElementById('dialog-record-icd').textContent = icd;
-            document.getElementById('dialog-record-diagnosis').textContent = diagnosis;
-            document.getElementById('dialog-record-conclusion').textContent = conclusion;
 
             openAppDialog('recordDetailDialog');
         }
@@ -1923,7 +1668,28 @@ else
             window.location.href = url.toString();
         }
 
-        // --- 7. MODAL ĐĂNG KÝ CA KHÁM (SHIFT BIDDING) ---
+        // --- 7. TAB CON LỊCH LÀM VIỆC / ĐĂNG KÝ CA KHÁM ---
+        function switchConsultPane(name) {
+            document.querySelectorAll('.sched-subtabs [data-consult-pane]').forEach(btn => {
+                const active = btn.dataset.consultPane === name;
+                btn.classList.toggle('is-active', active);
+                btn.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+            const week = document.getElementById('consult-pane-week');
+            const bidding = document.getElementById('consult-pane-bidding');
+            if (week) week.hidden = name !== 'week';
+            if (bidding) bidding.hidden = name !== 'bidding';
+            try { sessionStorage.setItem('consult-pane', name); } catch (e) { }
+        }
+
+        (function () {
+            if (!document.getElementById('consult-pane-week')) return;
+            let saved = null;
+            try { saved = sessionStorage.getItem('consult-pane'); } catch (e) { }
+            switchConsultPane(saved === 'bidding' ? 'bidding' : 'week');
+        })();
+
+        // --- 8. MODAL ĐĂNG KÝ CA KHÁM (SHIFT BIDDING) ---
         function openShiftBidModal(periodId, workDate, shift, label) {
             const pidInput = document.getElementById('bidModalPeriodId');
             const wdInput = document.getElementById('bidModalWorkDate');
@@ -1936,9 +1702,41 @@ else
             openAppDialog('shiftBidDialog');
         }
 
-        // --- 8. CHỈ ĐỊNH CẬN LÂM SÀNG & ĐƠN THUỐC ĐỘNG TỪ DATABASE ---
+        // --- 9. CHỈ ĐỊNH CẬN LÂM SÀNG & ĐƠN THUỐC ĐỘNG TỪ DATABASE ---
         const dbServices = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AvailableServices));
         const dbMedications = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AvailableMedications));
+
+        function buildDynamicSelect(className, placeholder, items, formatLabel) {
+            const select = document.createElement('select');
+            select.className = className;
+            select.required = true;
+            const defaultOpt = document.createElement('option');
+            defaultOpt.value = '';
+            defaultOpt.textContent = placeholder;
+            select.appendChild(defaultOpt);
+            if (Array.isArray(items)) {
+                items.forEach(item => {
+                    const opt = document.createElement('option');
+                    opt.value = item.Id;
+                    opt.textContent = formatLabel(item);
+                    select.appendChild(opt);
+                });
+            }
+            return select;
+        }
+
+        function createRemoveRowButton(onRemove) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn ghost sm dynamic-row-remove';
+            btn.textContent = '✕';
+            btn.title = 'Xóa dòng';
+            btn.addEventListener('click', () => {
+                btn.parentElement.remove();
+                onRemove();
+            });
+            return btn;
+        }
 
         function addClinicalServiceRow() {
             const list = document.getElementById('servicesList');
@@ -1948,23 +1746,21 @@ else
             if (notice) notice.style.display = 'none';
 
             const row = document.createElement('div');
-            row.className = 'clinical-service-item';
-            row.style = 'display:flex; gap:8px; align-items:center; margin-bottom:8px;';
-            
-            let options = '<option value="">-- Chọn dịch vụ cận lâm sàng --</option>';
-            if (Array.isArray(dbServices)) {
-                dbServices.forEach(s => {
-                    options += `<option value="${s.Id}">${s.Name} (${Number(s.Price).toLocaleString('vi-VN')} đ)</option>`;
-                });
-            }
+            row.className = 'clinical-service-item dynamic-row';
 
-            row.innerHTML = `
-                <select class="form-control clinical-service-select" style="flex:1; padding:6px 10px; font-size:12px; border:1px solid #cbd5e1; border-radius:6px;" required>
-                    ${options}
-                </select>
-                <input type="text" class="clinical-service-note" placeholder="Ghi chú lâm sàng..." style="flex:1; padding:6px 10px; font-size:12px; border:1px solid #cbd5e1; border-radius:6px;" />
-                <button type="button" class="btn ghost sm" style="color:#ef4444;" onclick="this.parentElement.remove(); reindexClinicalServices();">✕</button>
-            `;
+            const select = buildDynamicSelect(
+                'form-control clinical-service-select dynamic-row-field',
+                '-- Chọn dịch vụ cận lâm sàng --',
+                dbServices,
+                s => `${s.Name} (${Number(s.Price).toLocaleString('vi-VN')} đ)`
+            );
+
+            const note = document.createElement('input');
+            note.type = 'text';
+            note.className = 'clinical-service-note dynamic-row-field';
+            note.placeholder = 'Ghi chú lâm sàng...';
+
+            row.append(select, note, createRemoveRowButton(reindexClinicalServices));
             list.appendChild(row);
             reindexClinicalServices();
         }
@@ -1995,24 +1791,29 @@ else
             if (notice) notice.style.display = 'none';
 
             const row = document.createElement('div');
-            row.className = 'prescription-med-item';
-            row.style = 'display:flex; gap:8px; align-items:center; margin-bottom:8px;';
-            
-            let options = '<option value="">-- Chọn thuốc trong danh mục dược --</option>';
-            if (Array.isArray(dbMedications)) {
-                dbMedications.forEach(m => {
-                    options += `<option value="${m.Id}">${m.Name} (${m.Unit}) - ${Number(m.Price).toLocaleString('vi-VN')} đ</option>`;
-                });
-            }
+            row.className = 'prescription-med-item dynamic-row';
 
-            row.innerHTML = `
-                <select class="form-control med-item-select" style="flex:2; padding:6px 10px; font-size:12px; border:1px solid #cbd5e1; border-radius:6px;" required>
-                    ${options}
-                </select>
-                <input type="number" min="1" value="10" class="form-control med-item-qty" placeholder="Số lượng" style="width:70px; padding:6px 10px; font-size:12px; border:1px solid #cbd5e1; border-radius:6px;" required />
-                <input type="text" class="med-item-dosage" placeholder="Liều dùng (vd: 2 viên/ngày chia 2 lần sau ăn)..." style="flex:2; padding:6px 10px; font-size:12px; border:1px solid #cbd5e1; border-radius:6px;" />
-                <button type="button" class="btn ghost sm" style="color:#ef4444;" onclick="this.parentElement.remove(); reindexMedications();">✕</button>
-            `;
+            const select = buildDynamicSelect(
+                'form-control med-item-select dynamic-row-field wide',
+                '-- Chọn thuốc trong danh mục dược --',
+                dbMedications,
+                m => `${m.Name} (${m.Unit}) - ${Number(m.Price).toLocaleString('vi-VN')} đ`
+            );
+
+            const qty = document.createElement('input');
+            qty.type = 'number';
+            qty.min = '1';
+            qty.value = '10';
+            qty.required = true;
+            qty.className = 'form-control med-item-qty dynamic-row-qty';
+            qty.placeholder = 'Số lượng';
+
+            const dosage = document.createElement('input');
+            dosage.type = 'text';
+            dosage.className = 'med-item-dosage dynamic-row-field wide';
+            dosage.placeholder = 'Liều dùng (vd: 2 viên/ngày chia 2 lần sau ăn)...';
+
+            row.append(select, qty, dosage, createRemoveRowButton(reindexMedications));
             list.appendChild(row);
             reindexMedications();
         }

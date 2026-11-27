@@ -23,13 +23,13 @@
     const date = (value) => String(value).split('-').reverse().join('/');
     const titles = {
         dashboard: [
-            'Tổng quan & doanh thu',
+            'Tổng quan',
             'Theo dõi số lượt tiếp nhận và dòng tiền theo thời gian.',
         ],
         requests: ['Nghỉ / đổi ca', 'Duyệt đề nghị và sắp xếp lại lịch khám trong khoa.'],
         scheduling: [
-            'Phân & duyệt ca khám',
-            'Tạo kỳ đăng ký, duyệt ca theo ma trận ưu tiên, gán phòng và xuất bản lịch khám.',
+            'Lịch làm việc',
+            'Theo dõi và sắp xếp ca làm việc của bác sĩ trong khoa.',
         ],
         departments: ['Phòng ban', 'Danh sách khoa và đơn vị chuyên môn trong bệnh viện.'],
         rooms: ['Phòng khám', 'Quản lý buồng / phòng khám thuộc từng khoa chuyên môn.'],
@@ -46,9 +46,19 @@
     let schedulingState = null;
     let requestRows = [];
     let requestStatusFilter = 'all';
-    let selectedMatrixDate = null;
-    let selectedMatrixShift = 0;
     let schedulingWeekOffset = 0;
+    let schedViewMode = 'progress';
+    let rosterSearch = '';
+    let rosterPage = 1;
+    let reqStatus = 'pending';
+    let reqSearch = '';
+    let reqPage = 1;
+    let reqSelectedId = 0;
+    let reqRooms = new Map();
+    let assignDoctors = new Set();
+    let assignSearch = '';
+    const ROSTER_PAGE_SIZE = 5;
+    const REQ_PAGE_SIZE = 5;
     let busy = false;
     let reportVersion = 0;
     let auditVersion = 0;
@@ -56,11 +66,82 @@
     let reportDays = [];
     let reportPage = 1;
 
+    const checkIconSvg = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+    const errorIconSvg = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>';
+
     function notify(message, error = false) {
         const target = find('#admin-message');
-        target.textContent = message;
+        if (!target) return;
+        const titleEl = target.querySelector('.toast-title');
+        const textEl = target.querySelector('.toast-text');
+        const iconEl = target.querySelector('.toast-icon');
+
+        if (titleEl && textEl && iconEl) {
+            titleEl.textContent = error ? 'Lỗi thao tác' : 'Thành công';
+            textEl.textContent = message;
+            iconEl.innerHTML = error ? errorIconSvg : checkIconSvg;
+        } else {
+            target.textContent = message;
+        }
+
         target.classList.toggle('error', error);
+        target.classList.toggle('success', !error);
         target.hidden = false;
+
+        if (typeof clearTimeout === 'function') clearTimeout(notify.timer);
+        if (typeof setTimeout === 'function') {
+            notify.timer = setTimeout(() => {
+                target.hidden = true;
+            }, 4500);
+        }
+    }
+
+    function askConfirm(message, title = 'Xác nhận thao tác', okText = 'Đồng ý', isDanger = false) {
+        const dialog = find('#admin-confirm-dialog');
+        if (!dialog || typeof dialog.showModal !== 'function') {
+            return Promise.resolve(confirm(message));
+        }
+
+        const msgEl = find('#admin-confirm-msg');
+        const titleEl = find('#admin-confirm-title');
+        const okBtn = find('#admin-confirm-ok');
+        const cancelBtn = dialog.querySelector('[data-confirm-cancel]');
+        const closeBtn = dialog.querySelector('[data-close]');
+
+        if (msgEl) msgEl.textContent = message;
+        if (titleEl) titleEl.textContent = title;
+        if (okBtn) {
+            okBtn.textContent = okText;
+            okBtn.className = `btn button ${isDanger ? 'danger' : 'primary'}`;
+        }
+
+        return new Promise((resolve) => {
+            const cleanup = () => {
+                okBtn?.removeEventListener('click', onOk);
+                cancelBtn?.removeEventListener('click', onCancel);
+                closeBtn?.removeEventListener('click', onCancel);
+                dialog.removeEventListener('close', onCancel);
+            };
+
+            const onOk = () => {
+                cleanup();
+                dialog.close();
+                resolve(true);
+            };
+
+            const onCancel = () => {
+                cleanup();
+                if (dialog.open) dialog.close();
+                resolve(false);
+            };
+
+            okBtn?.addEventListener('click', onOk);
+            cancelBtn?.addEventListener('click', onCancel);
+            closeBtn?.addEventListener('click', onCancel);
+            dialog.addEventListener('close', onCancel, { once: true });
+
+            dialog.showModal();
+        });
     }
 
     async function request(path, data) {
@@ -77,6 +158,10 @@
             headers,
             body: data === undefined ? undefined : JSON.stringify(data),
         });
+
+        if (response.status === 499) {
+            return { candidates: [], availableRooms: [], totalActiveRooms: 0 };
+        }
 
         if (response.redirected || response.status === 401 || response.status === 403) {
             throw new Error(
@@ -125,7 +210,7 @@
         </table>`;
     }
 
-    function accountRows(rows, actions) {
+    function accountRows(rows, mode) {
         return rows.map((row) => [
             /* HTML */ `<strong>${escape(row.name)}</strong>`,
             escape(row.username),
@@ -134,18 +219,30 @@
             /* HTML */ `<span class="status ${row.isActive ? '' : 'inactive'}"
                 >${row.isActive ? 'Đang hoạt động' : 'Ngừng hoạt động'}</span
             >`,
-            ...(actions
+            ...(mode
                 ? [
-                      row.canChangeStatus
-                          ? /* HTML */ `<button
-                                type="button"
-                                class="btn button sm small-button ${row.isActive ? 'danger' : 'secondary'}"
-                                data-account="${row.id}"
-                                data-active="${!row.isActive}"
-                            >
-                                ${row.isActive ? 'Ngừng hoạt động' : 'Kích hoạt'}
-                            </button>`
-                          : '<span>Đang đăng nhập</span>',
+                      /* HTML */ `<div class="row-actions">
+                          <button
+                              type="button"
+                              class="btn button sm small-button secondary"
+                              data-edit-account="${row.id}"
+                              data-staff="${mode === 'staff'}"
+                          >
+                              Sửa
+                          </button>
+                          ${
+                              row.canChangeStatus
+                                  ? /* HTML */ `<button
+                                        type="button"
+                                        class="btn button sm small-button ${row.isActive ? 'danger' : 'secondary'}"
+                                        data-account="${row.id}"
+                                        data-active="${!row.isActive}"
+                                    >
+                                        ${row.isActive ? 'Ngừng hoạt động' : 'Kích hoạt'}
+                                    </button>`
+                                  : '<span>Đang đăng nhập</span>'
+                          }
+                      </div>`,
                   ]
                 : []),
         ]);
@@ -159,11 +256,15 @@
 
         table(
             '#departments-table',
-            ['Mã', 'Tên phòng ban', 'Mô tả'],
+            ['Mã', 'Tên phòng ban', 'Mô tả', 'Thao tác'],
             filtered.map((row) => [
                 escape(row.id),
                 /* HTML */ `<strong>${escape(row.name)}</strong>`,
                 escape(row.description || '—'),
+                /* HTML */ `<div class="row-actions">
+                    <button type="button" class="btn button sm small-button secondary" data-edit-department="${row.id}">Sửa</button>
+                    <button type="button" class="btn button sm small-button danger" data-delete-department="${row.id}">Xóa</button>
+                </div>`,
             ]),
         );
     }
@@ -177,8 +278,8 @@
             'Phòng ban',
             'Trạng thái',
         ];
-        table('#accounts-table', [...headings, 'Thao tác'], accountRows(directory.accounts, true));
-        table('#staff-table', headings, accountRows(directory.staff, false));
+        table('#accounts-table', [...headings, 'Thao tác'], accountRows(directory.accounts, 'accounts'));
+        table('#staff-table', [...headings, 'Thao tác'], accountRows(directory.staff, 'staff'));
         const filterDept = find('#filter-department');
         if (filterDept) {
             const currentVal = filterDept.value;
@@ -207,6 +308,16 @@
     async function loadReport(withFilter = true) {
         const version = ++reportVersion;
         const filter = find('#report-filter');
+
+        // Khởi tạo mặc định 7 ngày gần nhất nếu chưa chọn ngày
+        if (!filter.elements.from.value || !filter.elements.to.value) {
+            const today = new Date();
+            const past7 = new Date();
+            past7.setDate(today.getDate() - 6);
+            filter.elements.to.value = today.toISOString().slice(0, 10);
+            filter.elements.from.value = past7.toISOString().slice(0, 10);
+        }
+
         const query = withFilter ? '?' + new URLSearchParams(new FormData(filter)) : '';
         const report = await request('Report' + query);
         if (version !== reportVersion) return;
@@ -214,54 +325,156 @@
         filter.elements.from.value = report.from;
         filter.elements.to.value = report.to;
         find('#report-period').textContent = `${date(report.from)} – ${date(report.to)}`;
-        find('#report-stats').innerHTML = [
-            ['Doanh thu thực thu', money(report.revenue) + ' ₫', 'Sau khi trừ hoàn tiền', true],
-            ['Lượt đã tiếp nhận', money(report.visits), 'Theo thời điểm check-in', false],
-            ['Tạm ứng', money(report.deposits) + ' ₫', 'Đã ghi nhận trong kỳ', false],
-            ['Hoàn tiền', money(report.refunds) + ' ₫', 'Đã hoàn trong kỳ', false],
-        ]
+        const statConfig = [
+            {
+                label: 'Doanh thu thực thu',
+                value: money(report.revenue) + ' ₫',
+                icon: /* HTML */ `<svg class="stat-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`
+            },
+            {
+                label: 'Lượt tiếp nhận',
+                value: money(report.visits) + ' lượt',
+                icon: /* HTML */ `<svg class="stat-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`
+            },
+            {
+                label: 'Tạm ứng',
+                value: money(report.deposits) + ' ₫',
+                icon: /* HTML */ `<svg class="stat-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>`
+            },
+            {
+                label: 'Hoàn tiền',
+                value: money(report.refunds) + ' ₫',
+                icon: /* HTML */ `<svg class="stat-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>`
+            }
+        ];
+
+        find('#report-stats').innerHTML = statConfig
             .map(
-                ([label, value, note, highlight]) =>
-                    /* HTML */ `<article class="stat ${highlight ? 'highlight' : ''}">
-                        <span>${label}</span><strong>${escape(value)}</strong><small>${note}</small>
+                (item) =>
+                    /* HTML */ `<article class="stat">
+                        <div class="stat-icon-wrap">${item.icon}</div>
+                        <div class="stat-body">
+                            <span class="stat-label">${escape(item.label)}</span>
+                            <strong class="stat-value" title="${escape(item.value)}">${escape(item.value)}</strong>
+                        </div>
                     </article>`,
             )
             .join('');
 
         const maximum = Math.max(1, ...report.days.map((day) => Math.abs(day.revenue)));
+        const rawMaximum = Math.max(0, ...report.days.map((day) => Math.abs(day.revenue)));
+        const axis = find('#revenue-chart-y');
+        if (axis) {
+            if (rawMaximum <= 0) {
+                axis.innerHTML = '<span></span><span></span><span></span><span></span><span>0 ₫</span>';
+            } else {
+                const compact = (value) =>
+                    value >= 1e9 ? money(value / 1e9) + ' tỷ' : value >= 1e6 ? money(value / 1e6) + ' tr' : money(value);
+                axis.innerHTML = [rawMaximum, rawMaximum * 0.75, rawMaximum * 0.5, rawMaximum * 0.25, 0]
+                    .map((value) => /* HTML */ `<span>${escape(compact(value))}</span>`)
+                    .join('');
+            }
+        }
+        find('#revenue-chart').classList.toggle('is-empty', rawMaximum <= 0);
+        const barTones = ['#86efac', '#4ade80', '#22c55e', '#16a34a', '#15803d', '#107c41', '#0d6535'];
         find('#revenue-chart').innerHTML = report.days
-            .map(
-                (day) =>
-                    /* HTML */ `<div
-                        class="chart-day"
-                        title="${escape(date(day.date) + ': ' + money(day.revenue) + ' ₫ · ' + day.visits + ' lượt')}"
-                    >
+            .map((day, index) => {
+                const isZero = day.revenue === 0;
+                const pct = isZero ? 2 : Math.max(6, Math.round((Math.abs(day.revenue) / maximum) * 100));
+                const barHeight = isZero ? '3px' : pct + '%';
+                const formattedRev = money(day.revenue) + ' ₫';
+                const tone = barTones[index % barTones.length];
+                return /* HTML */ `<div class="chart-day" title="${escape(date(day.date) + ': ' + formattedRev + ' · ' + day.visits + ' lượt')}">
+                    <span class="chart-bar-tooltip">${formattedRev}</span>
+                    <div class="chart-bar-wrap">
                         <div
-                            class="chart-bar ${day.revenue < 0 ? 'negative' : ''}"
-                            style="height:${Math.max(2, (Math.abs(day.revenue) / maximum) * 160)}px"
+                            class="chart-bar ${day.revenue < 0 ? 'negative' : isZero ? 'zero-rev' : ''}"
+                            style="height:${barHeight}; --bar-tone:${tone}"
                         ></div>
-                        <small>${escape(date(day.date).slice(0, 5))}</small>
-                    </div>`,
-            )
+                    </div>
+                    <span class="chart-day-label">${escape(date(day.date).slice(0, 5))}</span>
+                </div>`;
+            })
             .join('');
         reportDays = report.days || [];
         renderReportPage(1);
 
         try {
             const deptStats = await request('DepartmentStats' + query);
+            renderDonutChart(deptStats);
             table(
                 '#department-stats-table',
-                ['Khoa chuyên môn', 'Lượt tiếp nhận', 'Doanh thu thực thu'],
+                ['Khoa chuyên môn', 'Lượt khám', 'Thực thu'],
                 deptStats.map((row) => [
                     /* HTML */ `<strong>${escape(row.departmentName)}</strong>`,
                     /* HTML */ `<span class="number">${escape(money(row.visits))} lượt</span>`,
-                    /* HTML */ `<span class="number">${escape(money(row.revenue))} ₫</span>`,
+                    /* HTML */ `<span class="number ${row.revenue > 0 ? 'money-pos' : ''}">${escape(money(row.revenue))} ₫</span>`,
                 ]),
             );
         } catch {
-            table('#department-stats-table', ['Khoa chuyên môn', 'Lượt tiếp nhận', 'Doanh thu thực thu'], []);
+            renderDonutChart([]);
+            table('#department-stats-table', ['Khoa chuyên môn', 'Lượt khám', 'Thực thu'], []);
             notify('Chưa tải được thống kê doanh thu theo khoa.', true);
         }
+    }
+
+    function renderDonutChart(deptStats) {
+        const segmentsContainer = find('#donut-segments');
+        const legendContainer = find('#donut-legend');
+        const totalNum = find('#donut-center-total');
+        const totalBadge = find('#donut-total-badge');
+        if (!segmentsContainer || !legendContainer) return;
+
+        const totalVisits = (deptStats || []).reduce((sum, d) => sum + (d.visits || 0), 0);
+        if (totalNum) totalNum.textContent = totalVisits.toLocaleString('vi-VN');
+        if (totalBadge) totalBadge.textContent = totalVisits + ' lượt';
+
+        if (!deptStats || deptStats.length === 0 || totalVisits === 0) {
+            segmentsContainer.innerHTML = '';
+            legendContainer.innerHTML = '<div style="font-size:11.5px;color:#94a3b8;text-align:center;padding:12px;">Chưa có lượt tiếp nhận trong kỳ này</div>';
+            return;
+        }
+
+        const colors = ['#107c41', '#16a34a', '#22c55e', '#4ade80', '#86efac', '#cbd5e1'];
+        const sorted = [...deptStats].filter(d => d.visits > 0).sort((a, b) => b.visits - a.visits);
+        const topDepts = sorted.slice(0, 4);
+        const otherVisits = sorted.slice(4).reduce((sum, d) => sum + d.visits, 0);
+        if (otherVisits > 0) {
+            topDepts.push({ departmentName: 'Khoa khác', visits: otherVisits, isOther: true });
+        }
+
+        const radius = 56;
+        const circumference = 2 * Math.PI * radius;
+        let cumulativePct = 0;
+
+        const segmentsHtml = topDepts.map((d, index) => {
+            const pct = d.visits / totalVisits;
+            const strokeDasharray = `${(pct * circumference).toFixed(2)} ${circumference.toFixed(2)}`;
+            const strokeDashoffset = (-cumulativePct * circumference).toFixed(2);
+            cumulativePct += pct;
+            const color = d.isOther ? '#cbd5e1' : colors[index % colors.length];
+
+            return `<circle cx="80" cy="80" r="${radius}" fill="none" stroke="${color}" stroke-width="22" stroke-dasharray="${strokeDasharray}" stroke-dashoffset="${strokeDashoffset}" stroke-linecap="butt" />`;
+        }).join('');
+
+        segmentsContainer.innerHTML = segmentsHtml;
+
+        const legendHtml = topDepts.map((d, index) => {
+            const color = d.isOther ? '#cbd5e1' : colors[index % colors.length];
+            const pct = Math.round((d.visits / totalVisits) * 100);
+            return `<div class="donut-legend-item">
+                <div class="donut-legend-left">
+                    <span class="donut-legend-dot" style="background:${color}"></span>
+                    <span class="donut-legend-name" title="${escape(d.departmentName)}">${escape(d.departmentName)}</span>
+                </div>
+                <div class="donut-legend-right">
+                    <strong class="donut-legend-val">${d.visits}</strong>
+                    <span class="donut-legend-pct">${pct}%</span>
+                </div>
+            </div>`;
+        }).join('');
+
+        legendContainer.innerHTML = legendHtml;
     }
 
     function renderReportPage(page) {
@@ -272,12 +485,11 @@
 
         table(
             '#report-table',
-            ['Ngày', 'Tạm ứng', 'Thanh toán', 'Hoàn tiền', 'Thực thu', 'Lượt tiếp nhận'],
+            ['Ngày', 'Lượt khám', 'Thực thu'],
             pageDays.map((day) => [
                 escape(date(day.date)),
-                ...[day.deposits, day.payments, day.refunds, day.revenue, day.visits].map(
-                    (value) => /* HTML */ `<span class="number">${escape(money(value))}</span>`,
-                ),
+                /* HTML */ `<span class="number">${escape(money(day.visits))}</span>`,
+                /* HTML */ `<span class="number ${day.revenue > 0 ? 'money-pos' : ''}">${escape(money(day.revenue))} ₫</span>`,
             ]),
         );
 
@@ -289,18 +501,31 @@
             return;
         }
         pager.hidden = false;
+
+        const startPage = Math.max(1, Math.min(reportPage - 2, totalPages - 4));
+        const endPage = Math.min(totalPages, startPage + 4);
+        const pageButtons = [];
+        for (let page = startPage; page <= endPage; page += 1) {
+            pageButtons.push(
+                /* HTML */ `<button type="button" class="pager-btn ${page === reportPage ? 'active' : ''}" data-report-page="${page}" aria-label="Trang ${page}">${page}</button>`,
+            );
+        }
+
         pager.innerHTML = /* HTML */ `
-            <span style="font-size:13px; color:#64748b;">
-                Hiển thị ${startIndex + 1}–${Math.min(startIndex + REPORT_PAGE_SIZE, reportDays.length)} / ${reportDays.length} ngày (tối đa ${REPORT_PAGE_SIZE} ngày/trang)
+            <span class="pager-summary">
+                ${startIndex + 1}–${Math.min(startIndex + REPORT_PAGE_SIZE, reportDays.length)} / ${reportDays.length} ngày
             </span>
-            <div style="display:flex; align-items:center; gap:8px;">
-                <button type="button" class="btn button secondary sm" id="report-prev-page" ${reportPage <= 1 ? 'disabled' : ''}>← Trước</button>
-                <span style="font-size:13px; font-weight:600;">Trang ${reportPage} / ${totalPages}</span>
-                <button type="button" class="btn button secondary sm" id="report-next-page" ${reportPage >= totalPages ? 'disabled' : ''}>Sau →</button>
+            <div class="pager-buttons">
+                <button type="button" class="pager-btn" id="report-prev-page" aria-label="Trang trước" ${reportPage <= 1 ? 'disabled' : ''}>‹</button>
+                ${pageButtons.join('')}
+                <button type="button" class="pager-btn" id="report-next-page" aria-label="Trang sau" ${reportPage >= totalPages ? 'disabled' : ''}>›</button>
             </div>
         `;
         find('#report-prev-page')?.addEventListener('click', () => renderReportPage(reportPage - 1));
         find('#report-next-page')?.addEventListener('click', () => renderReportPage(reportPage + 1));
+        pager.querySelectorAll('[data-report-page]').forEach((button) =>
+            button.addEventListener('click', () => renderReportPage(Number(button.dataset.reportPage))),
+        );
     }
 
     function renderRoomsTable(filterDeptId = '') {
@@ -317,9 +542,14 @@
                 /* HTML */ `<strong>${escape(row.roomNumber)}</strong>`,
                 escape(row.roomName),
                 /* HTML */ `<span class="status ${row.activeSchedulesCount > 0 ? '' : 'inactive'}">${row.activeSchedulesCount} lịch phân công</span>`,
-                row.activeSchedulesCount === 0
-                    ? /* HTML */ `<button type="button" class="btn button sm small-button danger" data-delete-room="${row.id}">Xóa</button>`
-                    : '<span>Đang sử dụng</span>',
+                /* HTML */ `<div class="row-actions">
+                    <button type="button" class="btn button sm small-button secondary" data-edit-room="${row.id}">Sửa</button>
+                    ${
+                        row.activeSchedulesCount === 0
+                            ? /* HTML */ `<button type="button" class="btn button sm small-button danger" data-delete-room="${row.id}">Xóa</button>`
+                            : '<span>Đang sử dụng</span>'
+                    }
+                </div>`,
             ]),
         );
     }
@@ -538,6 +768,33 @@
         if (event.key === 'Escape') closeNavigation();
     });
 
+    const quickSearch = find('#admin-quick-search');
+    if (quickSearch) {
+        document.addEventListener('keydown', (event) => {
+            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+                event.preventDefault();
+                quickSearch.focus();
+                quickSearch.select();
+            }
+        });
+        quickSearch.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            const keyword = quickSearch.value.trim().toLowerCase();
+            if (!keyword) return;
+            const link = [...document.querySelectorAll('#admin-sidebar nav [data-section]')].find((item) =>
+                item.textContent.toLowerCase().includes(keyword),
+            );
+            if (!link) {
+                notify(`Không tìm thấy mục phù hợp với "${quickSearch.value.trim()}".`, true);
+                return;
+            }
+            quickSearch.value = '';
+            find('#admin-message').hidden = true;
+            selectSection(link.dataset.section);
+        });
+    }
+
     function selectSection(explicitSection) {
         closeNavigation();
         const selected = explicitSection || location.hash.slice(1) || workspace.dataset.section;
@@ -554,52 +811,94 @@
         find('#page-title').textContent = titles[section][0];
         find('#admin-breadcrumb').textContent = titles[section][0];
         find('#page-description').textContent = titles[section][1];
+        const reportFilter = find('#report-filter');
+        if (reportFilter) reportFilter.hidden = section !== 'dashboard';
     }
 
-    function openAccount(staffOnly) {
+    function openAccount(staffOnly, row = null) {
         if (!directory)
             return notify('Danh sách chưa tải được. Hãy làm mới trước khi tạo tài khoản.', true);
         const form = find('#account-form');
         form.reset();
         form.querySelector('.form-error').textContent = '';
-        const roles = directory.roles.filter((role) => !staffOnly || role.requiresDepartment);
-        form.elements.roleId.innerHTML = roles
+        const editing = !!row;
+        form.dataset.mode = editing ? 'edit' : 'create';
+        form.elements.id.value = editing ? row.id : '';
+
+        const roles = directory.roles.filter(
+            (role) => !staffOnly || role.requiresDepartment || role.code === 'ACCOUNTANT',
+        );
+        // Khi sửa quản trị viên, chỉ giữ đúng vai trò hiện tại để tránh tự hạ quyền hệ thống
+        form.elements.roleId.innerHTML = (editing && row.role === 'ADMIN'
+            ? roles.filter((role) => role.code === 'ADMIN')
+            : roles
+        )
             .map((role) => /* HTML */ `<option value="${role.id}">${escape(role.name)}</option>`)
             .join('');
         form.elements.departmentId.innerHTML =
             '<option value="">Chọn phòng ban</option>' +
             directory.departments
-                .map((row) => /* HTML */ `<option value="${row.id}">${escape(row.name)}</option>`)
+                .map((department) => /* HTML */ `<option value="${department.id}">${escape(department.name)}</option>`)
                 .join('');
-        find('#account-title').textContent = staffOnly
-            ? 'Thêm nhân sự và tài khoản'
-            : 'Tạo tài khoản';
+
+        form.elements.username.value = editing ? row.username : '';
+        form.elements.username.readOnly = editing;
+        form.elements.password.value = '';
+        form.elements.password.required = !editing;
+        find('#account-password-label').textContent = editing
+            ? 'Mật khẩu mới (để trống nếu giữ nguyên)'
+            : 'Mật khẩu ban đầu *';
+        if (editing) {
+            const currentRole = directory.roles.find((role) => role.code === row.role);
+            if (currentRole) form.elements.roleId.value = String(currentRole.id);
+            form.elements.fullName.value = row.name;
+        }
+
+        find('#account-title').textContent = editing
+            ? staffOnly
+                ? 'Cập nhật nhân sự'
+                : 'Cập nhật tài khoản'
+            : staffOnly
+              ? 'Thêm nhân sự và tài khoản'
+              : 'Tạo tài khoản';
+        find('#account-submit').textContent = editing ? 'Lưu thay đổi' : 'Tạo tài khoản';
         updateRoleFields();
+
+        // Đặt sau updateRoleFields vì hàm này bật lại input theo vai trò đang chọn
+        form.elements.isActive.checked = editing ? row.isActive : true;
+        form.elements.isActive.disabled = editing && !row.canChangeStatus;
         find('#account-dialog').showModal();
     }
 
     function updateRoleFields() {
         const form = find('#account-form');
+        const editing = form.dataset.mode === 'edit';
         const role = directory?.roles.find(
             (role) => role.id === Number(form.elements.roleId.value),
         );
         const fields = [
             ['[data-name-field]', role?.requiresName],
-            ['[data-department-field]', role?.requiresDepartment],
-            ['[data-patient-field]', role?.requiresPatient],
+            ['[data-department-field]', !editing && role?.requiresDepartment],
+            ['[data-patient-field]', !editing && role?.requiresPatient],
+            ['[data-email-field]', !editing],
+            ['[data-status-field]', editing],
         ];
         for (const [selector, shown] of fields) {
             form.querySelectorAll(selector).forEach((field) => {
                 field.hidden = !shown;
                 field.querySelectorAll('input,select').forEach((input) => {
                     input.disabled = !shown;
-                    input.required = !!shown;
+                    input.required = !!shown && input.type !== 'checkbox';
                 });
             });
         }
-        find('#account-hint').textContent = role?.requiresName
-            ? 'Tài khoản mới được kích hoạt và liên kết hồ sơ đúng vai trò/phòng ban. Mật khẩu không hiển thị trong danh sách.'
-            : 'Tài khoản Admin dùng tên đăng nhập làm tên hiển thị.';
+        find('#account-hint').textContent = editing
+            ? `Đang sửa tài khoản ${form.elements.username.value}. ${
+                  role?.requiresDepartment ? 'Phòng ban hiện tại được giữ nguyên. ' : ''
+              }Để trống mật khẩu nếu không đổi.`
+            : role?.requiresName
+              ? 'Tài khoản mới được kích hoạt và liên kết hồ sơ đúng vai trò/phòng ban. Mật khẩu không hiển thị trong danh sách.'
+              : 'Tài khoản Admin dùng tên đăng nhập làm tên hiển thị.';
     }
 
     async function mutate(path, payload, form) {
@@ -635,18 +934,21 @@
 
     find('#department-form').addEventListener('submit', (event) => {
         event.preventDefault();
-        mutate(
-            'Departments',
-            Object.fromEntries(new FormData(event.currentTarget)),
-            event.currentTarget,
-        );
+        const form = event.currentTarget;
+        const data = Object.fromEntries(new FormData(form));
+        const id = data.id ? Number(data.id) : null;
+        delete data.id;
+        mutate(id ? 'Departments/Update' : 'Departments', id ? { id, ...data } : data, form);
     });
 
     find('#room-form').addEventListener('submit', (event) => {
         event.preventDefault();
-        const data = Object.fromEntries(new FormData(event.currentTarget));
+        const form = event.currentTarget;
+        const data = Object.fromEntries(new FormData(form));
+        const id = data.id ? Number(data.id) : null;
+        delete data.id;
         data.departmentId = Number(data.departmentId);
-        mutate('Rooms', data, event.currentTarget);
+        mutate(id ? 'Rooms/Update' : 'Rooms', id ? { id, ...data } : data, form);
     });
 
     find('#service-form').addEventListener('submit', (event) => {
@@ -672,11 +974,28 @@
 
     find('#account-form').addEventListener('submit', (event) => {
         event.preventDefault();
-        const data = Object.fromEntries(new FormData(event.currentTarget));
+        const form = event.currentTarget;
+        const data = Object.fromEntries(new FormData(form));
+        const id = data.id ? Number(data.id) : null;
+        delete data.id;
         data.roleId = Number(data.roleId);
+        if (form.dataset.mode === 'edit') {
+            mutate(
+                'Accounts/Update',
+                {
+                    id,
+                    fullName: data.fullName || form.elements.username.value,
+                    roleId: data.roleId,
+                    password: data.password || null,
+                    isActive: form.elements.isActive.checked,
+                },
+                form,
+            );
+            return;
+        }
         data.departmentId = data.departmentId ? Number(data.departmentId) : null;
         data.dateOfBirth = data.dateOfBirth || null;
-        mutate('Accounts', data, event.currentTarget);
+        mutate('Accounts', data, form);
     });
 
     find('#account-form [name="roleId"]').addEventListener('change', updateRoleFields);
@@ -705,7 +1024,13 @@
     // Không truyền thẳng selectSection: hashchange sẽ đưa đối tượng event vào làm tên mục và luôn quay về dashboard
     window.addEventListener('hashchange', () => selectSection());
 
-    document.addEventListener('click', (event) => {
+    document.addEventListener('click', async (event) => {
+        const toastClose = event.target.closest('#admin-message .toast-close');
+        if (toastClose) {
+            const msg = find('#admin-message');
+            if (msg) msg.hidden = true;
+            return;
+        }
         const open = event.target.closest('[data-open]');
         if (open) {
             const dialog = document.getElementById(open.dataset.open);
@@ -719,7 +1044,15 @@
                 dialog.querySelector('#medication-title').textContent = 'Thêm thuốc & Biệt dược';
                 dialog.querySelector('form').elements.id.value = '';
             }
+            if (open.dataset.open === 'department-dialog') {
+                dialog.querySelector('#department-title').textContent = 'Thêm phòng ban';
+                dialog.querySelector('form').elements.id.value = '';
+                dialog.querySelector('form button[type="submit"]').textContent = 'Lưu phòng ban';
+            }
             if (open.dataset.open === 'room-dialog') {
+                dialog.querySelector('form').elements.id.value = '';
+                dialog.querySelector('#room-title').textContent = 'Thêm phòng khám';
+                dialog.querySelector('form button[type="submit"]').textContent = 'Lưu phòng khám';
                 const currentFilter = find('#filter-room-department')?.value;
                 if (currentFilter) {
                     dialog.querySelector('form').elements.departmentId.value = currentFilter;
@@ -729,15 +1062,72 @@
         }
         if (event.target.closest('[data-close]')) event.target.closest('dialog').close();
         const account = event.target.closest('[data-account]');
-        if (account && confirm('Xác nhận thay đổi trạng thái truy cập của tài khoản này?')) {
+        if (account && await askConfirm('Xác nhận thay đổi trạng thái truy cập của tài khoản này?', 'Trạng thái tài khoản')) {
             mutate('AccountStatus', {
                 accountId: Number(account.dataset.account),
                 isActive: account.dataset.active === 'true',
             });
         }
+        const editRoom = event.target.closest('[data-edit-room]');
+        if (editRoom) {
+            const item = catalog?.rooms.find((room) => room.id === Number(editRoom.dataset.editRoom));
+            if (item) {
+                const dialog = document.getElementById('room-dialog');
+                const form = dialog.querySelector('form');
+                form.reset();
+                form.querySelector('.form-error').textContent = '';
+                form.elements.id.value = item.id;
+                form.elements.departmentId.value = String(item.departmentId);
+                form.elements.roomNumber.value = item.roomNumber;
+                form.elements.roomName.value = item.roomName;
+                dialog.querySelector('#room-title').textContent = 'Sửa phòng khám';
+                form.querySelector('button[type="submit"]').textContent = 'Lưu thay đổi';
+                dialog.showModal();
+            }
+        }
         const deleteRoom = event.target.closest('[data-delete-room]');
-        if (deleteRoom && confirm('Xác nhận xóa phòng khám này khỏi khoa?')) {
+        if (deleteRoom && await askConfirm('Xác nhận xóa phòng khám này khỏi khoa?', 'Xóa phòng khám', 'Xóa', true)) {
             mutate('Rooms/Delete', { roomId: Number(deleteRoom.dataset.deleteRoom) });
+        }
+        const editDepartment = event.target.closest('[data-edit-department]');
+        if (editDepartment) {
+            const item = directory?.departments.find(
+                (department) => department.id === Number(editDepartment.dataset.editDepartment),
+            );
+            if (item) {
+                const dialog = document.getElementById('department-dialog');
+                const form = dialog.querySelector('form');
+                form.reset();
+                form.querySelector('.form-error').textContent = '';
+                form.elements.id.value = item.id;
+                form.elements.name.value = item.name;
+                form.elements.description.value = item.description || '';
+                dialog.querySelector('#department-title').textContent = 'Sửa phòng ban';
+                dialog.querySelector('button[type="submit"]').textContent = 'Lưu thay đổi';
+                dialog.showModal();
+            }
+        }
+        const deleteDepartment = event.target.closest('[data-delete-department]');
+        if (
+            deleteDepartment &&
+            await askConfirm(
+                'Xác nhận xóa phòng ban này? Chỉ xóa được khi chưa có bác sĩ hoặc phòng khám liên kết.',
+                'Xóa phòng ban',
+                'Xóa',
+                true,
+            )
+        ) {
+            mutate('Departments/Delete', {
+                departmentId: Number(deleteDepartment.dataset.deleteDepartment),
+            });
+        }
+        const editAccount = event.target.closest('[data-edit-account]');
+        if (editAccount) {
+            const staffOnly = editAccount.dataset.staff === 'true';
+            const item = (staffOnly ? directory?.staff : directory?.accounts)?.find(
+                (account) => account.id === Number(editAccount.dataset.editAccount),
+            );
+            if (item) openAccount(staffOnly, item);
         }
         const editService = event.target.closest('[data-edit-service]');
         if (editService) {
@@ -776,8 +1166,9 @@
         const decision = event.target.closest('[data-decision]');
         if (
             decision &&
-            confirm(
+            await askConfirm(
                 'Xác nhận xử lý đề nghị này? Khi duyệt, lịch khám liên quan có thể được chuyển hoặc yêu cầu đặt lại.',
+                'Duyệt đề nghị',
             )
         ) {
             const container = decision.closest('[data-request]');
@@ -854,459 +1245,817 @@
             deptSelect.value = String(schedulingState.selectedDeptId);
         }
 
-        const periodInfo = find('#active-period-info');
+        reqRooms = new Map();
         const publishBtn = find('#publish-period-btn');
+        if (publishBtn) {
+            const period = schedulingState?.activePeriod;
+            const isPublished = !!period && (period.status === 3 || period.status === 'Published');
+            publishBtn.hidden = !period || isPublished;
+            if (period) publishBtn.dataset.periodId = period.id;
+            const generateBtn = find('#sched-generate-slots');
+            if (generateBtn) generateBtn.hidden = !(schedulingState?.board?.totals?.departmentsReady > 0);
+        }
+        const rangeBtn = find('#sched-this-week');
+        if (rangeBtn) rangeBtn.textContent = schedWeekText();
+
+        renderSchedPeriodPill();
+        renderSchedKpis();
+        renderDeptProgress();
+        renderWeeklyScheduleGrid();
+        renderAssign();
+        renderRequests();
+        applySchedView(schedViewMode);
+    }
+
+    const SCHED_DAY_LABELS = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+
+    function schedShiftOf(s) {
+        return s?.shift === 1 || s?.shift === 'Afternoon' ? 1 : 0;
+    }
+
+    function schedIsApproved(s) {
+        return s?.status === 1 || s?.status === 'Approved';
+    }
+
+    function schedIsPending(s) {
+        return s?.status === 0 || s?.status === 'Bidding';
+    }
+
+    function schedIsActive(s) {
+        return schedIsApproved(s) || schedIsPending(s);
+    }
+
+    function schedWeekDays() {
+        const start = schedulingState?.weekStart;
+        if (!start) return [];
+        const today = schedulingState?.today;
+        const base = new Date(start + 'T00:00:00');
+        const days = [];
+        for (let i = 0; i < 7; i += 1) {
+            const d = new Date(base);
+            d.setDate(base.getDate() + i);
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const iso = `${d.getFullYear()}-${mm}-${dd}`;
+            days.push({
+                iso,
+                dayName: SCHED_DAY_LABELS[d.getDay()],
+                shortDate: `${dd}/${mm}`,
+                isToday: iso === today,
+                isPast: today ? iso < today : false,
+                isWeekend: d.getDay() === 0 || d.getDay() === 6,
+            });
+        }
+        return days;
+    }
+
+    function applySchedView(mode) {
+        schedViewMode = ['progress', 'roster', 'assign', 'requests'].includes(mode) ? mode : 'progress';
+        ['progress', 'roster', 'assign', 'requests'].forEach((name) => {
+            const pane = find(`#sched-view-${name}`);
+            if (pane) pane.hidden = name !== schedViewMode;
+        });
+
+        const fullPane = schedViewMode === 'assign' || schedViewMode === 'requests';
+        const board = find('#sched-board');
+        if (board) board.hidden = fullPane;
+        const kpis = find('#sched-kpis');
+        if (kpis) kpis.hidden = fullPane;
+        const tools = find('#sched-board-tools');
+        if (tools) tools.hidden = schedViewMode !== 'roster';
+
+        document.querySelectorAll('[data-sched-view]').forEach((btn) => {
+            const active = btn.dataset.schedView === schedViewMode;
+            btn.classList.toggle('is-active', active);
+            btn.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+
+        const heading = {
+            progress: titles.scheduling,
+            roster: titles.scheduling,
+            assign: ['Phân lịch bác sĩ', 'Xếp ca và phòng khám cho bác sĩ trong khoa.'],
+            requests: ['Duyệt yêu cầu', 'Ca bác sĩ đã đăng ký, chờ bạn duyệt và gán phòng.'],
+        }[schedViewMode];
+        const pageTitle = find('#page-title');
+        const pageSub = find('#page-description');
+        const activeSection = find('#admin-sidebar nav .nav-item.active')?.dataset.section;
+        if (pageTitle && activeSection === 'scheduling') pageTitle.textContent = heading[0];
+        if (pageSub && activeSection === 'scheduling') pageSub.textContent = heading[1];
+
+        if (schedViewMode === 'assign') renderAssign();
+        if (schedViewMode === 'requests') renderRequests();
+    }
+
+    const schedHhmm = (t) => (t ? String(t).slice(0, 5) : '');
+    const schedInitials = (name, fallback) => (name || fallback).trim().split(/\s+/).slice(-2).map((w) => w[0]?.toUpperCase() || '').join('');
+    const schedNorm = (value) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').toLowerCase();
+
+    function schedWeekText() {
+        const start = schedulingState?.weekStart;
+        const end = schedulingState?.weekEnd;
+        if (!start || !end) return '—';
+        const s = new Date(start + 'T00:00:00');
+        const e = new Date(end + 'T00:00:00');
+        const sm = s.getMonth() + 1;
+        const em = e.getMonth() + 1;
+        if (sm === em) return `${s.getDate()} – ${e.getDate()} tháng ${sm}, ${e.getFullYear()}`;
+        return `${s.getDate()} tháng ${sm} – ${e.getDate()} tháng ${em}, ${e.getFullYear()}`;
+    }
+
+    function renderSchedPeriodPill() {
+        const host = find('#sched-period-pill');
+        if (!host) return;
+        const rows = schedulingState?.board?.departments || [];
+        const rangeText = find('#sched-this-week')?.textContent.trim() || 'tuần đang xem';
+        if (rows.length > 0) {
+            const openCount = rows.filter((row) => row.hasOpenPeriod).length;
+            const publishedCount = rows.filter((row) => row.isPublished).length;
+            if (publishedCount > 0) {
+                host.className = 'sched-period-pill is-published';
+                host.textContent = 'Đã xuất bản';
+                host.title = `${rangeText} · ${publishedCount}/${rows.length} khoa đã chốt lịch`;
+            } else if (openCount > 0) {
+                host.className = 'sched-period-pill is-open';
+                host.textContent = 'Đang mở đăng ký';
+                host.title = `${rangeText} · ${openCount}/${rows.length} khoa đang mở đăng ký`;
+            } else {
+                host.className = 'sched-period-pill is-none';
+                host.textContent = 'Chưa có đợt cho tuần này';
+                host.removeAttribute('title');
+            }
+            return;
+        }
         const period = schedulingState?.activePeriod;
         if (!period) {
-            periodInfo.innerHTML = '<strong>Chưa có kỳ đăng ký nào.</strong> Bấm <em>+ Tạo kỳ đăng ký</em> để mở đợt đăng ký ca cho bác sĩ.';
-            if (publishBtn) publishBtn.hidden = true;
-        } else {
-            const isPublished = period.status === 3 || period.status === 'Published';
-            const statusText = isPublished ? 'Đã xuất bản' : (period.isOpenForBidding ? 'Đang mở đăng ký' : 'Đã đóng đăng ký');
-            periodInfo.innerHTML = /* HTML */ `
-                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-                    <div>
-                        <strong>${escape(period.name)}</strong> (${escape(period.departmentName || 'Toàn viện')}) ·
-                        <span>${escape(date(period.startDate))} – ${escape(date(period.endDate))}</span>
-                    </div>
-                    <span class="badge">${escape(statusText)}</span>
-                </div>
-            `;
-            if (publishBtn) {
-                publishBtn.hidden = isPublished;
-                publishBtn.dataset.periodId = period.id;
-            }
+            host.className = 'sched-period-pill is-none';
+            host.textContent = 'Chưa có kỳ đăng ký';
+            host.removeAttribute('title');
+            return;
         }
+        const isPublished = period.status === 3 || period.status === 'Published';
+        const state = isPublished ? 'is-published' : (period.isOpenForBidding ? 'is-open' : 'is-closed');
+        const label = isPublished ? 'Đã xuất bản' : (period.isOpenForBidding ? 'Đang mở đăng ký' : 'Đã đóng đăng ký');
+        host.className = `sched-period-pill ${state}`;
+        host.textContent = label;
+        host.title = `${period.name || 'Kỳ làm việc'} · ${label}`;
+    }
 
-        const gridCells = schedulingState?.demandGrid?.cells || [];
-        const groupedDates = [];
-        const byDate = new Map();
-        for (const cell of gridCells) {
-            if (!byDate.has(cell.workDate)) {
-                const entry = { workDate: cell.workDate, morning: null, afternoon: null };
-                byDate.set(cell.workDate, entry);
-                groupedDates.push(entry);
-            }
-            const entry = byDate.get(cell.workDate);
-            if (cell.shift === 0 || cell.shift === 'Morning') entry.morning = cell;
-            else entry.afternoon = cell;
-        }
-
-        const dayNames = ['CHỦ NHẬT', 'THỨ HAI', 'THỨ BA', 'THỨ TƯ', 'THỨ NĂM', 'THỨ SÁU', 'THỨ BẢY'];
-        const renderShiftCard = (cell, shiftVal, label) => {
-            if (!cell) return '';
-            const totalRooms = cell.totalRooms ?? 0;
-            const currentBidders = cell.currentBidders ?? 0;
-            const approvedCount = cell.approvedCount ?? 0;
-            const pendingCount = Math.max(0, currentBidders - approvedCount);
-            const isSelected = selectedMatrixDate === cell.workDate && selectedMatrixShift === shiftVal;
-            const borderStyle = isSelected ? '2px solid #0284c7' : (approvedCount > 0 || pendingCount > 0 ? '1px solid #bbf7d0' : '1px solid #e2e8f0');
-            const bgStyle = approvedCount > 0 || pendingCount > 0 ? '#f0fdf4' : '#ffffff';
-            const hotBadge = cell.isHotShift ? '<span style="background:#fef3c7; color:#c2410c; font-size:10px; font-weight:700; padding:2px 6px; border-radius:999px;">🔥 Hot</span>' : '';
-            const statusChip = pendingCount > 0
-                ? `<span style="background:#fef3c7; color:#92400e; font-size:11px; font-weight:600; padding:2px 6px; border-radius:4px;">⏳ ${pendingCount} chờ duyệt</span>`
-                : (approvedCount > 0
-                    ? `<span style="background:#dcfce7; color:#166534; font-size:11px; font-weight:600; padding:2px 6px; border-radius:4px;">✓ ${approvedCount} đã duyệt</span>`
-                    : `<span style="color:#94a3b8; font-size:11px;">Chưa có bác sĩ</span>`);
-            const biddersHtml = (cell.bidders || []).map((b) => {
-                const approved = b.status === 1 || b.status === 'Approved';
-                return `<div style="font-size:11.5px; padding:3px 6px; border-radius:4px; background:${approved ? '#dcfce7' : '#fef3c7'}; color:${approved ? '#166534' : '#92400e'}; border:1px solid ${approved ? '#86efac' : '#fde68a'};">
-                    ${approved ? '✓' : '⏳'} ${escape(b.doctorName)}${b.roomNumber ? ` (${escape(b.roomNumber)})` : ''}
-                </div>`;
-            }).join('');
-            const actionBtn = pendingCount > 0
-                ? `<button type="button" class="btn button primary sm" style="background:#d97706; border-color:#d97706;" data-select-matrix="${escape(cell.workDate)}" data-shift="${shiftVal}">Duyệt ca này</button>`
-                : (approvedCount > 0
-                    ? `<button type="button" class="btn button secondary sm" data-select-matrix="${escape(cell.workDate)}" data-shift="${shiftVal}">✓ Xem phân buồng</button>`
-                    : '');
-
-            return /* HTML */ `
-                <div style="border:${borderStyle}; background:${bgStyle}; border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:6px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; gap:4px;">
-                        <strong style="font-size:12px;">${label}</strong>
-                        ${hotBadge}
-                    </div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:11.5px;">
-                        <span><strong>${approvedCount}/${totalRooms}</strong> phòng</span>
-                        ${statusChip}
-                    </div>
-                    <div style="display:flex; flex-direction:column; gap:4px;">${biddersHtml}</div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-top:2px;">
-                        <button type="button" style="background:none; border:none; color:#0284c7; font-size:11.5px; font-weight:600; cursor:pointer; padding:0; white-space:nowrap;" data-select-matrix="${escape(cell.workDate)}" data-shift="${shiftVal}">Xem ma trận ↓</button>
-                        ${actionBtn}
-                    </div>
+    function renderSchedKpis() {
+        const host = find('#sched-kpis');
+        if (!host) return;
+        const totals = schedulingState?.board?.totals || {};
+        const ready = Number(totals.departmentsReady || 0);
+        const deptTotal = Number(totals.departmentsTotal || 0);
+        const registered = Number(totals.doctorsRegistered || 0);
+        const doctorTotal = Number(totals.doctorsTotal || 0);
+        const pending = Number(totals.pendingShifts || 0);
+        const understaffed = Number(totals.understaffedShifts || 0);
+        const icon = (path) => /* HTML */ `<span class="sched-kpi-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${path}</svg></span>`;
+        const fraction = (value, total) => `${value}<span class="sched-kpi-sub"> / ${total}</span>`;
+        host.innerHTML = /* HTML */ `
+            <article class="sched-kpi" title="Số khoa đã công bố lịch / tổng số khoa có bác sĩ đang hoạt động">
+                ${icon('<rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect>')}
+                <div class="sched-kpi-main">
+                    <span class="sched-kpi-label">Khoa đã chốt lịch</span>
+                    <strong class="sched-kpi-value">${fraction(ready, deptTotal)}</strong>
                 </div>
-            `;
+            </article>
+            <article class="sched-kpi" title="Bác sĩ có ca đã duyệt hoặc chờ duyệt / tổng bác sĩ đang hoạt động">
+                ${icon('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><polyline points="16 11 18 13 22 9"></polyline>')}
+                <div class="sched-kpi-main">
+                    <span class="sched-kpi-label">Bác sĩ đã đăng ký</span>
+                    <strong class="sched-kpi-value">${fraction(registered, doctorTotal)}</strong>
+                </div>
+            </article>
+            <button type="button" class="sched-kpi ${pending > 0 ? 'is-action' : ''}" ${pending > 0 ? 'data-sched-kpi="pending"' : ''} title="${pending > 0 ? 'Mở danh sách ca chờ duyệt của khoa đang chọn' : 'Không có ca chờ duyệt'}">
+                ${icon('<circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline>')}
+                <div class="sched-kpi-main">
+                    <span class="sched-kpi-label">Ca chờ duyệt</span>
+                    <strong class="sched-kpi-value ${pending > 0 ? 'is-warn' : ''}">${pending}</strong>
+                </div>
+            </button>
+            <article class="sched-kpi ${understaffed > 0 ? 'is-warn' : ''}" title="Ca có bác sĩ đăng ký nhưng chưa đủ so với số phòng hoạt động">
+                ${icon('<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line>')}
+                <div class="sched-kpi-main">
+                    <span class="sched-kpi-label">Ca thiếu người</span>
+                    <strong class="sched-kpi-value ${understaffed > 0 ? 'is-warn' : ''}">${understaffed}</strong>
+                </div>
+            </article>
+        `;
+    }
+
+    function renderDeptProgress() {
+        const host = find('#dept-progress');
+        if (!host) return;
+        const rows = schedulingState?.board?.departments || [];
+        if (rows.length === 0) {
+            host.innerHTML = '<p class="empty">Chưa có khoa nào có bác sĩ đang hoạt động.</p>';
+            return;
+        }
+        const badge = (row) => {
+            if (row.pendingShifts > 0) return `<span class="dp-badge is-pending">Chờ duyệt ${row.pendingShifts}</span>`;
+            if (row.isPublished) return '<span class="dp-badge is-final">Đã chốt</span>';
+            if (row.hasOpenPeriod) return '<span class="dp-badge is-open">Đang mở</span>';
+            return '<span class="dp-badge is-idle">Chưa mở</span>';
         };
+        host.innerHTML = /* HTML */ `
+            <div class="dp-scroll">
+                <table class="dept-progress">
+                    <thead>
+                        <tr>
+                            <th>Khoa</th>
+                            <th>Trưởng khoa</th>
+                            <th>Bác sĩ đăng ký</th>
+                            <th>Trạng thái duyệt</th>
+                            <th class="dp-actions-col">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows.map((row) => {
+                            const percent = row.doctorCount > 0 ? Math.round((row.registeredDoctorCount / row.doctorCount) * 100) : 0;
+                            return /* HTML */ `
+                                <tr>
+                                    <td class="dp-name">${escape(row.name)}</td>
+                                    <td class="dp-head">${escape(row.headName || '—')}</td>
+                                    <td>
+                                        <div class="dp-progress">
+                                            <span class="dp-bar"><i style="width:${Math.min(100, Math.max(0, percent))}%"></i></span>
+                                            <b>${row.registeredDoctorCount}/${row.doctorCount}</b>
+                                        </div>
+                                    </td>
+                                    <td>${badge(row)}</td>
+                                    <td class="dp-actions">
+                                        <button type="button" class="dp-action" data-sched-dept="${row.departmentId}" data-sched-dept-view="roster">Xem lưới</button>
+                                        <button type="button" class="dp-action" data-sched-dept="${row.departmentId}" data-sched-dept-view="assign">Xếp ca</button>
+                                        ${row.pendingShifts > 0
+                                            ? `<button type="button" class="dp-action is-strong" data-sched-dept="${row.departmentId}" data-sched-dept-view="requests">Duyệt ${row.pendingShifts}</button>`
+                                            : ''}
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
 
-        const board = find('#demand-grid-board');
-        if (board) {
-            if (groupedDates.length === 0) {
-                board.innerHTML = '<p class="empty" style="grid-column:1/-1;">Chưa có dữ liệu lưới ca cho kỳ này.</p>';
-            } else {
-                board.innerHTML = groupedDates.map((g) => {
-                    const dt = new Date(g.workDate + 'T00:00:00');
-                    const dayName = dayNames[dt.getDay()];
-                    const shortDate = date(g.workDate).slice(0, 5);
-                    return /* HTML */ `
-                        <div style="display:flex; flex-direction:column; gap:8px;">
-                            <div style="text-align:center; padding:6px; border-bottom:1px solid #e2e8f0;">
-                                <div style="font-size:11px; color:#64748b; font-weight:700;">${dayName}</div>
-                                <strong style="font-size:14px;">${shortDate}</strong>
-                            </div>
-                            ${renderShiftCard(g.morning, 0, '🌅 Sáng (07:30-11:30)')}
-                            ${renderShiftCard(g.afternoon, 1, '🌆 Chiều (13:00-16:30)')}
-                        </div>
-                    `;
-                }).join('');
-            }
-        }
-
-        if (!selectedMatrixDate && gridCells.length > 0) {
-            const firstPending = gridCells.find((c) => (c.currentBidders ?? 0) > (c.approvedCount ?? 0));
-            const firstCell = firstPending || gridCells[0];
-            selectedMatrixDate = firstCell.workDate;
-            selectedMatrixShift = firstCell.shift === 1 || firstCell.shift === 'Afternoon' ? 1 : 0;
-        }
-        if (selectedMatrixDate) {
-            await loadInlineDecisionMatrix(selectedMatrixDate, selectedMatrixShift);
-        } else {
-            table('#dm-table', ['#', 'Bác sĩ', '1. Trực đêm', '2. Luân phiên ca Hot', '3. Định mức tuần', '4. BN tái khám', 'Trạng thái', 'Duyệt / Điều phối'], []);
-        }
-
-        renderWeeklyScheduleGrid();
+    function schedDoctorsFiltered() {
+        const query = schedNorm(rosterSearch.trim());
+        return (schedulingState?.doctors || []).filter(
+            (d) => !query || schedNorm(`${d.fullName} ${d.specialty || ''}`).includes(query),
+        );
     }
 
     function renderWeeklyScheduleGrid() {
         const container = find('#dept-schedules-grid');
         if (!container) return;
 
-        const doctors = schedulingState?.doctors || [];
-        const staffList = schedulingState?.staff || [];
-        const doctorAccountIds = new Set(doctors.map((d) => d.accountId));
-        const nonDoctorStaff = staffList.filter((s) => !doctorAccountIds.has(s.id));
-        const schedules = schedulingState?.schedules || [];
+        const schedules = (schedulingState?.schedules || []).filter(schedIsActive);
         const dutyShifts = schedulingState?.dutyShifts || [];
-        const weekStartStr = schedulingState?.weekStart;
-        const todayStr = schedulingState?.today;
+        const days = schedWeekDays();
+        const approved = schedules.filter(schedIsApproved).length;
+        const pending = schedules.filter(schedIsPending).length;
+        const meta = find('#roster-meta');
+        if (meta) meta.textContent = `${approved} ca đã duyệt · ${pending} chờ duyệt`;
 
-        if (!weekStartStr) {
+        if (days.length === 0) {
             container.innerHTML = '<p class="empty">Chưa có dữ liệu tuần làm việc.</p>';
             return;
         }
 
-        const weekDays = [];
-        const base = new Date(weekStartStr + 'T00:00:00');
-        const dayLabels = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
-        for (let i = 0; i < 7; i++) {
-            const d = new Date(base);
-            d.setDate(base.getDate() + i);
-            const yyyy = d.getFullYear();
-            const mm = String(d.getMonth() + 1).padStart(2, '0');
-            const dd = String(d.getDate()).padStart(2, '0');
-            const iso = `${yyyy}-${mm}-${dd}`;
-            weekDays.push({
-                iso,
-                dayName: dayLabels[d.getDay()],
-                shortDate: `${dd}/${mm}`,
-                isToday: iso === todayStr,
-                isPast: todayStr ? iso < todayStr : false,
-            });
-        }
+        const doctors = schedDoctorsFiltered();
+        const pages = Math.max(1, Math.ceil(doctors.length / ROSTER_PAGE_SIZE));
+        rosterPage = Math.min(Math.max(1, rosterPage), pages);
+        const start = (rosterPage - 1) * ROSTER_PAGE_SIZE;
+        const pageRows = doctors.slice(start, start + ROSTER_PAGE_SIZE);
 
-        if (doctors.length === 0 && nonDoctorStaff.length === 0) {
-            container.innerHTML = '<p class="empty">Khoa này chưa có nhân sự nào để hiển thị lịch tuần.</p>';
-            return;
-        }
+        const roomOf = (sched) => sched.roomNumber || 'Chưa phòng';
+        const scheduleTitle = (sched, shift) => {
+            const schedStart = schedHhmm(sched.startTime) || (shift === 0 ? '07:30' : '13:00');
+            const end = schedHhmm(sched.endTime) || (shift === 0 ? '11:30' : '16:30');
+            return `${shift === 0 ? 'Ca sáng' : 'Ca chiều'} ${schedStart} – ${end} · ${roomOf(sched)} · ${sched.maxPatients} BN`;
+        };
+        const checkIcon = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>';
 
-        const renderShiftBlock = (doc, day, shiftVal) => {
-            const isMorning = shiftVal === 0;
-            const sched = schedules.find(
-                (s) => s.doctorId === doc.id && s.workDate === day.iso && (s.shift === shiftVal || s.shift === (isMorning ? 'Morning' : 'Afternoon')) && s.status !== 4 && s.status !== 'Cancelled' && s.status !== 2 && s.status !== 'Rejected' && s.status !== 3 && s.status !== 'Reallocated',
-            );
-
-            if (!sched) {
-                if (day.isPast) {
-                    return `<div style="background:#f1f5f9; color:#94a3b8; font-size:11px; text-align:center; padding:6px; border-radius:6px;">Đã qua</div>`;
-                }
-                const label = isMorning ? '+ Ca sáng (07:30)' : '+ Ca chiều (13:00)';
-                return `<button type="button" data-add-schedule="${doc.id}" data-date="${day.iso}" data-shift="${shiftVal}" style="width:100%; background:#ffffff; border:1px dashed #cbd5e1; color:#64748b; font-size:11px; padding:6px; border-radius:6px; cursor:pointer;">${label}</button>`;
-            }
-
-            if (sched.status === 0 || sched.status === 'Bidding') {
+        const pill = (sched, shift) => {
+            if (schedIsPending(sched)) {
                 return /* HTML */ `
-                    <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:6px; padding:6px 8px; font-size:11px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; gap:4px;">
-                            <strong>${isMorning ? 'Ca sáng (07:30-11:30)' : 'Ca chiều (13:00-16:30)'}</strong>
-                            <span style="background:#f59e0b; color:#fff; padding:1px 5px; border-radius:4px; font-size:10px; font-weight:700;">Chờ duyệt pick</span>
-                        </div>
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; color:#92400e;">
-                            <span>${escape(sched.doctorNote || 'Đăng ký ca')}</span>
-                            <button type="button" data-select-matrix="${day.iso}" data-shift="${shiftVal}" style="background:none; border:none; color:#d97706; font-weight:700; cursor:pointer; padding:0;">Duyệt</button>
-                        </div>
-                    </div>
+                    <button type="button" class="wk-pill is-pending" data-req-open-schedule="${sched.id}" title="Chờ duyệt · ${escape(scheduleTitle(sched, shift))} — bấm để duyệt">
+                        <span class="wk-pill-room">${escape(roomOf(sched))}</span><span class="wk-pill-flag">· Duyệt</span>
+                    </button>
                 `;
             }
-
-            const bg = isMorning ? '#e0f2fe' : '#f3e8ff';
-            const border = isMorning ? '#bae6fd' : '#e9d5ff';
-            const accent = isMorning ? '#0369a1' : '#7e22ce';
-            const walkIn = Math.max(0, (sched.maxPatients ?? 40) - (sched.onlineSlots ?? 0));
             return /* HTML */ `
-                <div style="background:${bg}; border:1px solid ${border}; border-radius:6px; padding:6px 8px; font-size:11px; cursor:pointer;" data-edit-schedule="${sched.id}">
-                    <div style="display:flex; justify-content:space-between; align-items:center; gap:4px; color:${accent};">
-                        <strong>${isMorning ? 'Ca sáng' : 'Ca chiều'}</strong>
-                        <span>${isMorning ? '07:30-11:30' : '13:00-16:30'}
-                            <button type="button" data-delete-schedule="${sched.id}" title="Hủy ca" style="background:none; border:none; color:#dc2626; font-weight:700; cursor:pointer; margin-left:4px; padding:0;">×</button>
-                        </span>
-                    </div>
-                    <div style="margin-top:3px; color:#1e293b;">
-                        <span style="background:#fff; padding:1px 5px; border-radius:4px; font-weight:700; color:${accent};">${escape(sched.roomNumber || '—')}</span>
-                        <strong>${sched.maxPatients}</strong> <small>(On: ${sched.onlineSlots} · Quầy: ${walkIn})</small>
-                    </div>
+                <div class="wk-pill ${shift === 0 ? 'is-morning' : 'is-afternoon'}" data-edit-schedule="${sched.id}" title="${escape(scheduleTitle(sched, shift))} — bấm để chỉnh">
+                    <button type="button" class="wk-pill-edit" data-edit-schedule="${sched.id}" title="Sửa ca" aria-label="Sửa ca">
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg>
+                    </button>
+                    <span class="wk-pill-room">${escape(roomOf(sched))}</span>${checkIcon}
+                    <button type="button" class="wk-pill-del" data-delete-schedule="${sched.id}" title="Hủy ca" aria-label="Hủy ca">×</button>
                 </div>
             `;
         };
 
+        const cell = (doctor, day, shift) => {
+            const sched = schedules.find((s) => s.doctorId === doctor.id && s.workDate === day.iso && schedShiftOf(s) === shift);
+            const duty = shift === 0
+                ? dutyShifts.find((ds) => ds.accountId === doctor.accountId && String(ds.startTime).slice(0, 10) === day.iso)
+                : null;
+            const chips = [];
+            if (sched) chips.push(pill(sched, shift));
+            if (duty) {
+                const range = `${schedHhmm(String(duty.startTime).slice(11))} – ${schedHhmm(String(duty.endTime).slice(11))}`;
+                chips.push(/* HTML */ `<span class="wk-duty" title="Trực đêm · ${range} · ${escape(duty.note || 'Trực đêm tại khoa')}">Trực</span>`);
+            }
+            if (!sched && !duty && !day.isPast) {
+                chips.push(/* HTML */ `<button type="button" class="wk-none is-add" data-assign-doctor="${doctor.id}" data-date="${day.iso}" data-shift="${shift}" title="Xếp ca · ${escape(day.dayName)} ${day.shortDate}">+</button>`);
+            }
+            if (chips.length === 0) return '<span class="wk-none is-past">—</span>';
+            return `<div class="wk-stack">${chips.join('')}</div>`;
+        };
+
+        const dayClass = (day) => `${day.isToday ? 'is-today' : ''} ${day.isWeekend ? 'is-weekend' : ''}`;
+
         container.innerHTML = /* HTML */ `
-            <table style="min-width:1050px;">
-                <thead>
-                    <tr>
-                        <th style="min-width:210px;">Bác sĩ / Nhân sự</th>
-                        ${weekDays.map((d) => /* HTML */ `
-                            <th style="text-align:center; min-width:140px; ${d.isToday ? 'background:#ecfeff; border-top:2px solid #06b6d4; color:#0e7490;' : ''}">
-                                <div style="font-size:11px; font-weight:600;">${d.dayName}</div>
-                                <div style="font-size:13px; font-weight:700;">${d.shortDate}</div>
-                                ${d.isToday ? '<div style="font-size:10px; color:#0891b2;">Hôm nay</div>' : ''}
-                            </th>
-                        `).join('')}
-                    </tr>
-                </thead>
-                <tbody>
-                    ${doctors.map((doc) => {
-                        const initials = (doc.fullName || 'BS').trim().split(/\s+/).slice(-2).map((w) => w[0]?.toUpperCase() || '').join('');
-                        return /* HTML */ `
-                            <tr>
-                                <td>
-                                    <div style="display:flex; align-items:center; gap:8px;">
-                                        <span style="width:30px; height:30px; border-radius:50%; background:#e0f2fe; color:#0369a1; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0;">${escape(initials)}</span>
-                                        <div>
-                                            <strong>${escape(doc.fullName)}</strong>
-                                            <small style="display:block; color:#64748b;">${escape(doc.specialty || doc.departmentName || '')}</small>
-                                        </div>
-                                    </div>
-                                </td>
-                                ${weekDays.map((day) => {
-                                    const nightDuty = dutyShifts.find((ds) => ds.accountId === doc.accountId && String(ds.startTime).slice(0, 10) === day.iso);
-                                    const nightHtml = nightDuty
-                                        ? `<div style="background:#0f172a; color:#fff; border-radius:6px; padding:6px 8px; font-size:11px;">
-                                                <div style="display:flex; justify-content:space-between;"><strong>🌙 Trực đêm</strong><span>18:00-07:00</span></div>
-                                                <small style="color:#cbd5e1; display:block; margin-top:2px;">${escape(nightDuty.note || 'Trực đêm')}</small>
-                                           </div>`
-                                        : '';
-                                    return /* HTML */ `
-                                        <td style="vertical-align:top; ${day.isToday ? 'background:#f0fdfa;' : ''}">
-                                            <div style="display:flex; flex-direction:column; gap:6px;">
-                                                ${renderShiftBlock(doc, day, 0)}
-                                                ${renderShiftBlock(doc, day, 1)}
-                                                ${nightHtml}
-                                            </div>
-                                        </td>
-                                    `;
-                                }).join('')}
-                            </tr>
-                        `;
-                    }).join('')}
-                    ${nonDoctorStaff.map((st) => {
-                        const initials = (st.fullName || 'NV').trim().split(/\s+/).slice(-2).map((w) => w[0]?.toUpperCase() || '').join('');
-                        return /* HTML */ `
-                            <tr>
-                                <td>
-                                    <div style="display:flex; align-items:center; gap:8px;">
-                                        <span style="width:30px; height:30px; border-radius:50%; background:#f1f5f9; color:#475569; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0;">${escape(initials)}</span>
-                                        <div>
-                                            <strong>${escape(st.fullName)}</strong>
-                                            <small style="display:block; color:#64748b;">${escape(st.roleName || 'Nhân sự khoa')}</small>
-                                        </div>
-                                    </div>
-                                </td>
-                                ${weekDays.map((day) => {
-                                    const nightDuty = dutyShifts.find((ds) => ds.accountId === st.id && String(ds.startTime).slice(0, 10) === day.iso);
-                                    const nightHtml = nightDuty
-                                        ? `<div style="background:#0f172a; color:#fff; border-radius:6px; padding:6px 8px; font-size:11px;">
-                                                <div style="display:flex; justify-content:space-between;"><strong>🌙 Trực đêm</strong><span>18:00-07:00</span></div>
-                                                <small style="color:#cbd5e1; display:block; margin-top:2px;">${escape(nightDuty.note || 'Trực đêm')}</small>
-                                           </div>`
-                                        : `<div style="color:#cbd5e1; text-align:center; padding:6px;">—</div>`;
-                                    return `<td style="vertical-align:top; ${day.isToday ? 'background:#f0fdfa;' : ''}">${nightHtml}</td>`;
-                                }).join('')}
-                            </tr>
-                        `;
-                    }).join('')}
-                </tbody>
-            </table>
-        `;
-    }
-
-    async function openDecisionMatrix(workDate, shift) {
-        const deptId = Number(find('#scheduling-dept')?.value || 0);
-        if (!deptId) return notify('Vui lòng chọn khoa chuyên môn.', true);
-
-        const matrix = await request(`DecisionMatrix?departmentId=${deptId}&workDate=${encodeURIComponent(workDate)}&shift=${shift}`);
-        const body = find('#decision-matrix-body');
-        const shiftText = shift === 0 ? 'Ca Sáng (07:30 - 11:30)' : 'Ca Chiều (13:00 - 16:30)';
-        find('#decision-matrix-title').textContent = `Duyệt ca ${date(workDate)} · ${shiftText}`;
-
-        const roomOptions = (matrix.availableRooms || [])
-            .map((r) => /* HTML */ `<option value="${r.id}">${escape(r.roomNumber)} - ${escape(r.roomName)}</option>`)
-            .join('');
-        const allDeptRooms = (schedulingState?.rooms || [])
-            .map((r) => /* HTML */ `<option value="${r.id}">${escape(r.roomNumber)} - ${escape(r.roomName)}</option>`)
-            .join('');
-
-        if (!matrix.candidates || matrix.candidates.length === 0) {
-            body.innerHTML = '<p class="empty">Chưa có bác sĩ đăng ký hoặc được xếp trong ca này.</p>';
-        } else {
-            body.innerHTML = /* HTML */ `
-                <p style="margin:0 0 10px; color:#64748b; font-size:13px;">
-                    Tổng phòng hoạt động: <strong>${matrix.totalActiveRooms}</strong> · Phòng còn trống: <strong>${(matrix.availableRooms || []).length}</strong>
-                    ${matrix.isHotShift ? ' · <span class="badge reject">Ca Hot (đông đăng ký)</span>' : ''}
-                </p>
-                <div class="table-scroll">
-                    <table>
+            ${doctors.length === 0
+                ? '<p class="empty">Không có bác sĩ khớp bộ lọc.</p>'
+                : /* HTML */ `
+                <div class="wk-table-shell">
+                    <table class="wk-table wk-table-rows">
                         <thead>
                             <tr>
-                                <th>Bác sĩ</th>
-                                <th>Ưu tiên / Cảnh báo</th>
-                                <th>Phòng &amp; Duyệt</th>
-                                <th>Điều chuyển (nếu đang chờ)</th>
+                                <th class="wk-corner">Bác sĩ</th>
+                                <th class="wk-shift-col">Ca</th>
+                                ${days.map((day) => /* HTML */ `
+                                    <th class="wk-day ${dayClass(day)}">
+                                        <span class="wk-day-name">${day.dayName}</span>
+                                        <span class="wk-day-date">${day.shortDate}</span>
+                                        ${day.isToday ? '<span class="wk-today-badge">Hôm nay</span>' : ''}
+                                    </th>
+                                `).join('')}
                             </tr>
                         </thead>
                         <tbody>
-                            ${matrix.candidates.map((c) => {
-                                const isApproved = c.status === 1 || c.status === 'Approved';
-                                const warnings = [];
-                                if (c.hasNightDutyConflict) warnings.push('<span class="badge reject">Trực đêm hôm trước</span>');
-                                if (c.rotationBadgeText) warnings.push(/* HTML */ `<span class="badge">${escape(c.rotationBadgeText)}</span>`);
-                                warnings.push(`<span>Điểm: ${c.rotationPriorityScore} · Ca tuần: ${c.approvedShiftsThisPeriod} · Tái khám: ${c.continuityOfCareFollowUpCount}</span>`);
-
-                                const approveCell = isApproved
-                                    ? /* HTML */ `<span class="badge ok">Đã duyệt (${escape(c.roomNumber || 'Đã gán')})</span>`
-                                    : (roomOptions
-                                        ? /* HTML */ `<div style="display:flex; gap:6px; align-items:center;">
-                                                <select id="matrix-room-${c.scheduleId}">${roomOptions}</select>
-                                                <button type="button" class="btn button primary sm" data-approve-shift="${c.scheduleId}">Duyệt</button>
-                                            </div>`
-                                        : '<span style="color:#b91c1c;">Hết phòng trống</span>');
-
-                                const reallocCell = isApproved
-                                    ? '—'
-                                    : /* HTML */ `<div style="display:flex; gap:4px; flex-wrap:wrap; align-items:center;">
-                                            <input type="date" id="realloc-date-${c.scheduleId}" value="${escape(workDate)}" style="width:130px;" />
-                                            <select id="realloc-shift-${c.scheduleId}">
-                                                <option value="0" ${shift === 0 ? 'selected' : ''}>Sáng</option>
-                                                <option value="1" ${shift === 1 ? 'selected' : ''}>Chiều</option>
-                                            </select>
-                                            <select id="realloc-room-${c.scheduleId}">${allDeptRooms}</select>
-                                            <button type="button" class="btn button secondary sm" data-realloc-shift="${c.scheduleId}">Chuyển</button>
-                                        </div>`;
-
-                                return /* HTML */ `
-                                    <tr>
-                                        <td><strong>${escape(c.doctorName)}</strong>${c.doctorNote ? `<small style="display:block; color:#64748b;">${escape(c.doctorNote)}</small>` : ''}</td>
-                                        <td>${warnings.join('<br/>')}</td>
-                                        <td>${approveCell}</td>
-                                        <td>${reallocCell}</td>
-                                    </tr>
-                                `;
-                            }).join('')}
+                            ${pageRows.map((doctor) => /* HTML */ `
+                                <tr class="wk-row-top">
+                                    <td class="wk-person" rowspan="2">
+                                        <span class="wk-person-box">
+                                            <span class="wk-ava">${escape(schedInitials(doctor.fullName, 'BS'))}</span>
+                                            <span class="wk-person-main">
+                                                <strong title="${escape(doctor.fullName)}">${escape(doctor.fullName)}</strong>
+                                                <small title="${escape(doctor.specialty || '')}">${escape(doctor.specialty || 'Bác sĩ')}</small>
+                                            </span>
+                                        </span>
+                                    </td>
+                                    <td class="wk-shift-label is-morning">Sáng</td>
+                                    ${days.map((day) => /* HTML */ `<td class="wk-cell ${dayClass(day)}">${cell(doctor, day, 0)}</td>`).join('')}
+                                </tr>
+                                <tr class="wk-row-bottom">
+                                    <td class="wk-shift-label is-afternoon">Chiều</td>
+                                    ${days.map((day) => /* HTML */ `<td class="wk-cell ${dayClass(day)}">${cell(doctor, day, 1)}</td>`).join('')}
+                                </tr>
+                            `).join('')}
                         </tbody>
                     </table>
                 </div>
-            `;
-        }
-        find('#decision-matrix-dialog').showModal();
+                <div class="wk-pager">
+                    <span class="wk-pager-info">Hiển thị ${start + 1}–${start + pageRows.length} trong ${doctors.length} bác sĩ</span>
+                    <div class="wk-pager-btns" role="group" aria-label="Chuyển trang lịch bác sĩ">
+                        <button type="button" data-roster-page="-1" ${rosterPage <= 1 ? 'disabled' : ''} aria-label="Trang trước">‹</button>
+                        <span class="wk-pager-current">${rosterPage} / ${pages}</span>
+                        <button type="button" data-roster-page="1" ${rosterPage >= pages ? 'disabled' : ''} aria-label="Trang sau">›</button>
+                    </div>
+                </div>
+            `}
+        `;
     }
 
-    async function loadInlineDecisionMatrix(workDate, shift) {
-        const deptId = Number(find('#scheduling-dept')?.value || 0);
-        if (!deptId || !workDate) return;
+    function schedShiftLabel(shift) {
+        return shift === 1 ? 'Ca chiều · 13:00 – 16:30' : 'Ca sáng · 07:30 – 11:30';
+    }
 
-        selectedMatrixDate = workDate;
-        selectedMatrixShift = shift;
-        const dmDate = find('#dm-date');
-        const dmShift = find('#dm-shift');
-        if (dmDate) dmDate.value = workDate;
-        if (dmShift) dmShift.value = String(shift);
+    function assignDates() {
+        const start = find('#assign-date')?.value;
+        if (!start) return [];
+        const weeks = Number(find('#assign-repeat')?.value || 1);
+        const base = new Date(start + 'T00:00:00');
+        const list = [];
+        for (let i = 0; i < Math.max(1, Math.min(4, weeks)); i += 1) {
+            const d = new Date(base);
+            d.setDate(base.getDate() + i * 7);
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            list.push(`${d.getFullYear()}-${mm}-${dd}`);
+        }
+        return list;
+    }
 
-        const shiftText = shift === 0 ? 'Ca Sáng (07:30 - 11:30)' : 'Ca Chiều (13:00 - 16:30)';
-        const label = find('#dm-selected-label');
-        if (label) label.textContent = `Đang chọn ca: ${workDate} — ${shiftText}`;
+    function assignExisting(doctorId, dateIso, shift) {
+        return (schedulingState?.schedules || [])
+            .filter(schedIsActive)
+            .find((s) => s.doctorId === doctorId && s.workDate === dateIso && schedShiftOf(s) === shift);
+    }
 
-        const matrix = await request(`DecisionMatrix?departmentId=${deptId}&workDate=${encodeURIComponent(workDate)}&shift=${shift}`);
-        const roomsCountEl = find('#dm-rooms-count');
-        if (roomsCountEl) {
-            roomsCountEl.textContent = `Số buồng khám khả dụng của khoa: ${(matrix.availableRooms || []).length} / ${matrix.totalActiveRooms}`;
+    function assignError(message) {
+        const box = find('#assign-error');
+        if (!box) return;
+        box.textContent = message || '';
+        box.hidden = !message;
+    }
+
+    function renderAssign() {
+        const dateInput = find('#assign-date');
+        if (!dateInput) return;
+        if (!dateInput.value) dateInput.value = schedulingState?.today || '';
+
+        const roomSelect = find('#assign-room');
+        if (roomSelect) {
+            const rooms = schedulingState?.rooms || [];
+            const current = roomSelect.value;
+            roomSelect.innerHTML = rooms.length
+                ? rooms.map((r) => /* HTML */ `<option value="${r.id}">${escape(r.roomNumber)} · ${escape(r.roomName)}</option>`).join('')
+                : '<option value="">Khoa chưa có phòng khám</option>';
+            if (current && rooms.some((r) => String(r.id) === current)) roomSelect.value = current;
         }
 
-        const roomOptions = (matrix.availableRooms || [])
-            .map((r) => /* HTML */ `<option value="${r.id}">${escape(r.roomNumber)} - ${escape(r.roomName)}</option>`)
-            .join('');
+        renderAssignDoctors();
+        renderAssignSummary();
+    }
 
-        table(
-            '#dm-table',
-            ['#', 'Bác sĩ', '1. Trực đêm (Fatigue)', '2. Luân phiên ca Hot', '3. Định mức tuần', '4. BN tái khám', 'Trạng thái', 'Duyệt / Điều phối'],
-            (matrix.candidates || []).map((c, idx) => {
-                const isApproved = c.status === 1 || c.status === 'Approved';
-                const fatigueHtml = c.hasNightDutyConflict
-                    ? '<span style="color:#b91c1c; font-weight:600;">⚠ Trực đêm hôm trước</span>'
-                    : '<span style="color:#15803d; font-weight:600;">✓ Đảm bảo</span>';
-                const rotationHtml = c.rotationBadgeText
-                    ? /* HTML */ `<span class="badge" style="background:#e0f2fe; color:#0369a1;">${escape(c.rotationBadgeText)}</span>`
-                    : '<span style="color:#64748b;">Bình thường</span>';
-                const statusHtml = isApproved
-                    ? /* HTML */ `<span class="badge" style="background:#dcfce7; color:#166534;">Đã duyệt (${escape(c.roomNumber || '')})</span>`
-                    : '<span class="badge" style="background:#fef3c7; color:#92400e;">Chờ duyệt</span>';
-                const actionHtml = isApproved
-                    ? /* HTML */ `<span style="color:#15803d; font-weight:600;">Phòng ${escape(c.roomNumber || '')}</span>`
-                    : /* HTML */ `<div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-                            ${roomOptions
-                                ? /* HTML */ `<select id="inline-room-${c.scheduleId}"><option value="">-- Chọn phòng --</option>${roomOptions}</select>
-                                    <button type="button" class="btn button primary sm" data-inline-approve="${c.scheduleId}">Duyệt</button>`
-                                : '<span style="color:#b91c1c;">Hết phòng trống</span>'}
-                            <button type="button" class="btn button secondary sm" data-open-matrix="${escape(workDate)}" data-shift="${shift}">Điều chuyển</button>
-                        </div>`;
-
-                return [
-                    String(idx + 1),
-                    /* HTML */ `<strong>${escape(c.doctorName)}</strong><br /><small style="color:#64748b;">${escape([c.academicTitle, c.specialty, c.employmentType === 0 ? 'Full-time' : 'Part-time'].filter(Boolean).join(' · '))}</small>`,
-                    fatigueHtml,
-                    rotationHtml,
-                    `${c.approvedShiftsThisPeriod} / ${c.maxShiftsPerWeek} ca`,
-                    String(c.continuityOfCareFollowUpCount),
-                    statusHtml,
-                    actionHtml,
-                ];
-            }),
+    function renderAssignDoctors() {
+        const host = find('#assign-doctor-list');
+        if (!host) return;
+        const shift = Number(find('#assign-shift')?.value || 0);
+        const dates = assignDates();
+        const query = schedNorm(assignSearch.trim());
+        const doctors = (schedulingState?.doctors || []).filter(
+            (d) => !query || schedNorm(`${d.fullName} ${d.specialty || ''}`).includes(query),
         );
+
+        host.innerHTML = doctors.length
+            ? doctors.map((d) => {
+                  const busy = dates.some((dt) => assignExisting(d.id, dt, shift));
+                  const checked = assignDoctors.has(d.id);
+                  return /* HTML */ `
+                      <label class="assign-doc ${busy ? 'is-busy' : ''} ${checked ? 'is-checked' : ''}">
+                          <input type="checkbox" data-assign-doc="${d.id}" ${checked ? 'checked' : ''} ${busy ? 'disabled' : ''} />
+                          <span class="wk-ava">${escape(schedInitials(d.fullName, 'BS'))}</span>
+                          <span class="wk-person-main">
+                              <strong>${escape(d.fullName)}</strong>
+                              <small>${escape(d.specialty || 'Bác sĩ')}</small>
+                          </span>
+                          <span class="assign-doc-tag">${busy ? 'Đã có ca' : (checked ? 'Đã chọn' : 'Trống lịch')}</span>
+                      </label>
+                  `;
+              }).join('')
+            : '<p class="empty">Không có bác sĩ khớp tìm kiếm.</p>';
+
+        const count = find('#assign-count');
+        if (count) count.textContent = `Đã chọn ${assignDoctors.size} bác sĩ`;
+    }
+
+    function renderAssignSummary() {
+        const host = find('#assign-summary');
+        if (!host) return;
+        const dateIso = find('#assign-date')?.value;
+        const shift = Number(find('#assign-shift')?.value || 0);
+        const weeks = Number(find('#assign-repeat')?.value || 1);
+        const room = (schedulingState?.rooms || []).find((r) => String(r.id) === find('#assign-room')?.value);
+        const doctors = (schedulingState?.doctors || []).filter((d) => assignDoctors.has(d.id));
+        const day = schedWeekDays().find((d) => d.iso === dateIso);
+        const rows = [
+            ['Ngày làm việc', dateIso ? `${day ? `${day.dayName}, ` : ''}${date(dateIso)}` : 'Chưa chọn'],
+            ['Ca làm việc', schedShiftLabel(shift)],
+            ['Phòng khám', room ? `${room.roomNumber} · ${room.roomName}` : 'Chưa chọn'],
+            ['Lặp lại', weeks > 1 ? `${weeks} tuần liên tiếp` : 'Không lặp lại'],
+        ].map(([label, value]) => /* HTML */ `<div class="assign-sum-row"><span>${label}</span><strong>${escape(value)}</strong></div>`).join('');
+
+        host.innerHTML = /* HTML */ `
+            ${rows}
+            <div class="assign-sum-doctors">
+                <span>Bác sĩ (${doctors.length})</span>
+                ${doctors.length
+                    ? /* HTML */ `<ul>${doctors.map((d) => /* HTML */ `<li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>${escape(d.fullName)}</li>`).join('')}</ul>`
+                    : '<p>Chưa chọn bác sĩ nào.</p>'}
+            </div>
+        `;
+
+        const save = find('#assign-save');
+        if (save) save.disabled = busy || !dateIso || doctors.length === 0;
+    }
+
+    function openAssignFor({ doctorId = 0, workDate = '', shift = 0 } = {}) {
+        assignError('');
+        applySchedView('assign');
+        const dateInput = find('#assign-date');
+        if (dateInput && workDate) dateInput.value = workDate;
+        const shiftSelect = find('#assign-shift');
+        if (shiftSelect) shiftSelect.value = String(shift === 1 ? 1 : 0);
+        if (doctorId) assignDoctors.add(doctorId);
+        renderAssign();
+    }
+
+    async function saveAssign() {
+        if (busy) return;
+        const dateIso = find('#assign-date')?.value;
+        const shift = Number(find('#assign-shift')?.value || 0);
+        const roomId = Number(find('#assign-room')?.value || 0);
+        const departmentId = Number(find('#scheduling-dept')?.value || 0);
+        const note = (find('#assign-note')?.value || '').trim() || null;
+        const doctors = (schedulingState?.doctors || []).filter((d) => assignDoctors.has(d.id));
+
+        if (!dateIso) return assignError('Chọn ngày làm việc trước khi lưu.');
+        if (!departmentId) return assignError('Chọn khoa chuyên môn trước khi lưu.');
+        if (!roomId) return assignError('Khoa chưa có phòng khám để gán.');
+        if (doctors.length === 0) return assignError('Chọn ít nhất một bác sĩ.');
+        assignError('');
+
+        const tasks = [];
+        let skipped = 0;
+        assignDates().forEach((workDate) => {
+            doctors.forEach((d) => {
+                if (assignExisting(d.id, workDate, shift)) {
+                    skipped += 1;
+                    return;
+                }
+                tasks.push({ workDate, doctorId: d.id });
+            });
+        });
+        if (tasks.length === 0) return assignError('Các bác sĩ đã chọn đều đã có ca trong khung giờ này.');
+
+        busy = true;
+        const saveBtn = find('#assign-save');
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Đang lưu…';
+        }
+        let created = 0;
+        try {
+            for (const task of tasks) {
+                await request('UpsertSchedule', {
+                    id: null,
+                    doctorId: task.doctorId,
+                    departmentId,
+                    roomId,
+                    workDate: task.workDate,
+                    shift,
+                    maxPatients: 40,
+                    onlineSlots: 28,
+                    doctorNote: note,
+                });
+                created += 1;
+            }
+            assignDoctors.clear();
+            const noteBox = find('#assign-note');
+            if (noteBox) noteBox.value = '';
+            await loadScheduling(departmentId);
+            applySchedView('roster');
+            notify(`Đã phân ${created} ca cho ${doctors.length} bác sĩ${skipped ? ` · bỏ qua ${skipped} ca trùng` : ''}.`);
+        } catch (error) {
+            await loadScheduling(departmentId).catch(() => {});
+            assignError(created ? `Đã lưu ${created}/${tasks.length} ca. ${error.message}` : error.message);
+        } finally {
+            busy = false;
+            if (saveBtn) saveBtn.textContent = 'Lưu phân lịch';
+            renderAssignSummary();
+        }
+    }
+
+    function reqDoctor(doctorId) {
+        return (schedulingState?.doctors || []).find((d) => d.id === doctorId) || null;
+    }
+
+    function reqDayLabel(workDate) {
+        const day = schedWeekDays().find((d) => d.iso === workDate);
+        return day ? `${day.dayName}, ${day.shortDate}` : date(workDate);
+    }
+
+    function renderRequests() {
+        const listHost = find('#req-list');
+        if (!listHost) return;
+
+        const schedules = (schedulingState?.schedules || []).filter(schedIsActive);
+        const pending = schedules.filter(schedIsPending);
+        const approved = schedules.filter(schedIsApproved);
+
+        const countPending = find('#req-count-pending');
+        const countApproved = find('#req-count-approved');
+        if (countPending) countPending.textContent = String(pending.length);
+        if (countApproved) countApproved.textContent = String(approved.length);
+        const badge = find('#sched-request-badge');
+        if (badge) {
+            badge.textContent = String(pending.length);
+            badge.hidden = pending.length === 0;
+        }
+        const weekLabel = find('#req-week-label');
+        if (weekLabel) weekLabel.textContent = schedWeekText();
+
+        document.querySelectorAll('[data-req-status]').forEach((btn) => {
+            const active = btn.dataset.reqStatus === reqStatus;
+            btn.classList.toggle('is-active', active);
+            btn.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+
+        const base = reqStatus === 'approved' ? approved : pending;
+        const query = schedNorm(reqSearch.trim());
+        const rows = base
+            .filter((s) => !query || schedNorm(`${(reqDoctor(s.doctorId)?.fullName || '')} ${(reqDoctor(s.doctorId)?.specialty || '')}`).includes(query))
+            .sort((a, b) => String(a.workDate).localeCompare(String(b.workDate)) || schedShiftOf(a) - schedShiftOf(b));
+
+        if (reqSelectedId && !rows.some((s) => s.id === reqSelectedId)) reqSelectedId = rows[0]?.id || 0;
+        if (!reqSelectedId && rows.length) reqSelectedId = rows[0].id;
+
+        const pages = Math.max(1, Math.ceil(rows.length / REQ_PAGE_SIZE));
+        reqPage = Math.min(Math.max(1, reqPage), pages);
+        const start = (reqPage - 1) * REQ_PAGE_SIZE;
+        const pageRows = rows.slice(start, start + REQ_PAGE_SIZE);
+
+        listHost.innerHTML = pageRows.length
+            ? pageRows.map((s) => {
+                  const isPending = schedIsPending(s);
+                  const doctor = reqDoctor(s.doctorId);
+                  return /* HTML */ `
+                      <button type="button" class="req-row ${s.id === reqSelectedId ? 'is-selected' : ''}" data-req-open="${s.id}">
+                          <span class="wk-ava">${escape(schedInitials(doctor?.fullName, 'BS'))}</span>
+                          <span class="req-row-main">
+                              <strong>${escape(doctor?.fullName || 'Bác sĩ')}</strong>
+                              <small>${reqDayLabel(s.workDate)} · ${schedShiftOf(s) === 0 ? 'Ca sáng' : 'Ca chiều'}</small>
+                          </span>
+                          <span class="req-row-side">
+                              <span class="req-chip ${isPending ? 'is-wait' : 'is-ok'}">${isPending ? 'Chờ duyệt' : 'Đã duyệt'}</span>
+                              <small>${s.roomNumber ? `P.${escape(s.roomNumber)}` : 'Chưa gán phòng'}</small>
+                          </span>
+                      </button>
+                  `;
+              }).join('')
+            : /* HTML */ `<div class="req-empty">
+                  <strong>${reqStatus === 'approved' ? 'Chưa có ca nào được duyệt trong tuần này' : 'Không có yêu cầu chờ duyệt'}</strong>
+                  <p>${reqStatus === 'approved' ? 'Các ca đã duyệt sẽ xuất hiện tại đây sau khi bạn xử lý.' : 'Mọi ca bác sĩ đăng ký trong tuần đã được xử lý.'}</p>
+              </div>`;
+
+        const foot = find('#req-foot');
+        if (foot) {
+            foot.innerHTML = rows.length
+                ? /* HTML */ `
+                    <span class="wk-pager-info">Hiển thị ${start + 1}–${start + pageRows.length} trong ${rows.length} yêu cầu</span>
+                    <div class="wk-pager-btns" role="group" aria-label="Chuyển trang yêu cầu">
+                        <button type="button" data-req-page="-1" ${reqPage <= 1 ? 'disabled' : ''} aria-label="Trang trước">‹</button>
+                        <span class="wk-pager-current">${reqPage} / ${pages}</span>
+                        <button type="button" data-req-page="1" ${reqPage >= pages ? 'disabled' : ''} aria-label="Trang sau">›</button>
+                    </div>
+                `
+                : '';
+        }
+
+        renderRequestDetail();
+    }
+
+    function renderRequestDetail() {
+        const host = find('#req-detail');
+        if (!host) return;
+        const sched = (schedulingState?.schedules || []).find((s) => s.id === reqSelectedId && schedIsActive(s));
+        if (!sched) {
+            host.innerHTML = /* HTML */ `
+                <div class="req-detail-empty">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                    <strong>Chọn một yêu cầu</strong>
+                    <p>Bấm vào danh sách bên trái để xem chi tiết và duyệt ca.</p>
+                </div>
+            `;
+            return;
+        }
+
+        const isPending = schedIsPending(sched);
+        const shift = schedShiftOf(sched);
+        const start = schedHhmm(sched.startTime) || (shift === 0 ? '07:30' : '13:00');
+        const end = schedHhmm(sched.endTime) || (shift === 0 ? '11:30' : '16:30');
+        const doctor = reqDoctor(sched.doctorId);
+
+        let roomField;
+        if (isPending) {
+            const deptId = Number(find('#scheduling-dept')?.value || 0);
+            const key = `${deptId}-${sched.workDate}-${shift}`;
+            let rooms = reqRooms.get(key);
+            if (rooms === undefined && deptId > 0) {
+                reqRooms.set(key, null);
+                request(`DecisionMatrix?departmentId=${deptId}&workDate=${encodeURIComponent(sched.workDate)}&shift=${shift}`)
+                    .then((matrix) => {
+                        reqRooms.set(key, matrix.availableRooms || []);
+                        renderRequestDetail();
+                    })
+                    .catch(() => {
+                        reqRooms.set(key, []);
+                        renderRequestDetail();
+                    });
+                rooms = null;
+            }
+            if (rooms === undefined || rooms === null) {
+                roomField = '<span class="req-loading">Đang tải phòng trống…</span>';
+            } else if (rooms.length === 0) {
+                roomField = '<span class="req-warn">Hết phòng khả dụng</span>';
+            } else {
+                roomField = /* HTML */ `<select id="req-room" aria-label="Chọn phòng khám">${rooms
+                    .map((r) => /* HTML */ `<option value="${r.id}">${escape(r.roomNumber)} · ${escape(r.roomName)}</option>`)
+                    .join('')}</select>`;
+            }
+        } else {
+            roomField = sched.roomNumber
+                ? /* HTML */ `<strong>P.${escape(sched.roomNumber)}</strong>`
+                : '<span class="req-warn">Chưa gán phòng</span>';
+        }
+
+        host.innerHTML = /* HTML */ `
+            <header class="req-detail-head">
+                <div>
+                    <p class="eyebrow">${isPending ? 'YÊU CẦU CHỜ DUYỆT' : 'CA ĐÃ DUYỆT'}</p>
+                    <h3>${escape(doctor?.fullName || 'Bác sĩ')}</h3>
+                    <small>${escape(doctor?.specialty || 'Bác sĩ')}</small>
+                </div>
+                <span class="req-chip ${isPending ? 'is-wait' : 'is-ok'}">${isPending ? 'Chờ duyệt' : 'Đã duyệt'}</span>
+            </header>
+            <div class="req-detail-body">
+                <div class="req-detail-row"><span>Ngày làm việc</span><strong>${reqDayLabel(sched.workDate)}</strong></div>
+                <div class="req-detail-row"><span>Ca khám</span><strong>${start} – ${end}</strong></div>
+                <div class="req-detail-row"><span>Quy mô</span><strong>${sched.maxPatients} bệnh nhân · ${sched.onlineSlots} slot trực tuyến</strong></div>
+                <div class="req-detail-row"><span>Phòng khám</span><div class="req-room-field">${roomField}</div></div>
+                ${sched.doctorNote ? /* HTML */ `<blockquote class="req-note">“${escape(sched.doctorNote)}”</blockquote>` : ''}
+                ${!isPending && sched.reviewedByName
+                    ? /* HTML */ `<p class="req-reviewer">Duyệt bởi ${escape(sched.reviewedByName)}${sched.reviewedAt ? ` · ${new Date(sched.reviewedAt).toLocaleString('vi-VN')}` : ''}</p>`
+                    : ''}
+            </div>
+            <footer class="req-actions">
+                ${isPending
+                    ? /* HTML */ `
+                        <button type="button" class="btn button secondary" data-req-reject="${sched.id}">Từ chối</button>
+                        <button type="button" class="btn button primary" data-req-approve="${sched.id}">Duyệt &amp; gán phòng</button>
+                    `
+                    : /* HTML */ `<button type="button" class="btn button secondary" data-edit-schedule="${sched.id}">Chỉnh sửa ca</button>`}
+            </footer>
+        `;
+    }
+
+    function openRequest(scheduleId) {
+        const sched = (schedulingState?.schedules || []).find((s) => s.id === scheduleId);
+        reqStatus = sched && schedIsApproved(sched) ? 'approved' : 'pending';
+        reqSelectedId = scheduleId;
+        reqPage = 1;
+        applySchedView('requests');
+    }
+
+    async function runSchedAction(path, payload, successMessage, nextStatus = '') {
+        if (busy) return;
+        busy = true;
+        try {
+            const result = await request(path, payload);
+            if (nextStatus) {
+                reqStatus = nextStatus;
+                reqPage = 1;
+            }
+            notify(result.message || successMessage);
+            await loadScheduling(Number(find('#scheduling-dept')?.value || 0) || null);
+        } catch (error) {
+            notify(error.message, true);
+        } finally {
+            busy = false;
+        }
     }
 
     find('#scheduling-dept')?.addEventListener('change', (e) => {
         e.currentTarget.dataset.userPicked = '1';
-        selectedMatrixDate = null;
         loadScheduling(Number(e.target.value)).catch((err) => notify(err.message, true));
     });
 
-    find('#dm-date')?.addEventListener('change', (e) => {
-        const d = e.currentTarget.value;
-        const s = Number(find('#dm-shift')?.value || 0);
-        if (d) loadInlineDecisionMatrix(d, s).catch((err) => notify(err.message, true));
+    find('#sched-kpis')?.addEventListener('click', (e) => {
+        if (!e.target.closest('[data-sched-kpi="pending"]')) return;
+        reqStatus = 'pending';
+        reqPage = 1;
+        reqSelectedId = 0;
+        applySchedView('requests');
     });
 
-    find('#dm-shift')?.addEventListener('change', (e) => {
-        const d = find('#dm-date')?.value;
-        const s = Number(e.currentTarget.value || 0);
-        if (d) loadInlineDecisionMatrix(d, s).catch((err) => notify(err.message, true));
+    find('#dept-progress')?.addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-sched-dept]');
+        if (!btn) return;
+        const deptId = Number(btn.dataset.schedDept || 0);
+        const rawView = btn.dataset.schedDeptView;
+        const view = rawView === 'requests' ? 'requests' : (rawView === 'assign' ? 'assign' : 'roster');
+        const deptSelect = find('#scheduling-dept');
+        if (deptId > 0 && deptSelect) {
+            deptSelect.dataset.userPicked = '1';
+            deptSelect.value = String(deptId);
+        }
+        try {
+            await loadScheduling(deptId || null);
+            if (view === 'requests') {
+                reqStatus = 'pending';
+                reqPage = 1;
+                reqSelectedId = 0;
+            }
+            applySchedView(view);
+        } catch (error) {
+            notify(error.message, true);
+        }
     });
 
     find('#open-create-period')?.addEventListener('click', () => {
@@ -1324,10 +2073,10 @@
         mutate('SchedulingPeriods', data, e.currentTarget);
     });
 
-    find('#publish-period-btn')?.addEventListener('click', (e) => {
+    find('#publish-period-btn')?.addEventListener('click', async (e) => {
         const periodId = Number(e.currentTarget.dataset.periodId || 0);
         if (!periodId) return;
-        if (confirm('Xác nhận xuất bản kỳ lịch và sinh slot khám trực tuyến cho tất cả ca đã duyệt?')) {
+        if (await askConfirm('Xác nhận xuất bản kỳ lịch và sinh slot khám trực tuyến cho tất cả ca đã duyệt?', 'Xuất bản kỳ lịch', 'Xuất bản')) {
             mutate('PublishPeriod', { periodId });
         }
     });
@@ -1354,11 +2103,124 @@
         if (preset?.maxPatients) form.elements.maxPatients.value = String(preset.maxPatients);
         if (preset?.onlineSlots !== undefined) form.elements.onlineSlots.value = String(preset.onlineSlots);
         if (preset?.doctorNote) form.elements.doctorNote.value = preset.doctorNote;
-        find('#upsert-schedule-title').textContent = preset?.id ? 'Chỉnh sửa Quota / Phòng khám' : 'Xếp lịch trực tiếp';
+        find('#upsert-schedule-title').textContent = 'Chỉnh sửa ca khám';
         dialog.showModal();
     }
 
-    find('#open-upsert-schedule')?.addEventListener('click', () => openUpsertScheduleModal());
+    find('#open-upsert-schedule')?.addEventListener('click', () => {
+        assignDoctors.clear();
+        applySchedView('assign');
+    });
+
+    document.querySelectorAll('[data-sched-view]').forEach((btn) => {
+        btn.addEventListener('click', () => applySchedView(btn.dataset.schedView));
+    });
+
+    find('#sched-board-tools')?.addEventListener('input', (e) => {
+        if (e.target.id !== 'roster-search') return;
+        rosterSearch = e.target.value;
+        rosterPage = 1;
+        renderWeeklyScheduleGrid();
+    });
+
+    find('#dept-schedules-grid')?.addEventListener('click', (e) => {
+        const pager = e.target.closest('[data-roster-page]');
+        if (!pager) return;
+        rosterPage += Number(pager.dataset.rosterPage);
+        renderWeeklyScheduleGrid();
+    });
+
+    ['#assign-date', '#assign-shift', '#assign-room', '#assign-repeat'].forEach((selector) => {
+        find(selector)?.addEventListener('change', () => {
+            assignError('');
+            renderAssignDoctors();
+            renderAssignSummary();
+        });
+    });
+
+    find('#assign-search')?.addEventListener('input', (e) => {
+        assignSearch = e.target.value;
+        renderAssignDoctors();
+        const input = find('#assign-search');
+        if (input) {
+            input.focus();
+            input.setSelectionRange(input.value.length, input.value.length);
+        }
+    });
+
+    find('#assign-doctor-list')?.addEventListener('change', (e) => {
+        const input = e.target.closest('[data-assign-doc]');
+        if (!input) return;
+        const id = Number(input.dataset.assignDoc);
+        if (input.checked) assignDoctors.add(id);
+        else assignDoctors.delete(id);
+        renderAssignDoctors();
+        renderAssignSummary();
+    });
+
+    find('#assign-back')?.addEventListener('click', () => applySchedView('roster'));
+    find('#assign-cancel')?.addEventListener('click', () => {
+        assignDoctors.clear();
+        assignError('');
+        applySchedView('roster');
+    });
+    find('#assign-save')?.addEventListener('click', () => saveAssign());
+
+    document.querySelectorAll('[data-req-status]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            reqStatus = btn.dataset.reqStatus === 'approved' ? 'approved' : 'pending';
+            reqPage = 1;
+            reqSelectedId = 0;
+            renderRequests();
+        });
+    });
+
+    find('#req-search')?.addEventListener('input', (e) => {
+        reqSearch = e.target.value;
+        reqPage = 1;
+        renderRequests();
+        const input = find('#req-search');
+        if (input) {
+            input.focus();
+            input.setSelectionRange(input.value.length, input.value.length);
+        }
+    });
+
+    find('#req-list')?.addEventListener('click', (e) => {
+        const open = e.target.closest('[data-req-open]');
+        if (!open) return;
+        reqSelectedId = Number(open.dataset.reqOpen);
+        renderRequests();
+    });
+
+    find('#req-foot')?.addEventListener('click', (e) => {
+        const pager = e.target.closest('[data-req-page]');
+        if (!pager) return;
+        reqPage += Number(pager.dataset.reqPage);
+        renderRequests();
+    });
+
+    find('#req-back')?.addEventListener('click', () => applySchedView('roster'));
+
+    find('#req-detail')?.addEventListener('click', async (e) => {
+        const approveBtn = e.target.closest('[data-req-approve]');
+        if (approveBtn) {
+            const scheduleId = Number(approveBtn.dataset.reqApprove);
+            const roomId = Number(find('#req-room')?.value || 0);
+            if (!roomId) return notify('Chọn phòng khám trước khi duyệt.', true);
+            reqSelectedId = scheduleId;
+            runSchedAction('ApproveShift', { scheduleId, roomId }, 'Đã duyệt ca khám.', 'approved');
+            return;
+        }
+        const rejectBtn = e.target.closest('[data-req-reject]');
+        if (rejectBtn) {
+            if (!await askConfirm('Từ chối yêu cầu này? Ca sẽ bị hủy khỏi lịch của bác sĩ.', 'Từ chối yêu cầu', 'Từ chối', true)) return;
+            const scheduleId = Number(rejectBtn.dataset.reqReject);
+            const departmentId = Number(find('#scheduling-dept')?.value || 0);
+            reqSelectedId = 0;
+            runSchedAction('DeleteSchedule', { scheduleId, departmentId }, 'Đã từ chối ca khám.');
+        }
+    });
 
     find('#sched-prev-week')?.addEventListener('click', () => {
         schedulingWeekOffset -= 1;
@@ -1395,44 +2257,22 @@
         mutate('UpsertSchedule', data, e.currentTarget);
     });
 
-    find('#decision-matrix-body')?.addEventListener('click', (e) => {
-        const approveBtn = e.target.closest('[data-approve-shift]');
-        if (approveBtn) {
-            const scheduleId = Number(approveBtn.dataset.approveShift);
-            const roomId = Number(find(`#matrix-room-${scheduleId}`)?.value || 0);
-            if (!roomId) return notify('Vui lòng chọn phòng khám.', true);
-            find('#decision-matrix-dialog').close();
-            mutate('ApproveShift', { scheduleId, roomId });
-            return;
-        }
-        const reallocBtn = e.target.closest('[data-realloc-shift]');
-        if (reallocBtn) {
-            const oldScheduleId = Number(reallocBtn.dataset.reallocShift);
-            const targetDate = find(`#realloc-date-${oldScheduleId}`)?.value;
-            const targetShift = Number(find(`#realloc-shift-${oldScheduleId}`)?.value || 0);
-            const targetRoomId = Number(find(`#realloc-room-${oldScheduleId}`)?.value || 0);
-            if (!targetDate || !targetRoomId) return notify('Vui lòng chọn đủ ngày và phòng điều chuyển.', true);
-            find('#decision-matrix-dialog').close();
-            mutate('ReallocateShift', { oldScheduleId, targetDate, targetShift, targetRoomId });
-        }
-    });
-
-    document.addEventListener('click', (e) => {
+    document.addEventListener('click', async (e) => {
         const delSchedBtn = e.target.closest('[data-delete-schedule]');
         if (delSchedBtn) {
             e.stopPropagation();
-            if (confirm('Xác nhận hủy ca khám này?')) {
+            if (await askConfirm('Xác nhận hủy ca khám này?', 'Hủy ca khám', 'Hủy ca', true)) {
                 const departmentId = Number(find('#scheduling-dept')?.value || 0);
                 mutate('DeleteSchedule', { scheduleId: Number(delSchedBtn.dataset.deleteSchedule), departmentId });
             }
             return;
         }
-        const addSchedBtn = e.target.closest('[data-add-schedule]');
-        if (addSchedBtn) {
-            openUpsertScheduleModal({
-                doctorId: Number(addSchedBtn.dataset.addSchedule),
-                workDate: addSchedBtn.dataset.date,
-                shift: Number(addSchedBtn.dataset.shift),
+        const assignBtn = e.target.closest('[data-assign-doctor]');
+        if (assignBtn) {
+            openAssignFor({
+                doctorId: Number(assignBtn.dataset.assignDoctor),
+                workDate: assignBtn.dataset.date,
+                shift: Number(assignBtn.dataset.shift || 0),
             });
             return;
         }
@@ -1453,27 +2293,9 @@
             }
             return;
         }
-        const selectCell = e.target.closest('[data-select-matrix]');
-        if (selectCell) {
-            const d = selectCell.dataset.selectMatrix;
-            const s = Number(selectCell.dataset.shift);
-            loadInlineDecisionMatrix(d, s)
-                .then(() => find('#inline-decision-matrix')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }))
-                .catch((err) => notify(err.message, true));
-            return;
-        }
-        const inlineApproveBtn = e.target.closest('[data-inline-approve]');
-        if (inlineApproveBtn) {
-            const scheduleId = Number(inlineApproveBtn.dataset.inlineApprove);
-            const roomId = Number(find(`#inline-room-${scheduleId}`)?.value || 0);
-            if (!roomId) return notify('Vui lòng chọn phòng khám trước khi duyệt.', true);
-            mutate('ApproveShift', { scheduleId, roomId });
-            return;
-        }
-        const matrixBtn = e.target.closest('[data-open-matrix]');
-        if (matrixBtn) {
-            openDecisionMatrix(matrixBtn.dataset.openMatrix, Number(matrixBtn.dataset.shift)).catch((err) => notify(err.message, true));
-            return;
+        const pendingPill = e.target.closest('[data-req-open-schedule]');
+        if (pendingPill) {
+            openRequest(Number(pendingPill.dataset.reqOpenSchedule));
         }
     });
 

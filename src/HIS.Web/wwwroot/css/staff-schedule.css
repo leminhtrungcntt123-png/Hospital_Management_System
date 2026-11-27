@@ -1,29 +1,29 @@
 /* Styling đồng bộ chuẩn MediCare UI */
 .medicare-tabs {
     display: flex;
-    gap: 8px;
-    padding: 12px 16px;
-    border-bottom: 1px solid #eef3f7;
-    background: #fbfcfe;
+    gap: 6px;
+    padding: 10px 16px;
+    border-bottom: 1px solid #eef2f0;
+    background: #ffffff;
 }
 .medicare-tab-btn {
-    background: none;
-    border: none;
-    padding: 6px 14px;
-    border-radius: 50px;
+    background: transparent;
+    border: 1px solid transparent;
+    padding: 6px 12px;
+    border-radius: 6px;
     font-size: 12px;
     font-weight: 600;
-    color: #596a7c;
+    color: #475569;
     cursor: pointer;
     transition: all 0.15s ease;
 }
 .medicare-tab-btn:hover {
-    background: #e2ebf3;
+    background: #f3f7f4;
     color: #0f172a;
 }
 .medicare-tab-btn.active {
-    background: #079bc9;
-    color: #ffffff;
+    background: #e8f5e9;
+    color: #107c41;
 }
 .app-modal-backdrop {
     position: fixed;
@@ -56,15 +56,16 @@
     align-items: center;
     justify-content: space-between;
     padding: 16px 20px;
-    background: #111f38;
-    color: #fff;
+    background: #ffffff;
+    color: #0f172a;
+    border-bottom: 1px solid #eef2f0;
     border-top-left-radius: 12px;
     border-top-right-radius: 12px;
 }
 .app-modal-close {
-    background: rgba(255, 255, 255, 0.12);
+    background: #f1f5f9;
     border: none;
-    color: #ffffff;
+    color: #475569;
     font-size: 16px;
     font-weight: 700;
     width: 30px;
@@ -76,7 +77,7 @@
     cursor: pointer;
 }
 .app-modal-close:hover {
-    background: rgba(255, 255, 255, 0.25);
+    background: #e2e8f0;
 }
 .app-modal-body {
     padding: 20px;
@@ -85,11 +86,11 @@
 }
 .app-modal-footer {
     padding: 12px 20px;
-    border-top: 1px solid #f1f5f9;
+    border-top: 1px solid #eef2f0;
     display: flex;
     justify-content: flex-end;
     gap: 10px;
-    background: #fbfcfe;
+    background: #ffffff;
     border-bottom-left-radius: 12px;
     border-bottom-right-radius: 12px;
 }
@@ -103,3 +104,272 @@
         opacity: 1;
     }
 }
+
+.kpi-grid {
+    align-items: stretch;
+}
+.kpi-grid .stat-card {
+    height: 100%;
+    align-items: center;
+}
+
+/* Styling đồng bộ chuẩn MediCare UI */
+    .medicare-tabs {
+        display: flex;
+        gap: 8px;
+        padding: 12px 16px;
+        border-bottom: 1px solid #eef3f7;
+        background: #fbfcfe;
+    }
+    .medicare-tab-btn {
+        background: none;
+        border: none;
+        padding: 6px 14px;
+        border-radius: 50px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #64748b;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .medicare-tab-btn:hover {
+        background: #e3e9e6;
+        color: #0f172a;
+    }
+    .medicare-tab-btn.active {
+        background: #107c41;
+        color: #ffffff;
+    }
+    .page-subnav {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 3px;
+        width: max-content;
+        max-width: 100%;
+        margin-bottom: 12px;
+    }
+    .page-subnav button {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: none;
+        border: none;
+        padding: 5px 12px;
+        border-radius: 6px;
+        font-size: 11.5px;
+        font-weight: 600;
+        color: #475569;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+    .page-subnav button:hover { color: #0f172a; }
+    .page-subnav button.active {
+        background: #ffffff;
+        color: #107c41;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+    }
+    .page-subnav button .count {
+        font-size: 10px;
+        font-weight: 700;
+        background: #e2e8f0;
+        color: #475569;
+        border-radius: 8px;
+        padding: 0 5px;
+        line-height: 14px;
+    }
+    .page-subnav button.active .count { background: #dcfce7; color: #15803d; }
+    .app-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(17, 38, 56, 0.55);
+        backdrop-filter: blur(2px);
+        z-index: 9999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+    }
+    .app-modal-backdrop.show {
+        display: flex !important;
+    }
+    .app-modal-card {
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 20px 45px rgba(0, 0, 0, 0.25);
+        width: 100%;
+        max-width: 540px;
+        max-height: 90vh;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        animation: appModalIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .app-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        background: #ffffff;
+        color: #0f172a;
+        border-bottom: 1px solid #eef2f0;
+        border-top-left-radius: 12px;
+        border-top-right-radius: 12px;
+    }
+    .app-modal-close {
+        background: #f1f5f9;
+        border: none;
+        color: #475569;
+        font-size: 16px;
+        font-weight: 700;
+        width: 30px;
+        height: 30px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+    }
+    .app-modal-close:hover {
+        background: #e2e8f0;
+    }
+    .app-modal-body {
+        padding: 20px;
+        font-size: 13px;
+        color: #334155;
+    }
+    .app-modal-footer {
+        padding: 12px 20px;
+        border-top: 1px solid #eef2f0;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        background: #ffffff;
+        border-bottom-left-radius: 12px;
+        border-bottom-right-radius: 12px;
+    }
+    @keyframes appModalIn {
+        from { transform: translateY(-12px) scale(0.98); opacity: 0; }
+        to { transform: translateY(0) scale(1); opacity: 1; }
+    }
+
+    /* Icon mảnh đơn sắc dùng chung */
+    .ic {
+        width: 15px;
+        height: 15px;
+        flex: 0 0 auto;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.7;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        vertical-align: -2px;
+    }
+    .ic-xs { width: 12px; height: 12px; }
+    .ic-sm { width: 13px; height: 13px; }
+    .ic-lg { width: 18px; height: 18px; }
+    .ic-xl { width: 26px; height: 26px; }
+    .kpi-grid .stat-body strong small {
+        font-size: 12px;
+        font-weight: 600;
+        color: #64748b;
+        margin-left: 3px;
+    }
+    .section-head {
+        padding: 14px 18px;
+        border-bottom: 1px solid #eef2f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+    }
+    .section-head h3 {
+        font-size: 13px;
+        font-weight: 700;
+        margin: 0;
+        color: #0f172a;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .section-head h3 .ic { color: #107c41; }
+    .section-head small { color: #64748b; font-size: 11.5px; }
+    .section-head.solo {
+        padding: 0;
+        border-bottom: none;
+        font-size: 13px;
+        font-weight: 700;
+        color: #0f172a;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .section-head.solo .ic { color: #107c41; }
+    .empty-glyph {
+        display: flex;
+        justify-content: center;
+        color: #94a3b8;
+        margin-bottom: 8px;
+    }
+    .section-ico {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: #e8f5e9;
+        color: #107c41;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+    }
+    .section-ico.danger { background: #fee2e2; color: #b91c1c; }
+    .status-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #cbd5e1;
+        flex: 0 0 auto;
+    }
+    .status-dot.green { background: #107c41; }
+    .status-dot.red { background: #dc2626; }
+    .staff-toast {
+        position: fixed;
+        top: 24px;
+        right: 24px;
+        z-index: 10060;
+        min-width: 300px;
+        max-width: 420px;
+        padding: 12px 16px;
+        border-radius: 10px;
+        background: #ffffff;
+        border: 1px solid #e3e9e6;
+        box-shadow: 0 10px 28px -6px rgba(15, 23, 42, 0.16);
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        font-size: 13px;
+        color: #0f172a;
+        animation: staffToastIn 0.22s ease-out;
+    }
+    .staff-toast[hidden] { display: none; }
+    .staff-toast.success { background: #f0fdf4; border-color: #86efac; color: #166534; }
+    .staff-toast.error { background: #fef2f2; border-color: #fca5a5; color: #991b1b; }
+    .staff-toast-close {
+        margin-left: auto;
+        background: none;
+        border: none;
+        color: inherit;
+        font-size: 16px;
+        line-height: 1;
+        cursor: pointer;
+        opacity: 0.7;
+    }
+    .staff-toast-close:hover { opacity: 1; }
+    @keyframes staffToastIn {
+        from { transform: translateX(24px); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }

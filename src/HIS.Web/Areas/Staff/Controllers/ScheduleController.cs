@@ -5,6 +5,8 @@ using HIS.Domain;
 using HIS.Web.Areas.Staff.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Primitives;
 
 namespace HIS.Web.Areas.Staff.Controllers;
 
@@ -16,17 +18,20 @@ public class ScheduleController : Controller
     private readonly ISlotGenerationService _slotGenerationService;
     private readonly IDepartmentService _departmentService;
     private readonly TimeProvider _timeProvider;
+    private readonly IMemoryCache _cache;
 
     public ScheduleController(
         IDepartmentHeadService departmentHeadService,
         ISlotGenerationService slotGenerationService,
         IDepartmentService departmentService,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IMemoryCache cache)
     {
         _departmentHeadService = departmentHeadService;
         _slotGenerationService = slotGenerationService;
         _departmentService = departmentService;
         _timeProvider = timeProvider;
+        _cache = cache;
     }
 
     [HttpGet]
@@ -56,8 +61,7 @@ public class ScheduleController : Controller
             mondayTargetWeek.AddDays(4)
         };
 
-        var allDepartments = await _departmentService.GetDepartmentsAsync(ct);
-        var allRooms = await _departmentService.GetRoomsByDepartmentAsync(departmentId > 0 ? departmentId : 0, ct);
+        var board = await GetOrLoadBoardAsync(accountId, weekOffset, departmentId, mondayTargetWeek, ct);
 
         IReadOnlyList<AppointmentSlotItemDto> slots = [];
         var slotFromDate = today;
@@ -83,63 +87,23 @@ public class ScheduleController : Controller
                 Today = today,
                 WeekStart = mondayTargetWeek,
                 WeekDates = weekDates,
-                AllDepartments = allDepartments,
-                AvailableRooms = allRooms,
+                AllDepartments = board.AllDepartments,
+                AvailableRooms = board.AllRooms,
                 Slots = slots,
                 SlotFilterStartDate = slotFromDate,
                 SlotFilterEndDate = slotToDate
             });
         }
 
-        var overview = departmentId > 0
-            ? await _departmentHeadService.GetDepartmentOverviewAsync(departmentId, ct)
-            : new DepartmentOverviewDto(0, "Tất cả chuyên khoa", 0, 0, 0, 0, 0, 0);
-
-        var exceptions = departmentId > 0
-            ? await _departmentHeadService.GetExceptionsAsync(departmentId, null, ct)
-            : (IReadOnlyList<DepartmentExceptionItemDto>)[];
-
-        var activePeriod = departmentId > 0
-            ? await _departmentHeadService.GetActiveSchedulingPeriodAsync(departmentId, ct)
-            : null;
-
-        DepartmentDemandGridDto? demandGrid = null;
-        if (departmentId > 0 && activePeriod != null)
-        {
-            demandGrid = await _departmentHeadService.GetDepartmentDemandGridAsync(departmentId, activePeriod.Id, ct);
-        }
-
-        var schedules = departmentId > 0
-            ? await _departmentHeadService.GetSchedulesAsync(departmentId, null, mondayTargetWeek, mondayTargetWeek.AddDays(6), ct)
-            : (IReadOnlyList<DepartmentScheduleItemDto>)[];
-
-        var dutyShifts = departmentId > 0
-            ? await _departmentHeadService.GetDutyShiftsAsync(departmentId, ct)
-            : (IReadOnlyList<DepartmentDutyShiftDto>)[];
-
+        // Bệnh án + slot giữ nguyên truy vấn mỗi lần: bệnh án ghi access log kèm IP,
+        // slot phụ thuộc cửa sổ tìm kiếm của riêng tab.
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
         var isHead = User.IsInRole("DEPARTMENT_HEAD");
         var medicalRecords = (isHead && departmentId > 0)
             ? await _departmentHeadService.GetMedicalRecordsAsync(departmentId, accountId, ipAddress, ct)
             : (IReadOnlyList<DepartmentMedicalRecordDto>)[];
 
-        var doctors = departmentId > 0
-            ? await _departmentHeadService.GetDoctorsInDepartmentAsync(departmentId, ct)
-            : await _departmentHeadService.GetDoctorsInDepartmentAsync(0, ct);
-
-        var staff = departmentId > 0
-            ? await _departmentHeadService.GetStaffInDepartmentAsync(departmentId, ct)
-            : (IReadOnlyList<StaffListItemDto>)[];
-
-        var rooms = departmentId > 0
-            ? await _departmentHeadService.GetRoomsInDepartmentAsync(departmentId, ct)
-            : allRooms;
-
-        var patients = departmentId > 0
-            ? await _departmentHeadService.GetPatientsAsync(departmentId, ct)
-            : (IReadOnlyList<DepartmentPatientListItemDto>)[];
-
-        var headDoctor = doctors.FirstOrDefault(d => d.AccountId == accountId);
+        var headDoctor = board.Doctors.FirstOrDefault(d => d.AccountId == accountId);
         if (headDoctor == null && activeTab == "my-schedule")
         {
             ViewBag.UnlinkedAccountMessage = "Tài khoản hiện tại chưa được liên kết với hồ sơ bác sĩ trong khoa. Vui lòng liên hệ Quản trị viên để gán tài khoản với hồ sơ Bác sĩ.";
@@ -149,25 +113,25 @@ public class ScheduleController : Controller
         {
             ActiveTab = activeTab,
             DepartmentId = departmentId,
-            DepartmentName = overview.DepartmentName,
+            DepartmentName = board.Overview.DepartmentName,
             WeekOffset = weekOffset,
             Today = today,
             WeekStart = mondayTargetWeek,
             WeekDates = weekDates,
-            Overview = overview,
-            Exceptions = exceptions,
-            Schedules = schedules,
-            DutyShifts = dutyShifts,
+            Overview = board.Overview,
+            Exceptions = board.Exceptions,
+            Schedules = board.Schedules,
+            DutyShifts = board.DutyShifts,
             MedicalRecords = medicalRecords,
-            Patients = patients,
-            AvailableDoctors = doctors,
-            AvailableStaff = staff,
-            AvailableRooms = rooms,
+            Patients = board.Patients,
+            AvailableDoctors = board.Doctors,
+            AvailableStaff = board.Staff,
+            AvailableRooms = board.Rooms,
             CurrentHeadDoctorId = headDoctor?.Id,
             CurrentHeadDoctor = headDoctor,
-            ActivePeriod = activePeriod,
-            DemandGrid = demandGrid,
-            AllDepartments = allDepartments,
+            ActivePeriod = board.ActivePeriod,
+            DemandGrid = board.DemandGrid,
+            AllDepartments = board.AllDepartments,
             Slots = slots,
             SlotFilterStartDate = slotFromDate,
             SlotFilterEndDate = slotToDate,
@@ -199,6 +163,7 @@ public class ScheduleController : Controller
         }
         else
         {
+            InvalidateBoardCache(accountId);
             TempData["SuccessMessage"] = "Đã phê duyệt đề nghị và tự động điều phối slot / lịch hẹn liên quan.";
         }
 
@@ -227,6 +192,7 @@ public class ScheduleController : Controller
         }
         else
         {
+            InvalidateBoardCache(accountId);
             TempData["SuccessMessage"] = "Đã từ chối đề nghị.";
         }
 
@@ -280,6 +246,7 @@ public class ScheduleController : Controller
         }
         else
         {
+            InvalidateBoardCache(currentAccountId);
             TempData["SuccessMessage"] = "Đã phân công ca trực nhân sự thành công.";
         }
 
@@ -323,6 +290,7 @@ public class ScheduleController : Controller
         }
         else
         {
+            InvalidateBoardCache(currentAccountId);
             TempData["SuccessMessage"] = $"Đã mở đợt đăng ký lịch \"{name}\" thành công! Bác sĩ có thể bắt đầu đăng ký ca.";
         }
 
@@ -414,6 +382,7 @@ public class ScheduleController : Controller
         }
         else
         {
+            InvalidateBoardCache(currentAccountId);
             TempData["SuccessMessage"] = "Đã lưu thiết lập lịch khám thành công.";
         }
 
@@ -432,8 +401,15 @@ public class ScheduleController : Controller
             return BadRequest(new { message = "Không xác định được khoa chuyên môn." });
         }
 
-        var matrix = await _departmentHeadService.GetDecisionMatrixAsync(departmentId, workDate, shift, ct);
-        return Ok(matrix);
+        try
+        {
+            var matrix = await _departmentHeadService.GetDecisionMatrixAsync(departmentId, workDate, shift, ct);
+            return Ok(matrix);
+        }
+        catch (OperationCanceledException)
+        {
+            return StatusCode(499);
+        }
     }
 
     // Trưởng khoa phê duyệt ca & gán phòng khám
@@ -452,6 +428,7 @@ public class ScheduleController : Controller
         }
         else
         {
+            InvalidateBoardCache(currentAccountId);
             TempData["SuccessMessage"] = "Đã phê duyệt ca khám và phân công phòng thành công.";
         }
 
@@ -479,6 +456,7 @@ public class ScheduleController : Controller
         }
         else
         {
+            InvalidateBoardCache(currentAccountId);
             TempData["SuccessMessage"] = $"Đã điều chuyển bác sĩ sang ca ngày {targetDate:dd/MM/yyyy} ({targetShift}) thành công!";
         }
 
@@ -505,6 +483,7 @@ public class ScheduleController : Controller
         }
         else
         {
+            InvalidateBoardCache(currentAccountId);
             TempData["SuccessMessage"] = $"Đã xuất bản lịch làm việc thành công! Hệ thống đã tạo {result.Value} slots khám trực tuyến.";
         }
 
@@ -549,6 +528,7 @@ public class ScheduleController : Controller
         }
         else
         {
+            InvalidateBoardCache(currentAccountId);
             TempData["SuccessMessage"] = "Đã hủy ca khám thành công. Các lịch hẹn bị ảnh hưởng đã được chuyển sang trạng thái cần đặt lại lịch.";
         }
 
@@ -577,6 +557,7 @@ public class ScheduleController : Controller
         }
         else
         {
+            InvalidateBoardCache(currentAccountId);
             TempData["SuccessMessage"] = "Đã xóa ca trực thành công.";
         }
 
@@ -614,6 +595,7 @@ public class ScheduleController : Controller
         }
 
         var data = result.Value!;
+        InvalidateBoardCache(GetCurrentAccountId());
         return Json(new
         {
             success = true,
@@ -678,4 +660,124 @@ public class ScheduleController : Controller
         var claim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         return int.TryParse(claim, out var id) ? id : 0;
     }
+
+    // ========================================================
+    // CACHE BẢNG DỮ LIỆU LỊCH KHOA (chống lag khi chuyển tab)
+    // Dữ liệu nền của trang lịch chỉ đổi khi có thao tác ghi, nên cache theo
+    // (tài khoản + tuần) với TTL ngắn và hủy toàn bộ ngay sau mỗi thao tác ghi.
+    // ========================================================
+    private const string BoardCacheKeyPrefix = "schedule-board:";
+    private const string BoardTokenKeyPrefix = "schedule-board-token:";
+    private static readonly TimeSpan BoardCacheTtl = TimeSpan.FromSeconds(60);
+
+    private async Task<ScheduleBoardData> GetOrLoadBoardAsync(
+        int accountId, int weekOffset, int departmentId, DateOnly mondayTargetWeek, CancellationToken ct)
+    {
+        var cacheKey = $"{BoardCacheKeyPrefix}{accountId}:{weekOffset}";
+        if (_cache.TryGetValue<ScheduleBoardData>(cacheKey, out var board))
+        {
+            return board!;
+        }
+
+        board = await LoadBoardAsync(departmentId, mondayTargetWeek, ct);
+
+        // Mỗi tài khoản một CancellationTokenSource; hủy token là vô hiệu hóa
+        // toàn bộ entry của tài khoản đó (mọi tuần) trong một nhát.
+        var tokenKey = $"{BoardTokenKeyPrefix}{accountId}";
+        var cts = _cache.GetOrCreate(tokenKey, _ => new CancellationTokenSource())!;
+        using (var entry = _cache.CreateEntry(cacheKey))
+        {
+            entry.Value = board;
+            entry.AbsoluteExpirationRelativeToNow = BoardCacheTtl;
+            entry.AddExpirationToken(new CancellationChangeToken(cts.Token));
+        }
+
+        return board;
+    }
+
+    private async Task<ScheduleBoardData> LoadBoardAsync(int departmentId, DateOnly mondayTargetWeek, CancellationToken ct)
+    {
+        var allDepartments = await _departmentService.GetDepartmentsAsync(ct);
+        var allRooms = await _departmentService.GetRoomsByDepartmentAsync(departmentId > 0 ? departmentId : 0, ct);
+
+        var overview = departmentId > 0
+            ? await _departmentHeadService.GetDepartmentOverviewAsync(departmentId, ct)
+            : new DepartmentOverviewDto(0, "Tất cả chuyên khoa", 0, 0, 0, 0, 0, 0);
+
+        var exceptions = departmentId > 0
+            ? await _departmentHeadService.GetExceptionsAsync(departmentId, null, ct)
+            : (IReadOnlyList<DepartmentExceptionItemDto>)[];
+
+        var activePeriod = departmentId > 0
+            ? await _departmentHeadService.GetActiveSchedulingPeriodAsync(departmentId, ct)
+            : null;
+
+        DepartmentDemandGridDto? demandGrid = null;
+        if (departmentId > 0 && activePeriod != null)
+        {
+            demandGrid = await _departmentHeadService.GetDepartmentDemandGridAsync(departmentId, activePeriod.Id, ct);
+        }
+
+        var schedules = departmentId > 0
+            ? await _departmentHeadService.GetSchedulesAsync(departmentId, null, mondayTargetWeek, mondayTargetWeek.AddDays(6), ct)
+            : (IReadOnlyList<DepartmentScheduleItemDto>)[];
+
+        var dutyShifts = departmentId > 0
+            ? await _departmentHeadService.GetDutyShiftsAsync(departmentId, ct)
+            : (IReadOnlyList<DepartmentDutyShiftDto>)[];
+
+        var doctors = departmentId > 0
+            ? await _departmentHeadService.GetDoctorsInDepartmentAsync(departmentId, ct)
+            : await _departmentHeadService.GetDoctorsInDepartmentAsync(0, ct);
+
+        var staff = departmentId > 0
+            ? await _departmentHeadService.GetStaffInDepartmentAsync(departmentId, ct)
+            : (IReadOnlyList<StaffListItemDto>)[];
+
+        var rooms = departmentId > 0
+            ? await _departmentHeadService.GetRoomsInDepartmentAsync(departmentId, ct)
+            : allRooms;
+
+        var patients = departmentId > 0
+            ? await _departmentHeadService.GetPatientsAsync(departmentId, ct)
+            : (IReadOnlyList<DepartmentPatientListItemDto>)[];
+
+        return new ScheduleBoardData(
+            allDepartments,
+            allRooms,
+            overview,
+            exceptions,
+            activePeriod,
+            demandGrid,
+            schedules,
+            dutyShifts,
+            doctors,
+            staff,
+            rooms,
+            patients);
+    }
+
+    private void InvalidateBoardCache(int accountId)
+    {
+        var tokenKey = $"{BoardTokenKeyPrefix}{accountId}";
+        if (_cache.TryGetValue(tokenKey, out var cached) && cached is CancellationTokenSource cts)
+        {
+            cts.Cancel();
+        }
+        _cache.Remove(tokenKey);
+    }
+
+    private sealed record ScheduleBoardData(
+        IReadOnlyList<DepartmentListItemDto> AllDepartments,
+        IReadOnlyList<ClinicRoomDto> AllRooms,
+        DepartmentOverviewDto Overview,
+        IReadOnlyList<DepartmentExceptionItemDto> Exceptions,
+        SchedulingPeriodDto? ActivePeriod,
+        DepartmentDemandGridDto? DemandGrid,
+        IReadOnlyList<DepartmentScheduleItemDto> Schedules,
+        IReadOnlyList<DepartmentDutyShiftDto> DutyShifts,
+        IReadOnlyList<DoctorListItemDto> Doctors,
+        IReadOnlyList<StaffListItemDto> Staff,
+        IReadOnlyList<ClinicRoomDto> Rooms,
+        IReadOnlyList<DepartmentPatientListItemDto> Patients);
 }

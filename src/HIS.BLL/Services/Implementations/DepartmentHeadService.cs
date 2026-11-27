@@ -379,6 +379,9 @@ public partial class DepartmentHeadService : IDepartmentHeadService
         if (doctor == null)
             return Result.Failure<int>("NOT_FOUND", "Không tìm thấy bác sĩ.");
 
+        if (request.Status == DoctorScheduleStatus.Approved && !request.RoomId.HasValue)
+            return Result.Failure<int>("MISSING_ROOM", "Lịch khám đã duyệt phải có phòng khám. Vui lòng chọn phòng khám trước khi lưu.");
+
         if (request.RoomId.HasValue)
         {
             var room = await _context.ClinicRooms.FirstOrDefaultAsync(r => r.Id == request.RoomId.Value, ct);
@@ -520,6 +523,11 @@ public partial class DepartmentHeadService : IDepartmentHeadService
                 {
                     return Result.Failure<int>("DOCTOR_SHIFT_COLLISION",
                         $"Bác sĩ {doctor.FullName} đã có ca làm việc trong ca khám ngày {request.WorkDate:dd/MM/yyyy}.");
+                }
+                if (pgEx.ConstraintName == "ck_approved_requires_room")
+                {
+                    return Result.Failure<int>("MISSING_ROOM",
+                        "Lịch khám đã duyệt phải có phòng khám. Vui lòng chọn phòng khám trước khi lưu.");
                 }
             }
             return Result.Failure<int>("DB_UPDATE_ERROR", "Lỗi lưu lịch khám: " + (ex.InnerException?.Message ?? ex.Message));

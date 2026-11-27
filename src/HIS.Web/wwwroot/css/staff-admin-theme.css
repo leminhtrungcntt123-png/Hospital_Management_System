@@ -1,0 +1,737 @@
+/* ==========================================================================
+   STAFF CONTEXT — ADMIN DESIGN SYNC
+   Applies only to pages rendered with body.staff-context (staff role pages:
+   Trưởng khoa, Bác sĩ, Y tá, Kế toán) so the admin workspace tokens win over
+   the legacy MediCare component theme. Home / Patient / Login are untouched.
+   ========================================================================== */
+
+body.staff-context {
+    background: #f5f8f6;
+}
+
+body.staff-context,
+body.staff-context * {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+}
+
+body.staff-context::-webkit-scrollbar,
+body.staff-context *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+body.staff-context::-webkit-scrollbar-track,
+body.staff-context *::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+body.staff-context::-webkit-scrollbar-thumb,
+body.staff-context *::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 9999px;
+}
+
+body.staff-context::-webkit-scrollbar-thumb:hover,
+body.staff-context *::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+.staff-context .staff-app {
+    --primary: #107c41;
+    --primary-hover: #0d6535;
+    --primary-light: #e8f5e9;
+    --primary-border: #86efac;
+    --line: #e3e9e6;
+    --line-subtle: #eef2f0;
+    --ink: #0f172a;
+    --muted: #64748b;
+    --bg: #f5f8f6;
+    --pale: #f0fdf4;
+    --shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+
+    background: #f5f8f6;
+    color: #0f172a;
+    font-family: 'Inter', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.staff-context .staff-app button,
+.staff-context .staff-app input,
+.staff-context .staff-app select,
+.staff-context .staff-app textarea {
+    font-family: inherit;
+}
+
+/* ==========================================================================
+   SIDEBAR SHELL
+   ========================================================================== */
+.staff-context .staff-app .sidebar {
+    width: 232px !important;
+    min-width: 232px !important;
+    max-width: 232px !important;
+    padding: 16px 12px 12px !important;
+    border-right: 1px solid #e3e9e6 !important;
+    box-shadow: 1px 0 3px rgba(0, 0, 0, 0.02) !important;
+    scrollbar-width: none !important;
+}
+
+.staff-context .staff-app .sidebar::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+}
+
+.staff-context .staff-app .staff-shell {
+    margin-left: 232px !important;
+}
+
+@media (max-width: 850px) {
+    .staff-context .staff-app .staff-shell {
+        margin-left: 0 !important;
+    }
+}
+
+/* Brand (markup shared with admin workspace) */
+.staff-context .admin-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 11px;
+    padding: 0 4px;
+    text-decoration: none;
+}
+
+.staff-context .brand-logo-box {
+    width: 34px;
+    height: 34px;
+    background: #107c41;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 3px 8px rgba(16, 124, 65, 0.22);
+    flex-shrink: 0;
+}
+
+.staff-context .brand-logo-box svg {
+    width: 20px !important;
+    height: 20px !important;
+    stroke: #ffffff !important;
+    stroke-width: 3 !important;
+}
+
+.staff-context .brand-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.staff-context .brand-title {
+    font-size: 16px;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.1;
+    letter-spacing: -0.4px;
+}
+
+.staff-context .brand-title em {
+    font-style: normal;
+    color: #107c41;
+}
+
+/* Workspace / department chip */
+.staff-context .staff-app .sidebar .workspace {
+    background: #f8faf9;
+    border: 1px solid #eef2f0;
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin: 12px 0 8px;
+}
+
+/* ==========================================================================
+   SIDEBAR NAVIGATION
+   ========================================================================== */
+.staff-context .staff-app .staff-nav {
+    padding: 0;
+    gap: 12px;
+}
+
+.staff-context .staff-app .nav-group {
+    gap: 2px;
+}
+
+.staff-context .staff-app .nav-group > span {
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.9px !important;
+    color: #94a3b8 !important;
+    text-transform: uppercase;
+    padding: 4px 12px 3px;
+    margin: 0 0 2px;
+}
+
+.staff-context .staff-app .nav-group > a {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 11px;
+    min-height: 36px;
+    margin: 0;
+    border: 0 !important;
+    border-radius: 8px;
+    color: #475569 !important;
+    font-size: 12.5px !important;
+    font-weight: 500 !important;
+    line-height: 1.25;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.staff-context .staff-app .nav-group > a:hover {
+    background: #f3f7f4 !important;
+    color: #0f172a !important;
+}
+
+.staff-context .staff-app .nav-group > a.active,
+.staff-context .staff-app .staff-nav a.active {
+    background: #e8f5e9 !important;
+    color: #107c41 !important;
+    font-weight: 600 !important;
+    border: 0 !important;
+}
+
+.staff-context .staff-app .nav-group > a.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 9px;
+    bottom: 9px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: #107c41;
+}
+
+.staff-context .staff-app .nav-group > a.active > .icon,
+.staff-context .staff-app .staff-nav a.active .icon {
+    color: #107c41 !important;
+    stroke: #107c41 !important;
+}
+
+/* ==========================================================================
+   TOPBAR
+   ========================================================================== */
+.staff-context .staff-app .staff-topbar {
+    height: 64px;
+    padding: 0 24px;
+    border-bottom: 1px solid #e3e9e6;
+    box-shadow: none;
+}
+
+.staff-context .staff-app .staff-breadcrumb {
+    gap: 7px;
+    font-size: 13px;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.staff-context .staff-app .staff-breadcrumb strong {
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.staff-context .staff-app .staff-breadcrumb i {
+    color: #cbd5e1;
+}
+
+.staff-context .staff-app .staff-profile {
+    padding: 4px 10px;
+    border-radius: 8px;
+}
+
+.staff-context .staff-app .staff-profile:hover {
+    background: #f8faf9;
+    border-color: #e3e9e6;
+}
+
+.staff-context .staff-app .staff-profile .avatar {
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+    font-weight: 700;
+}
+
+.staff-context .staff-app .staff-profile strong {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.staff-context .staff-app .staff-profile small {
+    font-size: 11px;
+    color: #64748b;
+}
+
+.staff-context .staff-app .reception-account-menu {
+    border: 1px solid #e3e9e6;
+    border-radius: 10px;
+    box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.15);
+}
+
+.staff-context .staff-app .reception-account-menu :is(a, button):hover {
+    background: #f3f7f4;
+}
+
+/* ==========================================================================
+   MAIN VIEWPORT & PAGE HEADINGS
+   ========================================================================== */
+.staff-context .staff-app .staff-main {
+    max-width: none;
+    padding: 20px 24px 30px;
+}
+
+.staff-context .staff-app .page-heading,
+.staff-context .staff-app .reception-heading {
+    align-items: flex-start;
+    margin-bottom: 16px;
+}
+
+.staff-context .staff-app .page-heading h1,
+.staff-context .staff-app .reception-heading h1 {
+    font-size: 23px;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.5px;
+    margin: 2px 0 4px;
+    line-height: 1.2;
+}
+
+.staff-context .staff-app .page-heading p,
+.staff-context .staff-app .reception-heading p {
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 400;
+    margin: 0;
+}
+
+.staff-context .staff-app .page-heading .eyebrow,
+.staff-context .staff-app .reception-eyebrow {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    color: #107c41;
+    letter-spacing: 0.9px;
+    text-transform: uppercase;
+    margin: 0;
+}
+
+/* ==========================================================================
+   CARDS
+   ========================================================================== */
+.staff-context .staff-app .card,
+.staff-context .staff-app .reception-search,
+.staff-context .staff-app .reception-panel {
+    background: #ffffff;
+    border: 1px solid #e3e9e6 !important;
+    border-radius: 12px !important;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.staff-context .staff-app .card-header {
+    background: #ffffff !important;
+    border-bottom: 1px solid #eef2f0 !important;
+    padding: 12px 16px;
+}
+
+.staff-context .staff-app .card-header h2 {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.staff-context .staff-app .card-header p {
+    font-size: 11.5px;
+    color: #64748b;
+}
+
+.staff-context .staff-app .reception-panel h2 {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+/* ==========================================================================
+   TABLES
+   ========================================================================== */
+.staff-context .staff-app th {
+    background: #f8fafc !important;
+    color: #475569 !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #e3e9e6 !important;
+    border-top: 0 !important;
+}
+
+.staff-context .staff-app td {
+    color: #334155;
+    font-size: 12.5px;
+    border-bottom: 1px solid #f1f5f9 !important;
+}
+
+.staff-context .staff-app td strong {
+    color: #0f172a;
+    font-weight: 600;
+}
+
+.staff-context .staff-app tbody tr:hover {
+    background: #f8fafc;
+}
+
+.staff-context .staff-app .reception-panel th {
+    background: #f8fafc !important;
+    color: #475569 !important;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ==========================================================================
+   BUTTONS
+   ========================================================================== */
+.staff-context .staff-main :is(.btn, .button) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 36px;
+    height: auto;
+    padding: 0 14px;
+    border-radius: 7px;
+    border: 1px solid #d1d5db;
+    background: #ffffff;
+    color: #374151;
+    font-size: 12.5px;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+    text-decoration: none;
+    box-shadow: none;
+}
+
+.staff-context .staff-main :is(.btn, .button):hover {
+    background: #f9fafb;
+    border-color: #9ca3af;
+    color: #0f172a;
+}
+
+.staff-context .staff-main :is(.btn, .button).primary {
+    background: #107c41;
+    border-color: #107c41;
+    color: #ffffff;
+    box-shadow: 0 1px 2px rgba(16, 124, 65, 0.2);
+}
+
+.staff-context .staff-main :is(.btn, .button).primary:hover {
+    background: #0d6535;
+    border-color: #0d6535;
+    color: #ffffff;
+}
+
+.staff-context .staff-main :is(.btn, .button).outline {
+    background: #ffffff;
+    border-color: #d1d5db;
+    color: #374151;
+}
+
+.staff-context .staff-main :is(.btn, .button).outline:hover {
+    background: #f9fafb;
+    border-color: #9ca3af;
+    color: #0f172a;
+}
+
+.staff-context .staff-main :is(.btn, .button).ghost {
+    background: transparent;
+    border-color: transparent;
+    color: #475569;
+}
+
+.staff-context .staff-main :is(.btn, .button).ghost:hover {
+    background: #f3f7f4;
+    color: #0f172a;
+}
+
+.staff-context .staff-main :is(.btn, .button).danger {
+    background: #fee2e2;
+    border-color: #fca5a5;
+    color: #b91c1c;
+}
+
+.staff-context .staff-main :is(.btn, .button).danger:hover {
+    background: #ef4444;
+    border-color: #ef4444;
+    color: #ffffff;
+}
+
+.staff-context .staff-main :is(.btn, .button).sm {
+    min-height: 28px;
+    padding: 0 9px;
+    font-size: 11.5px;
+    border-radius: 5px;
+}
+
+.staff-context .staff-main .text-link,
+.staff-context .staff-main .link-button,
+.staff-context .staff-main .btn.text-link,
+.staff-context .staff-main .button.text-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 0;
+    padding: 2px 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    color: #107c41;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.staff-context .staff-main .text-link:hover,
+.staff-context .staff-main .link-button:hover {
+    color: #0d6535;
+    background: none;
+}
+
+/* ==========================================================================
+   FORMS
+   ========================================================================== */
+.staff-context .staff-main :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]) {
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #0f172a;
+    font-size: 12.5px;
+    box-shadow: none;
+}
+
+.staff-context .staff-main :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):focus {
+    outline: none;
+    border-color: #107c41;
+    box-shadow: 0 0 0 3px rgba(16, 124, 65, 0.15);
+}
+
+.staff-context .staff-main label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.staff-context .staff-main .text-muted,
+.staff-context .staff-main small {
+    color: #64748b;
+}
+
+/* ==========================================================================
+   TABS / SEGMENTED CONTROLS
+   ========================================================================== */
+.staff-context .staff-main .medicare-tabs {
+    background: #ffffff;
+    border-bottom: 1px solid #eef2f0;
+    padding: 10px 16px;
+    gap: 6px;
+}
+
+.staff-context .staff-main .medicare-tab-btn {
+    padding: 6px 12px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.staff-context .staff-main .medicare-tab-btn:hover {
+    background: #f3f7f4;
+    color: #0f172a;
+}
+
+.staff-context .staff-main .medicare-tab-btn.active {
+    background: #e8f5e9;
+    color: #107c41;
+}
+
+.staff-context .staff-main .reception-shortcuts a {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+    color: #15803d;
+}
+
+.staff-context .staff-main .reception-shortcuts a:hover {
+    background: #dcfce7;
+    border-color: #86efac;
+}
+
+/* ==========================================================================
+   KPI / STAT CARDS
+   ========================================================================== */
+.staff-context .staff-main .stat-card {
+    background: #ffffff !important;
+    border: 1px solid #e3e9e6 !important;
+    border-top-width: 1px !important;
+    border-radius: 12px !important;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important;
+}
+
+.staff-context .staff-main .stat-label {
+    color: #64748b !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.staff-context .staff-main .stat-card > strong {
+    color: #0f172a !important;
+    font-size: 20px !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.4px;
+}
+
+.staff-context .staff-main .stat-card > small {
+    color: #64748b !important;
+    font-size: 11.5px !important;
+}
+
+.staff-context .staff-main .stat-card .stat-icon {
+    background: #e8f5e9 !important;
+    color: #107c41 !important;
+}
+
+.staff-context .staff-main .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+    margin: 16px 0;
+}
+
+.staff-context .staff-main .kpi-grid .stat-card {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    text-align: left;
+    gap: 14px;
+    padding: 16px 18px !important;
+}
+
+.staff-context .staff-main .kpi-grid .stat-card .stat-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.staff-context .staff-main .kpi-grid .stat-card .stat-icon svg {
+    width: 20px !important;
+    height: 20px !important;
+    stroke-width: 2 !important;
+}
+
+.staff-context .staff-main .kpi-grid .stat-body {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.staff-context .staff-main .kpi-grid .stat-body > span {
+    font-size: 12px !important;
+    color: #64748b !important;
+    font-weight: 500 !important;
+}
+
+.staff-context .staff-main .kpi-grid .stat-body > strong {
+    font-size: 24px !important;
+    font-weight: 800 !important;
+    color: #0f172a !important;
+    letter-spacing: -0.4px;
+    line-height: 1.15;
+    margin: 2px 0 0;
+}
+
+.staff-context .staff-main .kpi-grid .stat-body > small {
+    font-size: 11.5px !important;
+    color: #64748b !important;
+    margin-top: 2px;
+}
+
+/* ==========================================================================
+   OVERLAY MODALS (SPA pages mount dialogs outside .staff-app)
+   ========================================================================== */
+.staff-context #overlay-root .modal {
+    border-radius: 12px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.staff-context #overlay-root .modal-header {
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid #eef2f0;
+}
+
+.staff-context #overlay-root .modal-header h2 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.staff-context #overlay-root .modal-footer {
+    background: #ffffff;
+    border-top: 1px solid #eef2f0;
+}
+
+.staff-context #overlay-root :is(.btn, .button) {
+    min-height: 36px;
+    padding: 0 14px;
+    border-radius: 7px;
+    font-size: 12.5px;
+    font-weight: 600;
+}
+
+.staff-context #overlay-root :is(.btn, .button).primary {
+    background: #107c41;
+    border-color: #107c41;
+    color: #ffffff;
+}
+
+.staff-context #overlay-root :is(.btn, .button).primary:hover {
+    background: #0d6535;
+    border-color: #0d6535;
+}
+
+.staff-context #overlay-root :is(.btn, .button).outline {
+    background: #ffffff;
+    border-color: #d1d5db;
+    color: #374151;
+}
+
+/* ==========================================================================
+   PORTAL PILL (sidebar bottom)
+   ========================================================================== */
+.staff-context .staff-app .portal-link {
+    border: 1px solid #86efac;
+    background: #f0fdf4;
+    color: #15803d;
+    border-radius: 16px;
+    font-size: 11.5px;
+    font-weight: 600;
+}
+
+.staff-context .staff-app .portal-link:hover {
+    background: #dcfce7;
+    border-color: #86efac;
+}

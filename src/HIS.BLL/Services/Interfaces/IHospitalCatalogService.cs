@@ -7,6 +7,7 @@ public interface IHospitalCatalogService
     // Phòng khám
     Task<IReadOnlyList<AdminRoomRow>> GetRoomsAsync(int? departmentId = null, CancellationToken ct = default);
     Task<int> CreateRoomAsync(CreateRoomRequest request, CancellationToken ct = default);
+    Task<int> UpdateRoomAsync(int roomId, CreateRoomRequest request, CancellationToken ct = default);
     Task<bool> DeleteRoomAsync(int roomId, CancellationToken ct = default);
 
     // Loại dịch vụ & Dịch vụ kỹ thuật

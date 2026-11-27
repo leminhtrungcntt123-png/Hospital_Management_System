@@ -64,6 +64,44 @@ public sealed class HospitalCatalogService(AppDbContext db) : IHospitalCatalogSe
         return room.Id;
     }
 
+    public async Task<int> UpdateRoomAsync(int roomId, CreateRoomRequest request, CancellationToken ct = default)
+    {
+        var room = await db.ClinicRooms.FirstOrDefaultAsync(r => r.Id == roomId, ct);
+        if (room == null)
+            throw new AdminOperationException("Phòng khám không tồn tại.");
+
+        var deptExists = await db.Departments.AnyAsync(d => d.Id == request.DepartmentId, ct);
+        if (!deptExists)
+            throw new AdminOperationException("Khoa chuyên môn không tồn tại.");
+
+        if (room.DepartmentId != request.DepartmentId
+            && await db.DoctorSchedules.AnyAsync(s => s.RoomId == roomId, ct))
+            throw new AdminOperationException("Không thể chuyển phòng khám sang khoa khác khi phòng đang có lịch phân công.");
+
+        var trimmedName = request.RoomName.Trim();
+        var trimmedNumber = request.RoomNumber.Trim();
+
+        var duplicate = await db.ClinicRooms.AnyAsync(
+            r => r.Id != roomId && r.DepartmentId == request.DepartmentId
+                && (r.RoomNumber == trimmedNumber || r.RoomName == trimmedName), ct);
+        if (duplicate)
+            throw new AdminOperationException($"Phòng khám với tên '{trimmedName}' hoặc số phòng '{trimmedNumber}' đã tồn tại trong khoa này.");
+
+        room.DepartmentId = request.DepartmentId;
+        room.RoomName = trimmedName;
+        room.RoomNumber = trimmedNumber;
+
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            throw new AdminOperationException($"Phòng khám với tên '{trimmedName}' hoặc số phòng '{trimmedNumber}' đã tồn tại trong khoa này.");
+        }
+        return room.Id;
+    }
+
     public async Task<bool> DeleteRoomAsync(int roomId, CancellationToken ct = default)
     {
         var room = await db.ClinicRooms.FirstOrDefaultAsync(r => r.Id == roomId, ct);

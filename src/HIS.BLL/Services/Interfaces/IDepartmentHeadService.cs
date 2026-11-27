@@ -38,6 +38,7 @@ public interface IDepartmentHeadService
     Task<Result> ApproveShiftAsync(ApproveShiftRequest request, CancellationToken ct = default);
     Task<Result<int>> ReallocateShiftAsync(ReallocateShiftRequest request, CancellationToken ct = default);
     Task<Result<int>> PublishSchedulingPeriodAsync(int periodId, int reviewedByAccountId, CancellationToken ct = default);
+    Task<SchedulingBoardDto> GetSchedulingBoardAsync(DateOnly weekStart, DateOnly weekEnd, CancellationToken ct = default);
 
     // 3. Phân công ca trực đêm nhân sự
     Task<IReadOnlyList<DepartmentDutyShiftDto>> GetDutyShiftsAsync(int departmentId, CancellationToken ct = default);
