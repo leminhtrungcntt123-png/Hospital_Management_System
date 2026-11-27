@@ -5,6 +5,10 @@
     line-height: 1.65;
 }
 
+html:has(.hospital-portal) {
+    scroll-padding-top: 84px;
+}
+
 .hospital-portal :is(a, button, input, select, textarea):focus-visible {
     outline: 3px solid #56b8d2;
     outline-offset: 3px;
@@ -32,15 +36,12 @@
 .hospital-portal .utility-bar > div {
     max-width: 1200px;
     margin: auto;
-    padding: 8px 0;
+    padding: 4px 0;
     font-size: 11px;
 }
 
-.hospital-portal .utility-bar > div > a {
+.hospital-portal .utility-bar > div > span:last-child {
     margin-left: auto;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
 }
 
 .hospital-portal .public-header {
@@ -54,11 +55,11 @@
 .hospital-portal .header-inner {
     position: relative;
     max-width: 1200px;
-    min-height: 82px;
+    min-height: 70px;
     height: auto;
     margin: auto;
-    padding: 12px 0;
-    gap: 26px;
+    padding: 0;
+    gap: 22px;
 }
 
 .hospital-portal .brand {
@@ -82,6 +83,9 @@
 .hospital-portal .public-nav a.active {
     color: #00718e;
     font-weight: 750;
+}
+.hospital-portal .public-nav a.active::after {
+    bottom: 0;
 }
 
 .hospital-portal .public-nav > .nav-mobile {

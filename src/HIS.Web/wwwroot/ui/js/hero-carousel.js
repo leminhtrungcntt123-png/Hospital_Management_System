@@ -22,6 +22,7 @@ function setHeroSlide(index) {
         const active = position === ui.heroIndex;
         slide.classList.toggle('active', active);
         slide.setAttribute('aria-hidden', String(!active));
+        slide.inert = !active;
     });
     document
         .querySelectorAll('[data-act="hero-slide"]')

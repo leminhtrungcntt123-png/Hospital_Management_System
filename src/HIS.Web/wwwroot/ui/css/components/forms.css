@@ -203,6 +203,19 @@
     margin-left: 2px;
     line-height: 0;
 }
+.brand .brand-mark.brand-logo,
+.admin-brand .brand-logo-box.brand-logo {
+    padding: 0;
+    overflow: hidden;
+    background: #fff;
+    border: 1px solid #d9e6ed;
+}
+.brand-logo > img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
 .brand-link {
     display: inline-flex;
     align-items: center;
