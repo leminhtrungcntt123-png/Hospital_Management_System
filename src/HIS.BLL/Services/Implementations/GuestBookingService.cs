@@ -254,6 +254,10 @@ public sealed class GuestBookingService(
             {
                 // Serialize guest requests for one contact before checking duplicate/active bookings.
                 await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({phone}))", ct);
+                if (request.PatientId.HasValue && request.PatientId.Value > 0)
+                {
+                    await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(77021, {request.PatientId.Value})", ct);
+                }
                 var schedule = await db.DoctorSchedules
                     .FromSqlInterpolated($"SELECT * FROM doctor_schedules WHERE id = {request.ScheduleId} FOR UPDATE")
                     .AsNoTracking()
@@ -271,15 +275,44 @@ public sealed class GuestBookingService(
                 }
 
                 var fullName = request.FullName.Trim();
-                var active = db.Appointments.Where(a => a.Patient.PhoneNumber == phone
+                var dayStart = date.ToDateTime(TimeOnly.MinValue);
+                var dayEnd = date.AddDays(1).ToDateTime(TimeOnly.MinValue);
+
+                var activeByPhone = db.Appointments.Where(a => a.Patient.PhoneNumber == phone
                     && a.StatusId >= 1 && a.StatusId <= 5
                     && a.Slot != null && a.Slot.StartTime > Now);
-                if (await active.CountAsync(ct) >= options.Value.MaxActiveAppointmentsPerAccount
-                    || await active.AnyAsync(a => a.Patient.FullName == fullName && a.Patient.DateOfBirth == request.DateOfBirth
-                        && a.DoctorId == schedule.DoctorId && a.Slot!.StartTime >= date.ToDateTime(TimeOnly.MinValue)
-                        && a.Slot.StartTime < date.AddDays(1).ToDateTime(TimeOnly.MinValue), ct))
+
+                if (await activeByPhone.CountAsync(ct) >= options.Value.MaxActiveAppointmentsPerAccount)
                 {
-                    return Result.Failure<GuestBookingReceipt>("DuplicateBooking", "Thông tin này đã có lịch khám đang hiệu lực hoặc đạt giới hạn đặt khám. Vui lòng kiểm tra mã lịch đã lưu hoặc liên hệ quầy tiếp nhận.");
+                    return Result.Failure<GuestBookingReceipt>("DuplicateBooking", "Số điện thoại này đã đạt giới hạn lịch khám đang hiệu lực. Vui lòng kiểm tra mã lịch đã lưu hoặc liên hệ quầy tiếp nhận.");
+                }
+
+                var requestedPatientId = request.PatientId.HasValue && request.PatientId.Value > 0
+                    ? request.PatientId.Value
+                    : (int?)null;
+
+                var samePatientActive = db.Appointments.Where(a =>
+                    a.StatusId >= 1 && a.StatusId <= 5
+                    && a.Slot != null && a.Slot.StartTime > Now
+                    && ((requestedPatientId.HasValue && a.PatientId == requestedPatientId.Value)
+                        || (a.Patient.PhoneNumber == phone
+                            && a.Patient.FullName == fullName
+                            && a.Patient.DateOfBirth == request.DateOfBirth)));
+
+                if (await samePatientActive.AnyAsync(a =>
+                        a.Slot!.StartTime < choice.EndTime && a.Slot.EndTime > choice.StartTime, ct))
+                {
+                    return Result.Failure<GuestBookingReceipt>("DuplicateBooking",
+                        "Người khám này đã có lịch hẹn trùng khung giờ này (kể cả với bác sĩ khác). Mỗi người chỉ được đặt 1 lịch trong cùng khung giờ, vui lòng chọn khung giờ khác.");
+                }
+
+                if (await samePatientActive.AnyAsync(a =>
+                        a.DoctorId == schedule.DoctorId
+                        && a.Slot!.StartTime >= dayStart
+                        && a.Slot.StartTime < dayEnd, ct))
+                {
+                    return Result.Failure<GuestBookingReceipt>("DuplicateBooking",
+                        "Người khám này đã có lịch khám với bác sĩ này trong ngày đã chọn. Vui lòng kiểm tra mã lịch đã lưu hoặc chọn ngày khác.");
                 }
 
                 var slot = await db.AppointmentSlots.AsNoTracking().SingleOrDefaultAsync(s => s.DoctorId == schedule.DoctorId && s.StartTime == request.StartTime, ct);
@@ -354,7 +387,7 @@ public sealed class GuestBookingService(
 
                 var appointment = new Appointment
                 {
-                    AppointmentCode = "HIS-" + Today.ToString("yyyyMMdd") + "-" + RandomNumberGenerator.GetString("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", 6),
+                    AppointmentCode = "HIS-" + choice.StartTime.ToString("yyyyMMdd") + "-" + RandomNumberGenerator.GetString("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", 6),
                     Patient = patient,
                     SlotId = slot.Id,
                     DoctorId = schedule.DoctorId,

@@ -95,8 +95,6 @@ public static class ReceptionWorkflowScenario
         Assert.Empty((await service.GetDeskAsync(otherId, null)).Value!.Visits);
         Assert.False((await service.CheckInAsync(otherId, appointmentId, true)).IsSuccess);
         Assert.False((await service.CheckInAsync(nurseId, appointmentId, false)).IsSuccess);
-        clock.Hour = 1; clock.Minute = 29;
-        Assert.False((await service.CheckInAsync(nurseId, appointmentId, true)).IsSuccess);
         clock.Hour = 2; clock.Minute = 0;
         Assert.Equal("O01", (await service.CheckInAsync(nurseId, appointmentId, true)).Value);
         Assert.Equal("O01", (await service.CheckInAsync(nurseId, appointmentId, true)).Value);

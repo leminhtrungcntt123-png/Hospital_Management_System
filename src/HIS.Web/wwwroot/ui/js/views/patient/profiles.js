@@ -377,7 +377,279 @@ async function submitAddRelative() {
     }
 }
 
+const patientRecordsState = {
+    status: 'idle', // idle | loading | ready | error
+    profiles: [],
+    items: [],
+    selectedPatientId: '',
+    error: '',
+};
+
+function ensurePatientRecords() {
+    if (!config.authenticated || patientRecordsState.status !== 'idle') return;
+    loadPatientRecords();
+}
+
+async function loadPatientRecords(patientId = patientRecordsState.selectedPatientId) {
+    patientRecordsState.status = 'loading';
+    patientRecordsState.error = '';
+    patientRecordsState.selectedPatientId = patientId ? String(patientId) : '';
+    render();
+    try {
+        const baseUrl = config.medicalRecordsUrl || '/Patient/MedicalRecords/List';
+        const url = patientRecordsState.selectedPatientId
+            ? `${baseUrl}?patientId=${encodeURIComponent(patientRecordsState.selectedPatientId)}`
+            : baseUrl;
+        const res = await fetch(url, {
+            credentials: 'same-origin',
+            cache: 'no-store',
+            headers: { Accept: 'application/json' },
+        });
+        const body = await res.json();
+        if (!res.ok) throw new Error(body.message || 'Không tải được hồ sơ sức khỏe.');
+        patientRecordsState.profiles = Array.isArray(body.profiles) ? body.profiles : [];
+        patientRecordsState.items = Array.isArray(body.items) ? body.items : [];
+        patientRecordsState.status = 'ready';
+    } catch (err) {
+        patientRecordsState.status = 'error';
+        patientRecordsState.error = err.message;
+    }
+    render();
+}
+
+function openMedicalRecordDetailModal(recordId) {
+    const rec = patientRecordsState.items.find((r) => Number(r.id) === Number(recordId));
+    if (!rec) return;
+
+    const formatDateOnly = (val) => (typeof formatPortalDate === 'function' ? formatPortalDate(val) : String(val || '—'));
+    const formatDateTime = (val) => (typeof formatPortalDateTime === 'function' ? formatPortalDateTime(val) : String(val || '—'));
+
+    const diagnosisTitle = [rec.primaryDiagnosisCode, rec.primaryDiagnosisDesc].filter(Boolean).join(' – ') || 'Chưa cập nhật';
+
+    let vitalsHtml = '';
+    if (rec.vitalSigns) {
+        const v = rec.vitalSigns;
+        const vItems = [
+            v.pulse != null ? `<span><strong>Mạch:</strong> ${esc(v.pulse)} lần/phút</span>` : '',
+            v.systolicBp != null && v.diastolicBp != null ? `<span><strong>Huyết áp:</strong> ${esc(v.systolicBp)}/${esc(v.diastolicBp)} mmHg</span>` : '',
+            v.temperature != null ? `<span><strong>Nhiệt độ:</strong> ${esc(v.temperature)} °C</span>` : '',
+            v.respiratoryRate != null ? `<span><strong>Nhịp thở:</strong> ${esc(v.respiratoryRate)} lần/phút</span>` : '',
+            v.spo2 != null ? `<span><strong>SpO2:</strong> ${esc(v.spo2)}%</span>` : '',
+            v.weight != null ? `<span><strong>Cân nặng:</strong> ${esc(v.weight)} kg</span>` : '',
+            v.height != null ? `<span><strong>Chiều cao:</strong> ${esc(v.height)} cm</span>` : '',
+        ].filter(Boolean);
+        if (vItems.length) {
+            vitalsHtml = `
+                <div style="margin-bottom:14px;">
+                    <h4 style="margin:0 0 8px 0; color:#007d9f; font-size:14px;">Chỉ số sinh hiệu</h4>
+                    <div style="display:flex; flex-wrap:wrap; gap:8px 16px; background:#f7fbfd; border:1px solid #d9ecf4; border-radius:8px; padding:10px 12px; font-size:13px;">
+                        ${vItems.join('')}
+                    </div>
+                </div>`;
+        }
+    }
+
+    const prescriptions = Array.isArray(rec.prescriptions) ? rec.prescriptions : [];
+    const prescriptionsHtml = prescriptions.length
+        ? prescriptions
+              .map(
+                  (p) => `
+            <div style="margin-bottom:12px;">
+                <div style="font-size:13px; color:#4b677a; margin-bottom:6px;">
+                    <strong>Ngày kê đơn:</strong> ${esc(formatDateOnly(p.prescribedDate))}
+                    ${p.note ? ` · <strong>Lời dặn:</strong> ${esc(p.note)}` : ''}
+                </div>
+                <div class="table-wrap">
+                    <table style="font-size:13px;">
+                        <thead>
+                            <tr>
+                                <th>Tên thuốc</th>
+                                <th>Số lượng</th>
+                                <th>Liều dùng</th>
+                                <th>Số ngày</th>
+                                <th>Cách dùng</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${(p.items || [])
+                                .map(
+                                    (m) => `<tr>
+                                <td>
+                                    <strong>${esc(m.medicationName)}</strong>
+                                    ${m.activeIngredient || m.strength ? `<br /><small class="text-muted">${esc([m.activeIngredient, m.strength].filter(Boolean).join(' · '))}</small>` : ''}
+                                </td>
+                                <td>${esc(m.quantity)} ${esc(m.unit || '')}</td>
+                                <td>${esc(m.dosage || '—')}</td>
+                                <td>${m.durationDays != null ? esc(m.durationDays) + ' ngày' : '—'}</td>
+                                <td>${esc(m.usageInstructions || '—')}</td>
+                            </tr>`,
+                                )
+                                .join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>`,
+              )
+              .join('')
+        : '<p class="text-muted" style="font-size:13px; margin:0;">Không có đơn thuốc trong lượt khám này.</p>';
+
+    const labOrders = Array.isArray(rec.labOrders) ? rec.labOrders : [];
+    const labsHtml = labOrders.length
+        ? `<div style="margin-top:14px;">
+            <h4 style="margin:0 0 8px 0; color:#007d9f; font-size:14px;">Chỉ định & Kết quả cận lâm sàng</h4>
+            <div class="table-wrap">
+                <table style="font-size:13px;">
+                    <thead>
+                        <tr>
+                            <th>Dịch vụ</th>
+                            <th>Trạng thái</th>
+                            <th>Kết quả</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${labOrders
+                            .map(
+                                (o) => `<tr>
+                            <td><strong>${esc(o.serviceName)}</strong>${o.note ? `<br /><small class="text-muted">${esc(o.note)}</small>` : ''}</td>
+                            <td><span class="badge">${esc(o.status)}</span></td>
+                            <td>${o.result ? esc(o.result) : '<span class="text-muted">Chưa có kết quả</span>'}</td>
+                        </tr>`,
+                            )
+                            .join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>`
+        : '';
+
+    const bodyHtml = `
+        <div style="background:#f0f8fb; border:1px solid #d5eaf3; border-radius:10px; padding:12px 14px; margin-bottom:14px; font-size:13.5px;">
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:6px 14px;">
+                <div><strong>Mã lịch hẹn:</strong> <span style="color:#007d9f;">${esc(rec.appointmentCode)}</span></div>
+                <div><strong>Ngày khám:</strong> ${esc(formatDateTime(rec.examDate))}</div>
+                <div><strong>Người khám:</strong> ${esc(rec.patientName)}</div>
+                <div><strong>Bác sĩ khám:</strong> ${esc(rec.doctorName)}</div>
+                <div><strong>Chuyên khoa:</strong> ${esc(rec.departmentName)}</div>
+                <div><strong>Phòng khám:</strong> ${esc(rec.roomNumber)}</div>
+            </div>
+        </div>
+        ${vitalsHtml}
+        <div style="margin-bottom:14px;">
+            <h4 style="margin:0 0 8px 0; color:#007d9f; font-size:14px;">Kết quả khám của bác sĩ</h4>
+            <dl style="display:grid; grid-template-columns:150px 1fr; gap:6px 12px; margin:0; font-size:13.5px;">
+                <dt style="color:#4b677a; font-weight:600; margin:0;">Triệu chứng</dt>
+                <dd style="margin:0;">${esc(rec.symptoms || 'Không ghi nhận')}</dd>
+                <dt style="color:#4b677a; font-weight:600; margin:0;">Khám lâm sàng</dt>
+                <dd style="margin:0;">${esc(rec.clinicalExamination || 'Không ghi nhận')}</dd>
+                <dt style="color:#4b677a; font-weight:600; margin:0;">Chẩn đoán chính</dt>
+                <dd style="margin:0;"><strong>${esc(diagnosisTitle)}</strong></dd>
+                ${
+                    rec.secondaryDiagnosis
+                        ? `<dt style="color:#4b677a; font-weight:600; margin:0;">Chẩn đoán phụ</dt><dd style="margin:0;">${esc(rec.secondaryDiagnosis)}</dd>`
+                        : ''
+                }
+                <dt style="color:#4b677a; font-weight:600; margin:0;">Kết luận & dặn dò</dt>
+                <dd style="margin:0;">${esc(rec.conclusion || 'Không có')}</dd>
+                ${
+                    rec.followUpDate
+                        ? `<dt style="color:#4b677a; font-weight:600; margin:0;">Ngày tái khám</dt><dd style="margin:0;"><strong style="color:#007d9f;">${esc(formatDateOnly(rec.followUpDate))}</strong></dd>`
+                        : ''
+                }
+            </dl>
+        </div>
+        <div>
+            <h4 style="margin:0 0 8px 0; color:#007d9f; font-size:14px;">Đơn thuốc</h4>
+            ${prescriptionsHtml}
+        </div>
+        ${labsHtml}
+    `;
+
+    openModal(
+        `Hồ sơ khám bệnh · ${rec.appointmentCode}`,
+        bodyHtml,
+        `<button type="button" class="btn primary" onclick="closeModal()">Đóng</button>`,
+    );
+}
+
 function recordsPage() {
-    return `${heading('Hồ sơ sức khỏe', 'Bệnh án, kết quả và đơn thuốc được cung cấp theo quyền truy cập của tài khoản.')}
-        ${unavailableNotice()}${pendingTable('Hồ sơ khám bệnh', ['Ngày khám', 'Người khám', 'Chuyên khoa', 'Bác sĩ', 'Kết quả'])}`;
+    ensurePatientRecords();
+    const s = patientRecordsState;
+    const formatDateTime = (val) => (typeof formatPortalDateTime === 'function' ? formatPortalDateTime(val) : String(val || '—'));
+
+    const profileFilter =
+        s.profiles.length > 1
+            ? `<select aria-label="Lọc theo người khám" onchange="loadPatientRecords(this.value)" style="min-width:210px;">
+                <option value="" ${!s.selectedPatientId ? 'selected' : ''}>Tất cả người khám (${s.profiles.length})</option>
+                ${s.profiles
+                    .map(
+                        (p) =>
+                            `<option value="${esc(p.patientId)}" ${s.selectedPatientId === String(p.patientId) ? 'selected' : ''}>${esc(p.fullName)} (${esc(p.relationshipLabel)})</option>`,
+                    )
+                    .join('')}
+            </select>`
+            : '';
+
+    const headerActions = `<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        ${profileFilter}
+        <button type="button" class="btn outline" onclick="loadPatientRecords()">${icon('refresh')}Làm mới</button>
+    </div>`;
+
+    let content = '';
+    if (s.status === 'loading') {
+        content = `<section class="card"><p style="padding:20px;">Đang tải hồ sơ sức khỏe…</p></section>`;
+    } else if (s.status === 'error') {
+        content = `<div class="notice error" role="alert">${esc(s.error)} <button type="button" class="btn outline" onclick="loadPatientRecords()">Thử lại</button></div>`;
+    } else if (!s.items.length) {
+        content = `<section class="card">
+            <header class="card-header"><h2>Hồ sơ khám bệnh</h2>${headerActions}</header>
+            ${empty('Chưa có hồ sơ khám bệnh nào', 'Kết quả khám, chẩn đoán và đơn thuốc sẽ tự động hiển thị tại đây sau khi bác sĩ hoàn tất khám bệnh.', link('Đặt lịch khám', 'public/booking', 'calendar', 'btn primary'))}
+        </section>`;
+    } else {
+        content = `<section class="card">
+            <header class="card-header">
+                <h2>Hồ sơ khám bệnh (${s.items.length})</h2>
+                ${headerActions}
+            </header>
+            <div class="table-wrap"><table><thead><tr>
+                <th scope="col">Ngày khám</th>
+                <th scope="col">Người khám</th>
+                <th scope="col">Chuyên khoa</th>
+                <th scope="col">Bác sĩ</th>
+                <th scope="col">Kết quả / Chẩn đoán</th>
+                <th scope="col">Thao tác</th>
+            </tr></thead><tbody>
+                ${s.items
+                    .map((r) => {
+                        const diag = [r.primaryDiagnosisCode, r.primaryDiagnosisDesc].filter(Boolean).join(' – ') || r.conclusion || 'Đã hoàn tất khám';
+                        const rxCount = (r.prescriptions || []).reduce((acc, p) => acc + (p.items ? p.items.length : 0), 0);
+                        const labCount = (r.labOrders || []).length;
+                        const subTags = [
+                            rxCount > 0 ? `<span class="badge ok">${rxCount} thuốc</span>` : '',
+                            labCount > 0 ? `<span class="badge">${labCount} cận lâm sàng</span>` : '',
+                        ]
+                            .filter(Boolean)
+                            .join(' ');
+                        return `<tr>
+                            <td>
+                                <strong>${esc(formatDateTime(r.examDate))}</strong><br />
+                                <small class="text-muted">${esc(r.appointmentCode)}</small>
+                            </td>
+                            <td>${esc(r.patientName)}</td>
+                            <td>${esc(r.departmentName)}<br /><small class="text-muted">Phòng ${esc(r.roomNumber)}</small></td>
+                            <td>${esc(r.doctorName)}</td>
+                            <td>
+                                <div>${esc(diag)}</div>
+                                ${subTags ? `<div style="margin-top:4px; display:flex; gap:4px; flex-wrap:wrap;">${subTags}</div>` : ''}
+                            </td>
+                            <td>
+                                <button type="button" class="btn outline" onclick="openMedicalRecordDetailModal(${r.id})">${icon('eye')}Xem kết quả</button>
+                            </td>
+                        </tr>`;
+                    })
+                    .join('')}
+            </tbody></table></div>
+        </section>`;
+    }
+
+    return `${heading('Hồ sơ sức khỏe', 'Bệnh án, kết quả khám và đơn thuốc trực tiếp từ bác sĩ sau khi hoàn tất khám.')}${content}`;
 }

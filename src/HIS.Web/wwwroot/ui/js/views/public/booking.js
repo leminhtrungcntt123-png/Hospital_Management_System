@@ -15,6 +15,8 @@ function resetGuestBooking() {
         error: '',
         submitting: false,
         receipt: null,
+        emailSent: false,
+        sentEmail: '',
         patient: {
             fullName: '',
             dateOfBirth: '',
@@ -223,6 +225,9 @@ function slotKey(slot) {
     return slot.scheduleId + '|' + slot.startTime;
 }
 function bookingTime(value) {
+    if (!value) return '';
+    const match = String(value).match(/T(\d{2}):(\d{2})/);
+    if (match) return `${match[1]}:${match[2]}`;
     return new Date(value).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 }
 function bookingDate(value) {
@@ -571,6 +576,8 @@ async function submitGuestBooking(otpOverride) {
         if (!response.ok || !body.receipt?.appointmentCode)
             throw new Error(body.message || 'Chưa thể xác nhận lịch. Vui lòng thử lại sau.');
         guestBooking.receipt = body.receipt;
+        guestBooking.emailSent = Boolean(body.emailSent);
+        guestBooking.sentEmail = body.sentEmail || guestBooking.patient.email || '';
         guestBooking.submitting = false;
         if (typeof patientAppointmentsState !== 'undefined') {
             patientAppointmentsState.status = 'idle';
@@ -655,18 +662,27 @@ function guestSlotsMarkup() {
 
 function guestBookingReceipt() {
     const receipt = guestBooking.receipt;
-    return `<section class="card booking-receipt"><span class="receipt-check">${icon('check')}</span><span class="eyebrow">LỊCH KHÁM ĐÃ ĐƯỢC GHI NHẬN</span><h1 tabindex="-1">Đặt lịch thành công</h1><p>Lưu lại mã dưới đây và cung cấp tại quầy tiếp nhận khi đến khám.</p><strong class="receipt-code">${esc(receipt.appointmentCode)}</strong><dl>${[
+    const emailNotice = guestBooking.sentEmail
+        ? guestBooking.emailSent
+            ? `<div class="account-alert success" style="margin:12px 0;">Phiếu xác nhận kèm đầy đủ thông tin lịch khám đã được gửi về email <strong>${esc(guestBooking.sentEmail)}</strong>.</div>`
+            : `<div class="notice" style="margin:12px 0;">${icon('info')}<span>Hệ thống chưa thể gửi email tự động tới <strong>${esc(guestBooking.sentEmail)}</strong>. Vui lòng chụp lại hoặc lưu mã lịch hẹn bên dưới.</span></div>`
+        : '';
+    const rows = [
         ['Người khám', receipt.patientName],
         ['Bác sĩ', receipt.doctorName],
         ['Chuyên khoa', receipt.department],
         ['Ngày khám', bookingDate(receipt.startTime)],
         ['Giờ khám', bookingTime(receipt.startTime) + ' – ' + bookingTime(receipt.endTime)],
         ['Phòng khám', receipt.room],
-    ]
+    ];
+    if (guestBooking.patient?.reason) {
+        rows.push(['Lý do khám', guestBooking.patient.reason]);
+    }
+    return `<section class="card booking-receipt"><span class="receipt-check">${icon('check')}</span><span class="eyebrow">LỊCH KHÁM ĐÃ ĐƯỢC GHI NHẬN</span><h1 tabindex="-1">Đặt lịch thành công</h1><p>Lưu lại mã dưới đây và cung cấp tại quầy tiếp nhận khi đến khám.</p><strong class="receipt-code">${esc(receipt.appointmentCode)}</strong>${emailNotice}<dl>${rows
         .map(([title, value]) => `<div><dt>${title}</dt><dd>${esc(value)}</dd></div>`)
         .join(
             '',
-        )}</dl><p class="booking-hint">Mang theo giấy tờ của người khám, thẻ BHYT và kết quả khám trước đây nếu có. Nhân viên sẽ kiểm tra thông tin và cấp số tại quầy.</p><div class="receipt-actions">${link('Về trang chủ', 'public/home', 'arrow', 'btn outline')}${button('Đặt lịch khác', 'new-guest-booking', 'calendar', 'btn primary')}</div></section>`;
+        )}</dl><p class="booking-hint">Mang theo giấy tờ của người khám, thẻ BHYT và kết quả khám trước đây nếu có. Nhân viên sẽ kiểm tra thông tin và cấp số tại quầy.</p><div class="receipt-actions">${link('Về trang chủ', 'public/home', 'arrow', 'btn outline')}${config.authenticated ? link('Lịch hẹn của tôi', 'patient/appointments', 'calendar', 'btn outline') : ''}${button('Đặt lịch khác', 'new-guest-booking', 'calendar', 'btn primary')}</div></section>`;
 }
 
 function guestBookingPage() {

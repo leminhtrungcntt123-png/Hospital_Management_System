@@ -204,26 +204,41 @@ public class BookingController(
                 var receipt = result.Value!;
                 var receiptEmail = !string.IsNullOrWhiteSpace(request.Email)
                     ? request.Email.Trim()
-                    : User.FindFirstValue(ClaimTypes.Email);
+                    : User.FindFirstValue(ClaimTypes.Email)?.Trim();
+                var emailSent = false;
 
                 if (!string.IsNullOrWhiteSpace(receiptEmail) && !isTestEnvironment)
                 {
+                    var phoneDisplay = request.PhoneNumber.Trim();
+                    var dobDisplay = request.DateOfBirth.ToString("dd/MM/yyyy");
+                    var reasonRow = !string.IsNullOrWhiteSpace(request.Reason)
+                        ? $@"<p style=""margin: 6px 0 0 0;""><strong>Lý do khám / Triệu chứng:</strong> {System.Net.WebUtility.HtmlEncode(request.Reason.Trim())}</p>"
+                        : string.Empty;
+
                     var receiptBody = $@"
-<div style=""font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; border: 1px solid #cbe4ee; border-radius: 12px; background: #ffffff;"">
-    <h2 style=""color: #007d9f; margin: 0 0 8px 0;"">Phiếu xác nhận đặt lịch khám — MediCare</h2>
-    <p style=""color: #4b677a; font-size: 14px; margin: 0 0 16px 0;"">Lịch khám của bạn đã được ghi nhận thành công.</p>
-    <div style=""background: #f0f8fb; padding: 16px; border-radius: 8px; margin-bottom: 16px;"">
-        <p style=""margin: 0 0 6px 0;""><strong>Mã lịch hẹn:</strong> <span style=""color: #007d9f; font-size: 18px;"">{System.Net.WebUtility.HtmlEncode(receipt.AppointmentCode)}</span></p>
-        <p style=""margin: 0 0 6px 0;""><strong>Người khám:</strong> {System.Net.WebUtility.HtmlEncode(receipt.PatientName)}</p>
-        <p style=""margin: 0 0 6px 0;""><strong>Bác sĩ:</strong> {System.Net.WebUtility.HtmlEncode(receipt.DoctorName)} ({System.Net.WebUtility.HtmlEncode(receipt.Department)})</p>
-        <p style=""margin: 0 0 6px 0;""><strong>Thời gian:</strong> {receipt.StartTime:HH:mm} – {receipt.EndTime:HH:mm} ngày {receipt.StartTime:dd/MM/yyyy}</p>
-        <p style=""margin: 0;""><strong>Phòng khám:</strong> {System.Net.WebUtility.HtmlEncode(receipt.Room)}</p>
+<div style=""font-family: Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 24px; border: 1px solid #cbe4ee; border-radius: 12px; background: #ffffff; color: #15334d;"">
+    <div style=""text-align: center; border-bottom: 1px solid #e6f1f6; padding-bottom: 14px; margin-bottom: 18px;"">
+        <h2 style=""color: #007d9f; margin: 0 0 6px 0;"">Phiếu xác nhận đặt lịch khám — MediCare</h2>
+        <p style=""color: #4b677a; font-size: 13px; margin: 0;"">Lịch khám của bạn đã được ghi nhận thành công trên hệ thống.</p>
     </div>
-    <p style=""font-size: 12px; color: #627d92; margin: 0;"">Vui lòng mang theo giấy tờ tùy thân / BHYT và cung cấp mã lịch hẹn tại quầy tiếp nhận khi đến khám.</p>
+    <div style=""background: #f0f8fb; padding: 16px 18px; border-radius: 8px; margin-bottom: 16px; line-height: 1.6; font-size: 14px;"">
+        <p style=""margin: 0 0 8px 0;""><strong>Mã lịch hẹn:</strong> <span style=""color: #007d9f; font-size: 18px; font-weight: bold;"">{System.Net.WebUtility.HtmlEncode(receipt.AppointmentCode)}</span></p>
+        <p style=""margin: 0 0 6px 0;""><strong>Người khám:</strong> {System.Net.WebUtility.HtmlEncode(receipt.PatientName)}</p>
+        <p style=""margin: 0 0 6px 0;""><strong>Ngày sinh:</strong> {dobDisplay} · <strong>SĐT:</strong> {System.Net.WebUtility.HtmlEncode(phoneDisplay)}</p>
+        <p style=""margin: 0 0 6px 0;""><strong>Chuyên khoa:</strong> {System.Net.WebUtility.HtmlEncode(receipt.Department)}</p>
+        <p style=""margin: 0 0 6px 0;""><strong>Bác sĩ phụ trách:</strong> {System.Net.WebUtility.HtmlEncode(receipt.DoctorName)}</p>
+        <p style=""margin: 0 0 6px 0;""><strong>Ngày khám:</strong> {receipt.StartTime:dd/MM/yyyy}</p>
+        <p style=""margin: 0 0 6px 0;""><strong>Giờ khám:</strong> <strong style=""color: #007d9f;"">{receipt.StartTime:HH:mm} – {receipt.EndTime:HH:mm}</strong></p>
+        <p style=""margin: 0;""><strong>Phòng khám:</strong> {System.Net.WebUtility.HtmlEncode(receipt.Room)}</p>
+        {reasonRow}
+    </div>
+    <p style=""font-size: 12px; color: #627d92; margin: 0 0 6px 0;"">Vui lòng đến trước giờ khám 15 phút, mang theo giấy tờ tùy thân / thẻ BHYT (nếu có) và cung cấp <strong>mã lịch hẹn {System.Net.WebUtility.HtmlEncode(receipt.AppointmentCode)}</strong> tại quầy tiếp nhận.</p>
+    <p style=""font-size: 12px; color: #8ba2b1; margin: 12px 0 0 0; text-align: center;"">© 2026 MediCare · Hệ thống thông tin bệnh viện trực tuyến</p>
 </div>";
                     try
                     {
-                        await emailSender.SendEmailAsync(receiptEmail, $"[MediCare] Phiếu hẹn khám {receipt.AppointmentCode}", receiptBody, ct);
+                        await emailSender.SendEmailAsync(receiptEmail, $"[MediCare] Phiếu xác nhận đặt lịch khám {receipt.AppointmentCode}", receiptBody, ct);
+                        emailSent = true;
                     }
                     catch (Exception emailEx) when (emailEx is not OperationCanceledException)
                     {
@@ -231,7 +246,7 @@ public class BookingController(
                     }
                 }
 
-                return Json(new { receipt });
+                return Json(new { receipt, emailSent, sentEmail = receiptEmail });
             }
             return BadRequest(new { message = result.Error.Message });
         }
