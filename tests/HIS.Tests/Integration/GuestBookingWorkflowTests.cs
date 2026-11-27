@@ -95,10 +95,21 @@ public static class GuestBookingScenario
         Assert.Empty((await service.GetSlotsAsync(raceDoctor.Id, date)).Value!);
 
         var sharedDoctor = Doctor("Test Shared Slot Doctor");
-        var sharedSchedule = Schedule(sharedDoctor, Room("TEST04"), 4);
+        var sharedRoom = Room("TEST04");
+        var sharedSchedule = Schedule(sharedDoctor, sharedRoom, 4);
         sharedSchedule.EndTime = new TimeOnly(8, 30);
         sharedSchedule.SlotDurationMinutes = 30;
         db.Add(sharedSchedule);
+        db.AppointmentSlots.Add(new AppointmentSlot
+        {
+            Doctor = sharedDoctor,
+            Room = sharedRoom,
+            StartTime = date.ToDateTime(new TimeOnly(7, 30)),
+            EndTime = date.ToDateTime(new TimeOnly(8, 0)),
+            Capacity = 2,
+            BookedCount = 0,
+            Status = SlotStatus.Available
+        });
         await db.SaveChangesAsync();
         var sharedOutcomes = await Task.WhenAll(new[] { "0900000101", "0900000102", "0900000103" }.Select(async phone =>
         {

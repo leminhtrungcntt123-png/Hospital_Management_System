@@ -86,21 +86,17 @@ public static class AdminWorkflowScenario
         db.AddRange(admin, secondAdmin, doctor, replacement, otherDoctor, nurse, booker, room, targetRoom, patient);
         await db.SaveChangesAsync();
 
-        var schedules = new[] { (doctor, room, 4), (replacement, targetRoom, 1) };
-        foreach (var (person, clinic, online) in schedules)
+        db.DoctorSchedules.Add(new DoctorSchedule
         {
-            db.DoctorSchedules.Add(new DoctorSchedule
-            {
-                Doctor = person,
-                Department = department,
-                Room = clinic,
-                WorkDate = new DateOnly(2026, 11, 6),
-                Shift = ExamShift.Morning,
-                StartTime = new TimeOnly(7, 30),
-                EndTime = new TimeOnly(11, 30),
-                Status = DoctorScheduleStatus.Approved
-            });
-        }
+            Doctor = doctor,
+            Department = department,
+            Room = room,
+            WorkDate = new DateOnly(2026, 11, 6),
+            Shift = ExamShift.Morning,
+            StartTime = new TimeOnly(7, 30),
+            EndTime = new TimeOnly(11, 30),
+            Status = DoctorScheduleStatus.Approved
+        });
 
         AppointmentSlot Slot(Doctor person, ClinicRoom clinic, int hour, int minute, int booked) => new()
         {
