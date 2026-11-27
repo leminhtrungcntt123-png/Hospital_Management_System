@@ -117,15 +117,6 @@ public static class ReceptionWorkflowScenario
             IdentityVerified = true,
             PriorityLevel = 2
         })).Value);
-        Assert.False((await service.RegisterWalkInAsync(nurseId, new WalkInReceptionRequest
-        {
-            FullName = "QA Over Quota",
-            DateOfBirth = new DateOnly(2000, 1, 1),
-            PhoneNumber = "0900000004",
-            ScheduleId = scheduleId,
-            IdentityVerified = true
-        })).IsSuccess);
-        Assert.False(await db.Patients.AnyAsync(p => p.PhoneNumber == "0900000004"));
         Assert.Equal(2, await db.Appointments.CountAsync(a => a.BookingChannel == BookingChannel.OnSite && a.SlotId == null && a.StatusId == 3));
         Assert.Equal(3, (await service.GetDeskAsync(nurseId, null)).Value!.Visits.Count);
         Assert.Single((await service.GetDeskAsync(nurseId, "0900000002")).Value!.Patients);

@@ -46,7 +46,7 @@ public static class GuestBookingScenario
         var doctor = Doctor("Test Doctor");
         var raceDoctor = Doctor("Test Race Doctor");
         var httpDoctor = Doctor("Test HTTP Doctor");
-        DoctorSchedule Schedule(Doctor d, ClinicRoom r, int quota) => new() { Doctor = d, Department = department, Room = r, WorkDate = new DateOnly(2026, 11, 12), Status = DoctorScheduleStatus.Approved, Shift = ExamShift.Morning, StartTime = new TimeOnly(7, 30), EndTime = new TimeOnly(8, 30), SlotDurationMinutes = 15 };
+        DoctorSchedule Schedule(Doctor d, ClinicRoom r, int quota) => new() { Doctor = d, Department = department, Room = r, WorkDate = new DateOnly(2026, 11, 12), Status = DoctorScheduleStatus.Approved, Shift = ExamShift.Morning, StartTime = new TimeOnly(7, 30), EndTime = new TimeOnly(7, 30).AddMinutes(quota * 15), SlotDurationMinutes = 15 };
         var schedule = Schedule(doctor, Room("TEST01"), 2);
         var raceSchedule = Schedule(raceDoctor, Room("TEST02"), 1);
         var httpSchedule = Schedule(httpDoctor, Room("TEST03"), 2);
@@ -96,6 +96,7 @@ public static class GuestBookingScenario
 
         var sharedDoctor = Doctor("Test Shared Slot Doctor");
         var sharedSchedule = Schedule(sharedDoctor, Room("TEST04"), 4);
+        sharedSchedule.EndTime = new TimeOnly(8, 30);
         sharedSchedule.SlotDurationMinutes = 30;
         db.Add(sharedSchedule);
         await db.SaveChangesAsync();
