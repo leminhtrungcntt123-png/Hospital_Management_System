@@ -9,240 +9,213 @@
     var shift = ViewBag.CurrentShift as HIS.BLL.DTOs.CashierShiftDto;
 }
 
-<!-- Hidden Anti-Forgery Token cố định toàn trang chống lỗi 400 Bad Request khi gọi fetch -->
+@section Styles {
+    <link rel="stylesheet" href="~/css/staff-cashier.css" asp-append-version="true" />
+}
+
 <div id="anti-forgery-token-holder" style="display: none;">
     @Html.AntiForgeryToken()
 </div>
 
-<div class="reception-desk" style="padding: 24px; max-width: 1280px; margin: 0 auto;">
-    <!-- Topbar Thông tin ca làm việc & Tiêu đề -->
-    <header class="reception-heading" style="display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-bottom: 20px; border-bottom: 1px solid #e0e0e0; padding-bottom: 16px; flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 320px;">
-            <span class="reception-eyebrow" style="font-size: 12px; font-weight: 700; color: #0288d1; text-transform: uppercase; letter-spacing: 0.5px;">PHÒNG TÀI CHÍNH KẾ TOÁN · QUẦY THU NGÂN &amp; QUYẾT TOÁN</span>
-            <h1 style="font-size: 26px; font-weight: 800; margin: 4px 0; color: #1a237e;">Thu viện phí, BHYT &amp; tất toán tạm ứng</h1>
-            <p style="color: #616161; margin: 0; font-size: 13.5px;">Hôm nay, @DateTime.Now.ToString("dd/MM/yyyy") · Tra cứu người bệnh đến quầy để thu tiền dịch vụ &amp; thuốc hoặc cấn trừ tạm ứng &amp; hoàn tiền mặt.</p>
+<div class="cashier-page">
+    <div class="page-heading">
+        <div>
+            <span class="eyebrow">TÀI CHÍNH KẾ TOÁN</span>
+            <h1>Thu viện phí &amp; BHYT</h1>
         </div>
 
-        <div style="display: flex; gap: 12px; align-items: center; flex-shrink: 0; white-space: nowrap;">
+        <div class="heading-actions">
             @if (shift != null)
             {
-                <div style="background: #e8f5e9; border: 1.5px solid #81c784; border-radius: 10px; padding: 10px 18px; display: inline-flex; align-items: center; gap: 14px; white-space: nowrap;">
-                    <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #2e7d32; flex-shrink: 0;"></span>
-                    <div style="display: flex; align-items: center; gap: 10px; white-space: nowrap;">
-                        <span style="font-size: 12.5px; color: #2e7d32; font-weight: 800;">CA ĐANG MỞ (Từ @shift.OpenedAt.ToString("HH:mm"))</span>
-                        <span style="color: #a5d6a7;">|</span>
-                        <span style="font-size: 13px; font-weight: 700; color: #1b5e20;">Đầu ca: @shift.OpeningCash.ToString("N0") đ</span>
-                    </div>
-                    <button type="button" class="btn outline" style="padding: 6px 14px; font-size: 12.5px; font-weight: 700; background: #ffffff; border-color: #66bb6a; color: #1b5e20; white-space: nowrap;" onclick="document.getElementById('modal-close-shift').showModal()">
+                <div class="shift-pill open">
+                    <span class="shift-dot"></span>
+                    <span>Ca từ @shift.OpenedAt.ToString("HH:mm") · <strong>@shift.OpeningCash.ToString("N0") đ</strong></span>
+                    <button type="button" class="btn outline sm" onclick="document.getElementById('modal-close-shift').showModal()">
                         Kết ca
                     </button>
                 </div>
             }
             else
             {
-                <div style="background: #fff3e0; border: 1.5px solid #ffb74d; border-radius: 10px; padding: 10px 18px; display: inline-flex; align-items: center; gap: 14px; white-space: nowrap;">
-                    <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #f57c00; flex-shrink: 0;"></span>
-                    <div style="display: flex; align-items: center; gap: 10px; white-space: nowrap;">
-                        <span style="font-size: 12.5px; color: #e65100; font-weight: 800;">CHƯA MỞ CA THU NGÂN</span>
-                        <span style="color: #ffcc80;">|</span>
-                        <span style="font-size: 12.5px; color: #bf360c; font-weight: 600;">Mở ca để đối chiếu tiền mặt</span>
-                    </div>
-                    <button type="button" class="btn primary" style="padding: 6px 14px; font-size: 12.5px; font-weight: 700; white-space: nowrap;" onclick="document.getElementById('modal-open-shift').showModal()">
-                        Mở ca ngay
+                <div class="shift-pill closed">
+                    <span class="shift-dot"></span>
+                    <span>Chưa mở ca</span>
+                    <button type="button" class="btn primary sm" onclick="document.getElementById('modal-open-shift').showModal()">
+                        Mở ca
                     </button>
                 </div>
             }
 
-            <a class="btn outline" asp-action="Index" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; padding: 10px 16px; font-size: 13px; font-weight: 600; white-space: nowrap;">
-                @await Html.PartialAsync("_AdminIcon", "refresh") Đổi bệnh nhân / Làm mới
+            <a class="btn outline" asp-action="Index">
+                @await Html.PartialAsync("_AdminIcon", "refresh") Làm mới
             </a>
         </div>
-    </header>
+    </div>
 
     @if (TempData["SuccessMessage"] is string success)
     {
-        <div style="background: #e8f5e9; color: #1b5e20; border: 1px solid #c8e6c9; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; font-size: 14px; font-weight: 600;">
-            ✓ @success
+        <div class="flash-banner ok">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            <span>@success</span>
         </div>
     }
     @if (TempData["ErrorMessage"] is string error)
     {
-        <div style="background: #ffebee; color: #b71c1c; border: 1px solid #ffcdd2; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; font-size: 14px; font-weight: 600;">
-            ✕ @error
+        <div class="flash-banner err">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            <span>@error</span>
         </div>
     }
 
-    <!-- KHỐI TRA CỨU BỆNH NHÂN ĐẾN QUẦY (1 CỘT TOÀN MÀN HÌNH, CHỈ TRA CỨU MÃ BN & CCCD CHO HỒ SƠ CHƯA ĐÓNG TIỀN) -->
-    <section style="background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 18px 20px; margin-bottom: 20px; box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);">
-        <form asp-action="Index" method="get" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-            <div style="flex: 1; min-width: 260px; position: relative;">
-                <input id="cashier-search" name="search" value="@search" maxlength="60" class="form-control"
-                       placeholder="🔍 Nhập Mã bệnh nhân (00000001), Mã lượt khám, Số CCCD, SĐT hoặc Họ tên..."
-                       style="width: 100%; padding: 11px 16px; border: 1.5px solid #94a3b8; border-radius: 8px; font-size: 14.5px; font-weight: 500; color: #0f172a;" />
-            </div>
-            <select name="statusFilter" class="form-control" style="width: 215px; padding: 11px 12px; border: 1.5px solid #94a3b8; border-radius: 8px; font-size: 13.5px; font-weight: 700; color: #1e293b;">
-                <option value="unpaid" selected="@(statusFilter == "unpaid")">⏳ Chưa thanh toán</option>
-                <option value="paid" selected="@(statusFilter == "paid")">✓ Đã quyết toán (In lại/Hoàn)</option>
-                <option value="all" selected="@(statusFilter == "all")">📋 Tất cả hồ sơ</option>
-            </select>
-            <button class="btn primary" type="submit" style="padding: 11px 24px; font-size: 14px; font-weight: 700; border-radius: 8px; white-space: nowrap;">
-                🔍 Tra cứu hồ sơ
-            </button>
-            @if (!string.IsNullOrWhiteSpace(search) || selectedId > 0)
-            {
-                <a asp-action="Index" class="btn outline" style="padding: 11px 16px; font-size: 13.5px; font-weight: 600; text-decoration: none; border-radius: 8px; white-space: nowrap;">
-                    ✕ Xóa tra cứu
-                </a>
-            }
-        </form>
-
-        @if (!string.IsNullOrWhiteSpace(search) && Model.Count == 0 && selected == null)
-        {
-            <div style="margin-top: 12px; background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; padding: 10px 14px; border-radius: 8px; font-size: 13.5px; font-weight: 600;">
-                ⚠️ Không tìm thấy hồ sơ viện phí nào khớp với từ khóa "<strong>@search</strong>" theo bộ lọc đã chọn (Hãy đổi sang "Tất cả hồ sơ" nếu muốn tra cứu hóa đơn đã đóng tiền).
-            </div>
-        }
-
-        @if (!string.IsNullOrWhiteSpace(search) && Model.Count > 1)
-        {
-            <div style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed #e2e8f0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                <span style="font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.3px;">
-                    📋 Kết quả khớp từ khóa "@search" (@Model.Count hồ sơ):
-                </span>
-                @foreach (var item in Model)
+    <section class="card">
+        <div class="card-body">
+            <form asp-action="Index" method="get" class="search-row">
+                <div class="search-input-wrap">
+                    <input id="cashier-search" name="search" value="@search" maxlength="60"
+                           placeholder="Nhập Mã BN, Mã lượt khám, số CCCD, SĐT hoặc Họ tên..." />
+                </div>
+                <select name="statusFilter" aria-label="Trạng thái hóa đơn" style="height: 38px; padding: 0 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13.5px; font-weight: 600; color: #0f172a; background: #fff;">
+                    <option value="unpaid" selected="@(statusFilter == "unpaid")">Chưa thanh toán</option>
+                    <option value="paid" selected="@(statusFilter == "paid")">Đã quyết toán</option>
+                    <option value="all" selected="@(statusFilter == "all")">Tất cả hồ sơ</option>
+                </select>
+                <button class="btn primary" type="submit">
+                    @await Html.PartialAsync("_AdminIcon", "search") Tra cứu
+                </button>
+                @if (!string.IsNullOrWhiteSpace(search) || selectedId > 0 || statusFilter != "unpaid")
                 {
-                    bool isCur = item.AppointmentId == selectedId;
-                    decimal diff = item.PatientPayAmount - item.DepositBalance;
-                    string statusTag;
-                    string badgeBg;
-                    string badgeColor;
-
-                    if (item.InvoiceStatus == HIS.Domain.InvoiceStatus.Paid)
-                    {
-                        statusTag = $"✓ Đã tất toán ({item.PatientPayAmount:N0} đ)";
-                        badgeBg = isCur ? "#15803d" : "#f0fdf4";
-                        badgeColor = isCur ? "#ffffff" : "#15803d";
-                    }
-                    else if (item.DepositBalance > 0 && diff < 0)
-                    {
-                        statusTag = $"💵 Hoàn tạm ứng: {Math.Abs(diff):N0} đ";
-                        badgeBg = isCur ? "#0284c7" : "#f0f9ff";
-                        badgeColor = isCur ? "#ffffff" : "#0369a1";
-                    }
-                    else if (item.DepositBalance > 0 && diff > 0)
-                    {
-                        statusTag = $"💰 Thu thêm: {diff:N0} đ";
-                        badgeBg = isCur ? "#dc2626" : "#fef2f2";
-                        badgeColor = isCur ? "#ffffff" : "#b91c1c";
-                    }
-                    else
-                    {
-                        statusTag = $"💳 Cần thu: {item.PatientPayAmount:N0} đ";
-                        badgeBg = isCur ? "#0f172a" : "#f8fafc";
-                        badgeColor = isCur ? "#ffffff" : "#334155";
-                    }
-
-                    <button type="button"
-                            onclick="selectAppointment(@item.AppointmentId, this)"
-                            class="patient-quick-chip"
-                            id="app-card-@item.AppointmentId"
-                            data-id="@item.AppointmentId"
-                            style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 20px; border: 1.5px solid @(isCur ? "#0284c7" : "#cbd5e1"); background: @(isCur ? "#e0f2fe" : "#ffffff"); cursor: pointer; font-size: 12.5px; transition: all 0.15s;">
-                        <strong style="color: #0f172a;">@item.PatientName</strong>
-                        <span style="color: #64748b; font-family: monospace; font-size: 11.5px;">(@item.PatientCode)</span>
-                        <span id="app-chip-status-@item.AppointmentId" style="background: @badgeBg; color: @badgeColor; font-weight: 700; font-size: 11px; padding: 2px 8px; border-radius: 12px;">
-                            @statusTag
-                        </span>
-                    </button>
+                    <a asp-action="Index" class="btn outline">Xóa lọc</a>
                 }
-            </div>
-        }
+            </form>
+
+            @if (!string.IsNullOrWhiteSpace(search) && Model.Count == 0 && selected == null)
+            {
+                <div class="flash-banner err" style="margin-top: 12px;">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    <span>Không tìm thấy hồ sơ chưa thanh toán cho "<strong>@search</strong>".</span>
+                </div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(search) && Model.Count > 1)
+            {
+                <div class="quick-chips-bar">
+                    <span class="quick-chips-label">Kết quả khớp "@search" (@Model.Count hồ sơ):</span>
+                    @foreach (var item in Model)
+                    {
+                        bool isCur = item.AppointmentId == selectedId;
+                        decimal diff = item.PatientPayAmount - item.DepositBalance;
+                        string statusTag;
+                        string badgeClass;
+
+                        if (item.InvoiceStatus == HIS.Domain.InvoiceStatus.Paid)
+                        {
+                            statusTag = $"Đã tất toán ({item.PatientPayAmount:N0} đ)";
+                            badgeClass = "ok";
+                        }
+                        else if (item.DepositBalance > 0 && diff < 0)
+                        {
+                            statusTag = $"Hoàn tạm ứng: {Math.Abs(diff):N0} đ";
+                            badgeClass = "ok";
+                        }
+                        else if (item.DepositBalance > 0 && diff > 0)
+                        {
+                            statusTag = $"Thu thêm: {diff:N0} đ";
+                            badgeClass = "danger";
+                        }
+                        else
+                        {
+                            statusTag = $"Cần thu: {item.PatientPayAmount:N0} đ";
+                            badgeClass = "muted";
+                        }
+
+                        <button type="button"
+                                onclick="selectAppointment(@item.AppointmentId, this)"
+                                class="patient-quick-chip @(isCur ? "active" : "")"
+                                id="app-card-@item.AppointmentId"
+                                data-id="@item.AppointmentId">
+                            <strong>@item.PatientName</strong>
+                            <span class="chip-code">(@item.PatientCode)</span>
+                            <span id="app-chip-status-@item.AppointmentId" class="status-badge @badgeClass">
+                                @statusTag
+                            </span>
+                        </button>
+                    }
+                </div>
+            }
+        </div>
     </section>
 
-    <!-- KHỐI NỘI DUNG CHÍNH TOÀN MÀN HÌNH (100% WIDTH): BẢNG KÊ VIỆN PHÍ, BHYT, TẠM ỨNG & QUYẾT TOÁN -->
-    <section id="right-detail-container" style="background: #ffffff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 24px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); min-height: 460px; transition: opacity 0.15s ease;">
-        @if (selected != null)
-        {
-            @await Html.PartialAsync("_InvoiceDetail", selected)
-        }
-        else if (string.IsNullOrWhiteSpace(search))
-        {
-            <div style="text-align: center; padding: 56px 24px; color: #475569; background: #f8fafc; border: 1.5px dashed #cbd5e1; border-radius: 12px;">
-                <div style="font-size: 42px; margin-bottom: 12px;">🏥</div>
-                <h3 style="font-size: 18px; font-weight: 800; color: #1e293b; margin: 0 0 8px;">Quầy thu viện phí, BHYT &amp; tất toán tạm ứng</h3>
-                <p style="font-size: 14px; color: #64748b; margin: 0 auto 20px; max-width: 580px; line-height: 1.6;">
-                    Khi người bệnh đến quầy thanh toán, vui lòng nhập <strong>Mã bệnh nhân (Mã BN)</strong> hoặc <strong>Số CCCD</strong> vào thanh tra cứu phía trên để mở bảng kê các hồ sơ viện phí chưa thanh toán.
-                </p>
-                <div style="display: inline-grid; grid-template-columns: repeat(2, minmax(240px, 300px)); gap: 14px; text-align: left;">
-                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px;">
-                        <div style="font-weight: 800; color: #0284c7; font-size: 13px; margin-bottom: 4px;">1. Thu tiền dịch vụ &amp; thuốc</div>
-                        <div style="font-size: 12px; color: #64748b; line-height: 1.45;">Tổng hợp công khám, cận lâm sàng, thuốc kê đơn, trừ BHYT &amp; tạm ứng. Hỗ trợ máy tính tiền thừa và quét VietQR.</div>
-                    </div>
-                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px;">
-                        <div style="font-weight: 800; color: #15803d; font-size: 13px; margin-bottom: 4px;">2. Hoàn trả tiền mặt cho người bệnh</div>
-                        <div style="font-size: 12px; color: #64748b; line-height: 1.45;">Tự động khấu trừ viện phí từ các phiếu tạm ứng đã nộp và chi hoàn số tiền thừa bằng tiền mặt tại quầy.</div>
-                    </div>
+    <section class="card">
+        <div id="right-detail-container" class="card-body" style="min-height: 440px; transition: opacity 0.15s ease;">
+            @if (selected != null)
+            {
+                @await Html.PartialAsync("_InvoiceDetail", selected)
+            }
+            else if (string.IsNullOrWhiteSpace(search))
+            {
+                <div class="empty-state">
+                    <div class="empty-state-icon">@await Html.PartialAsync("_AdminIcon", "wallet")</div>
+                    <h3>Tra cứu viện phí</h3>
+                    <p>Nhập Mã bệnh nhân hoặc số CCCD ở trên để thu tiền, trừ BHYT và tất toán tạm ứng.</p>
                 </div>
-            </div>
-        }
-        else
-        {
-            <div style="text-align: center; padding: 56px 24px; color: #64748b; background: #fff1f2; border: 1.5px dashed #fda4af; border-radius: 12px;">
-                <div style="font-size: 38px; margin-bottom: 10px;">🔍</div>
-                <h3 style="font-size: 16px; font-weight: 700; color: #9f1239; margin-bottom: 6px;">Không tìm thấy hồ sơ viện phí chưa đóng tiền</h3>
-                <p style="font-size: 13.5px; color: #881337; margin: 0 auto; max-width: 480px; line-height: 1.5;">
-                    Không tìm thấy hồ sơ viện phí chưa thanh toán nào khớp với Mã BN / Số CCCD <strong>"@search"</strong> (Hồ sơ không tồn tại hoặc đã được thanh toán hoàn tất).
-                </p>
-            </div>
-        }
+            }
+            else
+            {
+                <div class="empty-state err">
+                    <div class="empty-state-icon">@await Html.PartialAsync("_AdminIcon", "search")</div>
+                    <h3>Không tìm thấy hồ sơ</h3>
+                    <p>Không có hồ sơ viện phí chưa thanh toán nào khớp với <strong>"@search"</strong>.</p>
+                </div>
+            }
+        </div>
     </section>
 </div>
 
-<!-- Modal Mở ca làm việc -->
-<dialog id="modal-open-shift" style="border: none; border-radius: 10px; padding: 24px; max-width: 440px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+<dialog id="modal-open-shift" class="staff-dialog">
     <form asp-action="OpenShift" method="post">
-        <h3 style="margin-top: 0; font-size: 18px; color: #1a237e;">Mở ca thu ngân mới</h3>
-        <p style="font-size: 13px; color: #616161;">Nhập số tiền mặt đầu ca để phục vụ đối chiếu và trả lại tiền thừa / hoàn tạm ứng cho người bệnh.</p>
-        
-        <div style="margin-bottom: 14px;">
-            <label style="font-size: 12px; font-weight: 700; display: block; margin-bottom: 4px;">Tiền mặt đầu ca (VNĐ):</label>
-            <input type="number" name="openingCash" value="10000000" min="0" step="100000" class="form-control" style="width: 100%; padding: 8px 12px; font-size: 15px; font-weight: 700;" required />
+        <div class="staff-dialog-header">
+            <h3>Mở ca thu ngân mới</h3>
+            <button type="button" class="staff-dialog-close" onclick="document.getElementById('modal-open-shift').close()" aria-label="Đóng">&times;</button>
         </div>
-
-        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <div class="staff-dialog-body">
+            <div>
+                <label for="open-shift-cash" style="display: block; margin-bottom: 6px;">Tiền mặt đầu ca (VNĐ)</label>
+                <input id="open-shift-cash" type="number" name="openingCash" value="10000000" min="0" step="100000" style="width: 100%; height: 38px; padding: 0 12px; font-weight: 700;" required />
+            </div>
+        </div>
+        <div class="staff-dialog-footer">
             <button type="button" class="btn outline" onclick="document.getElementById('modal-open-shift').close()">Hủy</button>
             <button type="submit" class="btn primary">Xác nhận mở ca</button>
         </div>
     </form>
 </dialog>
 
-<!-- Modal Kết thúc ca -->
 @if (shift != null)
 {
-    <dialog id="modal-close-shift" style="border: none; border-radius: 10px; padding: 24px; max-width: 480px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+    <dialog id="modal-close-shift" class="staff-dialog">
         <form asp-action="CloseShift" method="post">
             <input type="hidden" name="shiftId" value="@shift.Id" />
-            <h3 style="margin-top: 0; font-size: 18px; color: #c62828;">Kết thúc ca làm việc</h3>
-            <p style="font-size: 13px; color: #616161;">Kiểm đếm tiền mặt thực tế tại quầy để hệ thống đối soát chênh lệch tự động.</p>
-
-            <div style="background: #f5f5f5; padding: 10px 14px; border-radius: 6px; margin-bottom: 14px; font-size: 13px;">
-                <div>Tiền đầu ca: <strong>@shift.OpeningCash.ToString("N0") đ</strong></div>
-                <div>Thời gian mở: @shift.OpenedAt.ToString("HH:mm, dd/MM/yyyy")</div>
+            <div class="staff-dialog-header">
+                <h3>Kết thúc ca làm việc</h3>
+                <button type="button" class="staff-dialog-close" onclick="document.getElementById('modal-close-shift').close()" aria-label="Đóng">&times;</button>
             </div>
-
-            <div style="margin-bottom: 14px;">
-                <label style="font-size: 12px; font-weight: 700; display: block; margin-bottom: 4px;">Tiền mặt thực đếm tại quầy (VNĐ):</label>
-                <input type="number" name="countedCash" min="0" step="1000" class="form-control" style="width: 100%; padding: 8px 12px; font-size: 15px; font-weight: 700; color: #1b5e20;" required />
+            <div class="staff-dialog-body">
+                <div style="background: #f8fafc; border: 1px solid #e3e9e6; padding: 10px 14px; border-radius: 8px; margin-bottom: 14px;">
+                    <div>Tiền đầu ca: <strong>@shift.OpeningCash.ToString("N0") đ</strong></div>
+                    <div>Mở lúc: @shift.OpenedAt.ToString("HH:mm, dd/MM/yyyy")</div>
+                </div>
+                <div style="margin-bottom: 14px;">
+                    <label for="close-shift-cash" style="display: block; margin-bottom: 6px;">Tiền mặt thực đếm tại quầy (VNĐ)</label>
+                    <input id="close-shift-cash" type="number" name="countedCash" min="0" step="1000" style="width: 100%; height: 38px; padding: 0 12px; font-weight: 700; color: #15803d;" required />
+                </div>
+                <div>
+                    <label for="close-shift-note" style="display: block; margin-bottom: 6px;">Ghi chú bàn giao ca</label>
+                    <textarea id="close-shift-note" name="note" rows="2" placeholder="Ghi chú thêm nếu có tiền rách, tạm ứng chưa hoàn..." style="width: 100%; padding: 8px 12px;"></textarea>
+                </div>
             </div>
-
-            <div style="margin-bottom: 18px;">
-                <label style="font-size: 12px; font-weight: 700; display: block; margin-bottom: 4px;">Ghi chú bàn giao ca:</label>
-                <textarea name="note" class="form-control" rows="2" placeholder="Ghi chú thêm nếu có tiền rách, tạm ứng chưa hoàn..." style="width: 100%; padding: 8px 12px; font-size: 13px;"></textarea>
-            </div>
-
-            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <div class="staff-dialog-footer">
                 <button type="button" class="btn outline" onclick="document.getElementById('modal-close-shift').close()">Hủy</button>
-                <button type="submit" class="btn primary" style="background: #c62828; border-color: #c62828;">Xác nhận kết ca</button>
+                <button type="submit" class="btn danger">Xác nhận kết ca</button>
             </div>
         </form>
     </dialog>
@@ -330,8 +303,8 @@
                 el.style.background = '#ffffff';
             });
             if (chipElem) {
-                chipElem.style.borderColor = '#0284c7';
-                chipElem.style.background = '#e0f2fe';
+                chipElem.style.borderColor = '#15803d';
+                chipElem.style.background = '#dcfce7';
             }
 
             try {
@@ -466,15 +439,15 @@
 
             if (btnCash && btnBank) {
                 if (method === 'Cash') {
-                    btnCash.style.borderColor = '#0284c7';
-                    btnCash.style.background = '#f0f9ff';
+                    btnCash.style.borderColor = '#15803d';
+                    btnCash.style.background = '#f0fdf4';
                     btnBank.style.borderColor = '#cbd5e1';
                     btnBank.style.background = '#ffffff';
                     if (calcPanel) calcPanel.style.display = 'block';
                     if (qrPanel) qrPanel.style.display = 'none';
                 } else {
-                    btnBank.style.borderColor = '#0284c7';
-                    btnBank.style.background = '#f0f9ff';
+                    btnBank.style.borderColor = '#15803d';
+                    btnBank.style.background = '#f0fdf4';
                     btnCash.style.borderColor = '#cbd5e1';
                     btnCash.style.background = '#ffffff';
                     if (calcPanel) calcPanel.style.display = 'none';
@@ -551,7 +524,7 @@
                     title: 'Chưa mở ca thu ngân',
                     text: 'Vui lòng mở ca thu ngân trước khi thực hiện thu tiền & quyết toán.',
                     confirmButtonText: 'Mở ca ngay',
-                    confirmButtonColor: '#0284c7'
+                    confirmButtonColor: '#15803d'
                 });
                 document.getElementById('modal-open-shift').showModal();
                 return;
@@ -603,7 +576,7 @@
                         icon: 'warning',
                         title: 'Tiền khách đưa chưa đủ',
                         text: 'Số tiền khách đưa (' + cashGivenVal.toLocaleString('vi-VN') + ' đ) đang ít hơn số tiền cần thu thêm (' + netDiffVal.toLocaleString('vi-VN') + ' đ). Vui lòng kiểm tra lại!',
-                        confirmButtonColor: '#0284c7'
+                        confirmButtonColor: '#15803d'
                     });
                     cashGivenInput.focus();
                     return;
@@ -615,7 +588,7 @@
                     icon: 'warning',
                     title: 'Thiếu mã giao dịch ngân hàng',
                     text: 'Vui lòng nhập mã chuẩn chi / giao dịch ngân hàng trước khi xác nhận.',
-                    confirmButtonColor: '#0284c7'
+                    confirmButtonColor: '#15803d'
                 });
                 if (refInput) refInput.focus();
                 return;
@@ -627,7 +600,7 @@
                         icon: 'warning',
                         title: 'Thiếu thông tin người duyệt',
                         text: 'Vui lòng nhập họ tên Người duyệt hoàn tiền (Bác sĩ / Trưởng ca thu ngân).',
-                        confirmButtonColor: '#0284c7'
+                        confirmButtonColor: '#15803d'
                     });
                     if (approvedByInput) approvedByInput.focus();
                     return;
@@ -649,7 +622,7 @@
                 showCancelButton: true,
                 confirmButtonText: '✓ Xác nhận ngay',
                 cancelButtonText: 'Hủy',
-                confirmButtonColor: netDiffVal < 0 ? '#0284c7' : '#15803d',
+                confirmButtonColor: netDiffVal < 0 ? '#15803d' : '#15803d',
                 cancelButtonColor: '#64748b'
             });
 
@@ -713,7 +686,7 @@
                         showCancelButton: true,
                         confirmButtonText: '🖨️ In bảng kê & Hóa đơn',
                         cancelButtonText: 'Đóng',
-                        confirmButtonColor: '#0284c7',
+                        confirmButtonColor: '#15803d',
                         cancelButtonColor: '#64748b'
                     }).then(function(result) {
                         if (result.isConfirmed) {
@@ -815,7 +788,7 @@
         function printDischargeSettlement() {
             var container = document.getElementById('current-invoice-data-container');
             if (!container) {
-                Swal.fire({ icon: 'warning', title: 'Chưa có thông tin', text: 'Chưa có thông tin lượt khám để in bảng kê.', confirmButtonColor: '#0284c7' });
+                Swal.fire({ icon: 'warning', title: 'Chưa có thông tin', text: 'Chưa có thông tin lượt khám để in bảng kê.', confirmButtonColor: '#15803d' });
                 return;
             }
 
@@ -842,7 +815,7 @@
 
             var printWin = window.open('', '_blank', 'width=950,height=800');
             if (!printWin) {
-                Swal.fire({ icon: 'warning', title: 'Trình duyệt chặn Popup', text: 'Vui lòng cho phép popup trên trình duyệt để in bảng kê.', confirmButtonColor: '#0284c7' });
+                Swal.fire({ icon: 'warning', title: 'Trình duyệt chặn Popup', text: 'Vui lòng cho phép popup trên trình duyệt để in bảng kê.', confirmButtonColor: '#15803d' });
                 return;
             }
 
@@ -992,7 +965,7 @@
     </div>
 
     <div class="no-print" style="margin-top: 30px; text-align: center;">
-        <button onclick="window.print()" style="padding: 10px 24px; font-size: 14px; font-weight: bold; background: #0284c7; color: #fff; border: none; border-radius: 6px; cursor: pointer;">
+        <button onclick="window.print()" style="padding: 10px 24px; font-size: 14px; font-weight: bold; background: #15803d; color: #fff; border: none; border-radius: 6px; cursor: pointer;">
             🖨️ In bảng quyết toán ngay
         </button>
     </div>
