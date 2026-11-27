@@ -71,11 +71,11 @@ public partial class DepartmentHeadService
                     .Count(cell => cell.Count(schedule => schedule.Status == DoctorScheduleStatus.Approved) < rooms);
 
             var published = periods.Any(period =>
-                (period.DepartmentId == department.Id || period.DepartmentId == null)
+                period.DepartmentId == department.Id
                 && period.Status == SchedulingPeriodStatus.Published
                 && period.StartDate <= weekEnd && period.EndDate >= weekStart);
             var open = periods.Any(period =>
-                (period.DepartmentId == department.Id || period.DepartmentId == null)
+                period.DepartmentId == department.Id
                 && period.Status == SchedulingPeriodStatus.Open
                 && period.StartDate <= weekEnd && period.EndDate >= weekStart);
 

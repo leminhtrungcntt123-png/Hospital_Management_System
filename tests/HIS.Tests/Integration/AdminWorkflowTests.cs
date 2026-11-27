@@ -86,23 +86,17 @@ public static class AdminWorkflowScenario
         db.AddRange(admin, secondAdmin, doctor, replacement, otherDoctor, nurse, booker, room, targetRoom, patient);
         await db.SaveChangesAsync();
 
-        var schedules = new[] { (doctor, room, 4), (replacement, targetRoom, 1) };
-        foreach (var (person, clinic, online) in schedules)
+        db.DoctorSchedules.Add(new DoctorSchedule
         {
-            db.DoctorSchedules.Add(new DoctorSchedule
-            {
-                Doctor = person,
-                Department = department,
-                Room = clinic,
-                WorkDate = new DateOnly(2026, 11, 6),
-                Shift = ExamShift.Morning,
-                StartTime = new TimeOnly(7, 30),
-                EndTime = new TimeOnly(11, 30),
-                Status = DoctorScheduleStatus.Approved,
-                OnlineSlots = online,
-                MaxPatients = 8
-            });
-        }
+            Doctor = doctor,
+            Department = department,
+            Room = room,
+            WorkDate = new DateOnly(2026, 11, 6),
+            Shift = ExamShift.Morning,
+            StartTime = new TimeOnly(7, 30),
+            EndTime = new TimeOnly(11, 30),
+            Status = DoctorScheduleStatus.Approved
+        });
 
         AppointmentSlot Slot(Doctor person, ClinicRoom clinic, int hour, int minute, int booked) => new()
         {
@@ -119,8 +113,7 @@ public static class AdminWorkflowScenario
         var sourceB = Slot(doctor, room, 10, 0, 1);
         var sourceHold = Slot(doctor, room, 11, 0, 1);
         var targetA = Slot(replacement, targetRoom, 9, 30, 0);
-        var targetB = Slot(replacement, targetRoom, 10, 0, 0);
-        db.AddRange(targetA, targetB);
+        db.Add(targetA);
         Appointment Visit(string code, AppointmentSlot slot, int status) => new()
         {
             AppointmentCode = code,
@@ -271,10 +264,11 @@ public static class AdminWorkflowScenario
         await Assert.ThrowsAsync<InvalidOperationException>(() => departments.CreateDepartmentAsync("QA New Department", null));
 
         Assert.Contains(await service.GetRequestsAsync(actor), row => row.Id == changeId && row.CanApprove);
-        await Assert.ThrowsAsync<AdminOperationException>(() => service.ReviewAsync(nurseId, new(changeId, true, targetDoctorId)));
-        await Assert.ThrowsAsync<AdminOperationException>(() => service.ReviewAsync(actor, new(changeId, true, otherDoctorId)));
+        await Assert.ThrowsAsync<AdminOperationException>(() => service.ReviewAsync(nurseId, new(changeId, true, targetDoctorId, departmentId)));
+        await Assert.ThrowsAsync<AdminOperationException>(() => service.ReviewAsync(actor, new(changeId, true, otherDoctorId, departmentId)));
+        await Assert.ThrowsAsync<AdminOperationException>(() => service.ReviewAsync(actor, new(changeId, true, targetDoctorId, otherDepartment.Id)));
         Assert.Equal(ScheduleExceptionStatus.Pending, (await db.ScheduleExceptions.AsNoTracking().SingleAsync(row => row.Id == changeId)).Status);
-        var decision = await service.ReviewAsync(actor, new(changeId, true, targetDoctorId));
+        var decision = await service.ReviewAsync(actor, new(changeId, true, targetDoctorId, departmentId));
         Assert.Equal(new ScheduleDecisionResult(1, 1, 1), decision);
         Assert.Equal(targetDoctorId, (await db.Appointments.AsNoTracking().SingleAsync(row => row.Id == confirmedId)).DoctorId);
         var needsRebooking = await db.Appointments.AsNoTracking().SingleAsync(row => row.Id == rebookId);
@@ -286,7 +280,7 @@ public static class AdminWorkflowScenario
         Assert.Equal(0, blocked.BookedCount);
         Assert.Equal(1, await db.AppointmentSlots.Where(row => row.DoctorId == targetDoctorId).SumAsync(row => row.BookedCount));
         Assert.Equal(3, await db.Notifications.CountAsync());
-        await Assert.ThrowsAsync<AdminOperationException>(() => service.ReviewAsync(actor, new(changeId, true, targetDoctorId)));
+        await Assert.ThrowsAsync<AdminOperationException>(() => service.ReviewAsync(actor, new(changeId, true, targetDoctorId, departmentId)));
 
         var rejected = new ScheduleException
         {
@@ -296,7 +290,7 @@ public static class AdminWorkflowScenario
         };
         db.ScheduleExceptions.Add(rejected);
         await db.SaveChangesAsync();
-        await service.ReviewAsync(actor, new(rejected.Id, false, null));
+        await service.ReviewAsync(actor, new(rejected.Id, false, null, otherDepartment.Id));
         Assert.Equal(ScheduleExceptionStatus.Rejected, (await db.ScheduleExceptions.AsNoTracking().SingleAsync(row => row.Id == rejected.Id)).Status);
 
         // On-site visits have no online slot but must still prevent changing a shift already in use.
@@ -322,7 +316,7 @@ public static class AdminWorkflowScenario
         db.AddRange(onSite, receivedChange);
         await db.SaveChangesAsync();
         var receivedChangeId = receivedChange.Id;
-        await Assert.ThrowsAsync<AdminOperationException>(() => service.ReviewAsync(actor, new(receivedChangeId, true, null)));
+        await Assert.ThrowsAsync<AdminOperationException>(() => service.ReviewAsync(actor, new(receivedChangeId, true, null, otherDepartment.Id)));
         Assert.Equal(ScheduleExceptionStatus.Pending,
             (await db.ScheduleExceptions.AsNoTracking().SingleAsync(row => row.Id == receivedChangeId)).Status);
         await AdminHttpScenario.RunAsync(connection, actor, nurseId);

@@ -20,19 +20,25 @@ public partial class ScheduleChangeService
             .ThenByDescending(request => request.Date)
             .Take(200).ToListAsync(ct);
 
-        var doctors = await db.Doctors.AsNoTracking()
-            .Where(doctor => doctor.Account.IsActive)
-            .OrderBy(doctor => doctor.FullName).ToListAsync(ct);
+        var rows = new List<ScheduleRequestRow>(requests.Count);
+        foreach (var request in requests)
+        {
+            var replacements = request.Status == ScheduleExceptionStatus.Pending
+                ? await ReplacementDoctorHelper.GetAvailableReplacementsAsync(db, request.Doctor.DepartmentId, request.DoctorId, request.Date, request.Shift, ct)
+                : [];
 
-        return requests.Select(request => new ScheduleRequestRow(
-            request.Id, request.Doctor.FullName, request.Doctor.Department.Name,
-            request.Date, ShiftName(request.Shift), TypeName(request.Type), request.Reason,
-            request.Status.ToString(), request.ReplacementDoctor?.FullName,
-            request.Status == ScheduleExceptionStatus.Pending && StartOfChange(request) > Now,
-            request.Status == ScheduleExceptionStatus.Pending,
-            doctors.Where(doctor => doctor.Id != request.DoctorId && doctor.DepartmentId == request.Doctor.DepartmentId)
-                .Select(doctor => new AdminOption(doctor.Id, doctor.FullName)).ToList(),
-            request.ApprovedAt)).ToList();
+            rows.Add(new ScheduleRequestRow(
+                request.Id, request.Doctor.FullName, request.Doctor.Department.Name,
+                request.Date, ShiftName(request.Shift), TypeName(request.Type), request.Reason,
+                request.Status.ToString(), request.ReplacementDoctor?.FullName,
+                request.Status == ScheduleExceptionStatus.Pending && StartOfChange(request) > Now,
+                request.Status == ScheduleExceptionStatus.Pending,
+                replacements,
+                request.ApprovedAt,
+                request.Doctor.DepartmentId));
+        }
+
+        return rows;
     }
 
     public async Task<ScheduleDecisionResult> ReviewAsync(
@@ -48,7 +54,10 @@ public partial class ScheduleChangeService
             var change = await db.ScheduleExceptions.Include(change => change.Doctor)
                 .SingleOrDefaultAsync(change => change.Id == request.ExceptionId, ct);
             AdminRules.Require(change != null, "Không tìm thấy đề nghị nghỉ/đổi ca.");
-            AdminRules.Require(change!.Status == ScheduleExceptionStatus.Pending, "Đề nghị đã được xử lý; hãy tải lại danh sách.");
+            if (change == null) throw new InvalidOperationException();
+            AdminRules.Require(request.DepartmentId is > 0 && change.Doctor.DepartmentId == request.DepartmentId.Value,
+                "Đề nghị này không thuộc khoa bạn đang chọn.");
+            AdminRules.Require(change.Status == ScheduleExceptionStatus.Pending, "Đề nghị đã được xử lý; hãy tải lại danh sách.");
 
             var result = new ScheduleDecisionResult(0, 0, 0);
 
@@ -63,10 +72,14 @@ public partial class ScheduleChangeService
                 var replacementId = request.ReplacementDoctorId ?? change.ReplacementDoctorId;
                 if (replacementId.HasValue)
                 {
-                    AdminRules.Require(replacementId != change.DoctorId
-                        && await db.Doctors.AnyAsync(doctor => doctor.Id == replacementId
-                            && doctor.DepartmentId == change.Doctor.DepartmentId && doctor.Account.IsActive, ct),
+                    var repDoctor = await db.Doctors.AsNoTracking()
+                        .Include(d => d.Account)
+                        .FirstOrDefaultAsync(doctor => doctor.Id == replacementId
+                            && doctor.DepartmentId == change.Doctor.DepartmentId && doctor.Account.IsActive, ct);
+                    AdminRules.Require(replacementId != change.DoctorId && repDoctor != null,
                         "Bác sĩ thay thế phải đang hoạt động và thuộc cùng khoa.");
+                    AdminRules.Require(!await ReplacementDoctorHelper.IsDoctorBusyAsync(db, repDoctor!.Id, repDoctor.AccountId, change.Date, change.Shift, ct),
+                        $"BS. {repDoctor.FullName} đã có lịch khám hoặc ca trực trong thời gian này.");
                 }
 
                 change.ReplacementDoctorId = replacementId;
@@ -148,18 +161,10 @@ public partial class ScheduleChangeService
                             && exception.DoctorId == slot.DoctorId && exception.Date == change.Date
                             && exception.Status == ScheduleExceptionStatus.Approved
                             && (exception.Shift == null || exception.Shift == (slot.StartTime.Hour < 12 ? ExamShift.Morning : ExamShift.Afternoon)))
-                        && db.DoctorSchedules.Any(schedule => schedule.DoctorId == slot.DoctorId && schedule.RoomId == slot.RoomId
-                            && schedule.Status == DoctorScheduleStatus.Approved && schedule.WorkDate == change.Date
-                            && schedule.StartTime <= TimeOnly.FromDateTime(slot.StartTime) && schedule.EndTime >= TimeOnly.FromDateTime(slot.EndTime)
-                            && db.Appointments.Count(existing => existing.DoctorId == slot.DoctorId && existing.StatusId >= 1 && existing.StatusId <= 6
-                                && ((existing.Slot != null && existing.Slot.StartTime >= (slot.StartTime.Hour < 12 ? day : afternoon)
-                                        && existing.Slot.StartTime < (slot.StartTime.Hour < 12 ? afternoon : end))
-                                    || (existing.Slot == null && existing.CreatedAt >= (slot.StartTime.Hour < 12 ? day : afternoon)
-                                        && existing.CreatedAt < (slot.StartTime.Hour < 12 ? afternoon : end)))) < schedule.MaxPatients
-                            && db.Appointments.Count(existing => existing.DoctorId == slot.DoctorId && existing.BookingChannel == BookingChannel.Web
-                                && existing.StatusId >= 1 && existing.StatusId <= 6 && existing.Slot != null
-                                && existing.Slot.StartTime >= (slot.StartTime.Hour < 12 ? day : afternoon)
-                                && existing.Slot.StartTime < (slot.StartTime.Hour < 12 ? afternoon : end)) < schedule.OnlineSlots))
+                        && (change.ReplacementDoctorId.HasValue
+                            || db.DoctorSchedules.Any(schedule => schedule.DoctorId == slot.DoctorId && schedule.RoomId == slot.RoomId
+                                && schedule.Status == DoctorScheduleStatus.Approved && schedule.WorkDate == change.Date
+                                && schedule.StartTime <= TimeOnly.FromDateTime(slot.StartTime) && schedule.EndTime >= TimeOnly.FromDateTime(slot.EndTime))))
                     .OrderBy(slot => slot.StartTime == source.StartTime ? 0 : 1)
                     .ThenBy(slot => slot.BookedCount).ThenBy(slot => slot.StartTime);
 

@@ -12,8 +12,6 @@ public class DoctorSchedule
     public TimeOnly StartTime { get; set; } = new TimeOnly(7, 30);
     public TimeOnly EndTime { get; set; } = new TimeOnly(11, 30);
     public int SlotDurationMinutes { get; set; } = 30;
-    public int MaxPatients { get; set; } = 40;
-    public int OnlineSlots { get; set; } = 28;
     public bool IsHotShift { get; set; } = false;
     public DoctorScheduleStatus Status { get; set; } = DoctorScheduleStatus.Bidding;
     public string? DoctorNote { get; set; }

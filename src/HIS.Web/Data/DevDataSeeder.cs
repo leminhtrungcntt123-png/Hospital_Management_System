@@ -258,11 +258,12 @@ public static class DevDataSeeder
             var periodMonday = currentDay.AddDays(-daysFromMonday);
             var periodSunday = periodMonday.AddDays(6);
 
-            var period = await db.SchedulingPeriods.FirstOrDefaultAsync(p => p.StartDate <= currentDay && p.EndDate >= currentDay);
+            var period = await db.SchedulingPeriods.FirstOrDefaultAsync(p => p.DepartmentId == deptNoi.Id && p.StartDate <= currentDay && p.EndDate >= currentDay);
             if (period == null)
             {
                 period = new SchedulingPeriod
                 {
+                    DepartmentId = deptNoi.Id,
                     Name = $"Kỳ làm việc tuần {periodMonday:dd/MM} - {periodSunday:dd/MM/yyyy}",
                     StartDate = periodMonday,
                     EndDate = periodSunday,
@@ -292,8 +293,6 @@ public static class DevDataSeeder
                         StartTime = new TimeOnly(7, 30),
                         EndTime = new TimeOnly(11, 30),
                         SlotDurationMinutes = 30,
-                        MaxPatients = 40,
-                        OnlineSlots = 28,
                         Status = DoctorScheduleStatus.Approved,
                         ReviewedBy = headAcc1.Id,
                         ReviewedAt = DateTime.UtcNow
@@ -309,8 +308,6 @@ public static class DevDataSeeder
                         StartTime = new TimeOnly(13, 0),
                         EndTime = new TimeOnly(16, 30),
                         SlotDurationMinutes = 30,
-                        MaxPatients = 40,
-                        OnlineSlots = 28,
                         Status = DoctorScheduleStatus.Approved,
                         ReviewedBy = headAcc1.Id,
                         ReviewedAt = DateTime.UtcNow
@@ -335,8 +332,6 @@ public static class DevDataSeeder
                         StartTime = new TimeOnly(7, 30),
                         EndTime = new TimeOnly(11, 30),
                         SlotDurationMinutes = 30,
-                        MaxPatients = 35,
-                        OnlineSlots = 25,
                         Status = DoctorScheduleStatus.Approved,
                         ReviewedBy = headAcc1.Id,
                         ReviewedAt = DateTime.UtcNow
@@ -352,8 +347,6 @@ public static class DevDataSeeder
                         StartTime = new TimeOnly(13, 0),
                         EndTime = new TimeOnly(16, 30),
                         SlotDurationMinutes = 30,
-                        MaxPatients = 35,
-                        OnlineSlots = 25,
                         Status = DoctorScheduleStatus.Approved,
                         ReviewedBy = headAcc1.Id,
                         ReviewedAt = DateTime.UtcNow
@@ -372,8 +365,6 @@ public static class DevDataSeeder
                     StartTime = new TimeOnly(7, 30),
                     EndTime = new TimeOnly(11, 30),
                     SlotDurationMinutes = 30,
-                    MaxPatients = 35,
-                    OnlineSlots = 25,
                     Status = DoctorScheduleStatus.Bidding,
                     DoctorNote = "Đăng ký ca sáng thứ 6"
                 });
@@ -396,8 +387,6 @@ public static class DevDataSeeder
                         StartTime = new TimeOnly(7, 30),
                         EndTime = new TimeOnly(11, 30),
                         SlotDurationMinutes = 30,
-                        MaxPatients = 30,
-                        OnlineSlots = 20,
                         Status = DoctorScheduleStatus.Approved,
                         ReviewedBy = headAcc1.Id,
                         ReviewedAt = DateTime.UtcNow
@@ -413,8 +402,6 @@ public static class DevDataSeeder
                         StartTime = new TimeOnly(13, 0),
                         EndTime = new TimeOnly(16, 30),
                         SlotDurationMinutes = 30,
-                        MaxPatients = 30,
-                        OnlineSlots = 20,
                         Status = DoctorScheduleStatus.Approved,
                         ReviewedBy = headAcc1.Id,
                         ReviewedAt = DateTime.UtcNow

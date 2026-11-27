@@ -19,7 +19,9 @@ public record SchedulingPeriodDto(
     DateTime BiddingOpensAt,
     DateTime BiddingClosesAt,
     SchedulingPeriodStatus Status,
-    bool IsOpenForBidding
+    bool IsOpenForBidding,
+    int PendingBidsCount = 0,
+    int ApprovedBidsCount = 0
 );
 
 public record ShiftDemandCellDto(
@@ -105,7 +107,8 @@ public record DecisionMatrixResultDto(
 public record ApproveShiftRequest(
     int ScheduleId,
     int RoomId,
-    int ReviewedByAccountId
+    int ReviewedByAccountId,
+    int? ExpectedDepartmentId = null
 );
 
 public record ReallocateShiftRequest(
@@ -113,7 +116,8 @@ public record ReallocateShiftRequest(
     DateOnly TargetDate,
     ExamShift TargetShift,
     int TargetRoomId,
-    int ReviewedByAccountId
+    int ReviewedByAccountId,
+    int? ExpectedDepartmentId = null
 );
 
 public record DoctorPublicDto(

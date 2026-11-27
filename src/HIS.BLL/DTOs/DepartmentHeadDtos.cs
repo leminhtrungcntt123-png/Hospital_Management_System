@@ -16,13 +16,20 @@ public record DepartmentExceptionItemDto(
     DateTime CreatedAt,
     string? ApprovedByName,
     DateTime? ApprovedAt,
-    int AffectedAppointmentsCount = 0
+    int AffectedAppointmentsCount = 0,
+    IReadOnlyList<AdminOption>? AvailableReplacements = null
+);
+
+public record ExceptionApprovalPreviewDto(
+    int AffectedAppointmentsCount,
+    IReadOnlyList<AdminOption> AvailableReplacements
 );
 
 public record ApproveExceptionRequest(
     int ExceptionId,
     int DepartmentHeadAccountId,
-    int? DepartmentId = null
+    int? DepartmentId = null,
+    int? ReplacementDoctorId = null
 );
 
 public record RejectExceptionRequest(
@@ -44,8 +51,6 @@ public record DepartmentScheduleItemDto(
     TimeOnly StartTime,
     TimeOnly EndTime,
     int SlotDurationMinutes,
-    int MaxPatients,
-    int OnlineSlots,
     bool IsHotShift,
     DoctorScheduleStatus Status,
     string? DoctorNote = null,
@@ -74,8 +79,6 @@ public record UpsertDoctorScheduleRequest(
     TimeOnly StartTime,
     TimeOnly EndTime,
     int SlotDurationMinutes,
-    int MaxPatients,
-    int OnlineSlots,
     DoctorScheduleStatus Status = DoctorScheduleStatus.Approved,
     string? DoctorNote = null
 );

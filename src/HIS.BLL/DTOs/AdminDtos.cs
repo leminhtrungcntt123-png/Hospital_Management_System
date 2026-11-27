@@ -48,7 +48,8 @@ public record AccountActivationRequest(
 public record ScheduleDecisionRequest(
     int ExceptionId,
     bool Approve,
-    int? ReplacementDoctorId);
+    int? ReplacementDoctorId,
+    int? DepartmentId = null);
 
 public record AdminAccountRow(
     int Id,
@@ -103,7 +104,8 @@ public record ScheduleRequestRow(
     bool CanApprove,
     bool CanReject,
     IReadOnlyList<AdminOption> Replacements,
-    DateTime? ApprovedAt = null);
+    DateTime? ApprovedAt = null,
+    int DepartmentId = 0);
 
 public record ScheduleDecisionResult(
     int Transferred,
