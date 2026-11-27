@@ -7,7 +7,7 @@ namespace HIS.Tests.Unit;
 public class DepartmentHeadTests
 {
     [Fact]
-    public void UpsertDoctorSchedule_ShouldValidate_OnlineSlotsCannotExceedMaxPatients()
+    public void UpsertDoctorSchedule_ShouldValidate_EndTimeMustBeAfterStartTime()
     {
         var request = new UpsertDoctorScheduleRequest(
             null,
@@ -17,14 +17,12 @@ public class DepartmentHeadTests
             1,
             DateOnly.FromDateTime(DateTime.Today),
             ExamShift.Morning,
-            new TimeOnly(7, 30),
             new TimeOnly(11, 30),
-            15,
-            40,
-            50 // 50 > 40 -> invalid
+            new TimeOnly(7, 30),
+            15
         );
 
-        Assert.True(request.OnlineSlots > request.MaxPatients);
+        Assert.True(request.EndTime <= request.StartTime);
     }
 
     [Fact]

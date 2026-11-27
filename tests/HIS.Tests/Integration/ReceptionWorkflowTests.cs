@@ -52,9 +52,7 @@ public static class ReceptionWorkflowScenario
             Shift = ExamShift.Morning,
             StartTime = new TimeOnly(7, 30),
             EndTime = new TimeOnly(11, 30),
-            Status = DoctorScheduleStatus.Approved,
-            MaxPatients = 4,
-            OnlineSlots = 2
+            Status = DoctorScheduleStatus.Approved
         };
         db.Add(schedule);
         var slot = new AppointmentSlot

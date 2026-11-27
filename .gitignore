@@ -24,3 +24,6 @@ Thumbs.db
 scratch/
 *.bak
 *.tmp
+
+## Graphify knowledge graph
+graphify-out/

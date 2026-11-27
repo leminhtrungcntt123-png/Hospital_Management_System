@@ -84,5 +84,24 @@ public class ShiftBiddingTests
         Assert.Equal(10, req.TargetRoomId);
         Assert.Equal(2, req.ReviewedByAccountId);
     }
+
+    [Fact]
+    public void DepartmentIsolationRequests_ShouldCarryExpectedDepartmentAndReplacement()
+    {
+        var approveShift = new ApproveShiftRequest(10, 3, 2, ExpectedDepartmentId: 5);
+        var decision = new ScheduleDecisionRequest(12, true, ReplacementDoctorId: 8, DepartmentId: 5);
+        var approveEx = new ApproveExceptionRequest(12, 2, DepartmentId: 5, ReplacementDoctorId: 8);
+        var period = new SchedulingPeriodDto(
+            1, 5, "Khoa Nội", "Tuần 48",
+            new DateOnly(2026, 11, 23), new DateOnly(2026, 11, 29),
+            new DateTime(2026, 11, 20, 8, 0, 0), new DateTime(2026, 11, 22, 17, 0, 0),
+            SchedulingPeriodStatus.Open, true, PendingBidsCount: 4, ApprovedBidsCount: 2);
+
+        Assert.Equal(5, approveShift.ExpectedDepartmentId);
+        Assert.Equal(5, decision.DepartmentId);
+        Assert.Equal(8, approveEx.ReplacementDoctorId);
+        Assert.Equal(4, period.PendingBidsCount);
+        Assert.Equal(2, period.ApprovedBidsCount);
+    }
 }
 

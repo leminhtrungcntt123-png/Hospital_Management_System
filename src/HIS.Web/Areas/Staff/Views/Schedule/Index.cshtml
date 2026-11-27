@@ -175,7 +175,8 @@
                     {
                         @foreach (var ex in Model.Exceptions)
                         {
-                            var statusStr = ex.Status.ToString().ToUpper();
+                            var isExpired = ex.Status == ScheduleExceptionStatus.Pending && ex.Date < Model.Today;
+                            var statusStr = isExpired ? "EXPIRED" : ex.Status.ToString().ToUpper();
                             var typeStr = ex.Type switch
                             {
                                 ScheduleExceptionType.Training => "Đào tạo",
@@ -199,7 +200,13 @@
                                     @(ex.ReplacementDoctorName != null ? CleanDocName(ex.ReplacementDoctorName) : "Tự tìm cùng khoa")
                                 </td>
                                 <td>
-                                    @if (ex.Status == ScheduleExceptionStatus.Pending)
+                                    @if (isExpired)
+                                    {
+                                        <span class="badge" style="background:#f1f5f9; color:#64748b; border:1px solid #cbd5e1; padding:4px 8px; border-radius:50px; font-size:11px;">
+                                            • Đã quá hạn
+                                        </span>
+                                    }
+                                    else if (ex.Status == ScheduleExceptionStatus.Pending)
                                     {
                                         <span class="badge" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; padding:4px 8px; border-radius:50px; font-size:11px;">
                                             • Chờ duyệt
@@ -219,10 +226,15 @@
                                     }
                                 </td>
                                 <td>
-                                    @if (ex.Status == ScheduleExceptionStatus.Pending)
+                                    @if (isExpired)
+                                    {
+                                        <span class="text-muted small">Đã quá ngày</span>
+                                    }
+                                    else if (ex.Status == ScheduleExceptionStatus.Pending)
                                     {
                                         <div style="display:flex; gap:8px; align-items:center;">
-                                            <button type="button" class="btn primary sm" onclick="openApproveModal(@ex.Id, '@CleanDocName(ex.DoctorName)', '@ex.Date.ToString("dd/MM/yyyy")', '@(ex.ReplacementDoctorName != null ? CleanDocName(ex.ReplacementDoctorName) : "Điều phối trong khoa")', @ex.AffectedAppointmentsCount)">
+                                            <button type="button" class="btn primary sm"
+                                                    onclick="openApproveModal(@ex.Id, '@CleanDocName(ex.DoctorName)', '@ex.Date.ToString("dd/MM/yyyy")', '@(ex.ReplacementDoctorName != null ? CleanDocName(ex.ReplacementDoctorName) : "Điều phối trong khoa")')">
                                                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><polyline points="20 6 9 17 4 12"></polyline></svg>
                                                 <span>Duyệt</span>
                                             </button>
@@ -268,6 +280,14 @@
                             <small style="color:#64748b; display:block; font-size:11px;">Đề xuất thay thế</small>
                             <strong id="approveReplacementName" style="font-size:14px; color:#107c41;">BS. Nguyễn Hoàng Nam</strong>
                         </div>
+                    </div>
+                    <div style="margin-bottom:14px;">
+                        <label for="approveReplacementSelect" style="display:block; font-size:12px; font-weight:600; color:#334155; margin-bottom:6px;">
+                            Chọn bác sĩ thay thế (chỉ liệt kê bác sĩ cùng khoa đang rảnh ngày/ca này):
+                        </label>
+                        <select name="replacementDoctorId" id="approveReplacementSelect" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px; background:#fff;">
+                            <option value="">-- Giữ đề xuất / tự điều phối trong khoa --</option>
+                        </select>
                     </div>
                     <p style="font-size:12px; color:#64748b; margin:0; line-height:1.5;">
                         Lịch hẹn được cập nhật cùng thông báo gửi về tài khoản đặt. Lượt hết chỗ thay thế cần chọn lại lịch.
@@ -1498,7 +1518,6 @@ else if (tab == "my-schedule")
 
     // Tính toán KPI cá nhân trong tuần
     var totalShifts = myApprovedSchedules.Count;
-    var totalMaxPatients = myApprovedSchedules.Sum(s => s.MaxPatients);
     var totalBookedCount = myApprovedSchedules.Sum(s => s.BookedAppointmentsCount);
     var weekDutyCount = myDutyShifts.Count(ds => Model.WeekDates.Contains(DateOnly.FromDateTime(ds.StartTime)));
 
@@ -1554,7 +1573,6 @@ else if (tab == "my-schedule")
     <div class="kpi-grid" style="margin-bottom:14px;">
         @Kpi("calendar", "Ca khám tuần này", totalShifts.ToString(), "ca")
         @Kpi("moon", "Ca trực đêm", weekDutyCount.ToString(), "đêm")
-        @Kpi("target", "Chỉ tiêu tiếp nhận", totalMaxPatients.ToString(), "lượt")
         @Kpi("users", "Lịch hẹn đã đặt", totalBookedCount.ToString(), "lượt")
     </div>
 
@@ -1626,11 +1644,10 @@ else if (tab == "my-schedule")
                                 }
                                 else if (schedMorning != null)
                                 {
-                                    <div onclick="openScheduleModalWithData(@headDocId, @(schedMorning.RoomId ?? 0), @((int)dOfWeek), 0, '@schedMorning.StartTime.ToString("HH:mm")', '@schedMorning.EndTime.ToString("HH:mm")', @schedMorning.MaxPatients, @schedMorning.OnlineSlots, @schedMorning.Id, '@curDate.ToString("yyyy-MM-dd")', @schedMorning.BookedAppointmentsCount)"
+                                    <div onclick="openScheduleModalWithData(@headDocId, @(schedMorning.RoomId ?? 0), @((int)dOfWeek), 0, '@schedMorning.StartTime.ToString("HH:mm")', '@schedMorning.EndTime.ToString("HH:mm")', 0, 0, @schedMorning.Id, '@curDate.ToString("yyyy-MM-dd")', @schedMorning.BookedAppointmentsCount)"
                                          title="Nhấp để xem/sửa ca sáng"
                                          style="flex:1; min-width:0; display:flex; align-items:center; gap:6px; background:#f0fdf4; border:1px solid #dcfce7; border-radius:6px; padding:4px 6px; cursor:pointer;">
                                         <strong style="font-size:11px; color:#0d6535; white-space:nowrap;">@(string.IsNullOrWhiteSpace(schedMorning.RoomNumber) ? "Chưa xếp" : schedMorning.RoomNumber)</strong>
-                                        <span style="font-size:10.5px; color:#475569; white-space:nowrap;">@schedMorning.MaxPatients BN</span>
                                         <span style="font-size:10.5px; color:#475569; margin-left:auto; white-space:nowrap;">Đã đặt @schedMorning.BookedAppointmentsCount</span>
                                         <button type="button"
                                                 onclick="event.stopPropagation(); openDeleteScheduleById(@schedMorning.Id, '@(headDoc != null ? CleanDocName(headDoc.FullName) : "Trưởng khoa")', 'Ca sáng (@schedMorning.StartTime.ToString("HH:mm")–@schedMorning.EndTime.ToString("HH:mm")) - @curDate.ToString("dd/MM/yyyy")', @schedMorning.BookedAppointmentsCount)"
@@ -1660,11 +1677,10 @@ else if (tab == "my-schedule")
                                 }
                                 else if (schedAfternoon != null)
                                 {
-                                    <div onclick="openScheduleModalWithData(@headDocId, @(schedAfternoon.RoomId ?? 0), @((int)dOfWeek), 1, '@schedAfternoon.StartTime.ToString("HH:mm")', '@schedAfternoon.EndTime.ToString("HH:mm")', @schedAfternoon.MaxPatients, @schedAfternoon.OnlineSlots, @schedAfternoon.Id, '@curDate.ToString("yyyy-MM-dd")', @schedAfternoon.BookedAppointmentsCount)"
+                                    <div onclick="openScheduleModalWithData(@headDocId, @(schedAfternoon.RoomId ?? 0), @((int)dOfWeek), 1, '@schedAfternoon.StartTime.ToString("HH:mm")', '@schedAfternoon.EndTime.ToString("HH:mm")', 0, 0, @schedAfternoon.Id, '@curDate.ToString("yyyy-MM-dd")', @schedAfternoon.BookedAppointmentsCount)"
                                          title="Nhấp để xem/sửa ca chiều"
                                          style="flex:1; min-width:0; display:flex; align-items:center; gap:6px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:4px 6px; cursor:pointer;">
                                         <strong style="font-size:11px; color:#334155; white-space:nowrap;">@(string.IsNullOrWhiteSpace(schedAfternoon.RoomNumber) ? "Chưa xếp" : schedAfternoon.RoomNumber)</strong>
-                                        <span style="font-size:10.5px; color:#475569; white-space:nowrap;">@schedAfternoon.MaxPatients BN</span>
                                         <span style="font-size:10.5px; color:#475569; margin-left:auto; white-space:nowrap;">Đã đặt @schedAfternoon.BookedAppointmentsCount</span>
                                         <button type="button"
                                                 onclick="event.stopPropagation(); openDeleteScheduleById(@schedAfternoon.Id, '@(headDoc != null ? CleanDocName(headDoc.FullName) : "Trưởng khoa")', 'Ca chiều (@schedAfternoon.StartTime.ToString("HH:mm")–@schedAfternoon.EndTime.ToString("HH:mm")) - @curDate.ToString("dd/MM/yyyy")', @schedAfternoon.BookedAppointmentsCount)"
@@ -1744,7 +1760,6 @@ else
     var deptMorningCount = deptApprovedSchedules.Count(s => s.Shift == ExamShift.Morning);
     var deptAfternoonCount = deptApprovedSchedules.Count(s => s.Shift == ExamShift.Afternoon);
     var deptTotalShifts = deptMorningCount + deptAfternoonCount;
-    var deptTotalMaxPatients = deptApprovedSchedules.Sum(s => s.MaxPatients);
     var deptTotalReceived = deptApprovedSchedules.Sum(s => s.ReceivedPatientsCount);
     var deptWeekDutyCount = Model.DutyShifts.Count(ds => Model.WeekDates.Contains(DateOnly.FromDateTime(ds.StartTime)));
 
@@ -1813,7 +1828,6 @@ else
     <div class="kpi-grid" style="margin-bottom:12px;">
         @Kpi("calendar", "Ca khám tuần", deptTotalShifts.ToString(), "ca")
         @Kpi("moon", "Ca trực đêm", deptWeekDutyCount.ToString(), "đêm")
-        @Kpi("target", "Chỉ tiêu tiếp nhận", deptTotalMaxPatients.ToString(), "lượt")
         @Kpi("users", "Đã tiếp nhận", deptTotalReceived.ToString(), "lượt")
     </div>
 
@@ -2010,15 +2024,14 @@ else
                                     {
                                         if (curDate < Model.Today)
                                         {
-                                            <span title="Ca khám trong quá khứ" style="flex:1; min-width:0; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:5px; padding:3px 6px; font-size:10.5px; color:#94a3b8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">@schedMorning.RoomNumber · @schedMorning.MaxPatients BN</span>
+                                            <span title="Ca khám trong quá khứ" style="flex:1; min-width:0; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:5px; padding:3px 6px; font-size:10.5px; color:#94a3b8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">@schedMorning.RoomNumber</span>
                                         }
                                         else
                                         {
-                                            <span onclick="openScheduleModalWithData(@doc.Id, @schedMorning.RoomId, @((int)dOfWeek), 0, '@schedMorning.StartTime.ToString("HH:mm")', '@schedMorning.EndTime.ToString("HH:mm")', @schedMorning.MaxPatients, @schedMorning.OnlineSlots, @schedMorning.Id, '@curDate.ToString("yyyy-MM-dd")')"
-                                                  title="Sửa định mức ca sáng"
+                                            <span onclick="openScheduleModalWithData(@doc.Id, @schedMorning.RoomId, @((int)dOfWeek), 0, '@schedMorning.StartTime.ToString("HH:mm")', '@schedMorning.EndTime.ToString("HH:mm")', 0, 0, @schedMorning.Id, '@curDate.ToString("yyyy-MM-dd")')"
+                                                  title="Sửa ca sáng"
                                                   style="flex:1; min-width:0; display:flex; align-items:center; gap:6px; background:#f0fdf4; border:1px solid #dcfce7; border-radius:5px; padding:3px 6px; cursor:pointer;">
                                                 <strong style="font-size:10.5px; color:#0d6535; white-space:nowrap;">@schedMorning.RoomNumber</strong>
-                                                <span style="font-size:10px; color:#475569; white-space:nowrap;">@schedMorning.MaxPatients BN</span>
                                                 <span style="font-size:10px; color:#64748b; margin-left:auto; white-space:nowrap;">Đặt @schedMorning.BookedAppointmentsCount</span>
                                                 <button type="button"
                                                         onclick="event.stopPropagation(); openDeleteScheduleById(@schedMorning.Id, '@CleanDocName(doc.FullName)', 'Ca sáng (@schedMorning.StartTime.ToString("HH:mm")–@schedMorning.EndTime.ToString("HH:mm")) - @curDate.ToString("dd/MM/yyyy")')"
@@ -2060,15 +2073,14 @@ else
                                     {
                                         if (curDate < Model.Today)
                                         {
-                                            <span title="Ca khám trong quá khứ" style="flex:1; min-width:0; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:5px; padding:3px 6px; font-size:10.5px; color:#94a3b8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">@schedAfternoon.RoomNumber · @schedAfternoon.MaxPatients BN</span>
+                                            <span title="Ca khám trong quá khứ" style="flex:1; min-width:0; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:5px; padding:3px 6px; font-size:10.5px; color:#94a3b8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">@schedAfternoon.RoomNumber</span>
                                         }
                                         else
                                         {
-                                            <span onclick="openScheduleModalWithData(@doc.Id, @schedAfternoon.RoomId, @((int)dOfWeek), 1, '@schedAfternoon.StartTime.ToString("HH:mm")', '@schedAfternoon.EndTime.ToString("HH:mm")', @schedAfternoon.MaxPatients, @schedAfternoon.OnlineSlots, @schedAfternoon.Id, '@curDate.ToString("yyyy-MM-dd")')"
-                                                  title="Sửa định mức ca chiều"
+                                            <span onclick="openScheduleModalWithData(@doc.Id, @schedAfternoon.RoomId, @((int)dOfWeek), 1, '@schedAfternoon.StartTime.ToString("HH:mm")', '@schedAfternoon.EndTime.ToString("HH:mm")', 0, 0, @schedAfternoon.Id, '@curDate.ToString("yyyy-MM-dd")')"
+                                                  title="Sửa ca chiều"
                                                   style="flex:1; min-width:0; display:flex; align-items:center; gap:6px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:3px 6px; cursor:pointer;">
                                                 <strong style="font-size:10.5px; color:#334155; white-space:nowrap;">@schedAfternoon.RoomNumber</strong>
-                                                <span style="font-size:10px; color:#475569; white-space:nowrap;">@schedAfternoon.MaxPatients BN</span>
                                                 <span style="font-size:10px; color:#64748b; margin-left:auto; white-space:nowrap;">Đặt @schedAfternoon.BookedAppointmentsCount</span>
                                                 <button type="button"
                                                         onclick="event.stopPropagation(); openDeleteScheduleById(@schedAfternoon.Id, '@CleanDocName(doc.FullName)', 'Ca chiều (@schedAfternoon.StartTime.ToString("HH:mm")–@schedAfternoon.EndTime.ToString("HH:mm")) - @curDate.ToString("dd/MM/yyyy")')"
@@ -2383,19 +2395,8 @@ else
                         </div>
                     </div>
 
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:6px;">
-                        <div>
-                            <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Tổng chỉ tiêu / ca</label>
-                            <input type="number" name="maxPatients" id="scheduleModalMaxPatients" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" value="40" min="1" max="100" required />
-                        </div>
-                        <div>
-                            <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Hạn mức trực tuyến</label>
-                            <input type="number" name="onlineSlots" id="scheduleModalOnlineSlots" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" value="28" min="0" max="100" required />
-                        </div>
-                    </div>
-
                     <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:8px 10px; font-size:11px; color:#475569; margin-top:8px;">
-                         <strong>Cơ chế định mức:</strong> Khám trực tuyến tối đa = <code>Hạn mức trực tuyến</code>. Số lượt khám tại quầy (tiếp nhận trực tiếp) tự động = <code>Tổng chỉ tiêu - Hạn mức trực tuyến</code>. Khi sửa cấu hình, hệ thống sẽ tự động cập nhật đè bản ghi cũ của bác sĩ trong ca đó.
+                        Khi sửa cấu hình, hệ thống sẽ tự động cập nhật phòng và giờ trực của bác sĩ trong ca đó.
                     </div>
                 </div>
                 <div class="app-modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
@@ -2649,12 +2650,42 @@ else
         });
     }
     
-    function openApproveModal(id, doctorName, date, replacementName, affectedCount) {
+    async function openApproveModal(id, doctorName, date, replacementName) {
         document.getElementById('approveExceptionId').value = id;
         document.getElementById('approveModalSub').textContent = doctorName + ' · ' + date;
         document.getElementById('approveReplacementName').textContent = replacementName;
-        document.getElementById('approveAffectedCount').textContent = (affectedCount !== undefined && affectedCount !== null) ? affectedCount : 0;
+        const countEl = document.getElementById('approveAffectedCount');
+        if (countEl) countEl.textContent = '...';
+        const select = document.getElementById('approveReplacementSelect');
+        if (select) {
+            select.innerHTML = '<option value="">-- Đang tải danh sách bác sĩ trống lịch... --</option>';
+        }
         document.getElementById('approveModal').classList.add('show');
+
+        try {
+            const resp = await fetch('@Url.Action("GetExceptionApprovalPreview", "Schedule", new { area = "Staff" })?id=' + encodeURIComponent(id), {
+                headers: { 'Accept': 'application/json' }
+            });
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            const data = await resp.json();
+            if (document.getElementById('approveExceptionId').value !== String(id)) return;
+
+            if (countEl) countEl.textContent = data.affectedCount ?? 0;
+            if (select) {
+                select.innerHTML = '<option value="">-- Giữ đề xuất / tự điều phối trong khoa --</option>';
+                (data.availableReplacements || []).forEach(item => {
+                    const opt = document.createElement('option');
+                    opt.value = item.id;
+                    opt.textContent = item.name;
+                    select.appendChild(opt);
+                });
+            }
+        } catch {
+            if (countEl) countEl.textContent = '0';
+            if (select) {
+                select.innerHTML = '<option value="">-- Giữ đề xuất / tự điều phối trong khoa --</option>';
+            }
+        }
     }
     function closeApproveModal() {
         document.getElementById('approveModal').classList.remove('show');
@@ -3050,12 +3081,6 @@ else
     
         const etInput = document.getElementById('scheduleModalEndTime');
         if (etInput) etInput.value = endTime || (shift === 1 ? '16:30' : '11:30');
-    
-        const mpInput = document.getElementById('scheduleModalMaxPatients');
-        if (mpInput) mpInput.value = maxPatients || 40;
-    
-        const osInput = document.getElementById('scheduleModalOnlineSlots');
-        if (osInput) osInput.value = (onlineSlots !== undefined && onlineSlots !== null && onlineSlots !== '') ? onlineSlots : 28;
     
         // Cập nhật danh sách buồng khám trống / đã có người cho ngày & ca đã chọn:
         if (typeof updateModalRoomAvailability === 'function') {

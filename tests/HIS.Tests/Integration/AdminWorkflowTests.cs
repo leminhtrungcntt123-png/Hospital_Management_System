@@ -98,9 +98,7 @@ public static class AdminWorkflowScenario
                 Shift = ExamShift.Morning,
                 StartTime = new TimeOnly(7, 30),
                 EndTime = new TimeOnly(11, 30),
-                Status = DoctorScheduleStatus.Approved,
-                OnlineSlots = online,
-                MaxPatients = 8
+                Status = DoctorScheduleStatus.Approved
             });
         }
 
