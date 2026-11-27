@@ -84,20 +84,13 @@ public sealed class GuestBookingService(
             {
                 var start = date.ToDateTime(schedule.StartTime);
                 var end = date.ToDateTime(schedule.EndTime);
-                if (schedule.SlotDurationMinutes <= 0 || end <= start || schedule.OnlineSlots <= 0)
+                if (schedule.SlotDurationMinutes <= 0 || end <= start)
                 {
                     continue;
                 }
 
-                var count = Math.Min((int)((end - start).TotalMinutes / schedule.SlotDurationMinutes), schedule.OnlineSlots);
+                var count = (int)((end - start).TotalMinutes / schedule.SlotDurationMinutes);
                 if (count <= 0)
-                {
-                    continue;
-                }
-
-                var booked = daySlots.Where(s => s.StartTime >= start && s.StartTime < end).Sum(s => s.BookedCount);
-                var remaining = Math.Min(schedule.OnlineSlots, schedule.MaxPatients) - booked;
-                if (remaining <= 0)
                 {
                     continue;
                 }
@@ -111,14 +104,13 @@ public sealed class GuestBookingService(
                     }
 
                     var existing = daySlots.SingleOrDefault(s => s.StartTime == time);
-                    var capacity = schedule.OnlineSlots / count + (index < schedule.OnlineSlots % count ? 1 : 0);
                     if (existing != null && (existing.Status != SlotStatus.Available || existing.RoomId != schedule.RoomId
                         || existing.EndTime != time.AddMinutes(schedule.SlotDurationMinutes)))
                     {
                         continue;
                     }
 
-                    var available = Math.Min(remaining, (existing?.Capacity ?? capacity) - (existing?.BookedCount ?? 0));
+                    var available = (existing?.Capacity ?? 1) - (existing?.BookedCount ?? 0);
                     if (available > 0)
                     {
                         hasAvailableSlot = true;
