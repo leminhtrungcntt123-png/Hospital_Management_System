@@ -132,27 +132,39 @@ function staffDashboard() {
         todayTasks: [],
     };
 
-    const statsHtml = `<div class="kpi-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin:20px 0;">
-        <div class="card stat-card" style="padding:16px; background:#fff; border:1px solid #e2e8f0; border-radius:8px;">
-            <div style="font-size:12px; color:#64748b; font-weight:600;">LỊCH KHÁM HÔM NAY</div>
-            <div style="font-size:28px; font-weight:700; color:#0f172a; margin:6px 0;">${s.totalToday}</div>
-            <div style="font-size:11px; color:#64748b;">Tổng lượt khám tại khoa</div>
-        </div>
-        <div class="card stat-card" style="padding:16px; background:#fff; border:1px solid #e2e8f0; border-radius:8px;">
-            <div style="font-size:12px; color:#d97706; font-weight:600;">CHỜ XỬ LÝ</div>
-            <div style="font-size:28px; font-weight:700; color:#d97706; margin:6px 0;">${s.waitingProcess}</div>
-            <div style="font-size:11px; color:#92400e;">Chờ đo: <strong>${s.waitingVitalsCount}</strong> · Chờ khám: <strong>${s.readyForDoctorCount}</strong></div>
-        </div>
-        <div class="card stat-card" style="padding:16px; background:#fff; border:1px solid #e2e8f0; border-radius:8px;">
-            <div style="font-size:12px; color:#2563eb; font-weight:600;">ĐANG KHÁM</div>
-            <div style="font-size:28px; font-weight:700; color:#2563eb; margin:6px 0;">${s.inProgressCount}</div>
-            <div style="font-size:11px; color:#64748b;">Bác sĩ đang khám</div>
-        </div>
-        <div class="card stat-card" style="padding:16px; background:#fff; border:1px solid #e2e8f0; border-radius:8px;">
-            <div style="font-size:12px; color:#16a34a; font-weight:600;">HOÀN THÀNH</div>
-            <div style="font-size:28px; font-weight:700; color:#16a34a; margin:6px 0;">${s.completedCount}</div>
-            <div style="font-size:11px; color:#64748b;">Đã có hồ sơ bệnh án</div>
-        </div>
+    const statsHtml = `<div class="kpi-grid">
+        <article class="card stat-card">
+            <span class="stat-icon">${icon('calendar')}</span>
+            <div class="stat-body">
+                <span class="stat-label">Lịch khám hôm nay</span>
+                <strong>${s.totalToday}</strong>
+                <small>Tổng lượt khám tại khoa</small>
+            </div>
+        </article>
+        <article class="card stat-card">
+            <span class="stat-icon">${icon('clock')}</span>
+            <div class="stat-body">
+                <span class="stat-label">Chờ xử lý</span>
+                <strong>${s.waitingProcess}</strong>
+                <small>Chờ đo: ${s.waitingVitalsCount} · Chờ khám: ${s.readyForDoctorCount}</small>
+            </div>
+        </article>
+        <article class="card stat-card">
+            <span class="stat-icon">${icon('pulse')}</span>
+            <div class="stat-body">
+                <span class="stat-label">Đang khám</span>
+                <strong>${s.inProgressCount}</strong>
+                <small>Bác sĩ đang khám</small>
+            </div>
+        </article>
+        <article class="card stat-card">
+            <span class="stat-icon">${icon('clipboard')}</span>
+            <div class="stat-body">
+                <span class="stat-label">Hoàn thành</span>
+                <strong>${s.completedCount}</strong>
+                <small>Đã có hồ sơ bệnh án</small>
+            </div>
+        </article>
     </div>`;
 
     const tasks = s.todayTasks || [];
