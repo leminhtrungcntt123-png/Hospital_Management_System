@@ -161,9 +161,10 @@ public partial class ScheduleChangeService
                             && exception.DoctorId == slot.DoctorId && exception.Date == change.Date
                             && exception.Status == ScheduleExceptionStatus.Approved
                             && (exception.Shift == null || exception.Shift == (slot.StartTime.Hour < 12 ? ExamShift.Morning : ExamShift.Afternoon)))
-                        && db.DoctorSchedules.Any(schedule => schedule.DoctorId == slot.DoctorId && schedule.RoomId == slot.RoomId
-                            && schedule.Status == DoctorScheduleStatus.Approved && schedule.WorkDate == change.Date
-                            && schedule.StartTime <= TimeOnly.FromDateTime(slot.StartTime) && schedule.EndTime >= TimeOnly.FromDateTime(slot.EndTime)))
+                        && (change.ReplacementDoctorId.HasValue
+                            || db.DoctorSchedules.Any(schedule => schedule.DoctorId == slot.DoctorId && schedule.RoomId == slot.RoomId
+                                && schedule.Status == DoctorScheduleStatus.Approved && schedule.WorkDate == change.Date
+                                && schedule.StartTime <= TimeOnly.FromDateTime(slot.StartTime) && schedule.EndTime >= TimeOnly.FromDateTime(slot.EndTime))))
                     .OrderBy(slot => slot.StartTime == source.StartTime ? 0 : 1)
                     .ThenBy(slot => slot.BookedCount).ThenBy(slot => slot.StartTime);
 
