@@ -113,8 +113,7 @@ public static class AdminWorkflowScenario
         var sourceB = Slot(doctor, room, 10, 0, 1);
         var sourceHold = Slot(doctor, room, 11, 0, 1);
         var targetA = Slot(replacement, targetRoom, 9, 30, 0);
-        var targetB = Slot(replacement, targetRoom, 10, 0, 0);
-        db.AddRange(targetA, targetB);
+        db.Add(targetA);
         Appointment Visit(string code, AppointmentSlot slot, int status) => new()
         {
             AppointmentCode = code,
