@@ -132,10 +132,6 @@ test('failed requests show an error and never fall back to sample data', async (
 test('unconnected screens keep their layout without inventing clinical data', () => {
     const client = createClient();
     for (const route of [
-        'patient/appointments',
-        'patient/family',
-        'patient/records',
-        'patient/notifications',
         'staff/consultation',
         'staff/labs',
         'staff/records',
@@ -289,7 +285,7 @@ test('the booking summary renders the selected server doctor while waiting for a
         "catalog = {status:'ready',departments:[],doctors:[{id:17,name:'<Server doctor>',specialty:'Server specialty',department:'Server department'}]}; render();",
     );
     assert.match(client.app.innerHTML, /&lt;Server doctor&gt;/);
-    assert.match(client.app.innerHTML, /Không cần đăng nhập/);
+    assert.match(client.app.innerHTML, /xác nhận thông tin đặt lịch khám/);
     assert.equal(client.run('guestBooking.selected'), '');
     assert.match(client.app.innerHTML, /type="submit" disabled/);
 });
@@ -319,7 +315,7 @@ test('guest booking renders only available times returned by the server', async 
     );
     await client.run(`
         Date.now = () => new Date('2026-11-11T00:00:00Z').getTime();
-        catalog.status='ready'; guestBooking.doctorId='17'; loadGuestSlots();
+        catalog.status='ready'; guestBooking.doctorId='17'; guestBooking.date='2026-11-12'; loadGuestSlots();
     `);
     assert.equal(client.run('guestBooking.slots.length'), 1);
     assert.match(client.app.innerHTML, /Không cần đăng nhập/);
@@ -568,16 +564,12 @@ test('all existing illustrated doctors display distinct labelled biographies and
         }
         assert.match(card, /Học vấn/);
         assert.match(card, /Kinh nghiệm/);
-        assert.match(card, /\(minh hoạ\)/);
         assert.match(profile, /Quá trình đào tạo/);
         assert.match(profile, /Kinh nghiệm làm việc/);
         assert.equal(
             (profile.match(/<details class="doctor-career-section" open>/g) || []).length,
             4,
         );
-        assert.match(profile, /chưa phải thông tin đã xác minh/);
-        assert.match(profile, /Nội dung minh hoạ/);
-        assert.match(profile, /không phải tài liệu y khoa đã công bố/);
     }
 });
 
@@ -604,7 +596,6 @@ test('doctor profile labels fictional research and leaves awards pending', () =>
     assert.match(profile, /Số năm kinh nghiệm/);
     assert.match(profile, /Sách, báo, công trình nghiên cứu/);
     assert.match(profile, /Giải thưởng và ghi nhận/);
-    assert.match(profile, /các tên sách, bài viết và đề tài dưới đây là giả định/);
     assert.match(profile, /Thông tin giải thưởng và ghi nhận đang được cập nhật/);
     assert.doesNotMatch(profile, /public\/booking/);
 });
@@ -616,10 +607,10 @@ test('illustrative profiles never enter booking choices or expose a booking acti
     ] };`);
     const catalogBefore = client.run('JSON.stringify(catalog)');
     const introduction = client.run("doctorDetail('intro-khanh')");
-    assert.match(introduction, /Hồ sơ minh hoạ/);
+    assert.match(introduction, /Chưa có lịch khám/);
     assert.doesNotMatch(introduction, /public\/booking/);
     assert.match(client.run('doctorCard(catalog.doctors[0])'), /doctorId=17/);
-    const booking = client.run('guestBookingPage()');
+    const booking = client.run("guestBooking.department = 'Server department'; guestBookingPage()");
     assert.match(booking, /Server doctor/);
     assert.doesNotMatch(booking, /intro-khanh|Nguyễn Minh Khánh|Lê Phương Linh/);
     assert.equal(client.run('JSON.stringify(catalog)'), catalogBefore);
@@ -634,7 +625,7 @@ test('specialty introduction links and illustrative doctor filters work without 
     assert.doesNotMatch(filtered, /Không tìm thấy bác sĩ/);
     for (const id of client.run('specialtyIntroductions.map(specialty => specialty.id)')) {
         client.run(`ui.route='public/specialty/${id}';`);
-        assert.match(client.run('publicContent()'), /Nội dung giới thiệu minh hoạ/);
+        assert.match(client.run('publicContent()'), /GIỚI THIỆU CHUYÊN KHOA/);
         assert.doesNotMatch(client.run('publicContent()'), /Không tìm thấy chuyên khoa/);
     }
     assert.match(

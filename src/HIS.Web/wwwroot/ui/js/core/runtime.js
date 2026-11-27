@@ -1,6 +1,6 @@
 function render() {
     const appEl = $('#app');
-    const contentOnly = appEl?.dataset.staffContentOnly === 'true';
+    const contentOnly = appEl?.dataset?.staffContentOnly === 'true';
     const bookingFocus = ui.route === 'public/booking' ? document.activeElement?.id : null;
     if (!contentOnly) {
         document.title = 'MediCare — ' + (pageTitles[ui.route] || 'Chăm sóc sức khỏe');
