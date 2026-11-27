@@ -10,11 +10,13 @@ public partial class DepartmentHeadService : IDepartmentHeadService
 {
     private readonly AppDbContext _context;
     private readonly TimeProvider _timeProvider;
+    private readonly INotificationService? _notificationService;
 
-    public DepartmentHeadService(AppDbContext context, TimeProvider timeProvider)
+    public DepartmentHeadService(AppDbContext context, TimeProvider timeProvider, INotificationService? notificationService = null)
     {
         _context = context;
         _timeProvider = timeProvider;
+        _notificationService = notificationService;
     }
 
     private DateTime LocalNow => DateTime.SpecifyKind(_timeProvider.GetLocalNow().DateTime, DateTimeKind.Unspecified);
@@ -128,8 +130,11 @@ public partial class DepartmentHeadService : IDepartmentHeadService
 
     public async Task<Result> ApproveExceptionAsync(ApproveExceptionRequest request, CancellationToken ct = default)
     {
-        return await _context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        var pendingEmails = new List<(string Email, string Subject, string Body)>();
+
+        var result = await _context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
+            pendingEmails.Clear();
             var ex = await _context.ScheduleExceptions
                 .Include(e => e.Doctor)
                 .FirstOrDefaultAsync(e => e.Id == request.ExceptionId, ct);
@@ -167,6 +172,7 @@ public partial class DepartmentHeadService : IDepartmentHeadService
 
             var appointmentsQuery = _context.Appointments
                 .Include(a => a.Patient)
+                .Include(a => a.BookedByAccount)
                 .Where(a => a.DoctorId == ex.DoctorId &&
                             a.Slot != null &&
                             a.Slot.StartTime >= startOfDay &&
@@ -190,7 +196,18 @@ public partial class DepartmentHeadService : IDepartmentHeadService
                     .Where(s => s.DoctorId == repDoctorId && s.StartTime >= startOfDay && s.StartTime <= endOfDay)
                     .ToListAsync(ct);
 
+                var repScheduleRoomId = await _context.DoctorSchedules
+                    .AsNoTracking()
+                    .Where(s => s.DoctorId == repDoctorId
+                        && s.WorkDate == ex.Date
+                        && s.Status == DoctorScheduleStatus.Approved
+                        && s.RoomId.HasValue
+                        && (!ex.Shift.HasValue || s.Shift == ex.Shift.Value))
+                    .Select(s => s.RoomId)
+                    .FirstOrDefaultAsync(ct);
+
                 var slotMapping = new Dictionary<int, int>();
+                var slotRoomMapping = new Dictionary<int, int>();
 
                 foreach (var slot in slots)
                 {
@@ -198,25 +215,49 @@ public partial class DepartmentHeadService : IDepartmentHeadService
                     if (existingRepSlot != null)
                     {
                         existingRepSlot.Capacity += slot.Capacity;
+                        existingRepSlot.BookedCount += slot.BookedCount;
+                        existingRepSlot.Status = existingRepSlot.BookedCount >= existingRepSlot.Capacity
+                            ? SlotStatus.Full
+                            : SlotStatus.Available;
+                        existingRepSlot.Version++;
+
+                        slot.BookedCount = 0;
                         slot.Status = SlotStatus.Blocked;
+                        slot.Version++;
+
                         slotMapping[slot.Id] = existingRepSlot.Id;
+                        slotRoomMapping[slot.Id] = existingRepSlot.RoomId;
                     }
                     else
                     {
                         slot.DoctorId = repDoctorId;
+                        if (repScheduleRoomId.HasValue && repScheduleRoomId.Value > 0)
+                        {
+                            slot.RoomId = repScheduleRoomId.Value;
+                        }
                         slotMapping[slot.Id] = slot.Id;
+                        slotRoomMapping[slot.Id] = slot.RoomId;
                     }
                 }
 
                 foreach (var app in affectedApps)
                 {
                     app.DoctorId = repDoctorId;
-                    if (app.SlotId.HasValue && slotMapping.TryGetValue(app.SlotId.Value, out var newSlotId))
+                    if (app.SlotId.HasValue)
                     {
-                        app.SlotId = newSlotId;
+                        var oldSlotId = app.SlotId.Value;
+                        if (slotMapping.TryGetValue(oldSlotId, out var newSlotId))
+                        {
+                            app.SlotId = newSlotId;
+                        }
+                        if (slotRoomMapping.TryGetValue(oldSlotId, out var newRoomId) && newRoomId > 0)
+                        {
+                            app.RoomId = newRoomId;
+                        }
                     }
                     app.UpdatedAt = now;
 
+                    var msgContent = $"Lịch khám của bệnh nhân {app.Patient.FullName} ngày {ex.Date:dd/MM/yyyy} đã được điều phối sang BS. {repDoctor?.FullName ?? "chuyên khoa"}.";
                     if (app.BookedBy.HasValue)
                     {
                         _context.Notifications.Add(new Notification
@@ -224,9 +265,18 @@ public partial class DepartmentHeadService : IDepartmentHeadService
                             AccountId = app.BookedBy.Value,
                             AppointmentId = app.Id,
                             Title = "Thay đổi bác sĩ khám",
-                            Content = $"Lịch khám của bệnh nhân {app.Patient.FullName} ngày {ex.Date:dd/MM/yyyy} đã được điều phối sang BS. {repDoctor?.FullName ?? "chuyên khoa"}.",
+                            Content = msgContent,
                             CreatedAt = now
                         });
+                    }
+
+                    var targetEmail = !string.IsNullOrWhiteSpace(app.ContactEmail) ? app.ContactEmail : app.BookedByAccount?.Email;
+                    if (!string.IsNullOrWhiteSpace(targetEmail))
+                    {
+                        pendingEmails.Add((
+                            targetEmail,
+                            $"[MediCare] Thay đổi bác sĩ khám {app.AppointmentCode}",
+                            $"<p>Xin chào,</p><p>{System.Net.WebUtility.HtmlEncode(msgContent)}</p><p>Mã lịch hẹn: <strong>{System.Net.WebUtility.HtmlEncode(app.AppointmentCode)}</strong></p>"));
                     }
                 }
             }
@@ -255,6 +305,7 @@ public partial class DepartmentHeadService : IDepartmentHeadService
                         ChangedAt = now
                     });
 
+                    var cancelMsgContent = $"Bác sĩ phụ trách ngày {ex.Date:dd/MM/yyyy} của bệnh nhân {app.Patient.FullName} có lịch nghỉ đột xuất. Vui lòng chọn lại thời gian hoặc bác sĩ khám.";
                     if (app.BookedBy.HasValue)
                     {
                         _context.Notifications.Add(new Notification
@@ -262,9 +313,18 @@ public partial class DepartmentHeadService : IDepartmentHeadService
                             AccountId = app.BookedBy.Value,
                             AppointmentId = app.Id,
                             Title = "Lịch khám cần đặt lại",
-                            Content = $"Bác sĩ phụ trách ngày {ex.Date:dd/MM/yyyy} của bệnh nhân {app.Patient.FullName} có lịch nghỉ đột xuất. Vui lòng chọn lại thời gian hoặc bác sĩ khám.",
+                            Content = cancelMsgContent,
                             CreatedAt = now
                         });
+                    }
+
+                    var targetEmail = !string.IsNullOrWhiteSpace(app.ContactEmail) ? app.ContactEmail : app.BookedByAccount?.Email;
+                    if (!string.IsNullOrWhiteSpace(targetEmail))
+                    {
+                        pendingEmails.Add((
+                            targetEmail,
+                            $"[MediCare] Lịch khám {app.AppointmentCode} cần đặt lại",
+                            $"<p>Xin chào,</p><p>{System.Net.WebUtility.HtmlEncode(cancelMsgContent)}</p><p>Mã lịch hẹn: <strong>{System.Net.WebUtility.HtmlEncode(app.AppointmentCode)}</strong></p>"));
                     }
                 }
             }
@@ -273,6 +333,16 @@ public partial class DepartmentHeadService : IDepartmentHeadService
             await tx.CommitAsync(ct);
             return Result.Success();
         });
+
+        if (result.IsSuccess && _notificationService != null)
+        {
+            foreach (var (email, subject, body) in pendingEmails)
+            {
+                await _notificationService.SendEmailNotificationAsync(email, subject, body, ct);
+            }
+        }
+
+        return result;
     }
 
     public async Task<Result> RejectExceptionAsync(RejectExceptionRequest request, CancellationToken ct = default)
@@ -467,8 +537,82 @@ public partial class DepartmentHeadService : IDepartmentHeadService
             }
         }
 
+        var pendingScheduleEmails = new List<(string Email, string Subject, string Body)>();
+
         if (schedule != null)
         {
+            var wasApproved = schedule.Status == DoctorScheduleStatus.Approved;
+            var changedCritical = schedule.DoctorId != request.DoctorId
+                || schedule.RoomId != request.RoomId
+                || schedule.WorkDate != request.WorkDate
+                || schedule.StartTime != request.StartTime
+                || schedule.EndTime != request.EndTime
+                || schedule.Status != request.Status;
+
+            if (wasApproved && changedCritical)
+            {
+                var activeApps = await _context.Appointments
+                    .Include(a => a.Patient)
+                    .Include(a => a.BookedByAccount)
+                    .Include(a => a.Slot)
+                    .Where(a => a.Slot != null
+                        && a.Slot.ScheduleId == schedule.Id
+                        && a.StatusId >= 1 && a.StatusId <= 5)
+                    .ToListAsync(ct);
+
+                if (activeApps.Count > 0)
+                {
+                    if (request.Status is DoctorScheduleStatus.Cancelled or DoctorScheduleStatus.Rejected or DoctorScheduleStatus.Reallocated)
+                    {
+                        return Result.Failure<int>("SCHEDULE_HAS_APPOINTMENTS",
+                            "Ca khám đã có lịch hẹn đang hiệu lực. Vui lòng xử lý nghỉ/đổi ca để điều phối bệnh nhân trước khi hủy.");
+                    }
+
+                    if (request.RoomId.HasValue && schedule.RoomId != request.RoomId)
+                    {
+                        var scheduleSlots = await _context.AppointmentSlots
+                            .Where(s => s.ScheduleId == schedule.Id)
+                            .ToListAsync(ct);
+                        foreach (var s in scheduleSlots)
+                        {
+                            s.RoomId = request.RoomId.Value;
+                        }
+                    }
+
+                    var changeMsg = $"Lịch khám ngày {request.WorkDate:dd/MM/yyyy} ({request.StartTime:HH:mm}–{request.EndTime:HH:mm}) với BS. {doctor.FullName} vừa được cập nhật thông tin ca/phòng khám.";
+                    foreach (var app in activeApps)
+                    {
+                        app.DoctorId = request.DoctorId;
+                        if (request.RoomId.HasValue)
+                        {
+                            app.RoomId = request.RoomId.Value;
+                        }
+                        app.UpdatedAt = LocalNow;
+
+                        if (app.BookedBy.HasValue)
+                        {
+                            _context.Notifications.Add(new Notification
+                            {
+                                AccountId = app.BookedBy.Value,
+                                AppointmentId = app.Id,
+                                Title = "Cập nhật lịch khám",
+                                Content = $"{app.Patient.FullName}: {changeMsg}",
+                                CreatedAt = LocalNow
+                            });
+                        }
+
+                        var targetEmail = !string.IsNullOrWhiteSpace(app.ContactEmail) ? app.ContactEmail : app.BookedByAccount?.Email;
+                        if (!string.IsNullOrWhiteSpace(targetEmail))
+                        {
+                            pendingScheduleEmails.Add((
+                                targetEmail,
+                                $"[MediCare] Cập nhật lịch khám {app.AppointmentCode}",
+                                $"<p>Xin chào,</p><p>{System.Net.WebUtility.HtmlEncode(changeMsg)}</p><p>Mã lịch hẹn: <strong>{System.Net.WebUtility.HtmlEncode(app.AppointmentCode)}</strong></p>"));
+                        }
+                    }
+                }
+            }
+
             schedule.PeriodId = periodId ?? schedule.PeriodId;
             schedule.DoctorId = request.DoctorId;
             schedule.DepartmentId = request.DepartmentId > 0 ? request.DepartmentId : doctor.DepartmentId;
@@ -508,6 +652,13 @@ public partial class DepartmentHeadService : IDepartmentHeadService
         try
         {
             await _context.SaveChangesAsync(ct);
+            if (_notificationService != null && pendingScheduleEmails.Count > 0)
+            {
+                foreach (var (email, subject, body) in pendingScheduleEmails)
+                {
+                    await _notificationService.SendEmailNotificationAsync(email, subject, body, ct);
+                }
+            }
             return Result<int>.Success(schedule.Id);
         }
         catch (DbUpdateException ex)

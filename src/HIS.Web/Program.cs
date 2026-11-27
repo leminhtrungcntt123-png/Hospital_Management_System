@@ -88,7 +88,7 @@ builder.Services.AddRateLimiter(options =>
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));
-    foreach (var (name, limit) in new[] { ("register", 3), ("password-reset-request", 3), ("password-reset-confirm", 10), ("guest-booking", 5) })
+    foreach (var (name, limit) in new[] { ("register", 3), ("password-reset-request", 3), ("password-reset-confirm", 10), ("guest-booking", 20) })
     {
         options.AddPolicy(name, context => RateLimitPartition.GetFixedWindowLimiter(
             context.Connection.RemoteIpAddress?.ToString() ?? "unknown",

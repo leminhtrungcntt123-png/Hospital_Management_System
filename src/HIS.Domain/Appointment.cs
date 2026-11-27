@@ -20,6 +20,7 @@ public class Appointment
     public DateTime? CheckedInAt { get; set; }
     public DateTime? CalledAt { get; set; }
     public int? ParentAppointmentId { get; set; }
+    public string? ContactEmail { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 

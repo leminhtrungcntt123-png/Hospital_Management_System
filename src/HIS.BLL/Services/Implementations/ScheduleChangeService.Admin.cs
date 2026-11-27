@@ -38,8 +38,11 @@ public partial class ScheduleChangeService
     public async Task<ScheduleDecisionResult> ReviewAsync(
         int actorId, ScheduleDecisionRequest request, CancellationToken ct = default)
     {
-        return await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        var pendingEmails = new List<(string Email, string Subject, string Body)>();
+
+        var result = await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
+            pendingEmails.Clear();
             db.ChangeTracker.Clear();
             await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
             await AdminRules.RequireAdminAsync(db, actorId, ct);
@@ -50,7 +53,7 @@ public partial class ScheduleChangeService
             AdminRules.Require(change != null, "Không tìm thấy đề nghị nghỉ/đổi ca.");
             AdminRules.Require(change!.Status == ScheduleExceptionStatus.Pending, "Đề nghị đã được xử lý; hãy tải lại danh sách.");
 
-            var result = new ScheduleDecisionResult(0, 0, 0);
+            var decision = new ScheduleDecisionResult(0, 0, 0);
 
             if (request.Approve)
             {
@@ -70,7 +73,7 @@ public partial class ScheduleChangeService
                 }
 
                 change.ReplacementDoctorId = replacementId;
-                result = await MoveAppointmentsAsync(change, actorId, ct);
+                decision = await MoveAppointmentsAsync(change, actorId, pendingEmails, ct);
                 change.Status = ScheduleExceptionStatus.Approved;
             }
             else
@@ -89,11 +92,25 @@ public partial class ScheduleChangeService
 
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
-            return result;
+            return decision;
         });
+
+        if (notificationService != null)
+        {
+            foreach (var (email, subject, body) in pendingEmails)
+            {
+                await notificationService.SendEmailNotificationAsync(email, subject, body, ct);
+            }
+        }
+
+        return result;
     }
 
-    private async Task<ScheduleDecisionResult> MoveAppointmentsAsync(ScheduleException change, int actorId, CancellationToken ct)
+    private async Task<ScheduleDecisionResult> MoveAppointmentsAsync(
+        ScheduleException change,
+        int actorId,
+        List<(string Email, string Subject, string Body)> pendingEmails,
+        CancellationToken ct)
     {
         var day = change.Date.ToDateTime(TimeOnly.MinValue);
         var end = day.AddDays(1);
@@ -104,6 +121,7 @@ public partial class ScheduleChangeService
         var slots = await db.AppointmentSlots
             .Where(slot => slot.DoctorId == change.DoctorId && slot.StartTime >= from && slot.StartTime < until)
             .Include(slot => slot.Appointments).ThenInclude(appointment => appointment.Patient)
+            .Include(slot => slot.Appointments).ThenInclude(appointment => appointment.BookedByAccount)
             .OrderBy(slot => slot.StartTime).ToListAsync(ct);
 
         var hasReceivedVisits = await db.Appointments.AnyAsync(appointment =>
@@ -127,7 +145,7 @@ public partial class ScheduleChangeService
                 {
                     ChangeStatus(appointment, AppointmentStatusId.Expired, actorId);
                     appointment.HoldUntil = null;
-                    Notify(appointment, "Giữ chỗ đã được giải phóng do bác sĩ thay đổi ca. Vui lòng chọn lịch mới.");
+                    Notify(appointment, "Giữ chỗ đã được giải phóng do bác sĩ thay đổi ca. Vui lòng chọn lịch mới.", pendingEmails);
                     expired++;
                     continue;
                 }
@@ -172,7 +190,7 @@ public partial class ScheduleChangeService
                     appointment.DoctorId = null;
                     appointment.RoomId = null;
                     ChangeStatus(appointment, AppointmentStatusId.RescheduleRequired, actorId);
-                    Notify(appointment, "Không còn slot thay thế trong khoa. Vui lòng chọn lịch khám mới.");
+                    Notify(appointment, "Không còn slot thay thế trong khoa. Vui lòng chọn lịch khám mới.", pendingEmails);
                     rebook++;
                 }
                 else
@@ -197,7 +215,7 @@ public partial class ScheduleChangeService
                         PerformedBy = actorId,
                         ChangedAt = Now
                     });
-                    Notify(appointment, $"Lịch khám đã chuyển sang bác sĩ khác trong khoa lúc {target.StartTime:HH:mm dd/MM/yyyy}.");
+                    Notify(appointment, $"Lịch khám đã chuyển sang bác sĩ khác trong khoa lúc {target.StartTime:HH:mm dd/MM/yyyy}.", pendingEmails);
                     moved++;
                 }
 
@@ -228,7 +246,7 @@ public partial class ScheduleChangeService
         appointment.StatusId = (int)next;
     }
 
-    private void Notify(Appointment appointment, string content)
+    private void Notify(Appointment appointment, string content, List<(string Email, string Subject, string Body)> pendingEmails)
     {
         if (appointment.BookedBy.HasValue)
         {
@@ -240,6 +258,15 @@ public partial class ScheduleChangeService
                 Content = appointment.Patient.FullName + ": " + content,
                 CreatedAt = Now
             });
+        }
+
+        var email = !string.IsNullOrWhiteSpace(appointment.ContactEmail)
+            ? appointment.ContactEmail
+            : appointment.BookedByAccount?.Email;
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            var body = $"<p>Xin chào,</p><p>Lịch hẹn <strong>{System.Net.WebUtility.HtmlEncode(appointment.AppointmentCode)}</strong> của người khám <strong>{System.Net.WebUtility.HtmlEncode(appointment.Patient.FullName)}</strong> vừa có cập nhật từ Bệnh viện MediCare:</p><p>{System.Net.WebUtility.HtmlEncode(content)}</p>";
+            pendingEmails.Add((email, $"[MediCare] Thông báo điều chỉnh lịch khám {appointment.AppointmentCode}", body));
         }
     }
 
