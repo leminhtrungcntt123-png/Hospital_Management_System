@@ -47,6 +47,7 @@ public sealed class VitalSignsService(
             .Include(a => a.Slot)
             .Include(a => a.VitalSigns).ThenInclude(v => v!.RecordedByNurse)
             .Where(a => a.DepartmentId == nurse.DepartmentId
+                && !a.AppointmentCode.StartsWith("DEP-")
                 && ((a.Slot != null && a.Slot.StartTime >= start && a.Slot.StartTime < end)
                     || (a.Slot == null && a.CreatedAt >= start && a.CreatedAt < end)));
 

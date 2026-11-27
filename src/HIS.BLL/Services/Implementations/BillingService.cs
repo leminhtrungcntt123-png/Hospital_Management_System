@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net.Mail;
 using System.Text.Json;
 using HIS.BLL.Common;
 using HIS.BLL.DTOs;
@@ -17,7 +18,11 @@ public class BillingService : IBillingService
 
     private sealed record DepositMeta(decimal Used, decimal Refunded, string? ReferenceCode);
     private sealed record DepositNoteMeta(string ApprovedBy, string Purpose, string? UserNote);
-    private sealed record InvoiceSettlementMeta(decimal DepositDeducted, string? IdempotencyKey, string? MainTransactionCode);
+    private sealed record InvoiceSettlementMeta(
+        decimal DepositDeducted,
+        string? IdempotencyKey,
+        string? MainTransactionCode,
+        string? ReceiptEmail = null);
 
     private readonly AppDbContext _context;
     private readonly TimeProvider _timeProvider;
@@ -198,15 +203,16 @@ public class BillingService : IBillingService
             .Include(a => a.MedicalRecord)!.ThenInclude(m => m!.LabOrders)!.ThenInclude(o => o.Service)
             .Include(a => a.MedicalRecord)!.ThenInclude(m => m!.Prescriptions)!.ThenInclude(p => p.PrescriptionItems)!.ThenInclude(pi => pi.Medication)
             .Where(a => a.StatusId >= (int)AppointmentStatusId.CheckedIn
+                && a.StatusId <= (int)AppointmentStatusId.Completed
                 && (!a.AppointmentCode.StartsWith("DEP-") || (a.Invoice != null && a.Invoice.TotalAmount > 0)));
 
         if (invoiceStatus == InvoiceStatus.Paid)
         {
             query = query.Where(a => a.Invoice != null && a.Invoice.Status == InvoiceStatus.Paid);
         }
-        else
+        else if (invoiceStatus == InvoiceStatus.Unpaid)
         {
-            query = query.Where(a => a.Invoice == null || a.Invoice.Status == InvoiceStatus.Unpaid);
+            query = query.Where(a => a.Invoice == null || a.Invoice.Status != InvoiceStatus.Paid);
         }
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -218,7 +224,9 @@ public class BillingService : IBillingService
             query = query.Where(a =>
                 (hasIntId && a.PatientId == parsedId)
                 || a.AppointmentCode.ToUpper() == searchUpper
-                || (a.Patient.NationalId != null && a.Patient.NationalId == search));
+                || (a.Patient.NationalId != null && a.Patient.NationalId == search)
+                || a.Patient.PhoneNumber.Contains(search)
+                || a.Patient.FullName.Contains(search));
         }
         else
         {
@@ -254,7 +262,7 @@ public class BillingService : IBillingService
                     return Math.Max(0m, p.Amount - meta.Used - meta.Refunded);
                 }));
 
-        var examService = await _context.Services.AsNoTracking().FirstOrDefaultAsync(s => s.Id == _options.ExamFeeServiceId, ct);
+        var examService = await ResolveDefaultExamServiceAsync(ct);
         var list = new List<PendingInvoiceItemDto>();
 
         foreach (var a in appointments)
@@ -319,6 +327,7 @@ public class BillingService : IBillingService
         var app = await _context.Appointments
             .AsNoTracking()
             .Include(a => a.Patient)
+            .Include(a => a.BookedByAccount)
             .Include(a => a.Doctor)
             .Include(a => a.Department)
             .Include(a => a.Slot)
@@ -345,7 +354,7 @@ public class BillingService : IBillingService
         string? cardNum = insuranceCard?.CardNumber;
         string? facility = insuranceCard?.RegisteredFacility;
 
-        var examService = await _context.Services.AsNoTracking().FirstOrDefaultAsync(s => s.Id == _options.ExamFeeServiceId, ct);
+        var examService = await ResolveDefaultExamServiceAsync(ct);
         var (items, totalAmount, insuranceCoveredAmount, patientAmountTotal) =
             BuildInvoiceLineItems(app, examService, hasInsurance, baseCoveragePct);
 
@@ -358,7 +367,13 @@ public class BillingService : IBillingService
 
         decimal additionalPaid = allPayments.Where(p => p.PaymentType == PaymentType.Payment).Sum(p => p.Amount);
         decimal refundedAmount = allPayments.Where(p => p.PaymentType == PaymentType.Refund).Sum(p => p.Amount);
+        decimal depositRefundedAmount = allPayments
+            .Where(p => p.PaymentType == PaymentType.Refund
+                && (p.Note == null || !p.Note.StartsWith("Hoàn tiền HĐ", StringComparison.OrdinalIgnoreCase)))
+            .Sum(p => p.Amount);
         decimal depositDeducted = invoice != null ? await GetRecordedDepositDeductedAsync(invoice.Id, ct) : 0m;
+
+        var (patientAccountId, patientEmail) = await ResolvePatientContactAccountAsync(app, ct);
 
         string? paymentMethodDisplay = null;
         if (depositDeducted > 0 || allPayments.Count > 0)
@@ -390,6 +405,11 @@ public class BillingService : IBillingService
             : null;
 
         int age = examDate.Year - app.Patient.DateOfBirth.Year;
+        if (app.Patient.DateOfBirth > examDate.AddYears(-age))
+        {
+            age--;
+        }
+        age = Math.Max(0, age);
         string genderStr = app.Patient.Gender switch
         {
             Gender.Male => "Nam",
@@ -418,6 +438,20 @@ public class BillingService : IBillingService
                 ? $"[{app.MedicalRecord.PrimaryDiagnosisCode}] {app.MedicalRecord.PrimaryDiagnosisDesc}"
                 : app.MedicalRecord.PrimaryDiagnosisDesc)
             : "Khám và theo dõi chuyên khoa";
+
+        string appointmentStatusName = app.StatusId switch
+        {
+            (int)AppointmentStatusId.Pending => "Chờ xác nhận",
+            (int)AppointmentStatusId.Confirmed => "Đã xác nhận lịch",
+            (int)AppointmentStatusId.CheckedIn => "Đã tiếp nhận (chờ đo sinh hiệu)",
+            (int)AppointmentStatusId.ReadyForDoctor => "Chờ Bác sĩ khám",
+            (int)AppointmentStatusId.InProgress => "Bác sĩ đang khám",
+            (int)AppointmentStatusId.Completed => "Đã hoàn thành khám",
+            (int)AppointmentStatusId.Cancelled => "Đã hủy",
+            (int)AppointmentStatusId.NoShow => "Vắng mặt",
+            (int)AppointmentStatusId.Expired => "Hết hạn",
+            _ => "Đang xử lý"
+        };
 
         var detail = new InvoiceDetailDto(
             invoice?.Id ?? 0,
@@ -455,7 +489,16 @@ public class BillingService : IBillingService
             refundedAmount,
             app.Patient.NationalId,
             app.Patient.Address,
-            diagnosisText);
+            diagnosisText,
+            patientEmail,
+            patientAccountId,
+            depositRefundedAmount,
+            app.StatusId,
+            appointmentStatusName,
+            insuranceCard?.InsurancePlanId,
+            insuranceCard?.ValidFrom,
+            insuranceCard?.ValidTo,
+            insuranceCard?.IsRegisteredHere ?? true);
 
         return Result.Success(detail);
     }
@@ -492,6 +535,13 @@ public class BillingService : IBillingService
             if (app.Invoice != null && (app.Invoice.Status == InvoiceStatus.Paid || app.Invoice.Payments.Any(p => p.PaymentType == PaymentType.Payment)))
             {
                 return Result.Failure<int>("ALREADY_PAID", "Lượt khám này đã được thanh toán viện phí trước đó.");
+            }
+
+            if (request.RequireCompletedVisit && app.StatusId != (int)AppointmentStatusId.Completed)
+            {
+                return Result.Failure<int>(
+                    "VISIT_NOT_COMPLETED",
+                    "Lượt khám chưa hoàn tất tại phòng Bác sĩ (chưa lưu bệnh án/chỉ định). Vui lòng thu tạm ứng trước hoặc đợi Bác sĩ hoàn tất khám rồi mới quyết toán.");
             }
 
             var detailRes = await GetInvoiceDetailAsync(request.AppointmentId, innerCt);
@@ -592,8 +642,47 @@ public class BillingService : IBillingService
             return Result.Failure<SettleDischargeResultDto>("INVALID_REQUEST", "Thông tin yêu cầu quyết toán không hợp lệ.");
         }
 
+        string? normalizedReceiptEmail = string.IsNullOrWhiteSpace(request.ReceiptEmail)
+            ? null
+            : request.ReceiptEmail.Trim();
+
+        if (request.SendReceiptEmail && !string.IsNullOrWhiteSpace(normalizedReceiptEmail)
+            && !MailAddress.TryCreate(normalizedReceiptEmail, out _))
+        {
+            return Result.Failure<SettleDischargeResultDto>("INVALID_EMAIL", "Địa chỉ email nhận biên lai không đúng định dạng.");
+        }
+
         return await ExecuteInTransactionAsync(async innerCt =>
         {
+            if (!string.IsNullOrWhiteSpace(request.IdempotencyKey))
+            {
+                var existingInvoiceId = await FindInvoiceIdByIdempotencyKeyAsync(request.IdempotencyKey, innerCt);
+                if (existingInvoiceId.HasValue)
+                {
+                    var existingDetailRes = await GetInvoiceDetailAsync(request.AppointmentId, innerCt);
+                    if (existingDetailRes.IsSuccess && existingDetailRes.Value!.InvoiceId == existingInvoiceId.Value)
+                    {
+                        var existingDetail = existingDetailRes.Value!;
+                        return Result.Success(new SettleDischargeResultDto(
+                            existingDetail.InvoiceId,
+                            existingDetail.InvoiceNumber,
+                            existingDetail.AppointmentCode,
+                            existingDetail.PatientName,
+                            existingDetail.TotalAmount,
+                            existingDetail.InsuranceCoveredAmount,
+                            existingDetail.PatientAmount,
+                            existingDetail.DepositDeducted,
+                            existingDetail.AdditionalPaid,
+                            existingDetail.DepositRefundedAmount,
+                            request.Method,
+                            existingDetail.TransactionCode ?? existingDetail.InvoiceNumber,
+                            existingDetail.PaidAt ?? Now,
+                            existingDetail.PatientAccountId,
+                            null));
+                    }
+                }
+            }
+
             var app = await LockAppointmentAsync(request.AppointmentId, innerCt);
             if (app == null)
             {
@@ -603,6 +692,13 @@ public class BillingService : IBillingService
             if (app.Invoice != null && app.Invoice.Status == InvoiceStatus.Paid)
             {
                 return Result.Failure<SettleDischargeResultDto>("ALREADY_PAID", "Lượt khám này đã hoàn tất quyết toán trước đó.");
+            }
+
+            if (request.RequireCompletedVisit && app.StatusId != (int)AppointmentStatusId.Completed)
+            {
+                return Result.Failure<SettleDischargeResultDto>(
+                    "VISIT_NOT_COMPLETED",
+                    "Lượt khám chưa hoàn tất tại phòng Bác sĩ (chưa lưu bệnh án/chỉ định). Vui lòng chỉ thu tạm ứng trước hoặc đợi Bác sĩ hoàn tất khám rồi mới quyết toán.");
             }
 
             var detailRes = await GetInvoiceDetailAsync(request.AppointmentId, innerCt);
@@ -710,6 +806,10 @@ public class BillingService : IBillingService
             string invoiceNum = $"HD-{invoice.Id:D6}";
             string mainTransCode = primaryPayment != null ? $"PT-{primaryPayment.Id:D8}" : invoiceNum;
 
+            string? resolvedReceiptEmail = request.SendReceiptEmail
+                ? (normalizedReceiptEmail ?? detail.PatientEmail)
+                : null;
+
             _context.AccessLogs.Add(new AccessLog
             {
                 AccountId = request.CashierAccountId > 0 ? request.CashierAccountId : null,
@@ -720,7 +820,7 @@ public class BillingService : IBillingService
                 IsSuccess = true,
                 Severity = "INFO",
                 OccurredAt = now,
-                Details = JsonSerializer.Serialize(new InvoiceSettlementMeta(depositDeductedTotal, request.IdempotencyKey, mainTransCode))
+                Details = JsonSerializer.Serialize(new InvoiceSettlementMeta(depositDeductedTotal, request.IdempotencyKey, mainTransCode, resolvedReceiptEmail))
             });
 
             await _context.SaveChangesAsync(innerCt);
@@ -738,7 +838,9 @@ public class BillingService : IBillingService
                 refundedToPatient,
                 request.Method,
                 mainTransCode,
-                now));
+                now,
+                detail.PatientAccountId,
+                resolvedReceiptEmail));
         }, ct);
     }
 
@@ -817,6 +919,118 @@ public class BillingService : IBillingService
                 p.Cashier?.Username ?? "Hệ thống",
                 ResolveShiftId(shiftRanges, p.CashierId, p.PaidAt));
         }).ToList();
+    }
+
+    public async Task<LedgerSummaryDto> GetLedgerSummaryAsync(LedgerFilterDto filter, CancellationToken ct = default)
+    {
+        var query = _context.Payments
+            .AsNoTracking()
+            .Where(p => !p.Invoice.Patient.FullName.StartsWith("BN Test"))
+            .AsQueryable();
+
+        if (filter.CashierId.HasValue)
+        {
+            query = query.Where(p => p.CashierId == filter.CashierId.Value);
+        }
+
+        if (filter.Method.HasValue)
+        {
+            query = query.Where(p => p.PaymentMethod == filter.Method.Value);
+        }
+
+        if (filter.Type.HasValue)
+        {
+            query = query.Where(p => p.PaymentType == filter.Type.Value);
+        }
+
+        if (filter.FromDate.HasValue)
+        {
+            var start = filter.FromDate.Value.ToDateTime(TimeOnly.MinValue);
+            query = query.Where(p => p.PaidAt >= start);
+        }
+
+        if (filter.ToDate.HasValue)
+        {
+            var end = filter.ToDate.Value.AddDays(1).ToDateTime(TimeOnly.MinValue);
+            query = query.Where(p => p.PaidAt < end);
+        }
+
+        var grouped = await query
+            .GroupBy(p => new { p.PaymentMethod, p.PaymentType })
+            .Select(g => new
+            {
+                g.Key.PaymentMethod,
+                g.Key.PaymentType,
+                Total = g.Sum(x => x.Amount),
+                Count = g.Count()
+            })
+            .ToListAsync(ct);
+
+        decimal totalCash = grouped
+            .Where(x => x.PaymentMethod == PaymentMethod.Cash && (x.PaymentType == PaymentType.Payment || x.PaymentType == PaymentType.Deposit))
+            .Sum(x => x.Total);
+        decimal totalTransfer = grouped
+            .Where(x => x.PaymentMethod == PaymentMethod.BankTransfer && (x.PaymentType == PaymentType.Payment || x.PaymentType == PaymentType.Deposit))
+            .Sum(x => x.Total);
+        decimal totalRefund = grouped
+            .Where(x => x.PaymentType == PaymentType.Refund)
+            .Sum(x => x.Total);
+        int totalCount = grouped.Sum(x => x.Count);
+
+        decimal totalDepositDeducted = 0m;
+        if ((!filter.Type.HasValue || filter.Type == PaymentType.Payment) && !filter.Method.HasValue)
+        {
+            var settleQuery = _context.AccessLogs
+                .AsNoTracking()
+                .Where(l => l.EntityName == InvoiceEntityName && l.Action == ActionSettleInvoice && l.Details != null);
+
+            if (filter.CashierId.HasValue)
+            {
+                settleQuery = settleQuery.Where(l => l.AccountId == filter.CashierId.Value);
+            }
+
+            if (filter.FromDate.HasValue)
+            {
+                var start = filter.FromDate.Value.ToDateTime(TimeOnly.MinValue);
+                settleQuery = settleQuery.Where(l => l.OccurredAt >= start);
+            }
+
+            if (filter.ToDate.HasValue)
+            {
+                var end = filter.ToDate.Value.AddDays(1).ToDateTime(TimeOnly.MinValue);
+                settleQuery = settleQuery.Where(l => l.OccurredAt < end);
+            }
+
+            var settleRows = await settleQuery
+                .Join(
+                    _context.Patients.AsNoTracking(),
+                    l => l.PatientId,
+                    p => p.Id,
+                    (l, p) => new { l.Details, p.FullName })
+                .Where(x => !x.FullName.StartsWith("BN Test"))
+                .Select(x => x.Details)
+                .ToListAsync(ct);
+
+            foreach (var details in settleRows)
+            {
+                if (string.IsNullOrWhiteSpace(details)) continue;
+                try
+                {
+                    var meta = JsonSerializer.Deserialize<InvoiceSettlementMeta>(details);
+                    if (meta != null && meta.DepositDeducted > 0)
+                    {
+                        totalDepositDeducted += meta.DepositDeducted;
+                    }
+                }
+                catch
+                {
+                    // Ignore malformed audit JSON
+                }
+            }
+        }
+
+        decimal netTotal = totalCash + totalTransfer - totalRefund;
+        return new LedgerSummaryDto(totalCash, totalTransfer, totalDepositDeducted, totalRefund, netTotal, totalCount);
     }
 
     public async Task<IReadOnlyList<PatientBillingHistoryItemDto>> GetPatientBillingHistoryAsync(int patientId, CancellationToken ct = default)
@@ -998,10 +1212,10 @@ public class BillingService : IBillingService
             query = query.Where(p => !p.Invoice.Patient.FullName.StartsWith("BN Test") && !p.Invoice.Patient.FullName.StartsWith("Nguyễn Văn Tra Cứu"));
         }
 
-        var payments = await query
-            .OrderByDescending(p => p.PaidAt)
-            .Take(500)
-            .ToListAsync(ct);
+        var orderedPayments = query.OrderByDescending(p => p.PaidAt);
+        var payments = (!string.IsNullOrWhiteSpace(search) || status.HasValue)
+            ? await orderedPayments.ToListAsync(ct)
+            : await orderedPayments.Take(500).ToListAsync(ct);
 
         IEnumerable<DepositDto> dtos = payments.Select(MapPaymentToDepositDto);
 
@@ -1523,15 +1737,19 @@ public class BillingService : IBillingService
             return _context.Appointments
                 .FromSqlInterpolated($"SELECT * FROM appointments WHERE id = {appointmentId} FOR UPDATE")
                 .Include(a => a.Patient)
+                .Include(a => a.BookedByAccount)
                 .Include(a => a.Slot)
                 .Include(a => a.Invoice)!.ThenInclude(i => i!.Payments)
+                .Include(a => a.Invoice)!.ThenInclude(i => i!.InvoiceItems)
                 .FirstOrDefaultAsync(ct);
         }
 
         return _context.Appointments
             .Include(a => a.Patient)
+            .Include(a => a.BookedByAccount)
             .Include(a => a.Slot)
             .Include(a => a.Invoice)!.ThenInclude(i => i!.Payments)
+            .Include(a => a.Invoice)!.ThenInclude(i => i!.InvoiceItems)
             .FirstOrDefaultAsync(a => a.Id == appointmentId, ct);
     }
 
@@ -1605,11 +1823,6 @@ public class BillingService : IBillingService
                 .Where(a => a.PatientId == patientId && (a.Invoice == null || a.Invoice.Status != InvoiceStatus.Paid))
                 .OrderByDescending(a => a.CreatedAt)
                 .FirstOrDefaultAsync(ct);
-
-            if (app != null && !app.AppointmentCode.StartsWith("DEP-", StringComparison.Ordinal) && app.StatusId < (int)AppointmentStatusId.CheckedIn)
-            {
-                app.StatusId = (int)AppointmentStatusId.CheckedIn;
-            }
         }
 
         if (app == null)
@@ -1627,7 +1840,7 @@ public class BillingService : IBillingService
                 DoctorId = defaultDoc.Id,
                 DepartmentId = defaultDept.Id,
                 AppointmentCode = $"DEP-{now:HHmmss}-{Random.Shared.Next(10, 99)}",
-                StatusId = (int)AppointmentStatusId.CheckedIn,
+                StatusId = (int)AppointmentStatusId.Expired,
                 CreatedAt = now
             };
             _context.Appointments.Add(app);
@@ -1694,9 +1907,50 @@ public class BillingService : IBillingService
             invoice.InsuranceCardId = insuranceCard?.Id;
             invoice.InsurancePlanId = insuranceCard?.InsurancePlanId;
             invoice.Status = InvoiceStatus.Paid;
+
+            if (invoice.InvoiceItems.Count == 0 && detail.Items.Count > 0)
+            {
+                foreach (var item in detail.Items)
+                {
+                    invoice.InvoiceItems.Add(new InvoiceItem
+                    {
+                        Category = MapCategory(item.Category),
+                        Description = Truncate(item.Description, 255)!,
+                        Amount = item.Total
+                    });
+                }
+            }
         }
 
         return invoice;
+    }
+
+    private async Task<(int? AccountId, string? Email)> ResolvePatientContactAccountAsync(Appointment app, CancellationToken ct)
+    {
+        if (app.BookedByAccount != null
+            && app.BookedByAccount.IsActive
+            && app.BookedByAccount.RoleId == (int)RoleId.Patient)
+        {
+            return (app.BookedByAccount.Id, string.IsNullOrWhiteSpace(app.BookedByAccount.Email) ? null : app.BookedByAccount.Email.Trim());
+        }
+
+        var linked = await _context.AccountPatientProfiles
+            .AsNoTracking()
+            .Where(l => l.PatientId == app.PatientId
+                && l.Status == LinkStatus.Active
+                && l.Account.IsActive
+                && l.Account.RoleId == (int)RoleId.Patient)
+            .OrderByDescending(l => l.Relationship == PatientRelationship.Self)
+            .ThenByDescending(l => l.CreatedAt)
+            .Select(l => new { l.AccountId, l.Account.Email })
+            .FirstOrDefaultAsync(ct);
+
+        if (linked == null)
+        {
+            return (null, null);
+        }
+
+        return (linked.AccountId, string.IsNullOrWhiteSpace(linked.Email) ? null : linked.Email.Trim());
     }
 
     private async Task<decimal> GetRecordedDepositDeductedAsync(int invoiceId, CancellationToken ct)
@@ -1782,11 +2036,187 @@ public class BillingService : IBillingService
         return null;
     }
 
+    public async Task<IReadOnlyList<InsurancePlanOptionDto>> GetInsurancePlansAsync(CancellationToken ct = default)
+    {
+        return await _context.InsurancePlans
+            .AsNoTracking()
+            .OrderByDescending(p => p.CoveragePct)
+            .ThenBy(p => p.Name)
+            .Select(p => new InsurancePlanOptionDto(p.Id, p.Name, p.CoveragePct, p.ReferralType))
+            .ToListAsync(ct);
+    }
+
+    public async Task<Result<int>> UpsertPatientInsuranceCardAsync(UpsertPatientInsuranceCardRequest request, CancellationToken ct = default)
+    {
+        if (request.PatientId <= 0)
+        {
+            return Result.Failure<int>("INVALID_PATIENT", "Mã bệnh nhân không hợp lệ.");
+        }
+
+        if (!request.IsActive)
+        {
+            return await ExecuteInTransactionAsync(async innerCt =>
+            {
+                var activeCards = await _context.InsuranceCards
+                    .Where(c => c.PatientId == request.PatientId && c.IsActive)
+                    .ToListAsync(innerCt);
+
+                foreach (var c in activeCards)
+                {
+                    c.IsActive = false;
+                }
+
+                if (request.CashierAccountId > 0)
+                {
+                    _context.AccessLogs.Add(new AccessLog
+                    {
+                        AccountId = request.CashierAccountId,
+                        PatientId = request.PatientId,
+                        Action = "DEACTIVATE_INSURANCE_CARD",
+                        EntityName = "insurance_cards",
+                        OccurredAt = Now
+                    });
+                }
+
+                await _context.SaveChangesAsync(innerCt);
+                return Result.Success(0);
+            }, ct);
+        }
+
+        string cardNumber = (request.CardNumber ?? string.Empty).Trim().ToUpperInvariant().Replace(" ", "").Replace("-", "");
+        if (cardNumber.Length < 10 || cardNumber.Length > 20 || !cardNumber.All(char.IsLetterOrDigit))
+        {
+            return Result.Failure<int>("INVALID_CARD_NUMBER", "Mã thẻ BHYT phải gồm 10 đến 20 ký tự chữ/số (VD: DN4797938328001).");
+        }
+
+        if (request.ValidTo < request.ValidFrom)
+        {
+            return Result.Failure<int>("INVALID_DATES", "Ngày hết hạn thẻ BHYT phải lớn hơn hoặc bằng ngày có hiệu lực.");
+        }
+
+        return await ExecuteInTransactionAsync(async innerCt =>
+        {
+            var patientExists = await _context.Patients.AnyAsync(p => p.Id == request.PatientId, innerCt);
+            if (!patientExists)
+            {
+                return Result.Failure<int>("PATIENT_NOT_FOUND", "Không tìm thấy hồ sơ người bệnh.");
+            }
+
+            var plan = await _context.InsurancePlans.AsNoTracking().FirstOrDefaultAsync(p => p.Id == request.InsurancePlanId, innerCt);
+            if (plan == null)
+            {
+                return Result.Failure<int>("PLAN_NOT_FOUND", "Không tìm thấy gói mức hưởng BHYT đã chọn.");
+            }
+
+            var duplicateOtherPatient = await _context.InsuranceCards
+                .AsNoTracking()
+                .AnyAsync(c => c.CardNumber == cardNumber && c.PatientId != request.PatientId, innerCt);
+            if (duplicateOtherPatient)
+            {
+                return Result.Failure<int>("DUPLICATE_CARD", "Mã thẻ BHYT này đã được gắn cho một hồ sơ người bệnh khác.");
+            }
+
+            var existingCards = await _context.InsuranceCards
+                .Where(c => c.PatientId == request.PatientId)
+                .ToListAsync(innerCt);
+
+            var targetCard = existingCards.FirstOrDefault(c => c.CardNumber == cardNumber)
+                ?? existingCards.OrderByDescending(c => c.IsActive).ThenByDescending(c => c.Id).FirstOrDefault();
+
+            string? facility = string.IsNullOrWhiteSpace(request.RegisteredFacility)
+                ? (request.IsRegisteredHere ? "Bệnh viện Đa khoa MediCare" : "Cơ sở KCB tuyến khác")
+                : Truncate(request.RegisteredFacility.Trim(), 150);
+
+            foreach (var other in existingCards)
+            {
+                if (targetCard == null || other.Id != targetCard.Id)
+                {
+                    other.IsActive = false;
+                }
+            }
+
+            if (targetCard == null)
+            {
+                targetCard = new InsuranceCard
+                {
+                    PatientId = request.PatientId,
+                    CardNumber = cardNumber,
+                    InsurancePlanId = plan.Id,
+                    RegisteredFacility = facility,
+                    IsRegisteredHere = request.IsRegisteredHere,
+                    ValidFrom = request.ValidFrom,
+                    ValidTo = request.ValidTo,
+                    IsActive = true,
+                    CreatedAt = Now
+                };
+                _context.InsuranceCards.Add(targetCard);
+            }
+            else
+            {
+                // Chỉ đổi CardNumber nếu chưa có hóa đơn nào gắn cứng hoặc không trùng
+                targetCard.CardNumber = cardNumber;
+                targetCard.InsurancePlanId = plan.Id;
+                targetCard.RegisteredFacility = facility;
+                targetCard.IsRegisteredHere = request.IsRegisteredHere;
+                targetCard.ValidFrom = request.ValidFrom;
+                targetCard.ValidTo = request.ValidTo;
+                targetCard.IsActive = true;
+            }
+
+            await _context.SaveChangesAsync(innerCt);
+
+            if (request.CashierAccountId > 0)
+            {
+                _context.AccessLogs.Add(new AccessLog
+                {
+                    AccountId = request.CashierAccountId,
+                    PatientId = request.PatientId,
+                    Action = "UPSERT_INSURANCE_CARD",
+                    EntityName = "insurance_cards",
+                    EntityId = targetCard.Id,
+                    OccurredAt = Now
+                });
+                await _context.SaveChangesAsync(innerCt);
+            }
+
+            return Result.Success(targetCard.Id);
+        }, ct);
+    }
+
+    private async Task<Service?> ResolveDefaultExamServiceAsync(CancellationToken ct)
+    {
+        var configured = await _context.Services
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == _options.ExamFeeServiceId && s.IsActive, ct);
+        if (configured != null)
+        {
+            return configured;
+        }
+
+        return await _context.Services
+            .AsNoTracking()
+            .Where(s => s.IsActive && s.ServiceTypeId == (int)ServiceTypeId.Examination)
+            .OrderBy(s => s.Id)
+            .FirstOrDefaultAsync(ct)
+            ?? await _context.Services
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.Id == _options.ExamFeeServiceId, ct);
+    }
+
     private decimal GetBaseCoveragePct(InsuranceCard? card)
     {
         if (card == null) return 0m;
-        bool isRightRoute = card.IsRegisteredHere || card.InsurancePlan?.ReferralType == ReferralType.InNetwork;
-        return isRightRoute ? (card.InsurancePlan?.CoveragePct ?? 80m) : _options.OutOfRoutePct;
+        if (card.IsRegisteredHere)
+        {
+            return card.InsurancePlan?.CoveragePct ?? 80m;
+        }
+
+        if (card.InsurancePlan?.ReferralType == ReferralType.OutOfNetwork)
+        {
+            return card.InsurancePlan.CoveragePct;
+        }
+
+        return _options.OutOfRoutePct;
     }
 
     private (IReadOnlyList<InvoiceItemDto> Items, decimal TotalAmount, decimal CoveredAmount, decimal PatientAmount) BuildInvoiceLineItems(
@@ -1799,13 +2229,18 @@ public class BillingService : IBillingService
         var items = new List<InvoiceItemDto>();
         int itemId = 1;
 
-        decimal examUnitPrice = examService?.Price ?? _options.DefaultExamPrice;
+        var explicitExamOrder = app.MedicalRecord?.LabOrders?
+            .FirstOrDefault(o => o.Service != null
+                && (o.Service.ServiceTypeId == (int)ServiceTypeId.Examination || o.ServiceId == _options.ExamFeeServiceId));
+        var effectiveExamService = explicitExamOrder?.Service ?? examService;
+
+        decimal examUnitPrice = effectiveExamService?.Price ?? _options.DefaultExamPrice;
         decimal examLineCoverage = hasInsurance ? baseCoveragePct : 0m;
         decimal examCoveredAmount = Math.Round(examUnitPrice * examLineCoverage / 100m, 0, MidpointRounding.AwayFromZero);
         items.Add(new InvoiceItemDto(
             itemId++,
             "Công khám",
-            examService?.Name ?? "Khám chuyên khoa",
+            effectiveExamService?.Name ?? "Khám chuyên khoa",
             examUnitPrice,
             1,
             examUnitPrice,
@@ -1819,6 +2254,9 @@ public class BillingService : IBillingService
             foreach (var order in app.MedicalRecord.LabOrders)
             {
                 if (order.Service == null) continue;
+                if (ReferenceEquals(order, explicitExamOrder)) continue;
+                if (order.ServiceId == _options.ExamFeeServiceId && order.Service.ServiceTypeId == (int)ServiceTypeId.Examination) continue;
+
                 decimal unitPrice = order.Service.Price;
                 decimal lineCoverage = hasInsurance ? baseCoveragePct : 0m;
                 decimal coveredAmount = Math.Round(unitPrice * lineCoverage / 100m, 0, MidpointRounding.AwayFromZero);

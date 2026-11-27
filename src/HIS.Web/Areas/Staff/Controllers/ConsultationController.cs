@@ -133,8 +133,9 @@ public class ConsultationController : Controller
                 .Include(a => a.Doctor)
                 .Include(a => a.Slot)
                 // Chỉ lượt khám của HÔM NAY (theo giờ slot, hoặc giờ tạo với ca vãng lai không có slot)
-                .Where(a => (a.Slot != null && a.Slot.StartTime >= todayStart && a.Slot.StartTime < todayEnd)
-                            || (a.Slot == null && a.CreatedAt >= todayStart && a.CreatedAt < todayEnd));
+                .Where(a => !a.AppointmentCode.StartsWith("DEP-")
+                            && ((a.Slot != null && a.Slot.StartTime >= todayStart && a.Slot.StartTime < todayEnd)
+                                || (a.Slot == null && a.CreatedAt >= todayStart && a.CreatedAt < todayEnd)));
 
             if (isDeptHead)
             {

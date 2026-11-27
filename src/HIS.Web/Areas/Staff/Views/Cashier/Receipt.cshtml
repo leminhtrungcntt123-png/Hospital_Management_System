@@ -201,21 +201,21 @@
                 <span><strong>VIỆN PHÍ NGƯỜI BỆNH CÙNG CHI TRẢ:</strong></span>
                 <strong style="font-size: 18px;">@Model.PatientAmount.ToString("N0") VNĐ</strong>
             </div>
-            @if (Model.DepositDeducted > 0 || Model.RefundedAmount > 0)
+            @if (Model.DepositDeducted > 0 || Model.DepositRefundedAmount > 0)
             {
                 <div class="summary-row" style="margin-top: 4px;">
                     <span>Tiền tạm ứng đã nộp:</span>
-                    <strong>@((Model.DepositDeducted + Model.RefundedAmount).ToString("N0")) đ</strong>
+                    <strong>@((Model.DepositDeducted + Model.DepositRefundedAmount).ToString("N0")) đ</strong>
                 </div>
                 <div class="summary-row">
                     <span>Đã cấn trừ thanh toán viện phí:</span>
                     <strong>@Model.DepositDeducted.ToString("N0") đ</strong>
                 </div>
-                @if (Model.RefundedAmount > 0)
+                @if (Model.DepositRefundedAmount > 0)
                 {
                     <div class="summary-row" style="font-weight: bold;">
                         <span>SỐ TIỀN BỆNH VIỆN HOÀN TRẢ NGƯỜI BỆNH:</span>
-                        <strong>@Model.RefundedAmount.ToString("N0") VNĐ</strong>
+                        <strong>@Model.DepositRefundedAmount.ToString("N0") VNĐ</strong>
                     </div>
                 }
                 else if (Model.AdditionalPaid > 0)
@@ -225,6 +225,13 @@
                         <strong>@Model.AdditionalPaid.ToString("N0") VNĐ</strong>
                     </div>
                 }
+            }
+            @if (Model.RefundedAmount > Model.DepositRefundedAmount)
+            {
+                <div class="summary-row" style="font-weight: bold; color: #b91c1c;">
+                    <span>HOÀN TRẢ VIỆN PHÍ SAU THANH TOÁN:</span>
+                    <strong>@((Model.RefundedAmount - Model.DepositRefundedAmount).ToString("N0")) VNĐ</strong>
+                </div>
             }
             <div style="margin-top: 4px; font-style: italic; font-size: 13px;">
                 Hình thức thanh toán: @(Model.PaymentMethod ?? "Tiền mặt") · Thu ngân phụ trách: @(Model.CashierName ?? "Hệ thống")

@@ -42,6 +42,7 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("DepartmentHeadOnly", policy => policy.RequireClaim(ClaimTypes.Role, "DEPARTMENT_HEAD"));
     options.AddPolicy("DoctorOnly", policy => policy.RequireClaim(ClaimTypes.Role, "DOCTOR", "DEPARTMENT_HEAD"));
     options.AddPolicy("NurseOnly", policy => policy.RequireClaim(ClaimTypes.Role, "NURSE"));
+    options.AddPolicy("CashierAccess", policy => policy.RequireClaim(ClaimTypes.Role, "ADMIN", "ACCOUNTANT", "CASHIER", "NURSE"));
     options.AddPolicy("PatientOnly", policy => policy.RequireClaim(ClaimTypes.Role, "PATIENT"));
     options.AddPolicy("StaffAny", policy => policy.RequireClaim(ClaimTypes.Role, "ADMIN", "DEPARTMENT_HEAD", "DOCTOR", "NURSE"));
 });
@@ -108,6 +109,8 @@ builder.Services.AddHealthChecks()
 builder.Services.AddHostedService<HoldExpirationWorker>();
 builder.Services.AddSingleton<PasswordResetQueue>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<PasswordResetQueue>());
+builder.Services.AddSingleton<PaymentReceiptEmailQueue>();
+builder.Services.AddHostedService(provider => provider.GetRequiredService<PaymentReceiptEmailQueue>());
 
 var app = builder.Build();
 

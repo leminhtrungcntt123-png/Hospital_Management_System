@@ -5,6 +5,7 @@
     var selected = ViewBag.SelectedInvoice as HIS.BLL.DTOs.InvoiceDetailDto;
     int selectedId = (int)(ViewBag.SelectedId ?? 0);
     string search = (string)(ViewBag.Search ?? "");
+    string statusFilter = (string)(ViewBag.StatusFilter ?? "unpaid");
     var shift = ViewBag.CurrentShift as HIS.BLL.DTOs.CashierShiftDto;
 }
 
@@ -73,12 +74,17 @@
 
     <!-- KHỐI TRA CỨU BỆNH NHÂN ĐẾN QUẦY (1 CỘT TOÀN MÀN HÌNH, CHỈ TRA CỨU MÃ BN & CCCD CHO HỒ SƠ CHƯA ĐÓNG TIỀN) -->
     <section style="background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 18px 20px; margin-bottom: 20px; box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);">
-        <form asp-action="Index" method="get" style="display: flex; gap: 10px; align-items: center;">
-            <div style="flex: 1; position: relative;">
+        <form asp-action="Index" method="get" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 260px; position: relative;">
                 <input id="cashier-search" name="search" value="@search" maxlength="60" class="form-control"
-                       placeholder="🔍 Quét mã vạch hoặc nhập Mã bệnh nhân (VD: 00000001, BN0006) hoặc Số CCCD (12 số) để tra cứu hồ sơ chưa đóng tiền..."
+                       placeholder="🔍 Nhập Mã bệnh nhân (00000001), Mã lượt khám, Số CCCD, SĐT hoặc Họ tên..."
                        style="width: 100%; padding: 11px 16px; border: 1.5px solid #94a3b8; border-radius: 8px; font-size: 14.5px; font-weight: 500; color: #0f172a;" />
             </div>
+            <select name="statusFilter" class="form-control" style="width: 215px; padding: 11px 12px; border: 1.5px solid #94a3b8; border-radius: 8px; font-size: 13.5px; font-weight: 700; color: #1e293b;">
+                <option value="unpaid" selected="@(statusFilter == "unpaid")">⏳ Chưa thanh toán</option>
+                <option value="paid" selected="@(statusFilter == "paid")">✓ Đã quyết toán (In lại/Hoàn)</option>
+                <option value="all" selected="@(statusFilter == "all")">📋 Tất cả hồ sơ</option>
+            </select>
             <button class="btn primary" type="submit" style="padding: 11px 24px; font-size: 14px; font-weight: 700; border-radius: 8px; white-space: nowrap;">
                 🔍 Tra cứu hồ sơ
             </button>
@@ -93,7 +99,7 @@
         @if (!string.IsNullOrWhiteSpace(search) && Model.Count == 0 && selected == null)
         {
             <div style="margin-top: 12px; background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; padding: 10px 14px; border-radius: 8px; font-size: 13.5px; font-weight: 600;">
-                ⚠️ Không tìm thấy hồ sơ viện phí chưa đóng tiền nào khớp với Mã BN / Số CCCD "<strong>@search</strong>" (Hồ sơ không tồn tại hoặc đã thanh toán).
+                ⚠️ Không tìm thấy hồ sơ viện phí nào khớp với từ khóa "<strong>@search</strong>" theo bộ lọc đã chọn (Hãy đổi sang "Tất cả hồ sơ" nếu muốn tra cứu hóa đơn đã đóng tiền).
             </div>
         }
 
@@ -249,6 +255,37 @@
         var currentSettleMethod = 'Cash';
         var detailLoadSeq = 0;
         var settleQrSeq = 0;
+        var settleIdempotencyKeys = {};
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function getOrCreateIdempotencyKey(appId) {
+            if (!settleIdempotencyKeys[appId]) {
+                var rnd = (window.crypto && typeof window.crypto.randomUUID === 'function')
+                    ? window.crypto.randomUUID()
+                    : ('settle-' + appId + '-' + Date.now() + '-' + Math.random().toString(16).slice(2, 10));
+                settleIdempotencyKeys[appId] = rnd;
+            }
+            return settleIdempotencyKeys[appId];
+        }
+
+        function toggleReceiptEmailInput() {
+            var chk = document.getElementById('settle-send-email');
+            var inp = document.getElementById('settle-receipt-email');
+            if (!chk || !inp) return;
+            inp.disabled = !chk.checked;
+            inp.style.opacity = chk.checked ? '1' : '0.6';
+            if (chk.checked && !inp.value) {
+                inp.focus();
+            }
+        }
 
         function getAntiForgeryToken() {
             return document.querySelector('#anti-forgery-token-holder input[name="__RequestVerificationToken"]')?.value || '';
@@ -336,6 +373,7 @@
 
         function initInvoiceDetailScripts() {
             currentSettleMethod = 'Cash';
+            toggleReceiptEmailInput();
             var netDiffElem = document.getElementById('val-net-diff');
             if (netDiffElem) {
                 var netDiff = parseFloat(netDiffElem.getAttribute('data-net')) || 0;
@@ -525,6 +563,34 @@
             var note = noteInput ? noteInput.value.trim() : null;
             var approvedByInput = document.getElementById('settle-approved-by');
             var approvedBy = approvedByInput ? approvedByInput.value.trim() : null;
+            var sendEmailChk = document.getElementById('settle-send-email');
+            var receiptEmailInput = document.getElementById('settle-receipt-email');
+            var sendReceiptEmail = !!(sendEmailChk && sendEmailChk.checked);
+            var receiptEmail = receiptEmailInput ? receiptEmailInput.value.trim() : '';
+
+            if (sendReceiptEmail) {
+                if (!receiptEmail) {
+                    await Swal.fire({
+                        icon: 'warning',
+                        title: 'Chưa nhập email nhận biên lai',
+                        text: 'Vui lòng nhập địa chỉ email của người bệnh hoặc bỏ chọn gửi biên lai qua email.',
+                        confirmButtonColor: '#0284c7'
+                    });
+                    if (receiptEmailInput) receiptEmailInput.focus();
+                    return;
+                }
+                var emailRegex = /^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/;
+                if (!emailRegex.test(receiptEmail)) {
+                    await Swal.fire({
+                        icon: 'warning',
+                        title: 'Email không hợp lệ',
+                        text: 'Vui lòng kiểm tra lại định dạng email nhận biên lai.',
+                        confirmButtonColor: '#0284c7'
+                    });
+                    if (receiptEmailInput) receiptEmailInput.focus();
+                    return;
+                }
+            }
 
             var netElem = document.getElementById('val-net-diff');
             var netDiffVal = netElem ? parseFloat(netElem.getAttribute('data-net') || '0') : 0;
@@ -568,14 +634,18 @@
                 }
             }
 
+            var emailNoteHtml = sendReceiptEmail
+                ? '<br/><small style="color:#0369a1;">📧 Sẽ gửi biên lai điện tử tới: <b>' + escapeHtml(receiptEmail) + '</b></small>'
+                : '';
+
             var confirmRes = await Swal.fire({
                 icon: 'question',
                 title: netDiffVal < 0 ? 'Xác nhận hoàn trả tiền thừa?' : 'Xác nhận thu tiền & quyết toán?',
-                html: netDiffVal < 0
-                    ? 'Xác nhận cấn trừ viện phí và <b>CHI HOÀN TIỀN MẶT ' + Math.abs(netDiffVal).toLocaleString('vi-VN') + ' đ</b> cho người bệnh?<br/><small style="color:#475569;">Người duyệt: ' + approvedBy + '</small>'
+                html: (netDiffVal < 0
+                    ? 'Xác nhận cấn trừ viện phí và <b>CHI HOÀN TIỀN MẶT ' + Math.abs(netDiffVal).toLocaleString('vi-VN') + ' đ</b> cho người bệnh?<br/><small style="color:#475569;">Người duyệt: ' + escapeHtml(approvedBy) + '</small>'
                     : (netDiffVal > 0
                         ? 'Xác nhận thu đủ <b>' + netDiffVal.toLocaleString('vi-VN') + ' đ</b> (' + (currentSettleMethod === 'BankTransfer' ? 'Chuyển khoản VietQR' : 'Tiền mặt') + ') và hoàn tất quyết toán viện phí?'
-                        : 'Xác nhận cấn trừ tạm ứng đủ 100% và hoàn tất quyết toán viện phí?'),
+                        : 'Xác nhận cấn trừ tạm ứng đủ 100% và hoàn tất quyết toán viện phí?')) + emailNoteHtml,
                 showCancelButton: true,
                 confirmButtonText: '✓ Xác nhận ngay',
                 cancelButtonText: 'Hủy',
@@ -595,6 +665,7 @@
 
             // Khi hoàn tiền cho khách (netDiffVal < 0), luôn chi hoàn bằng Tiền mặt (0)
             var finalMethod = netDiffVal < 0 ? 0 : (currentSettleMethod === 'BankTransfer' ? 1 : 0);
+            var idempotencyKey = getOrCreateIdempotencyKey(appId);
 
             try {
                 var token = getAntiForgeryToken();
@@ -611,6 +682,9 @@
                         referenceCode: refCode,
                         note: note,
                         approvedBy: approvedBy,
+                        idempotencyKey: idempotencyKey,
+                        receiptEmail: sendReceiptEmail ? receiptEmail : null,
+                        sendReceiptEmail: sendReceiptEmail,
                         cashierAccountId: 0
                     })
                 });
@@ -745,20 +819,20 @@
                 return;
             }
 
-            var patientName = container.getAttribute('data-patient-name') || 'Người bệnh';
-            var patientCode = container.getAttribute('data-patient-code') || '';
-            var patientPhone = container.getAttribute('data-patient-phone') || '';
-            var nationalId = container.getAttribute('data-patient-cccd') || container.getAttribute('data-national-id') || '';
-            var address = container.getAttribute('data-patient-address') || container.getAttribute('data-address') || '';
-            var diagnosis = container.getAttribute('data-diagnosis') || '';
-            var cardNum = container.getAttribute('data-card-number') || '';
-            var coveragePct = container.getAttribute('data-coverage-pct') || '0';
-            var appCode = container.getAttribute('data-appointment-code') || '';
-            var dept = container.getAttribute('data-department') || 'Khám bệnh';
-            var doctor = container.getAttribute('data-doctor') || 'Phụ trách chuyên môn';
-            var examDate = container.getAttribute('data-exam-date') || '';
-            var invoiceNum = container.getAttribute('data-invoice-number') || 'Chưa lập';
-            var cashierName = container.getAttribute('data-cashier-name') || '@(shift?.CashierName ?? "Thu ngân")';
+            var patientName = escapeHtml(container.getAttribute('data-patient-name') || 'Người bệnh');
+            var patientCode = escapeHtml(container.getAttribute('data-patient-code') || '');
+            var patientPhone = escapeHtml(container.getAttribute('data-patient-phone') || '');
+            var nationalId = escapeHtml(container.getAttribute('data-patient-cccd') || container.getAttribute('data-national-id') || '');
+            var address = escapeHtml(container.getAttribute('data-patient-address') || container.getAttribute('data-address') || '');
+            var diagnosis = escapeHtml(container.getAttribute('data-diagnosis') || '');
+            var cardNum = escapeHtml(container.getAttribute('data-card-number') || '');
+            var coveragePct = escapeHtml(container.getAttribute('data-coverage-pct') || '0');
+            var appCode = escapeHtml(container.getAttribute('data-appointment-code') || '');
+            var dept = escapeHtml(container.getAttribute('data-department') || 'Khám bệnh');
+            var doctor = escapeHtml(container.getAttribute('data-doctor') || 'Phụ trách chuyên môn');
+            var examDate = escapeHtml(container.getAttribute('data-exam-date') || '');
+            var invoiceNum = escapeHtml(container.getAttribute('data-invoice-number') || 'Chưa lập');
+            var cashierName = escapeHtml(container.getAttribute('data-cashier-name') || @Html.Raw(System.Text.Json.JsonSerializer.Serialize(shift?.CashierName ?? "Thu ngân")));
 
             var totalAmount = parseFloat(container.getAttribute('data-total-amount')) || 0;
             var insuranceCovered = parseFloat(container.getAttribute('data-insurance-covered')) || 0;
@@ -772,8 +846,8 @@
                 return;
             }
 
-            var nowStr = new Date().toLocaleString('vi-VN');
-            var balanceWord = numberToVietnameseWords(Math.round(Math.abs(netDiff > 0 ? netDiff : (netDiff < 0 ? Math.abs(netDiff) : patientAmount))));
+            var nowStr = escapeHtml(new Date().toLocaleString('vi-VN'));
+            var balanceWord = escapeHtml(numberToVietnameseWords(Math.round(Math.abs(netDiff > 0 ? netDiff : (netDiff < 0 ? Math.abs(netDiff) : patientAmount)))));
 
             var rows = document.querySelectorAll('#right-detail-container table tbody tr');
             var itemsHtml = '';
@@ -785,12 +859,12 @@
                         itemsHtml += `
                             <tr>
                                 <td style="text-align: center; border: 1px solid #333; padding: 4px 6px;">${stt++}</td>
-                                <td style="border: 1px solid #333; padding: 4px 6px;">${cells[1].innerText.trim()}</td>
-                                <td style="text-align: center; border: 1px solid #333; padding: 4px 6px;">${cells[2].innerText.trim()}</td>
-                                <td style="text-align: right; border: 1px solid #333; padding: 4px 6px;">${cells[3].innerText.trim()}</td>
-                                <td style="text-align: right; border: 1px solid #333; padding: 4px 6px;">${cells[4].innerText.trim()}</td>
-                                <td style="text-align: right; border: 1px solid #333; padding: 4px 6px;">${cells[6].innerText.trim()}</td>
-                                <td style="text-align: right; border: 1px solid #333; padding: 4px 6px; font-weight: bold;">${cells[7].innerText.trim()}</td>
+                                <td style="border: 1px solid #333; padding: 4px 6px;">${escapeHtml(cells[1].innerText.trim())}</td>
+                                <td style="text-align: center; border: 1px solid #333; padding: 4px 6px;">${escapeHtml(cells[2].innerText.trim())}</td>
+                                <td style="text-align: right; border: 1px solid #333; padding: 4px 6px;">${escapeHtml(cells[3].innerText.trim())}</td>
+                                <td style="text-align: right; border: 1px solid #333; padding: 4px 6px;">${escapeHtml(cells[4].innerText.trim())}</td>
+                                <td style="text-align: right; border: 1px solid #333; padding: 4px 6px;">${escapeHtml(cells[6].innerText.trim())}</td>
+                                <td style="text-align: right; border: 1px solid #333; padding: 4px 6px; font-weight: bold;">${escapeHtml(cells[7].innerText.trim())}</td>
                             </tr>`;
                     }
                 });
@@ -928,6 +1002,139 @@
             printWin.document.open();
             printWin.document.write(content);
             printWin.document.close();
+        }
+
+        // 7. KHAI BÁO / CẬP NHẬT THẺ BHYT & HOÀN VIỆN PHÍ SAU THANH TOÁN
+        function openBhytModal() {
+            var dlg = document.getElementById('modal-upsert-bhyt');
+            if (dlg) dlg.showModal();
+        }
+
+        async function submitUpsertBhyt(appId, patientId, isActive) {
+            var cardNum = (document.getElementById('bhyt-card-number')?.value || '').trim().toUpperCase();
+            var planId = parseInt(document.getElementById('bhyt-plan-id')?.value || '0');
+            var validFrom = document.getElementById('bhyt-valid-from')?.value || '';
+            var validTo = document.getElementById('bhyt-valid-to')?.value || '';
+            var isRegisteredHere = !!(document.getElementById('bhyt-registered-here')?.checked);
+            var facility = (document.getElementById('bhyt-facility')?.value || '').trim();
+
+            if (isActive) {
+                if (!cardNum || cardNum.length < 10) {
+                    await Swal.fire({ icon: 'warning', title: 'Mã thẻ chưa hợp lệ', text: 'Vui lòng nhập mã số thẻ BHYT (10–20 ký tự).', confirmButtonColor: '#0284c7' });
+                    return;
+                }
+                if (!planId || !validFrom || !validTo) {
+                    await Swal.fire({ icon: 'warning', title: 'Thiếu thông tin thẻ', text: 'Vui lòng chọn mức hưởng và thời hạn hiệu lực của thẻ BHYT.', confirmButtonColor: '#0284c7' });
+                    return;
+                }
+            }
+
+            var btn = document.getElementById('btn-save-bhyt');
+            if (btn) btn.disabled = true;
+
+            try {
+                var res = await fetch('@Url.Action("UpsertInsuranceCard", "Cashier", new { area = "Staff" })', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': getAntiForgeryToken()
+                    },
+                    body: JSON.stringify({
+                        patientId: patientId,
+                        cardNumber: isActive ? cardNum : 'DEACTIVATED',
+                        insurancePlanId: planId || 1,
+                        registeredFacility: facility || null,
+                        isRegisteredHere: isRegisteredHere,
+                        validFrom: validFrom || '2026-01-01',
+                        validTo: validTo || '2026-12-31',
+                        isActive: isActive,
+                        cashierAccountId: 0
+                    })
+                });
+                var data = await res.json();
+                if (res.ok && data.success) {
+                    document.getElementById('modal-upsert-bhyt')?.close();
+                    await selectAppointment(appId, document.getElementById('app-card-' + appId));
+                    await Swal.fire({ icon: 'success', title: 'Đã cập nhật BHYT', text: data.message, timer: 2200, showConfirmButton: false });
+                } else {
+                    await Swal.fire({ icon: 'error', title: 'Không thể lưu thẻ BHYT', text: data.message || 'Vui lòng kiểm tra lại thông tin thẻ.', confirmButtonColor: '#dc2626' });
+                }
+            } catch (err) {
+                await Swal.fire({ icon: 'error', title: 'Lỗi kết nối', text: err.message, confirmButtonColor: '#dc2626' });
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        function openRefundInvoiceModal() {
+            var dlg = document.getElementById('modal-refund-invoice');
+            if (dlg) dlg.showModal();
+        }
+
+        function toggleRefundInvRef() {
+            var method = document.getElementById('refund-inv-method')?.value;
+            var box = document.getElementById('refund-inv-ref-box');
+            if (box) box.style.display = method === '1' ? 'block' : 'none';
+        }
+
+        async function submitRefundInvoice(appId, invoiceId, maxRefundable) {
+            if (!isShiftOpen) {
+                await Swal.fire({ icon: 'warning', title: 'Chưa mở ca thu ngân', text: 'Vui lòng mở ca trước khi thực hiện hoàn viện phí.', confirmButtonColor: '#0284c7' });
+                return;
+            }
+
+            var amount = parseFloat(document.getElementById('refund-inv-amount')?.value || '0');
+            var method = parseInt(document.getElementById('refund-inv-method')?.value || '0');
+            var refCode = (document.getElementById('refund-inv-ref')?.value || '').trim();
+            var approvedBy = (document.getElementById('refund-inv-approver')?.value || '').trim();
+            var reason = (document.getElementById('refund-inv-reason')?.value || '').trim();
+
+            if (!amount || amount <= 0 || amount > maxRefundable) {
+                await Swal.fire({ icon: 'warning', title: 'Số tiền không hợp lệ', text: 'Số tiền hoàn phải từ 1.000 đ đến tối đa ' + maxRefundable.toLocaleString('vi-VN') + ' đ.', confirmButtonColor: '#0284c7' });
+                return;
+            }
+            if (!reason) {
+                await Swal.fire({ icon: 'warning', title: 'Thiếu lý do hoàn tiền', text: 'Bắt buộc nhập lý do hoàn trả / điều chỉnh hóa đơn.', confirmButtonColor: '#0284c7' });
+                return;
+            }
+            if (method === 1 && !refCode) {
+                await Swal.fire({ icon: 'warning', title: 'Thiếu mã giao dịch ngân hàng', text: 'Vui lòng nhập mã giao dịch chuyển khoản hoàn tiền.', confirmButtonColor: '#0284c7' });
+                return;
+            }
+
+            var btn = document.getElementById('btn-submit-refund-inv');
+            if (btn) btn.disabled = true;
+
+            try {
+                var res = await fetch('@Url.Action("RefundInvoice", "Cashier", new { area = "Staff" })', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': getAntiForgeryToken()
+                    },
+                    body: JSON.stringify({
+                        invoiceId: invoiceId,
+                        amount: amount,
+                        reason: reason,
+                        method: method,
+                        referenceCode: method === 1 ? refCode : null,
+                        cashierAccountId: 0,
+                        approvedBy: approvedBy || null
+                    })
+                });
+                var data = await res.json();
+                if (res.ok && data.success) {
+                    document.getElementById('modal-refund-invoice')?.close();
+                    await selectAppointment(appId, document.getElementById('app-card-' + appId));
+                    await Swal.fire({ icon: 'success', title: 'Hoàn viện phí thành công', text: data.message, confirmButtonColor: '#15803d' });
+                } else {
+                    await Swal.fire({ icon: 'error', title: 'Không thể hoàn viện phí', text: data.message || 'Thao tác thất bại.', confirmButtonColor: '#dc2626' });
+                }
+            } catch (err) {
+                await Swal.fire({ icon: 'error', title: 'Lỗi kết nối', text: err.message, confirmButtonColor: '#dc2626' });
+            } finally {
+                if (btn) btn.disabled = false;
+            }
         }
 
         document.addEventListener('DOMContentLoaded', function() {

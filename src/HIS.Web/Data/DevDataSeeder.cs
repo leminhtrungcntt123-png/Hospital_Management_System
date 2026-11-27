@@ -751,7 +751,7 @@ public static class DevDataSeeder
                             DoctorId = anyDoc.Id,
                             DepartmentId = anyDept.Id,
                             AppointmentCode = $"DEP-SEED-{patId}",
-                            StatusId = (int)AppointmentStatusId.CheckedIn,
+                            StatusId = (int)AppointmentStatusId.Expired,
                             CreatedAt = at
                         };
                         db.Appointments.Add(app);
