@@ -24,7 +24,9 @@ public sealed class AdminReportService(AppDbContext db) : IAdminReportService
         var end = to.AddDays(1).ToDateTime(TimeOnly.MinValue);
 
         var payments = await db.Payments.AsNoTracking()
-            .Where(payment => payment.PaidAt >= start && payment.PaidAt < end)
+            .Where(payment => payment.PaidAt >= start
+                && payment.PaidAt < end
+                && !payment.Invoice.Patient.FullName.StartsWith("BN Test"))
             .GroupBy(payment => payment.PaidAt.Date)
             .Select(group => new
             {
@@ -36,7 +38,10 @@ public sealed class AdminReportService(AppDbContext db) : IAdminReportService
             .ToDictionaryAsync(row => DateOnly.FromDateTime(row.Date), ct);
 
         var visits = await db.Appointments.AsNoTracking()
-            .Where(appointment => appointment.CheckedInAt >= start && appointment.CheckedInAt < end)
+            .Where(appointment => appointment.CheckedInAt >= start
+                && appointment.CheckedInAt < end
+                && !appointment.AppointmentCode.StartsWith("DEP-")
+                && !appointment.Patient.FullName.StartsWith("BN Test"))
             .GroupBy(appointment => appointment.CheckedInAt!.Value.Date)
             .Select(group => new
             {
@@ -93,7 +98,10 @@ public sealed class AdminReportService(AppDbContext db) : IAdminReportService
         var departments = await db.Departments.AsNoTracking().ToListAsync(ct);
 
         var visitsByDept = await db.Appointments.AsNoTracking()
-            .Where(a => a.CheckedInAt >= start && a.CheckedInAt < end)
+            .Where(a => a.CheckedInAt >= start
+                && a.CheckedInAt < end
+                && !a.AppointmentCode.StartsWith("DEP-")
+                && !a.Patient.FullName.StartsWith("BN Test"))
             .GroupBy(a => a.DepartmentId ?? (a.Doctor != null ? a.Doctor.DepartmentId : 0))
             .Select(g => new { DepartmentId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.DepartmentId, x => x.Count, ct);
@@ -102,7 +110,12 @@ public sealed class AdminReportService(AppDbContext db) : IAdminReportService
             .Include(p => p.Invoice)
                 .ThenInclude(i => i.Appointment)
                     .ThenInclude(a => a.Doctor)
-            .Where(p => p.PaidAt >= start && p.PaidAt < end && p.Invoice != null && p.Invoice.Appointment != null)
+            .Where(p => p.PaidAt >= start
+                && p.PaidAt < end
+                && p.Invoice != null
+                && p.Invoice.Appointment != null
+                && !p.Invoice.Appointment.AppointmentCode.StartsWith("DEP-")
+                && !p.Invoice.Patient.FullName.StartsWith("BN Test"))
             .GroupBy(p => p.Invoice.Appointment!.DepartmentId ?? (p.Invoice.Appointment.Doctor != null ? p.Invoice.Appointment.Doctor.DepartmentId : 0))
             .Select(g => new
             {

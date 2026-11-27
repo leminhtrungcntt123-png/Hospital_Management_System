@@ -3,21 +3,23 @@
     Layout = "_StaffLayout";
     ViewData["Title"] = "Sổ nhật ký thu ngân";
     var filter = ViewBag.Filter as HIS.BLL.DTOs.LedgerFilterDto ?? new HIS.BLL.DTOs.LedgerFilterDto();
+    var summary = ViewBag.Summary as HIS.BLL.DTOs.LedgerSummaryDto;
+    var shifts = ViewBag.Shifts as IReadOnlyList<HIS.BLL.DTOs.CashierShiftDto> ?? Array.Empty<HIS.BLL.DTOs.CashierShiftDto>();
 
-    // Tiền mặt thực thu = Tiền mặt thu viện phí + Tiền mặt thu tạm ứng
-    decimal totalCash = Model.Where(p => p.PaymentMethod == HIS.Domain.PaymentMethod.Cash && (p.PaymentType == HIS.Domain.PaymentType.Payment || p.PaymentType == HIS.Domain.PaymentType.Deposit)).Sum(p => p.Amount);
+    // Ưu tiên số liệu tổng hợp toàn bộ tập khớp bộ lọc từ backend (không bị cắt bởi Take(100))
+    decimal totalCash = summary?.TotalCash
+        ?? Model.Where(p => p.PaymentMethod == HIS.Domain.PaymentMethod.Cash && (p.PaymentType == HIS.Domain.PaymentType.Payment || p.PaymentType == HIS.Domain.PaymentType.Deposit)).Sum(p => p.Amount);
 
-    // Tiền chuyển khoản thực nhận = CK thu viện phí + CK thu tạm ứng
-    decimal totalTransfer = Model.Where(p => p.PaymentMethod == HIS.Domain.PaymentMethod.BankTransfer && (p.PaymentType == HIS.Domain.PaymentType.Payment || p.PaymentType == HIS.Domain.PaymentType.Deposit)).Sum(p => p.Amount);
+    decimal totalTransfer = summary?.TotalTransfer
+        ?? Model.Where(p => p.PaymentMethod == HIS.Domain.PaymentMethod.BankTransfer && (p.PaymentType == HIS.Domain.PaymentType.Payment || p.PaymentType == HIS.Domain.PaymentType.Deposit)).Sum(p => p.Amount);
 
-    // Viện phí đã cấn trừ từ tạm ứng (lưu tại nhật ký quyết toán hóa đơn)
-    decimal totalDepositDeduct = 0m;
+    decimal totalDepositDeduct = summary?.TotalDepositDeducted ?? 0m;
 
-    // Tiền hoàn trả cho người bệnh (hoàn số dư tạm ứng thừa hoặc hoàn viện phí)
-    decimal totalRefund = Model.Where(p => p.PaymentType == HIS.Domain.PaymentType.Refund).Sum(p => p.Amount);
+    decimal totalRefund = summary?.TotalRefund
+        ?? Model.Where(p => p.PaymentType == HIS.Domain.PaymentType.Refund).Sum(p => p.Amount);
 
-    // Thực thu ròng tại quỹ = (Tiền mặt + Chuyển khoản) - Hoàn trả
-    decimal netTotal = totalCash + totalTransfer - totalRefund;
+    decimal netTotal = summary?.NetTotal ?? (totalCash + totalTransfer - totalRefund);
+    int totalMatchedCount = summary?.TotalCount ?? Model.Count;
 }
 
 <div class="reception-desk" style="padding: 24px; max-width: 1400px; margin: 0 auto;">
@@ -108,6 +110,13 @@
         <a asp-action="Ledger" class="btn outline" style="padding: 8px 14px; font-size: 13px; text-decoration: none;">Đặt lại</a>
     </form>
 
+    @if (totalMatchedCount > Model.Count)
+    {
+        <div style="background: #f0f9ff; border: 1px solid #bae6fd; color: #0369a1; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 13px;">
+            ℹ️ Các ô tổng hợp phía trên được tính trên toàn bộ <strong>@totalMatchedCount.ToString("N0")</strong> giao dịch khớp bộ lọc. Bảng bên dưới hiển thị <strong>@Model.Count</strong> giao dịch mới nhất — bấm <strong>Xuất file CSV</strong> để tải toàn bộ.
+        </div>
+    }
+
     <!-- Bảng danh sách giao dịch -->
     <div style="background: #ffffff; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
         <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
@@ -179,6 +188,89 @@
                 }
             </tbody>
         </table>
+    </div>
+
+    <!-- Bảng lịch sử mở / kết ca thu ngân & đối soát tiền mặt -->
+    <div style="margin-top: 28px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h2 style="font-size: 17px; font-weight: 800; color: #1e293b; margin: 0;">
+                🕒 Lịch sử ca thu ngân &amp; biên bản bàn giao quỹ tiền mặt
+            </h2>
+            <span style="font-size: 12.5px; color: #64748b;">Hiển thị tối đa 50 ca gần nhất</span>
+        </div>
+
+        <div style="background: #ffffff; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                <thead>
+                    <tr style="background: #f8fafc; border-bottom: 1.5px solid #e2e8f0; text-align: left;">
+                        <th style="padding: 11px 14px; font-weight: 700; color: #334155;">Mã ca</th>
+                        <th style="padding: 11px 14px; font-weight: 700; color: #334155;">Thu ngân</th>
+                        <th style="padding: 11px 14px; font-weight: 700; color: #334155;">Mở ca</th>
+                        <th style="padding: 11px 14px; font-weight: 700; color: #334155;">Kết ca</th>
+                        <th style="padding: 11px 14px; font-weight: 700; color: #334155; text-align: right;">Đầu ca</th>
+                        <th style="padding: 11px 14px; font-weight: 700; color: #334155; text-align: right;">Lý thuyết cuối ca</th>
+                        <th style="padding: 11px 14px; font-weight: 700; color: #334155; text-align: right;">Thực đếm</th>
+                        <th style="padding: 11px 14px; font-weight: 700; color: #334155; text-align: right;">Chênh lệch</th>
+                        <th style="padding: 11px 14px; font-weight: 700; color: #334155; text-align: center;">Trạng thái</th>
+                        <th style="padding: 11px 14px; font-weight: 700; color: #334155;">Ghi chú</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (shifts.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="10" style="text-align: center; padding: 32px 20px; color: #94a3b8;">
+                                Chưa có dữ liệu ca thu ngân nào.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var s in shifts)
+                        {
+                            <tr style="border-bottom: 1px solid #f1f5f9;">
+                                <td style="padding: 10px 14px; font-family: monospace; font-weight: 700; color: #1e3a8a;">CA-@s.Id.ToString("D4")</td>
+                                <td style="padding: 10px 14px; font-weight: 600; color: #0f172a;">@s.CashierName</td>
+                                <td style="padding: 10px 14px; color: #475569;">@s.OpenedAt.ToString("HH:mm, dd/MM/yyyy")</td>
+                                <td style="padding: 10px 14px; color: #475569;">@(s.ClosedAt?.ToString("HH:mm, dd/MM/yyyy") ?? "—")</td>
+                                <td style="padding: 10px 14px; text-align: right; font-family: monospace; font-weight: 600;">@s.OpeningCash.ToString("N0") đ</td>
+                                <td style="padding: 10px 14px; text-align: right; font-family: monospace;">@(s.ExpectedCash.HasValue ? $"{s.ExpectedCash.Value:N0} đ" : "—")</td>
+                                <td style="padding: 10px 14px; text-align: right; font-family: monospace; font-weight: 700;">@(s.CountedCash.HasValue ? $"{s.CountedCash.Value:N0} đ" : "—")</td>
+                                <td style="padding: 10px 14px; text-align: right; font-family: monospace; font-weight: 700; color: @(!s.Difference.HasValue ? "#64748b" : (s.Difference.Value == 0 ? "#15803d" : (s.Difference.Value > 0 ? "#0284c7" : "#b91c1c")));">
+                                    @if (!s.Difference.HasValue)
+                                    {
+                                        <span>—</span>
+                                    }
+                                    else if (s.Difference.Value == 0)
+                                    {
+                                        <span>Khớp (0 đ)</span>
+                                    }
+                                    else if (s.Difference.Value > 0)
+                                    {
+                                        <span>+@s.Difference.Value.ToString("N0") đ</span>
+                                    }
+                                    else
+                                    {
+                                        <span>@s.Difference.Value.ToString("N0") đ</span>
+                                    }
+                                </td>
+                                <td style="padding: 10px 14px; text-align: center;">
+                                    @if (s.Status == HIS.Domain.ShiftStatus.Open)
+                                    {
+                                        <span style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px;">Đang mở</span>
+                                    }
+                                    else
+                                    {
+                                        <span style="background: #f1f5f9; color: #475569; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px;">Đã đóng</span>
+                                    }
+                                </td>
+                                <td style="padding: 10px 14px; color: #64748b; font-size: 12px;">@(string.IsNullOrWhiteSpace(s.Note) ? "—" : s.Note)</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 

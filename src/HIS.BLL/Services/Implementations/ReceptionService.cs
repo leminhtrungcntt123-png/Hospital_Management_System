@@ -50,6 +50,7 @@ public sealed class ReceptionService(
         var visits = db.Appointments
             .AsNoTracking()
             .Where(a => a.DepartmentId == nurse.DepartmentId
+                && !a.AppointmentCode.StartsWith("DEP-")
                 && ((a.Slot != null
                         && a.Slot.StartTime >= start
                         && a.Slot.StartTime < end)
@@ -264,6 +265,7 @@ public sealed class ReceptionService(
 
             var visits = db.Appointments
                 .Where(a => a.DoctorId == schedule.DoctorId
+                    && !a.AppointmentCode.StartsWith("DEP-")
                     && a.StatusId >= 1
                     && a.StatusId <= 6
                     && ((a.Slot != null
@@ -344,6 +346,7 @@ public sealed class ReceptionService(
                     .AnyAsync(
                     a => a.PatientId == patient.Id
                         && a.DepartmentId == nurse.DepartmentId
+                        && !a.AppointmentCode.StartsWith("DEP-")
                         && a.StatusId >= 1
                         && a.StatusId <= 5
                         && ((a.Slot != null

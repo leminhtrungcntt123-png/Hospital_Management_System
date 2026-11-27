@@ -50,7 +50,16 @@ public record InvoiceDetailDto(
     decimal RefundedAmount = 0m,
     string? NationalId = null,
     string? Address = null,
-    string? Diagnosis = null);
+    string? Diagnosis = null,
+    string? PatientEmail = null,
+    int? PatientAccountId = null,
+    decimal DepositRefundedAmount = 0m,
+    int AppointmentStatusId = (int)HIS.Domain.AppointmentStatusId.Completed,
+    string AppointmentStatusName = "Đã hoàn thành",
+    int? InsurancePlanId = null,
+    DateOnly? InsuranceValidFrom = null,
+    DateOnly? InsuranceValidTo = null,
+    bool InsuranceIsRegisteredHere = true);
 
 public record PendingInvoiceItemDto(
     int AppointmentId,
@@ -78,7 +87,8 @@ public record CheckoutInvoiceRequest(
     int CashierAccountId,
     string? IdempotencyKey = null,
     int? DepositId = null,
-    decimal? DepositDeductAmount = null);
+    decimal? DepositDeductAmount = null,
+    bool RequireCompletedVisit = false);
 
 public record LedgerFilterDto(
     DateOnly? FromDate = null,
@@ -277,7 +287,10 @@ public record SettleDischargeRequest(
     string? Note,
     int CashierAccountId,
     string? IdempotencyKey = null,
-    string? ApprovedBy = null);
+    string? ApprovedBy = null,
+    string? ReceiptEmail = null,
+    bool SendReceiptEmail = false,
+    bool RequireCompletedVisit = false);
 
 public record SettleDischargeResultDto(
     int InvoiceId,
@@ -292,10 +305,37 @@ public record SettleDischargeResultDto(
     decimal RefundedToPatient,
     PaymentMethod Method,
     string TransactionCode,
-    DateTime SettledAt);
+    DateTime SettledAt,
+    int? PatientAccountId = null,
+    string? ReceiptEmail = null);
+
+public record LedgerSummaryDto(
+    decimal TotalCash,
+    decimal TotalTransfer,
+    decimal TotalDepositDeducted,
+    decimal TotalRefund,
+    decimal NetTotal,
+    int TotalCount);
 
 public record DepositSummaryTotalsDto(
     int TotalCount,
     decimal TotalAmount,
     decimal TotalUsed,
     decimal TotalBalance);
+
+public record InsurancePlanOptionDto(
+    int Id,
+    string Name,
+    decimal CoveragePct,
+    ReferralType? ReferralType);
+
+public record UpsertPatientInsuranceCardRequest(
+    int PatientId,
+    string CardNumber,
+    int InsurancePlanId,
+    string? RegisteredFacility,
+    bool IsRegisteredHere,
+    DateOnly ValidFrom,
+    DateOnly ValidTo,
+    bool IsActive = true,
+    int CashierAccountId = 0);

@@ -30,6 +30,11 @@ public interface IBillingService
     Task<IReadOnlyList<LedgerItemDto>> GetLedgerAsync(LedgerFilterDto filter, bool exportAll = false, CancellationToken ct = default);
 
     /// <summary>
+    /// Tổng hợp số liệu tài chính (Tiền mặt, Chuyển khoản, Cấn trừ tạm ứng, Hoàn trả, Thực thu ròng) trên toàn bộ tập giao dịch khớp bộ lọc.
+    /// </summary>
+    Task<LedgerSummaryDto> GetLedgerSummaryAsync(LedgerFilterDto filter, CancellationToken ct = default);
+
+    /// <summary>
     /// Lấy lịch sử chi phí khám bệnh và thanh toán của bệnh nhân.
     /// </summary>
     Task<IReadOnlyList<PatientBillingHistoryItemDto>> GetPatientBillingHistoryAsync(int patientId, CancellationToken ct = default);
@@ -84,4 +89,14 @@ public interface IBillingService
     /// Quyết toán viện phí toàn diện tại quầy thu ngân: cấn trừ viện phí vào tạm ứng, tự động xử lý thu thêm (nếu thiếu) hoặc hoàn tiền thừa (nếu dư).
     /// </summary>
     Task<Result<SettleDischargeResultDto>> SettleDischargeAsync(SettleDischargeRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Lấy danh mục các gói mức hưởng BHYT để thu ngân khai báo/đối chiếu thẻ.
+    /// </summary>
+    Task<IReadOnlyList<InsurancePlanOptionDto>> GetInsurancePlansAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Khai báo mới hoặc cập nhật thẻ BHYT của người bệnh tại quầy thu ngân.
+    /// </summary>
+    Task<Result<int>> UpsertPatientInsuranceCardAsync(UpsertPatientInsuranceCardRequest request, CancellationToken ct = default);
 }

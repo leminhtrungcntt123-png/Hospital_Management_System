@@ -5,6 +5,7 @@ using HIS.BLL.DTOs;
 using HIS.BLL.Options;
 using HIS.BLL.Services;
 using HIS.Domain;
+using HIS.Web.Workers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -13,22 +14,28 @@ using QRCoder;
 namespace HIS.Web.Areas.Staff.Controllers;
 
 [Area("Staff")]
-[Authorize(Policy = "StaffAny")]
+[Authorize(Policy = "CashierAccess")]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public class CashierController : Controller
 {
     private readonly IBillingService _billingService;
     private readonly ICashierShiftService _shiftService;
     private readonly BillingOptions _billingOptions;
+    private readonly EmailOptions _emailOptions;
+    private readonly PaymentReceiptEmailQueue _receiptEmailQueue;
 
     public CashierController(
         IBillingService billingService,
         ICashierShiftService shiftService,
-        IOptions<BillingOptions> billingOptions)
+        IOptions<BillingOptions> billingOptions,
+        IOptionsSnapshot<EmailOptions> emailOptions,
+        PaymentReceiptEmailQueue receiptEmailQueue)
     {
         _billingService = billingService;
         _shiftService = shiftService;
         _billingOptions = billingOptions.Value;
+        _emailOptions = emailOptions.Value;
+        _receiptEmailQueue = receiptEmailQueue;
     }
 
     private int CurrentAccountId => int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : 0;
@@ -37,21 +44,33 @@ public class CashierController : Controller
     public async Task<IActionResult> Index(
         string? search = null,
         InvoiceStatus? invoiceStatus = null,
+        string? statusFilter = null,
         int? selectedId = null,
         CancellationToken ct = default)
     {
+        string normalizedStatusFilter = !string.IsNullOrWhiteSpace(statusFilter)
+            ? statusFilter.Trim().ToLowerInvariant()
+            : (invoiceStatus == InvoiceStatus.Paid ? "paid" : "unpaid");
+
+        InvoiceStatus? effectiveStatus = normalizedStatusFilter switch
+        {
+            "paid" => InvoiceStatus.Paid,
+            "all" => null,
+            _ => InvoiceStatus.Unpaid
+        };
+
         IReadOnlyList<PendingInvoiceItemDto> invoices = Array.Empty<PendingInvoiceItemDto>();
         InvoiceDetailDto? selectedInvoice = null;
         int activeId = 0;
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            invoices = await _billingService.GetPendingInvoicesAsync(search, InvoiceStatus.Unpaid, ct);
+            invoices = await _billingService.GetPendingInvoicesAsync(search, effectiveStatus, ct);
             activeId = selectedId ?? invoices.FirstOrDefault()?.AppointmentId ?? 0;
             if (activeId > 0)
             {
                 var detailResult = await _billingService.GetInvoiceDetailAsync(activeId, ct);
-                if (detailResult.IsSuccess && detailResult.Value?.Status != InvoiceStatus.Paid)
+                if (detailResult.IsSuccess && (effectiveStatus != InvoiceStatus.Unpaid || detailResult.Value?.Status != InvoiceStatus.Paid || selectedId.HasValue))
                 {
                     selectedInvoice = detailResult.Value;
                 }
@@ -61,21 +80,24 @@ public class CashierController : Controller
         {
             activeId = selectedId.Value;
             var detailResult = await _billingService.GetInvoiceDetailAsync(activeId, ct);
-            if (detailResult.IsSuccess && detailResult.Value?.Status != InvoiceStatus.Paid)
+            if (detailResult.IsSuccess)
             {
                 selectedInvoice = detailResult.Value;
             }
         }
 
         var currentShift = await _shiftService.GetCurrentShiftAsync(CurrentAccountId, ct);
+        var insurancePlans = await _billingService.GetInsurancePlansAsync(ct);
 
         ViewBag.Search = search;
-        ViewBag.InvoiceStatus = InvoiceStatus.Unpaid;
+        ViewBag.StatusFilter = normalizedStatusFilter;
+        ViewBag.InvoiceStatus = effectiveStatus;
         ViewBag.SelectedInvoice = selectedInvoice;
         ViewBag.SelectedId = activeId;
         ViewBag.CurrentShift = currentShift;
-        ViewBag.UnpaidCount = invoices.Count;
-        ViewBag.PaidCount = 0;
+        ViewBag.InsurancePlans = insurancePlans;
+        ViewBag.UnpaidCount = invoices.Count(i => i.InvoiceStatus != InvoiceStatus.Paid);
+        ViewBag.PaidCount = invoices.Count(i => i.InvoiceStatus == InvoiceStatus.Paid);
         ViewBag.AllCount = invoices.Count;
 
         return View(invoices);
@@ -103,17 +125,24 @@ public class CashierController : Controller
         }
 
         var currentShift = await _shiftService.GetCurrentShiftAsync(CurrentAccountId, ct);
+        var insurancePlans = await _billingService.GetInsurancePlansAsync(ct);
         ViewBag.CurrentShift = currentShift;
+        ViewBag.InsurancePlans = insurancePlans;
 
         return PartialView("_InvoiceDetail", detailResult.Value);
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Checkout([FromBody] CheckoutInvoiceRequest request, CancellationToken ct = default)
+    public async Task<IActionResult> Checkout([FromBody] CheckoutInvoiceRequest? request, CancellationToken ct = default)
     {
+        if (request == null)
+        {
+            return BadRequest(new { success = false, message = "Dữ liệu thanh toán không hợp lệ." });
+        }
+
         int cashierId = CurrentAccountId;
-        var reqWithCashier = request with { CashierAccountId = cashierId };
+        var reqWithCashier = request with { CashierAccountId = cashierId, RequireCompletedVisit = true };
 
         var result = await _billingService.CheckoutInvoiceAsync(reqWithCashier, ct);
         if (!result.IsSuccess)
@@ -189,8 +218,12 @@ public class CashierController : Controller
     public async Task<IActionResult> Ledger(LedgerFilterDto filter, CancellationToken ct = default)
     {
         var ledger = await _billingService.GetLedgerAsync(filter, ct: ct);
+        var summary = await _billingService.GetLedgerSummaryAsync(filter, ct);
+        var shifts = await _shiftService.GetShiftsAsync(filter.FromDate, filter.CashierId, ct);
         var currentShift = await _shiftService.GetCurrentShiftAsync(CurrentAccountId, ct);
         ViewBag.Filter = filter;
+        ViewBag.Summary = summary;
+        ViewBag.Shifts = shifts;
         ViewBag.CurrentShift = currentShift;
         return View(ledger);
     }
@@ -284,7 +317,8 @@ public class CashierController : Controller
         string cleanName = patient != null ? VietQrBuilder.SanitizeMessage(patient.FullName).ToUpperInvariant().Replace(" ", "") : "BN";
         if (cleanName.Length > 12) cleanName = cleanName[..12];
 
-        string msg = $"TU {patientCode[4..]} {cleanName}".Trim();
+        string shortCode = patientCode.Length > 4 ? patientCode[4..] : patientCode;
+        string msg = $"TU {shortCode} {cleanName}".Trim();
         if (msg.Length > 25) msg = msg[..25];
 
         var payload = VietQrBuilder.GeneratePayload(
@@ -312,10 +346,15 @@ public class CashierController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SettleDischarge([FromBody] SettleDischargeRequest request, CancellationToken ct = default)
+    public async Task<IActionResult> SettleDischarge([FromBody] SettleDischargeRequest? request, CancellationToken ct = default)
     {
+        if (request == null)
+        {
+            return BadRequest(new { success = false, message = "Dữ liệu quyết toán không hợp lệ." });
+        }
+
         int cashierId = CurrentAccountId;
-        var reqWithCashier = request with { CashierAccountId = cashierId };
+        var reqWithCashier = request with { CashierAccountId = cashierId, RequireCompletedVisit = true };
 
         var result = await _billingService.SettleDischargeAsync(reqWithCashier, ct);
         if (!result.IsSuccess)
@@ -324,24 +363,57 @@ public class CashierController : Controller
         }
 
         var res = result.Value!;
+        bool shouldDispatchEmail = request.SendReceiptEmail && !string.IsNullOrWhiteSpace(res.ReceiptEmail);
+        bool emailQueued = false;
+
+        if (shouldDispatchEmail || (res.PatientAccountId.HasValue && res.PatientAccountId.Value > 0))
+        {
+            var queued = _receiptEmailQueue.Enqueue(new PaymentReceiptDispatchJob(
+                request.AppointmentId,
+                res.InvoiceId,
+                res.InvoiceNumber,
+                shouldDispatchEmail ? res.ReceiptEmail : null,
+                res.PatientAccountId,
+                res.PatientPayable,
+                res.DepositDeducted,
+                res.AdditionalPaid,
+                res.RefundedToPatient));
+            emailQueued = shouldDispatchEmail && queued && _emailOptions.Enabled;
+        }
+
         string actionMsg = res.RefundedToPatient > 0
             ? $"Quyết toán thành công! Đã cấn trừ {res.DepositDeducted:N0} đ và hoàn trả {res.RefundedToPatient:N0} đ cho người bệnh."
             : (res.AdditionalPaid > 0
                 ? $"Quyết toán thành công! Đã cấn trừ {res.DepositDeducted:N0} đ và thu thêm {res.AdditionalPaid:N0} đ."
                 : $"Quyết toán thành công! Đã cấn trừ đủ 100% viện phí ({res.DepositDeducted:N0} đ).");
 
+        if (emailQueued)
+        {
+            actionMsg += $" Biên lai điện tử đang được gửi tới {res.ReceiptEmail}.";
+        }
+        else if (shouldDispatchEmail && !_emailOptions.Enabled)
+        {
+            actionMsg += " (Chức năng gửi email SMTP hiện đang tắt trong cấu hình).";
+        }
+
         return Ok(new
         {
             success = true,
             data = res,
+            emailQueued,
             message = actionMsg
         });
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CreateDeposit([FromBody] CreateDepositRequest request, CancellationToken ct = default)
+    public async Task<IActionResult> CreateDeposit([FromBody] CreateDepositRequest? request, CancellationToken ct = default)
     {
+        if (request == null)
+        {
+            return BadRequest(new { success = false, message = "Dữ liệu phiếu tạm ứng không hợp lệ." });
+        }
+
         var reqWithCashier = request with { CashierAccountId = CurrentAccountId };
         var result = await _billingService.CreateDepositAsync(reqWithCashier, ct);
         if (!result.IsSuccess)
@@ -366,8 +438,13 @@ public class CashierController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RefundDeposit([FromBody] RefundDepositRequest request, CancellationToken ct = default)
+    public async Task<IActionResult> RefundDeposit([FromBody] RefundDepositRequest? request, CancellationToken ct = default)
     {
+        if (request == null)
+        {
+            return BadRequest(new { success = false, message = "Dữ liệu hoàn tạm ứng không hợp lệ." });
+        }
+
         var reqWithCashier = request with { CashierAccountId = CurrentAccountId };
         var result = await _billingService.RefundDepositAsync(reqWithCashier, ct);
         if (!result.IsSuccess)
@@ -409,8 +486,13 @@ public class CashierController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RefundAllDeposits([FromBody] RefundAllPatientDepositsRequest request, CancellationToken ct = default)
+    public async Task<IActionResult> RefundAllDeposits([FromBody] RefundAllPatientDepositsRequest? request, CancellationToken ct = default)
     {
+        if (request == null)
+        {
+            return BadRequest(new { success = false, message = "Dữ liệu tất toán tạm ứng không hợp lệ." });
+        }
+
         var reqWithCashier = request with { CashierAccountId = CurrentAccountId };
         var result = await _billingService.RefundAllPatientDepositsAsync(reqWithCashier, ct);
         if (!result.IsSuccess)
@@ -429,8 +511,13 @@ public class CashierController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RefundInvoice([FromBody] RefundInvoiceRequest request, CancellationToken ct = default)
+    public async Task<IActionResult> RefundInvoice([FromBody] RefundInvoiceRequest? request, CancellationToken ct = default)
     {
+        if (request == null)
+        {
+            return BadRequest(new { success = false, message = "Dữ liệu hoàn viện phí không hợp lệ." });
+        }
+
         var reqWithCashier = request with { CashierAccountId = CurrentAccountId };
         var result = await _billingService.RefundInvoiceAsync(reqWithCashier, ct);
         if (!result.IsSuccess)
@@ -443,6 +530,32 @@ public class CashierController : Controller
             success = true,
             transactionCode = result.Value,
             message = $"Hoàn viện phí thành công! Mã phiếu chi: {result.Value}"
+        });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpsertInsuranceCard([FromBody] UpsertPatientInsuranceCardRequest? request, CancellationToken ct = default)
+    {
+        if (request == null)
+        {
+            return BadRequest(new { success = false, message = "Dữ liệu thẻ BHYT không hợp lệ." });
+        }
+
+        var reqWithCashier = request with { CashierAccountId = CurrentAccountId };
+        var result = await _billingService.UpsertPatientInsuranceCardAsync(reqWithCashier, ct);
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { success = false, message = result.Error.Message });
+        }
+
+        return Ok(new
+        {
+            success = true,
+            cardId = result.Value,
+            message = request.IsActive
+                ? "Đã cập nhật thẻ BHYT và tính lại mức hưởng cho người bệnh!"
+                : "Đã chuyển đối tượng khám về Viện phí tự túc (0% BHYT)."
         });
     }
 
