@@ -8,6 +8,8 @@ const staffMenus = {
                 ['staff/reception', 'users', 'Tiếp nhận & gọi số'],
                 ['staff/vitals', 'pulse', 'Sinh hiệu'],
                 ['staff/cashier', 'wallet', 'Thu phí & BHYT'],
+                ['staff/cashier/deposits', 'wallet', 'Quản lý tạm ứng'],
+                ['staff/cashier/ledger', 'clipboard', 'Sổ thu ngân'],
             ],
         ],
         [
@@ -66,9 +68,17 @@ const staffMenus = {
 
 function staffShell() {
     const name = config.displayName || 'Tài khoản';
+    const useCustomStaffLogo = ['NURSE', 'ACCOUNTANT', 'CASHIER'].includes((config.role || '').toUpperCase());
+    const brandIconHtml = useCustomStaffLogo
+        ? `<img src="${esc((config.pathBase || '') + '/images/medicare-staff-logo.jpg')}" alt="HIS MediCare" style="width:36px; height:36px; border:2px solid #107c41; border-radius:10px; box-sizing:border-box; object-fit:cover; flex-shrink:0;" />`
+        : `<div class="brand-logo-box"><svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></div>`;
     return `<div class="staff-app">
         <aside class="sidebar ${ui.mobileMenu ? 'open' : ''}">
-            <div>${link(brand(), 'public/home', '', 'brand-link')}
+            <div>
+                <a class="admin-brand" href="${esc(routeUrl('public/home'))}" title="HIS MediCare - Về trang chủ">
+                    ${brandIconHtml}
+                    <div class="brand-text"><span class="brand-title">HIS <em>MediCare</em></span></div>
+                </a>
                 <div class="workspace">${icon('building')}<span><strong>${esc(config.departmentName || 'Không gian nhân viên')}</strong><small>${esc(activeRole().name)}</small></span></div>
             </div>
             <nav class="staff-nav" aria-label="Chức năng theo vai trò">
@@ -81,7 +91,7 @@ function staffShell() {
                     .join('')}
             </nav>
             <div class="sidebar-bottom">${link('Cổng bệnh nhân', 'public/home', 'external', 'portal-link')}
-                <div><span><i></i>MediCare HIS</span><button type="button" data-act="account-menu">Tài khoản</button></div>
+                <div><span><i></i>HIS MediCare</span></div>
             </div>
         </aside>
         ${ui.mobileMenu ? '<button class="sidebar-scrim" type="button" data-act="menu" aria-label="Đóng điều hướng"></button>' : ''}

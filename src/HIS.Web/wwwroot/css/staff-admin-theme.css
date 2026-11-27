@@ -71,6 +71,8 @@ body.staff-context *::-webkit-scrollbar-thumb:hover {
     width: 232px !important;
     min-width: 232px !important;
     max-width: 232px !important;
+    background: #ffffff !important;
+    color: #475569 !important;
     padding: 16px 12px 12px !important;
     border-right: 1px solid #e3e9e6 !important;
     box-shadow: 1px 0 3px rgba(0, 0, 0, 0.02) !important;
@@ -146,6 +148,23 @@ body.staff-context *::-webkit-scrollbar-thumb:hover {
     border-radius: 8px;
     padding: 8px 10px;
     margin: 12px 0 8px;
+}
+
+.staff-context .staff-app .sidebar .workspace > .icon {
+    color: #64748b;
+    flex-shrink: 0;
+}
+
+.staff-context .staff-app .sidebar .workspace strong {
+    color: #0f172a;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.staff-context .staff-app .sidebar .workspace small {
+    color: #64748b;
+    font-size: 11px;
 }
 
 /* ==========================================================================

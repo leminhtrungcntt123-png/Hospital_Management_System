@@ -5,47 +5,71 @@
     ViewData["Title"] = "Tiếp nhận và hàng chờ";
     var online = Model.Desk.Visits.Where(a => a.Channel == BookingChannel.Web).ToList();
     var queue = Model.Desk.Visits.Where(a => a.StatusId is 3 or 4 or 5).ToList();
+    var activeTab = !ViewData.ModelState.IsValid ? "walk-in" : "web-visits";
 }
 
 <div class="reception-desk">
-    <header class="reception-heading">
+    <div class="page-heading">
         <div>
-            <span class="reception-eyebrow">QUẦY TIẾP NHẬN · @Model.Desk.Department</span>
+            <span class="eyebrow">QUẦY TIẾP NHẬN · @Model.Desk.Department</span>
             <h1>Tiếp nhận người khám</h1>
-            <p>@Model.Desk.Date.ToString("dd/MM/yyyy") · Xác minh lịch web hoặc đăng ký khách vãng lai tại quầy.</p>
         </div>
-        <a class="btn outline" asp-action="Index">@await Html.PartialAsync("_AdminIcon", "refresh") Làm mới danh sách</a>
-    </header>
+        <div class="heading-actions">
+            <a class="btn outline" asp-action="Index">@await Html.PartialAsync("_AdminIcon", "refresh") Làm mới</a>
+        </div>
+    </div>
 
     @if (TempData["ReceptionSuccess"] is string success)
     {
-        <div class="reception-alert success" role="status">@success</div>
+        <div class="flash-banner ok" role="status">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            <span>@success</span>
+        </div>
     }
     @if (TempData["ReceptionError"] is string error)
     {
-        <div class="reception-alert error" role="alert">@error</div>
+        <div class="flash-banner err" role="alert">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            <span>@error</span>
+        </div>
     }
 
-    <nav class="reception-shortcuts" aria-label="Tác vụ tiếp nhận">
-        <a href="#web-visits">Lịch đặt trên web</a>
-        <a href="#walk-in">Đăng ký khách vãng lai</a>
-        <a href="#reception-queue">Hàng chờ đã tiếp nhận</a>
-    </nav>
-
-    <form asp-action="Index" method="get" class="reception-search">
-        <label for="reception-search">Tìm mã lịch, số thứ tự, số điện thoại hoặc CCCD</label>
-        <div class="reception-search-input field">
-            <input id="reception-search" name="search" value="@Model.Search" maxlength="50" class="form-control" placeholder="Nhập chính xác thông tin cần tìm" />
-            <button class="btn primary" type="submit">Tìm kiếm</button>
+    <section class="card">
+        <div class="card-body">
+            <form asp-action="Index" method="get" class="reception-search-form">
+                <div class="reception-search-input">
+                    <input id="reception-search" name="search" value="@Model.Search" maxlength="50" placeholder="Tìm mã lịch, số thứ tự, SĐT hoặc CCCD..." />
+                    <button class="btn primary" type="submit">@await Html.PartialAsync("_AdminIcon", "search") Tìm</button>
+                    @if (!string.IsNullOrWhiteSpace(Model.Search))
+                    {
+                        <a asp-action="Index" class="btn outline">Xóa</a>
+                    }
+                </div>
+            </form>
         </div>
-        <small>Danh sách khám hiển thị tối đa 100 lượt hôm nay trong khoa. Tra hồ sơ sẵn có bằng số điện thoại hoặc CCCD chính xác.</small>
-    </form>
+    </section>
 
-    <section id="web-visits" class="reception-panel">
-        <h2>Lịch đặt trên web <span>@online.Count</span></h2>
-        <p>Đối chiếu mã lịch và thông tin người đến khám trước khi cấp số. Chỉ lịch đã xác nhận được tiếp nhận.</p>
-        <div class="table-responsive">
-            <table class="table align-middle">
+    <div class="reception-tabs" role="tablist" aria-label="Tác vụ tiếp nhận">
+        <button type="button" class="reception-tab @(activeTab == "web-visits" ? "active" : "")" role="tab" aria-selected="@(activeTab == "web-visits" ? "true" : "false")" data-tab="web-visits">
+            Lịch đặt trên web <span class="tab-count">@online.Count</span>
+        </button>
+        <button type="button" class="reception-tab @(activeTab == "reception-queue" ? "active" : "")" role="tab" aria-selected="@(activeTab == "reception-queue" ? "true" : "false")" data-tab="reception-queue">
+            Hàng chờ đã tiếp nhận <span class="tab-count">@queue.Count</span>
+        </button>
+        <button type="button" class="reception-tab @(activeTab == "walk-in" ? "active" : "")" role="tab" aria-selected="@(activeTab == "walk-in" ? "true" : "false")" data-tab="walk-in">
+            Đăng ký khách vãng lai
+        </button>
+    </div>
+
+    <section id="web-visits" class="card reception-tab-panel" data-tab-panel="web-visits" hidden="@(activeTab != "web-visits" ? "hidden" : null)">
+        <div class="card-header">
+            <div class="card-header-row">
+                <h2>Lịch đặt trên web</h2>
+                <span class="status-badge ok">@online.Count lượt</span>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table class="reception-table">
                 <thead>
                     <tr>
                         <th>Mã lịch / giờ</th>
@@ -59,14 +83,14 @@
                 @foreach (var visit in online)
                 {
                     <tr>
-                        <td><strong>@visit.Code</strong><br />@visit.ArrivalTime.ToString("HH:mm")</td>
-                        <td><strong>@visit.PatientName</strong><br />@visit.BirthDate.ToString("dd/MM/yyyy") · @visit.Phone</td>
-                        <td>@visit.Doctor<br />Phòng @visit.Room</td>
-                        <td>@StatusName(visit.StatusId)</td>
+                        <td><strong>@visit.Code</strong><br /><small>@visit.ArrivalTime.ToString("HH:mm")</small></td>
+                        <td><strong>@visit.PatientName</strong><br /><small>@visit.BirthDate.ToString("dd/MM/yyyy") · @visit.Phone</small></td>
+                        <td>@visit.Doctor<br /><small>Phòng @visit.Room</small></td>
+                        <td><span class="status-badge @StatusBadgeClass(visit.StatusId)">@StatusName(visit.StatusId)</span></td>
                         <td>
                             @if (visit.StatusId == 2)
                             {
-                                <form asp-action="CheckIn" method="post">
+                                <form asp-action="CheckIn" method="post" class="checkin-inline-form">
                                     <input type="hidden" name="appointmentId" value="@visit.Id" />
                                     <label class="reception-verify"><input type="checkbox" name="identityVerified" value="true" required /> Đã đối chiếu danh tính</label>
                                     <button type="submit" class="btn primary sm">Tiếp nhận &amp; cấp số</button>
@@ -78,7 +102,7 @@
                             }
                             else
                             {
-                                <span class="muted">Chưa đủ điều kiện</span>
+                                <small>Chưa đủ điều kiện</small>
                             }
                         </td>
                     </tr>
@@ -92,97 +116,18 @@
         </div>
     </section>
 
-    <section id="walk-in" class="reception-panel">
-        <h2>Đăng ký khách vãng lai</h2>
-        <p>Chọn hồ sơ sẵn có từ kết quả tìm kiếm, hoặc nhập thông tin người khám mới. Khách vãng lai không cần tài khoản web.</p>
-        <form asp-action="WalkIn" method="post">
-            <input type="hidden" name="search" value="@Model.Search" />
-            <div asp-validation-summary="All" class="danger-text" role="alert"></div>
-            <div class="reception-form-grid">
-                <div class="reception-field reception-wide">
-                    <label asp-for="WalkIn.PatientId">Hồ sơ người khám</label>
-                    <select asp-for="WalkIn.PatientId" class="form-select">
-                        <option value="">Tạo hồ sơ người khám mới</option>
-                        @foreach (var patient in Model.Desk.Patients)
-                        {
-                            <option value="@patient.Id">#@patient.Id · @patient.Name · @patient.BirthDate.ToString("dd/MM/yyyy") · @patient.Phone</option>
-                        }
-                    </select>
-                    <small>Với hồ sơ đã chọn, không cần nhập lại các thông tin cá nhân bên dưới.</small>
-                </div>
-                <div class="reception-field">
-                    <label asp-for="WalkIn.FullName">Họ và tên (người khám mới)</label>
-                    <input asp-for="WalkIn.FullName" class="form-control" autocomplete="name" />
-                </div>
-                <div class="reception-field">
-                    <label asp-for="WalkIn.DateOfBirth">Ngày sinh (người khám mới)</label>
-                    <input asp-for="WalkIn.DateOfBirth" type="date" max="@Model.Desk.Date.ToString("yyyy-MM-dd")" class="form-control" />
-                </div>
-                <div class="reception-field">
-                    <label asp-for="WalkIn.PhoneNumber">Điện thoại (người khám mới)</label>
-                    <input asp-for="WalkIn.PhoneNumber" type="tel" class="form-control" />
-                </div>
-                <div class="reception-field">
-                    <label asp-for="WalkIn.NationalId">CCCD (nếu có)</label>
-                    <input asp-for="WalkIn.NationalId" class="form-control" />
-                </div>
-                <div class="reception-field">
-                    <label asp-for="WalkIn.Gender">Giới tính</label>
-                    <select asp-for="WalkIn.Gender" class="form-select">
-                        <option value="">Chưa cung cấp</option>
-                        <option value="Male">Nam</option>
-                        <option value="Female">Nữ</option>
-                        <option value="Other">Khác</option>
-                    </select>
-                </div>
-                <div class="reception-field">
-                    <label asp-for="WalkIn.Address">Địa chỉ</label>
-                    <input asp-for="WalkIn.Address" class="form-control" />
-                </div>
-                <div class="reception-field">
-                    <label asp-for="WalkIn.Allergies">Dị ứng / Lưu ý y khoa</label>
-                    <input asp-for="WalkIn.Allergies" class="form-control" placeholder="Dị ứng thuốc, thực phẩm (nếu có)..." />
-                </div>
-                <div class="reception-field">
-                    <label asp-for="WalkIn.ScheduleId">Bác sĩ / phòng / ca đang tiếp nhận *</label>
-                    <select asp-for="WalkIn.ScheduleId" class="form-select" required>
-                        <option value="">Chọn ca khám</option>
-                        @foreach (var schedule in Model.Desk.Schedules)
-                        {
-                            <option value="@schedule.Id">@schedule.Label</option>
-                        }
-                    </select>
-                    @if (Model.Desk.Schedules.Count == 0)
-                    {
-                        <small>Hiện chưa có ca tiếp nhận hợp lệ. Liên hệ người phụ trách lịch khoa.</small>
-                    }
-                </div>
-                <div class="reception-field">
-                    <label asp-for="WalkIn.PriorityLevel">Mức ưu tiên tại quầy</label>
-                    <select asp-for="WalkIn.PriorityLevel" class="form-select">
-                        <option value="0">Bình thường</option>
-                        <option value="1">Ưu tiên 1</option>
-                        <option value="2">Ưu tiên 2</option>
-                        <option value="3">Ưu tiên 3</option>
-                    </select>
-                </div>
-                <div class="reception-field reception-wide">
-                    <label asp-for="WalkIn.Reason">Lý do khám</label>
-                    <textarea asp-for="WalkIn.Reason" class="form-control" rows="2"></textarea>
-                </div>
+    <section id="reception-queue" class="card reception-tab-panel" data-tab-panel="reception-queue" hidden="@(activeTab != "reception-queue" ? "hidden" : null)">
+        <div class="card-header">
+            <div class="card-header-row">
+                <h2>Hàng chờ đã tiếp nhận</h2>
+                <span class="status-badge ok">@queue.Count lượt</span>
             </div>
-            <label class="reception-verify"><input asp-for="WalkIn.IdentityVerified" required /> Đã đối chiếu thông tin và danh tính người đến khám</label>
-            <button type="submit" class="btn primary">Đăng ký &amp; cấp số khách vãng lai</button>
-        </form>
-    </section>
-
-    <section id="reception-queue" class="reception-panel">
-        <h2>Hàng chờ đã tiếp nhận <span>@queue.Count</span></h2>
-        <div class="table-responsive">
-            <table class="table align-middle">
+        </div>
+        <div class="table-wrap">
+            <table class="reception-table">
                 <thead>
                     <tr>
-                        <th>Số thứ tự</th>
+                        <th>STT</th>
                         <th>Người khám</th>
                         <th>Nguồn</th>
                         <th>Phòng / bác sĩ</th>
@@ -195,22 +140,129 @@
                 {
                     <tr>
                         <td class="reception-number">@visit.QueueNumber</td>
-                        <td>@visit.PatientName</td>
-                        <td>@(visit.Channel == BookingChannel.Web ? "Web" : "Vãng lai")</td>
-                        <td>@visit.Room · @visit.Doctor</td>
-                        <td>@visit.PriorityLevel</td>
-                        <td>@StatusName(visit.StatusId)</td>
+                        <td><strong>@visit.PatientName</strong></td>
+                        <td><span class="status-badge @(visit.Channel == BookingChannel.Web ? "ok" : "muted")">@(visit.Channel == BookingChannel.Web ? "Web" : "Vãng lai")</span></td>
+                        <td>Phòng @visit.Room · @visit.Doctor</td>
+                        <td>@(visit.PriorityLevel > 0 ? $"Ưu tiên {visit.PriorityLevel}" : "Bình thường")</td>
+                        <td><span class="status-badge @StatusBadgeClass(visit.StatusId)">@StatusName(visit.StatusId)</span></td>
                     </tr>
                 }
                 @if (queue.Count == 0)
                 {
-                    <tr><td colspan="6" class="reception-empty">Chưa có người khám trong hàng chờ phù hợp.</td></tr>
+                    <tr><td colspan="6" class="reception-empty">Chưa có người khám trong hàng chờ.</td></tr>
                 }
                 </tbody>
             </table>
         </div>
     </section>
+
+    <section id="walk-in" class="card reception-tab-panel" data-tab-panel="walk-in" hidden="@(activeTab != "walk-in" ? "hidden" : null)">
+        <div class="card-header">
+            <h2>Đăng ký khách vãng lai</h2>
+        </div>
+        <div class="card-body">
+            <form asp-action="WalkIn" method="post">
+                <input type="hidden" name="search" value="@Model.Search" />
+                <div asp-validation-summary="All" class="danger-text" role="alert"></div>
+                <div class="reception-form-grid">
+                    <div class="reception-field reception-wide">
+                        <label asp-for="WalkIn.PatientId">Hồ sơ sẵn có</label>
+                        <select asp-for="WalkIn.PatientId">
+                            <option value="">Tạo hồ sơ mới</option>
+                            @foreach (var patient in Model.Desk.Patients)
+                            {
+                                <option value="@patient.Id">#@patient.Id · @patient.Name · @patient.BirthDate.ToString("dd/MM/yyyy") · @patient.Phone</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="reception-field">
+                        <label asp-for="WalkIn.FullName">Họ và tên</label>
+                        <input asp-for="WalkIn.FullName" autocomplete="name" />
+                    </div>
+                    <div class="reception-field">
+                        <label asp-for="WalkIn.DateOfBirth">Ngày sinh</label>
+                        <input asp-for="WalkIn.DateOfBirth" type="date" max="@Model.Desk.Date.ToString("yyyy-MM-dd")" />
+                    </div>
+                    <div class="reception-field">
+                        <label asp-for="WalkIn.PhoneNumber">Điện thoại</label>
+                        <input asp-for="WalkIn.PhoneNumber" type="tel" />
+                    </div>
+                    <div class="reception-field">
+                        <label asp-for="WalkIn.NationalId">CCCD</label>
+                        <input asp-for="WalkIn.NationalId" />
+                    </div>
+                    <div class="reception-field">
+                        <label asp-for="WalkIn.Gender">Giới tính</label>
+                        <select asp-for="WalkIn.Gender">
+                            <option value="">Chưa cung cấp</option>
+                            <option value="Male">Nam</option>
+                            <option value="Female">Nữ</option>
+                            <option value="Other">Khác</option>
+                        </select>
+                    </div>
+                    <div class="reception-field">
+                        <label asp-for="WalkIn.Address">Địa chỉ</label>
+                        <input asp-for="WalkIn.Address" />
+                    </div>
+                    <div class="reception-field">
+                        <label asp-for="WalkIn.Allergies">Dị ứng / Lưu ý</label>
+                        <input asp-for="WalkIn.Allergies" placeholder="Thuốc, thực phẩm (nếu có)" />
+                    </div>
+                    <div class="reception-field">
+                        <label asp-for="WalkIn.ScheduleId">Ca khám *</label>
+                        <select asp-for="WalkIn.ScheduleId" required>
+                            <option value="">Chọn ca khám</option>
+                            @foreach (var schedule in Model.Desk.Schedules)
+                            {
+                                <option value="@schedule.Id">@schedule.Label</option>
+                            }
+                        </select>
+                        @if (Model.Desk.Schedules.Count == 0)
+                        {
+                            <small>Chưa có ca tiếp nhận.</small>
+                        }
+                    </div>
+                    <div class="reception-field">
+                        <label asp-for="WalkIn.PriorityLevel">Mức ưu tiên</label>
+                        <select asp-for="WalkIn.PriorityLevel">
+                            <option value="0">Bình thường</option>
+                            <option value="1">Ưu tiên 1</option>
+                            <option value="2">Ưu tiên 2</option>
+                            <option value="3">Ưu tiên 3</option>
+                        </select>
+                    </div>
+                    <div class="reception-field reception-wide">
+                        <label asp-for="WalkIn.Reason">Lý do khám</label>
+                        <textarea asp-for="WalkIn.Reason" rows="2"></textarea>
+                    </div>
+                </div>
+                <label class="reception-verify"><input asp-for="WalkIn.IdentityVerified" required /> Đã đối chiếu danh tính người đến khám</label>
+                <button type="submit" class="btn primary">Đăng ký &amp; cấp số</button>
+            </form>
+        </div>
+    </section>
 </div>
+
+<script>
+(() => {
+    const tabs = document.querySelectorAll('.reception-tab');
+    const panels = document.querySelectorAll('.reception-tab-panel');
+    function activate(id) {
+        tabs.forEach(t => {
+            const on = t.dataset.tab === id;
+            t.classList.toggle('active', on);
+            t.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        panels.forEach(p => { p.hidden = p.dataset.tabPanel !== id; });
+    }
+    tabs.forEach(t => t.addEventListener('click', () => {
+        activate(t.dataset.tab);
+        history.replaceState(null, '', '#' + t.dataset.tab);
+    }));
+    const hash = location.hash.slice(1);
+    if (hash && document.querySelector(`.reception-tab[data-tab="${hash}"]`)) activate(hash);
+})();
+</script>
 
 @functions {
     private static string StatusName(int status) => status switch
@@ -226,5 +278,13 @@
         9 => "Hết hạn",
         10 => "Cần đặt lại",
         _ => "Chưa xác định"
+    };
+
+    private static string StatusBadgeClass(int status) => status switch
+    {
+        2 or 3 or 4 or 6 => "ok",
+        1 or 5 => "warn",
+        7 or 8 or 9 or 10 => "danger",
+        _ => "muted"
     };
 }

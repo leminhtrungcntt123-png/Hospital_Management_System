@@ -557,7 +557,7 @@ else if (tab == "schedule")
                     };
                     <div class="period-info">
                         <span class="period-pill @pillClass">@pillText</span>
-                        <div class="period-meta">Kỳ @Model.ActivePeriod.Name · @Model.ActivePeriod.StartDate.ToString("dd/MM") – @Model.ActivePeriod.EndDate.ToString("dd/MM/yyyy")</div>
+                        <div class="period-meta">@(Model.ActivePeriod.Name.StartsWith("Kỳ", StringComparison.OrdinalIgnoreCase) ? Model.ActivePeriod.Name : $"Kỳ {Model.ActivePeriod.Name}") · @Model.ActivePeriod.StartDate.ToString("dd/MM") – @Model.ActivePeriod.EndDate.ToString("dd/MM/yyyy")</div>
                     </div>
                 }
                 else

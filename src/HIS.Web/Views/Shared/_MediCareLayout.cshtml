@@ -25,6 +25,7 @@
         _ => "/Admin/Accounts"
     };
     var isPreview = ViewData["UiPreview"] is true;
+    var isStaffRoute = (ViewData["MediCareRoute"]?.ToString() ?? "").StartsWith("staff/", StringComparison.OrdinalIgnoreCase);
     var config = new
     {
         preview = isPreview,
@@ -59,8 +60,14 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#079bc9" />
-    <title>@ViewData["Title"] — MediCare HIS</title>
+    <meta name="theme-color" content="@(isStaffRoute ? "#107c41" : "#079bc9")" />
+    <title>@ViewData["Title"] — @(isStaffRoute ? "HIS MediCare" : "MediCare HIS")</title>
+    @if (isStaffRoute)
+    {
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet" />
+    }
     <partial name="MediCare/_Styles" />
     <link rel="stylesheet" href="~/css/portal/layout.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/portal/home.css" asp-append-version="true" />
@@ -68,8 +75,12 @@
     <link rel="stylesheet" href="~/css/portal/catalog.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/portal/doctor-profile.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/portal/booking.css" asp-append-version="true" />
+    @if (isStaffRoute)
+    {
+        <link rel="stylesheet" href="~/css/staff-admin-theme.css" asp-append-version="true" />
+    }
 </head>
-<body>
+<body class="@(isStaffRoute ? "staff-context" : null)">
     @RenderBody()
     <partial name="MediCare/_Overlays" />
     <partial name="MediCare/_SessionControls" />

@@ -7,6 +7,8 @@ const mvcEntries = {
     'patient/notifications': '/Patient/Notifications',
     'staff/reception': '/Staff/Reception',
     'staff/cashier': '/Staff/Cashier',
+    'staff/cashier/deposits': '/Staff/Cashier/Deposits',
+    'staff/cashier/ledger': '/Staff/Cashier/Ledger',
     'staff/consultation': '/Staff/Consultation',
     'staff/schedule':
         config.role === 'DOCTOR' ? '/Staff/Consultation?tab=schedule' : '/Staff/Schedule',

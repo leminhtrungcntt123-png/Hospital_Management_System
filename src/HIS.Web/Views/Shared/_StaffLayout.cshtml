@@ -109,9 +109,16 @@
         <aside class="sidebar" id="staff-sidebar" aria-label="Điều hướng nhân viên">
             <div>
                 <a class="admin-brand" asp-area="" asp-controller="Home" asp-action="Index" title="HIS MediCare - Về trang chủ">
-                    <div class="brand-logo-box">
-                        <svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                    </div>
+                    @if (isNurse || isAccountant)
+                    {
+                        <img src="~/images/medicare-staff-logo.jpg" alt="HIS MediCare" style="width:36px; height:36px; border:2px solid #107c41; border-radius:10px; box-sizing:border-box; object-fit:cover; flex-shrink:0;" />
+                    }
+                    else
+                    {
+                        <div class="brand-logo-box">
+                            <svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        </div>
+                    }
                     <div class="brand-text"><span class="brand-title">HIS <em>MediCare</em></span></div>
                 </a>
                 <div class="workspace">
