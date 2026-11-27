@@ -7,6 +7,12 @@
     string search = (string)(ViewBag.Search ?? "");
     string statusFilter = (string)(ViewBag.StatusFilter ?? "unpaid");
     var shift = ViewBag.CurrentShift as HIS.BLL.DTOs.CashierShiftDto;
+    var lastClosedShift = ViewBag.LastClosedShift as HIS.BLL.DTOs.CashierShiftDto;
+    decimal? prevHandover = lastClosedShift != null ? (lastClosedShift.CarryOverCash ?? lastClosedShift.CountedCash ?? 0m) : null;
+    decimal defaultHandover = prevHandover ?? 0m;
+    decimal defaultTopUp = prevHandover.HasValue
+        ? (prevHandover.Value < 2000000m ? 5000000m : 0m)
+        : 5000000m;
 }
 
 <!-- Hidden Anti-Forgery Token cố định toàn trang chống lỗi 400 Bad Request khi gọi fetch -->
@@ -26,13 +32,18 @@
         <div style="display: flex; gap: 12px; align-items: center; flex-shrink: 0; white-space: nowrap;">
             @if (shift != null)
             {
-                <div style="background: #e8f5e9; border: 1.5px solid #81c784; border-radius: 10px; padding: 10px 18px; display: inline-flex; align-items: center; gap: 14px; white-space: nowrap;">
+                <div style="background: #e8f5e9; border: 1.5px solid #81c784; border-radius: 10px; padding: 10px 18px; display: inline-flex; align-items: center; gap: 12px; white-space: nowrap;">
                     <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #2e7d32; flex-shrink: 0;"></span>
                     <div style="display: flex; align-items: center; gap: 10px; white-space: nowrap;">
                         <span style="font-size: 12.5px; color: #2e7d32; font-weight: 800;">CA ĐANG MỞ (Từ @shift.OpenedAt.ToString("HH:mm"))</span>
                         <span style="color: #a5d6a7;">|</span>
-                        <span style="font-size: 13px; font-weight: 700; color: #1b5e20;">Đầu ca: @shift.OpeningCash.ToString("N0") đ</span>
+                        <span style="font-size: 13px; font-weight: 700; color: #1b5e20;">
+                            Đầu ca: @shift.OpeningCash.ToString("N0") đ@(shift.MidShiftTopUpCash > 0 ? $" (+Tiếp quỹ: {shift.MidShiftTopUpCash:N0} đ)" : "")
+                        </span>
                     </div>
+                    <button type="button" class="btn outline" style="padding: 6px 12px; font-size: 12.5px; font-weight: 700; background: #ffffff; border-color: #0284c7; color: #0369a1; white-space: nowrap;" onclick="document.getElementById('modal-topup-shift').showModal()">
+                        + Tiếp quỹ
+                    </button>
                     <button type="button" class="btn outline" style="padding: 6px 14px; font-size: 12.5px; font-weight: 700; background: #ffffff; border-color: #66bb6a; color: #1b5e20; white-space: nowrap;" onclick="document.getElementById('modal-close-shift').showModal()">
                         Kết ca
                     </button>
@@ -198,51 +209,197 @@
     </section>
 </div>
 
-<!-- Modal Mở ca làm việc -->
-<dialog id="modal-open-shift" style="border: none; border-radius: 10px; padding: 24px; max-width: 440px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
-    <form asp-action="OpenShift" method="post">
-        <h3 style="margin-top: 0; font-size: 18px; color: #1a237e;">Mở ca thu ngân mới</h3>
-        <p style="font-size: 13px; color: #616161;">Nhập số tiền mặt đầu ca để phục vụ đối chiếu và trả lại tiền thừa / hoàn tạm ứng cho người bệnh.</p>
-        
-        <div style="margin-bottom: 14px;">
-            <label style="font-size: 12px; font-weight: 700; display: block; margin-bottom: 4px;">Tiền mặt đầu ca (VNĐ):</label>
-            <input type="number" name="openingCash" value="10000000" min="0" step="100000" class="form-control" style="width: 100%; padding: 8px 12px; font-size: 15px; font-weight: 700;" required />
+<!-- Modal Mở ca làm việc (Bàn giao ca trước + Tiếp quỹ thêm từ Thủ quỹ) -->
+<dialog id="modal-open-shift" style="border: none; border-radius: 12px; padding: 24px; max-width: 540px; width: 95%; box-shadow: 0 15px 35px rgba(0,0,0,0.25);">
+    <form asp-action="OpenShift" method="post" onsubmit="return validateOpenShiftForm()">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
+            <h3 style="margin: 0; font-size: 18px; color: #1a237e;">🔓 Mở ca thu ngân &amp; Nhận bàn giao quỹ</h3>
+            <button type="button" onclick="document.getElementById('modal-open-shift').close()" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #64748b;">✕</button>
+        </div>
+        <p style="font-size: 12.5px; color: #475569; margin: 0 0 14px; line-height: 1.5;">
+            Đối chiếu tiền mặt ca trước để lại ngăn kéo, đồng thời ghi nhận tiền <strong>tiếp quỹ thêm từ Thủ quỹ</strong> để đủ tiền lẻ thối lại và hoàn tạm ứng.
+        </p>
+
+        @if (lastClosedShift != null && prevHandover.HasValue)
+        {
+            <input type="hidden" name="previousExpectedHandover" id="open-prev-expected" value="@prevHandover.Value" />
+            <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 12.5px; color: #0c4a6e;">
+                <div style="font-weight: 800; color: #0369a1; margin-bottom: 2px;">
+                    📋 Số liệu bàn giao từ ca liền trước (CA-@lastClosedShift.Id.ToString("D4") · @lastClosedShift.CashierName):
+                </div>
+                <div>
+                    Kết ca lúc <strong>@(lastClosedShift.ClosedAt?.ToString("HH:mm, dd/MM/yyyy") ?? "—")</strong> ·
+                    Tiền để lại ngăn kéo: <strong style="color: #0284c7; font-size: 14px;">@prevHandover.Value.ToString("N0") đ</strong>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 12.5px; color: #475569;">
+                ℹ️ Chưa có ca đóng liền trước — hệ thống khởi tạo ca đầu tiên với quỹ tiền mặt nhận từ Thủ quỹ.
+            </div>
+        }
+
+        <input type="hidden" name="openingCash" id="open-total-cash-hidden" value="@(defaultHandover + defaultTopUp)" />
+
+        <div style="margin-bottom: 12px;">
+            <label style="font-size: 12.5px; font-weight: 700; display: block; margin-bottom: 4px; color: #1e293b;">
+                1. Tiền mặt thực nhận từ ngăn kéo ca trước (VNĐ):
+            </label>
+            <input type="number" name="handoverCash" id="open-handover-cash" value="@defaultHandover" min="0" step="1" class="form-control"
+                   oninput="recalcOpenShiftTotal()"
+                   style="width: 100%; padding: 8px 12px; font-size: 15px; font-weight: 700; color: #0f172a; border: 1.5px solid #cbd5e1; border-radius: 6px;" required />
+            <div id="open-handover-diff-alert" style="display: none; margin-top: 6px; padding: 7px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c;"></div>
         </div>
 
-        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <div style="margin-bottom: 14px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px;">
+            <label style="font-size: 12.5px; font-weight: 700; display: block; margin-bottom: 4px; color: #0369a1;">
+                2. Tiền nhận tiếp quỹ thêm từ Thủ quỹ (VNĐ):
+            </label>
+            <input type="number" name="topUpCash" id="open-topup-cash" value="@defaultTopUp" min="0" step="1" class="form-control"
+                   oninput="recalcOpenShiftTotal()"
+                   style="width: 100%; padding: 8px 12px; font-size: 15px; font-weight: 800; color: #0284c7; border: 1.5px solid #7dd3fc; border-radius: 6px; background: #ffffff;" required />
+            <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">
+                <button type="button" class="btn outline" style="padding: 3px 9px; font-size: 11.5px;" onclick="setOpenTopUp(0)">Không tiếp quỹ (0 đ)</button>
+                <button type="button" class="btn outline" style="padding: 3px 9px; font-size: 11.5px;" onclick="setOpenTopUp(2000000)">+2.000.000</button>
+                <button type="button" class="btn outline" style="padding: 3px 9px; font-size: 11.5px; font-weight: 700; color: #0369a1; border-color: #7dd3fc; background: #e0f2fe;" onclick="setOpenTopUp(5000000)">+5.000.000</button>
+                <button type="button" class="btn outline" style="padding: 3px 9px; font-size: 11.5px;" onclick="setOpenTopUp(10000000)">+10.000.000</button>
+            </div>
+        </div>
+
+        <div style="background: #ecfdf5; border: 1.5px solid #6ee7b7; border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <div style="font-size: 11.5px; font-weight: 800; color: #047857; text-transform: uppercase;">Tổng quỹ tiền mặt đầu ca (1 + 2)</div>
+                <div style="font-size: 11.5px; color: #065f46;">Dùng làm mốc đối soát tiền mặt cuối ca</div>
+            </div>
+            <div id="open-total-cash-display" style="font-size: 21px; font-weight: 900; color: #047857;">
+                @((defaultHandover + defaultTopUp).ToString("N0")) đ
+            </div>
+        </div>
+
+        <div id="open-low-float-warn" style="display: @((defaultHandover + defaultTopUp) < 1000000m ? "block" : "none"); margin-bottom: 12px; padding: 8px 12px; border-radius: 6px; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; font-size: 12px; font-weight: 600;">
+            ⚠️ Tổng quỹ tiền mặt dưới 1.000.000 đ — có thể thiếu tiền lẻ thối lại hoặc không đủ tiền mặt chi hoàn tạm ứng. Nên tiếp quỹ thêm từ Thủ quỹ.
+        </div>
+
+        <div style="margin-bottom: 16px;">
+            <label style="font-size: 12px; font-weight: 700; display: block; margin-bottom: 4px; color: #334155;">
+                Ghi chú nhận ca / Phiếu tiếp quỹ <span id="open-note-req" style="color: #dc2626; display: none;">*</span>:
+            </label>
+            <input type="text" name="note" id="open-shift-note" class="form-control"
+                   placeholder="VD: Nhận bàn giao đủ, Thủ quỹ cấp thêm 5.000.000đ tiền lẻ..."
+                   style="width: 100%; padding: 8px 12px; font-size: 13px; border: 1px solid #cbd5e1; border-radius: 6px;" />
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
             <button type="button" class="btn outline" onclick="document.getElementById('modal-open-shift').close()">Hủy</button>
-            <button type="submit" class="btn primary">Xác nhận mở ca</button>
+            <button type="submit" class="btn primary" style="font-weight: 700;">✓ Xác nhận mở ca</button>
         </div>
     </form>
 </dialog>
 
-<!-- Modal Kết thúc ca -->
 @if (shift != null)
 {
-    <dialog id="modal-close-shift" style="border: none; border-radius: 10px; padding: 24px; max-width: 480px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+    <!-- Modal Tiếp quỹ bổ sung giữa ca -->
+    <dialog id="modal-topup-shift" style="border: none; border-radius: 12px; padding: 24px; max-width: 460px; width: 95%; box-shadow: 0 15px 35px rgba(0,0,0,0.25);">
+        <form asp-action="TopUpShift" method="post">
+            <input type="hidden" name="shiftId" value="@shift.Id" />
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
+                <h3 style="margin: 0; font-size: 18px; color: #0369a1;">💵 Tiếp quỹ tiền mặt bổ sung trong ca</h3>
+                <button type="button" onclick="document.getElementById('modal-topup-shift').close()" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #64748b;">✕</button>
+            </div>
+            <p style="font-size: 12.5px; color: #475569; margin: 0 0 12px; line-height: 1.5;">
+                Dùng khi ngăn kéo tại quầy sắp hết tiền lẻ hoặc cần thêm tiền mặt từ <strong>Thủ quỹ</strong> để chi hoàn tạm ứng cho bệnh nhân.
+            </p>
+
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 12.5px; color: #334155;">
+                Đầu ca: <strong>@shift.OpeningCash.ToString("N0") đ</strong> · Đã tiếp quỹ thêm trong ca: <strong style="color: #0284c7;">@shift.MidShiftTopUpCash.ToString("N0") đ</strong>
+            </div>
+
+            <div style="margin-bottom: 12px;">
+                <label style="font-size: 12.5px; font-weight: 700; display: block; margin-bottom: 4px; color: #1e293b;">Số tiền nhận thêm từ Thủ quỹ (VNĐ) <span style="color: #dc2626;">*</span>:</label>
+                <input type="number" name="amount" id="mid-topup-amount" value="5000000" min="1000" step="1" class="form-control"
+                       style="width: 100%; padding: 8px 12px; font-size: 16px; font-weight: 800; color: #0284c7; border: 1.5px solid #0284c7; border-radius: 6px;" required />
+                <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">
+                    <button type="button" class="btn outline" style="padding: 3px 9px; font-size: 11.5px;" onclick="document.getElementById('mid-topup-amount').value = 2000000">+2.000.000</button>
+                    <button type="button" class="btn outline" style="padding: 3px 9px; font-size: 11.5px;" onclick="document.getElementById('mid-topup-amount').value = 5000000">+5.000.000</button>
+                    <button type="button" class="btn outline" style="padding: 3px 9px; font-size: 11.5px;" onclick="document.getElementById('mid-topup-amount').value = 10000000">+10.000.000</button>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label style="font-size: 12px; font-weight: 700; display: block; margin-bottom: 4px; color: #334155;">Người cấp quỹ / Ghi chú:</label>
+                <input type="text" name="note" class="form-control" placeholder="VD: Nhận từ Thủ quỹ Nguyễn Thị Mai bổ sung tiền hoàn tạm ứng..." style="width: 100%; padding: 8px 12px; font-size: 13px;" />
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+                <button type="button" class="btn outline" onclick="document.getElementById('modal-topup-shift').close()">Hủy</button>
+                <button type="submit" class="btn primary" style="background: #0284c7; border-color: #0284c7; font-weight: 700;">✓ Xác nhận tiếp quỹ</button>
+            </div>
+        </form>
+    </dialog>
+
+    <!-- Modal Kết thúc ca (Kiểm đếm + Nộp về Thủ quỹ + Để lại cho ca sau) -->
+    <dialog id="modal-close-shift" style="border: none; border-radius: 12px; padding: 24px; max-width: 520px; width: 95%; box-shadow: 0 15px 35px rgba(0,0,0,0.25);">
         <form asp-action="CloseShift" method="post">
             <input type="hidden" name="shiftId" value="@shift.Id" />
-            <h3 style="margin-top: 0; font-size: 18px; color: #c62828;">Kết thúc ca làm việc</h3>
-            <p style="font-size: 13px; color: #616161;">Kiểm đếm tiền mặt thực tế tại quầy để hệ thống đối soát chênh lệch tự động.</p>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
+                <h3 style="margin: 0; font-size: 18px; color: #c62828;">🔒 Kết thúc ca &amp; Bàn giao ngăn kéo</h3>
+                <button type="button" onclick="document.getElementById('modal-close-shift').close()" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #64748b;">✕</button>
+            </div>
+            <p style="font-size: 12.5px; color: #475569; margin: 0 0 12px;">
+                Kiểm đếm tổng tiền mặt thực tế trong ngăn kéo, ghi nhận khoản nộp về Thủ quỹ (nếu có) và chốt số dư để lại cho ca kế tiếp.
+            </p>
 
-            <div style="background: #f5f5f5; padding: 10px 14px; border-radius: 6px; margin-bottom: 14px; font-size: 13px;">
-                <div>Tiền đầu ca: <strong>@shift.OpeningCash.ToString("N0") đ</strong></div>
-                <div>Thời gian mở: @shift.OpenedAt.ToString("HH:mm, dd/MM/yyyy")</div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 12.5px; line-height: 1.6;">
+                <div>Thời gian mở ca: <strong>@shift.OpenedAt.ToString("HH:mm, dd/MM/yyyy")</strong></div>
+                <div>Quỹ tiền mặt đầu ca: <strong>@shift.OpeningCash.ToString("N0") đ</strong>
+                    @if (shift.MidShiftTopUpCash > 0)
+                    {
+                        <span> · Tiếp quỹ thêm giữa ca: <strong style="color: #0284c7;">+@shift.MidShiftTopUpCash.ToString("N0") đ</strong></span>
+                    }
+                </div>
             </div>
 
-            <div style="margin-bottom: 14px;">
-                <label style="font-size: 12px; font-weight: 700; display: block; margin-bottom: 4px;">Tiền mặt thực đếm tại quầy (VNĐ):</label>
-                <input type="number" name="countedCash" min="0" step="1000" class="form-control" style="width: 100%; padding: 8px 12px; font-size: 15px; font-weight: 700; color: #1b5e20;" required />
+            <div style="margin-bottom: 12px;">
+                <label style="font-size: 12.5px; font-weight: 700; display: block; margin-bottom: 4px; color: #1e293b;">
+                    1. Tiền mặt thực đếm tại quầy (VNĐ) <span style="color: #dc2626;">*</span>:
+                </label>
+                <input type="number" name="countedCash" id="close-counted-cash" min="0" step="1" class="form-control"
+                       oninput="recalcCloseShiftCarryOver()"
+                       placeholder="Nhập tổng tiền mặt kiểm đếm thực tế..."
+                       style="width: 100%; padding: 8px 12px; font-size: 15px; font-weight: 800; color: #1b5e20; border: 1.5px solid #86efac; border-radius: 6px;" required />
             </div>
 
-            <div style="margin-bottom: 18px;">
+            <div style="margin-bottom: 12px;">
+                <label style="font-size: 12.5px; font-weight: 700; display: block; margin-bottom: 4px; color: #1e293b;">
+                    2. Nộp bớt doanh thu về Thủ quỹ / Két tổng (VNĐ):
+                </label>
+                <input type="number" name="vaultDropCash" id="close-vault-drop" value="0" min="0" step="1" class="form-control"
+                       oninput="recalcCloseShiftCarryOver()"
+                       style="width: 100%; padding: 8px 12px; font-size: 14px; font-weight: 700; color: #0369a1; border: 1.5px solid #cbd5e1; border-radius: 6px;" required />
+                <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;">
+                    <button type="button" class="btn outline" style="padding: 3px 9px; font-size: 11.5px;" onclick="keepDrawerFloatForNextShift(0)">Để lại toàn bộ cho ca sau</button>
+                    <button type="button" class="btn outline" style="padding: 3px 9px; font-size: 11.5px; color: #0369a1; border-color: #7dd3fc; background: #f0f9ff;" onclick="keepDrawerFloatForNextShift(2000000)">Giữ lại 2.000.000 đ cho ca sau</button>
+                    <button type="button" class="btn outline" style="padding: 3px 9px; font-size: 11.5px;" onclick="keepDrawerFloatForNextShift(5000000)">Giữ lại 5.000.000 đ cho ca sau</button>
+                </div>
+            </div>
+
+            <div style="background: #f0f9ff; border: 1.5px solid #7dd3fc; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-size: 11.5px; font-weight: 800; color: #0369a1; text-transform: uppercase;">Tiền để lại ngăn kéo bàn giao ca sau (1 - 2)</div>
+                    <div style="font-size: 11px; color: #475569;">Sẽ tự động hiển thị để ca sau đối chiếu khi mở ca</div>
+                </div>
+                <div id="close-carry-over-display" style="font-size: 19px; font-weight: 900; color: #0284c7;">0 đ</div>
+            </div>
+
+            <div style="margin-bottom: 16px;">
                 <label style="font-size: 12px; font-weight: 700; display: block; margin-bottom: 4px;">Ghi chú bàn giao ca:</label>
-                <textarea name="note" class="form-control" rows="2" placeholder="Ghi chú thêm nếu có tiền rách, tạm ứng chưa hoàn..." style="width: 100%; padding: 8px 12px; font-size: 13px;"></textarea>
+                <textarea name="note" class="form-control" rows="2" placeholder="Ghi chú thêm nếu có tiền lẻ, phiếu nộp quỹ..." style="width: 100%; padding: 8px 12px; font-size: 13px;"></textarea>
             </div>
 
-            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
                 <button type="button" class="btn outline" onclick="document.getElementById('modal-close-shift').close()">Hủy</button>
-                <button type="submit" class="btn primary" style="background: #c62828; border-color: #c62828;">Xác nhận kết ca</button>
+                <button type="submit" class="btn primary" style="background: #c62828; border-color: #c62828; font-weight: 700;">✓ Xác nhận kết ca</button>
             </div>
         </form>
     </dialog>
@@ -256,6 +413,90 @@
         var detailLoadSeq = 0;
         var settleQrSeq = 0;
         var settleIdempotencyKeys = {};
+
+        function setOpenTopUp(val) {
+            var inp = document.getElementById('open-topup-cash');
+            if (inp) {
+                inp.value = val;
+                recalcOpenShiftTotal();
+            }
+        }
+
+        function recalcOpenShiftTotal() {
+            var handover = Math.max(0, parseFloat(document.getElementById('open-handover-cash')?.value || '0') || 0);
+            var topup = Math.max(0, parseFloat(document.getElementById('open-topup-cash')?.value || '0') || 0);
+            var total = handover + topup;
+
+            var hiddenTotal = document.getElementById('open-total-cash-hidden');
+            var dispTotal = document.getElementById('open-total-cash-display');
+            var lowWarn = document.getElementById('open-low-float-warn');
+            if (hiddenTotal) hiddenTotal.value = total;
+            if (dispTotal) dispTotal.textContent = total.toLocaleString('vi-VN') + ' đ';
+            if (lowWarn) lowWarn.style.display = total < 1000000 ? 'block' : 'none';
+
+            var prevEl = document.getElementById('open-prev-expected');
+            var diffAlert = document.getElementById('open-handover-diff-alert');
+            var noteReq = document.getElementById('open-note-req');
+            var noteInp = document.getElementById('open-shift-note');
+            if (prevEl && diffAlert) {
+                var prevExpected = parseFloat(prevEl.value || '0') || 0;
+                var diff = handover - prevExpected;
+                if (diff !== 0) {
+                    diffAlert.style.display = 'block';
+                    diffAlert.textContent = diff < 0
+                        ? ('⚠️ Thiếu ' + Math.abs(diff).toLocaleString('vi-VN') + ' đ so với số bàn giao của ca trước (' + prevExpected.toLocaleString('vi-VN') + ' đ). Bắt buộc ghi rõ lý do bên dưới!')
+                        : ('⚠️ Thừa +' + diff.toLocaleString('vi-VN') + ' đ so với số bàn giao của ca trước (' + prevExpected.toLocaleString('vi-VN') + ' đ). Bắt buộc ghi rõ lý do bên dưới!');
+                    if (noteReq) noteReq.style.display = 'inline';
+                    if (noteInp) noteInp.required = true;
+                } else {
+                    diffAlert.style.display = 'none';
+                    if (noteReq) noteReq.style.display = 'none';
+                    if (noteInp) noteInp.required = false;
+                }
+            }
+        }
+
+        function validateOpenShiftForm() {
+            recalcOpenShiftTotal();
+            var prevEl = document.getElementById('open-prev-expected');
+            if (prevEl) {
+                var prevExpected = parseFloat(prevEl.value || '0') || 0;
+                var handover = Math.max(0, parseFloat(document.getElementById('open-handover-cash')?.value || '0') || 0);
+                var note = (document.getElementById('open-shift-note')?.value || '').trim();
+                if (handover !== prevExpected && !note) {
+                    Swal.fire({ icon: 'warning', title: 'Chênh lệch tiền nhận bàn giao', text: 'Vui lòng nhập lý do chênh lệch so với ca trước vào ô Ghi chú.', confirmButtonColor: '#0284c7' });
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function recalcCloseShiftCarryOver() {
+            var counted = Math.max(0, parseFloat(document.getElementById('close-counted-cash')?.value || '0') || 0);
+            var dropInp = document.getElementById('close-vault-drop');
+            var drop = Math.max(0, parseFloat(dropInp?.value || '0') || 0);
+            if (drop > counted && dropInp) {
+                drop = counted;
+                dropInp.value = counted;
+            }
+            var carry = Math.max(0, counted - drop);
+            var disp = document.getElementById('close-carry-over-display');
+            if (disp) disp.textContent = carry.toLocaleString('vi-VN') + ' đ';
+        }
+
+        function keepDrawerFloatForNextShift(keepAmount) {
+            var counted = Math.max(0, parseFloat(document.getElementById('close-counted-cash')?.value || '0') || 0);
+            var dropInp = document.getElementById('close-vault-drop');
+            if (!dropInp) return;
+            if (keepAmount <= 0) {
+                dropInp.value = 0;
+            } else {
+                dropInp.value = Math.max(0, counted - keepAmount);
+            }
+            recalcCloseShiftCarryOver();
+        }
+
+        document.addEventListener('DOMContentLoaded', recalcOpenShiftTotal);
 
         function escapeHtml(value) {
             return String(value ?? '')

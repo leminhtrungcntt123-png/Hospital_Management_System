@@ -87,6 +87,7 @@ public class CashierController : Controller
         }
 
         var currentShift = await _shiftService.GetCurrentShiftAsync(CurrentAccountId, ct);
+        var lastClosedShift = currentShift == null ? await _shiftService.GetLastClosedShiftAsync(ct) : null;
         var insurancePlans = await _billingService.GetInsurancePlansAsync(ct);
 
         ViewBag.Search = search;
@@ -95,6 +96,7 @@ public class CashierController : Controller
         ViewBag.SelectedInvoice = selectedInvoice;
         ViewBag.SelectedId = activeId;
         ViewBag.CurrentShift = currentShift;
+        ViewBag.LastClosedShift = lastClosedShift;
         ViewBag.InsurancePlans = insurancePlans;
         ViewBag.UnpaidCount = invoices.Count(i => i.InvoiceStatus != InvoiceStatus.Paid);
         ViewBag.PaidCount = invoices.Count(i => i.InvoiceStatus == InvoiceStatus.Paid);
@@ -161,12 +163,23 @@ public class CashierController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> OpenShift(decimal openingCash, string? note, CancellationToken ct = default)
+    public async Task<IActionResult> OpenShift(
+        decimal openingCash = 0m,
+        decimal? handoverCash = null,
+        decimal? topUpCash = null,
+        decimal? previousExpectedHandover = null,
+        string? note = null,
+        CancellationToken ct = default)
     {
-        var result = await _shiftService.OpenShiftAsync(new OpenShiftRequest(CurrentAccountId, openingCash, note), ct);
+        var result = await _shiftService.OpenShiftAsync(
+            new OpenShiftRequest(CurrentAccountId, openingCash, note, handoverCash, topUpCash, previousExpectedHandover),
+            ct);
         if (result.IsSuccess)
         {
-            TempData["SuccessMessage"] = $"Đã mở ca làm việc thành công với tiền đầu ca: {openingCash:N0} đ.";
+            var s = result.Value!;
+            TempData["SuccessMessage"] = s.TopUpCash > 0
+                ? $"Đã mở ca thành công! Tổng quỹ đầu ca: {s.OpeningCash:N0} đ (Nhận bàn giao: {s.HandoverCash:N0} đ + Tiếp quỹ thêm: {s.TopUpCash:N0} đ)."
+                : $"Đã mở ca làm việc thành công với tiền đầu ca: {s.OpeningCash:N0} đ.";
         }
         else
         {
@@ -178,14 +191,34 @@ public class CashierController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CloseShift(int shiftId, decimal countedCash, string? note, CancellationToken ct = default)
+    public async Task<IActionResult> TopUpShift(int shiftId, decimal amount, string? note = null, CancellationToken ct = default)
     {
-        var result = await _shiftService.CloseShiftAsync(new CloseShiftRequest(shiftId, CurrentAccountId, countedCash, note), ct);
+        var result = await _shiftService.TopUpShiftAsync(new TopUpShiftRequest(shiftId, CurrentAccountId, amount, note), ct);
+        if (result.IsSuccess)
+        {
+            TempData["SuccessMessage"] = $"Đã ghi nhận tiếp quỹ thêm +{amount:N0} đ từ Thủ quỹ vào ca làm việc hiện tại.";
+        }
+        else
+        {
+            TempData["ErrorMessage"] = result.Error.Message;
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CloseShift(int shiftId, decimal countedCash, decimal vaultDropCash = 0m, string? note = null, CancellationToken ct = default)
+    {
+        var result = await _shiftService.CloseShiftAsync(new CloseShiftRequest(shiftId, CurrentAccountId, countedCash, note, vaultDropCash), ct);
         if (result.IsSuccess)
         {
             var s = result.Value!;
             var diffStr = s.Difference == 0 ? "Khớp hoàn toàn" : (s.Difference > 0 ? $"Thừa {s.Difference:N0} đ" : $"Thiếu {Math.Abs(s.Difference!.Value):N0} đ");
-            TempData["SuccessMessage"] = $"Đã kết ca thành công! Tiền thực đếm: {s.CountedCash:N0} đ. Chênh lệch: {diffStr}.";
+            var carryStr = s.VaultDropCash > 0
+                ? $" · Nộp Thủ quỹ: {s.VaultDropCash:N0} đ · Để lại ca sau: {(s.CarryOverCash ?? 0m):N0} đ"
+                : $" · Để lại ngăn kéo cho ca sau: {(s.CarryOverCash ?? s.CountedCash ?? 0m):N0} đ";
+            TempData["SuccessMessage"] = $"Đã kết ca! Thực đếm: {s.CountedCash:N0} đ ({diffStr}){carryStr}.";
         }
         else
         {

@@ -16,10 +16,17 @@ public class CashierShiftService : ICashierShiftService
     private sealed class ShiftPayload
     {
         public decimal OpeningCash { get; set; }
+        public decimal? HandoverCash { get; set; }
+        public decimal TopUpCash { get; set; }
+        public decimal MidShiftTopUpCash { get; set; }
+        public decimal? PreviousExpectedHandover { get; set; }
+        public decimal? HandoverDifference { get; set; }
         public DateTime? ClosedAt { get; set; }
         public decimal? ExpectedCash { get; set; }
         public decimal? CountedCash { get; set; }
         public decimal? Difference { get; set; }
+        public decimal? VaultDropCash { get; set; }
+        public decimal? CarryOverCash { get; set; }
         public string? Note { get; set; }
     }
 
@@ -48,11 +55,60 @@ public class CashierShiftService : ICashierShiftService
         return MapToDto(log, username);
     }
 
+    public async Task<CashierShiftDto?> GetLastClosedShiftAsync(CancellationToken ct = default)
+    {
+        var logs = await _context.AccessLogs
+            .AsNoTracking()
+            .Where(l => l.EntityName == ShiftEntityName && l.Action == ActionClosed)
+            .OrderByDescending(l => l.Id)
+            .Take(10)
+            .ToListAsync(ct);
+
+        if (logs.Count == 0)
+        {
+            return null;
+        }
+
+        var latest = logs
+            .Select(l => (Log: l, Payload: DeserializePayload(l.Details)))
+            .OrderByDescending(x => x.Payload.ClosedAt ?? x.Log.OccurredAt)
+            .ThenByDescending(x => x.Log.Id)
+            .First().Log;
+
+        int cid = latest.AccountId ?? 0;
+        var username = cid > 0 ? await GetCashierUsernameAsync(cid, ct) : "Thu ngân";
+        return MapToDto(latest, username);
+    }
+
+    public static (decimal EffectiveOpeningCash, decimal HandoverCash, decimal TopUpCash, decimal? HandoverDifference) ComputeOpeningComponents(OpenShiftRequest request)
+    {
+        bool hasBreakdown = request.HandoverCash.HasValue || request.TopUpCash.HasValue;
+        decimal handover = hasBreakdown ? (request.HandoverCash ?? 0m) : request.OpeningCash;
+        decimal topUp = hasBreakdown ? (request.TopUpCash ?? 0m) : 0m;
+        decimal effectiveOpening = hasBreakdown ? (handover + topUp) : request.OpeningCash;
+        decimal? handoverDiff = request.PreviousExpectedHandover.HasValue
+            ? handover - request.PreviousExpectedHandover.Value
+            : null;
+        return (effectiveOpening, handover, topUp, handoverDiff);
+    }
+
+    public static decimal ComputeExpectedClosingCash(decimal openingCash, decimal midShiftTopUpCash, decimal cashIn, decimal cashOut)
+        => openingCash + midShiftTopUpCash + cashIn - cashOut;
+
     public async Task<Result<CashierShiftDto>> OpenShiftAsync(OpenShiftRequest request, CancellationToken ct = default)
     {
-        if (request.OpeningCash < 0)
+        var (effectiveOpening, handover, topUp, handoverDiff) = ComputeOpeningComponents(request);
+
+        if (effectiveOpening < 0 || handover < 0 || topUp < 0)
         {
-            return Result.Failure<CashierShiftDto>("INVALID_OPENING_CASH", "Số tiền đầu ca không được âm.");
+            return Result.Failure<CashierShiftDto>("INVALID_OPENING_CASH", "Số tiền nhận bàn giao và tiền tiếp quỹ không được âm.");
+        }
+
+        if (handoverDiff.HasValue && handoverDiff.Value != 0m && string.IsNullOrWhiteSpace(request.Note))
+        {
+            return Result.Failure<CashierShiftDto>(
+                "HANDOVER_DIFF_REASON_REQUIRED",
+                "Số tiền thực nhận từ ca trước đang chênh lệch so với bàn giao. Vui lòng nhập lý do vào ô Ghi chú để đối chứng.");
         }
 
         var strategy = _context.Database.CreateExecutionStrategy();
@@ -80,7 +136,12 @@ public class CashierShiftService : ICashierShiftService
 
             var payload = new ShiftPayload
             {
-                OpeningCash = request.OpeningCash,
+                OpeningCash = effectiveOpening,
+                HandoverCash = handover,
+                TopUpCash = topUp,
+                MidShiftTopUpCash = 0m,
+                PreviousExpectedHandover = request.PreviousExpectedHandover,
+                HandoverDifference = handoverDiff,
                 Note = request.Note?.Trim()
             };
 
@@ -111,11 +172,80 @@ public class CashierShiftService : ICashierShiftService
         });
     }
 
+    public async Task<Result<CashierShiftDto>> TopUpShiftAsync(TopUpShiftRequest request, CancellationToken ct = default)
+    {
+        if (request.Amount <= 0)
+        {
+            return Result.Failure<CashierShiftDto>("INVALID_TOPUP_AMOUNT", "Số tiền tiếp quỹ thêm phải lớn hơn 0 đ.");
+        }
+
+        var strategy = _context.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = _context.Database.CurrentTransaction == null
+                ? await _context.Database.BeginTransactionAsync(ct)
+                : null;
+
+            AccessLog? log;
+            long targetId = request.ShiftId;
+            if (_context.Database.IsNpgsql())
+            {
+                log = await _context.AccessLogs
+                    .FromSqlInterpolated($"SELECT * FROM access_logs WHERE id = {targetId} AND entity_name = {ShiftEntityName} FOR UPDATE")
+                    .FirstOrDefaultAsync(ct);
+            }
+            else
+            {
+                log = await _context.AccessLogs
+                    .FirstOrDefaultAsync(l => l.Id == targetId && l.EntityName == ShiftEntityName, ct);
+            }
+
+            if (log == null)
+            {
+                return Result.Failure<CashierShiftDto>("NOT_FOUND", "Không tìm thấy thông tin ca làm việc.");
+            }
+
+            if (log.Action == ActionClosed)
+            {
+                return Result.Failure<CashierShiftDto>("ALREADY_CLOSED", "Ca làm việc này đã kết thúc, không thể tiếp quỹ.");
+            }
+
+            if (log.AccountId != request.CashierAccountId)
+            {
+                return Result.Failure<CashierShiftDto>("FORBIDDEN", "Bạn không có quyền tiếp quỹ cho ca của người khác.");
+            }
+
+            var payload = DeserializePayload(log.Details);
+            payload.MidShiftTopUpCash += request.Amount;
+            payload.TopUpCash += request.Amount;
+            var stamp = $"[Tiếp quỹ +{request.Amount:N0}đ lúc {Now:HH:mm}{(string.IsNullOrWhiteSpace(request.Note) ? "" : $": {request.Note.Trim()}")}]";
+            payload.Note = string.IsNullOrWhiteSpace(payload.Note)
+                ? stamp
+                : $"{payload.Note} | {stamp}";
+
+            log.Details = JsonSerializer.Serialize(payload);
+            await _context.SaveChangesAsync(ct);
+
+            if (transaction != null)
+            {
+                await transaction.CommitAsync(ct);
+            }
+
+            var username = await GetCashierUsernameAsync(request.CashierAccountId, ct);
+            return Result.Success(MapToDto(log, username));
+        });
+    }
+
     public async Task<Result<CashierShiftDto>> CloseShiftAsync(CloseShiftRequest request, CancellationToken ct = default)
     {
         if (request.CountedCash < 0)
         {
             return Result.Failure<CashierShiftDto>("INVALID_COUNTED_CASH", "Số tiền kiểm đếm thực tế không được âm.");
+        }
+
+        if (request.VaultDropCash < 0 || request.VaultDropCash > request.CountedCash)
+        {
+            return Result.Failure<CashierShiftDto>("INVALID_VAULT_DROP", "Số tiền nộp về Thủ quỹ không được âm hoặc lớn hơn tiền mặt thực đếm tại quầy.");
         }
 
         var strategy = _context.Database.CreateExecutionStrategy();
@@ -171,11 +301,13 @@ public class CashierShiftService : ICashierShiftService
                 .Where(p => p.PaymentType == PaymentType.Refund)
                 .Sum(p => p.Amount);
 
-            decimal expectedCash = payload.OpeningCash + cashIn - cashOut;
+            decimal expectedCash = ComputeExpectedClosingCash(payload.OpeningCash, payload.MidShiftTopUpCash, cashIn, cashOut);
 
             payload.ExpectedCash = expectedCash;
             payload.CountedCash = request.CountedCash;
             payload.Difference = request.CountedCash - expectedCash;
+            payload.VaultDropCash = request.VaultDropCash;
+            payload.CarryOverCash = request.CountedCash - request.VaultDropCash;
             payload.ClosedAt = closedAt;
             if (!string.IsNullOrWhiteSpace(request.Note))
             {
@@ -267,6 +399,11 @@ public class CashierShiftService : ICashierShiftService
         var payload = DeserializePayload(log.Details);
         int cashierId = log.AccountId ?? 0;
         var status = log.Action == ActionClosed ? ShiftStatus.Closed : ShiftStatus.Open;
+        decimal handoverCash = payload.HandoverCash ?? payload.OpeningCash;
+        decimal? carryOver = status == ShiftStatus.Closed
+            ? (payload.CarryOverCash ?? payload.CountedCash)
+            : payload.CarryOverCash;
+
         return new CashierShiftDto(
             checked((int)log.Id),
             cashierId,
@@ -278,6 +415,13 @@ public class CashierShiftService : ICashierShiftService
             payload.CountedCash,
             payload.Difference,
             status,
-            payload.Note);
+            payload.Note,
+            handoverCash,
+            payload.TopUpCash,
+            payload.MidShiftTopUpCash,
+            payload.PreviousExpectedHandover,
+            payload.HandoverDifference,
+            payload.VaultDropCash,
+            carryOver);
     }
 }
