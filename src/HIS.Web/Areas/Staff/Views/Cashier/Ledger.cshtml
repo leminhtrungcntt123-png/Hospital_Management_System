@@ -233,9 +233,29 @@
                                 <td style="padding: 10px 14px; font-weight: 600; color: #0f172a;">@s.CashierName</td>
                                 <td style="padding: 10px 14px; color: #475569;">@s.OpenedAt.ToString("HH:mm, dd/MM/yyyy")</td>
                                 <td style="padding: 10px 14px; color: #475569;">@(s.ClosedAt?.ToString("HH:mm, dd/MM/yyyy") ?? "—")</td>
-                                <td style="padding: 10px 14px; text-align: right; font-family: monospace; font-weight: 600;">@s.OpeningCash.ToString("N0") đ</td>
+                                <td style="padding: 10px 14px; text-align: right; font-family: monospace; font-weight: 600;">
+                                    @s.OpeningCash.ToString("N0") đ
+                                    @if (s.TopUpCash > 0)
+                                    {
+                                        <div style="font-size: 11px; color: #0284c7; font-family: sans-serif; font-weight: 600;">
+                                            Bàn giao: @s.HandoverCash.ToString("N0") · Tiếp quỹ: +@s.TopUpCash.ToString("N0")
+                                        </div>
+                                    }
+                                </td>
                                 <td style="padding: 10px 14px; text-align: right; font-family: monospace;">@(s.ExpectedCash.HasValue ? $"{s.ExpectedCash.Value:N0} đ" : "—")</td>
-                                <td style="padding: 10px 14px; text-align: right; font-family: monospace; font-weight: 700;">@(s.CountedCash.HasValue ? $"{s.CountedCash.Value:N0} đ" : "—")</td>
+                                <td style="padding: 10px 14px; text-align: right; font-family: monospace; font-weight: 700;">
+                                    @(s.CountedCash.HasValue ? $"{s.CountedCash.Value:N0} đ" : "—")
+                                    @if (s.Status == HIS.Domain.ShiftStatus.Closed && (s.VaultDropCash.HasValue || s.CarryOverCash.HasValue))
+                                    {
+                                        <div style="font-size: 11px; color: #475569; font-family: sans-serif; font-weight: 500;">
+                                            @if ((s.VaultDropCash ?? 0m) > 0)
+                                            {
+                                                <span>Nộp két: @s.VaultDropCash!.Value.ToString("N0") · </span>
+                                            }
+                                            <span>Để lại: @((s.CarryOverCash ?? 0m).ToString("N0"))</span>
+                                        </div>
+                                    }
+                                </td>
                                 <td style="padding: 10px 14px; text-align: right; font-family: monospace; font-weight: 700; color: @(!s.Difference.HasValue ? "#64748b" : (s.Difference.Value == 0 ? "#15803d" : (s.Difference.Value > 0 ? "#0284c7" : "#b91c1c")));">
                                     @if (!s.Difference.HasValue)
                                     {

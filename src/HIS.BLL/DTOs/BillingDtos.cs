@@ -122,18 +122,35 @@ public record CashierShiftDto(
     decimal? CountedCash,
     decimal? Difference,
     ShiftStatus Status,
-    string? Note);
+    string? Note,
+    decimal HandoverCash = 0m,
+    decimal TopUpCash = 0m,
+    decimal MidShiftTopUpCash = 0m,
+    decimal? PreviousExpectedHandover = null,
+    decimal? HandoverDifference = null,
+    decimal? VaultDropCash = null,
+    decimal? CarryOverCash = null);
 
 public record OpenShiftRequest(
     int CashierAccountId,
     decimal OpeningCash,
+    string? Note,
+    decimal? HandoverCash = null,
+    decimal? TopUpCash = null,
+    decimal? PreviousExpectedHandover = null);
+
+public record TopUpShiftRequest(
+    int ShiftId,
+    int CashierAccountId,
+    decimal Amount,
     string? Note);
 
 public record CloseShiftRequest(
     int ShiftId,
     int CashierAccountId,
     decimal CountedCash,
-    string? Note);
+    string? Note,
+    decimal VaultDropCash = 0m);
 
 public record PatientBillingHistoryItemDto(
     int InvoiceId,
