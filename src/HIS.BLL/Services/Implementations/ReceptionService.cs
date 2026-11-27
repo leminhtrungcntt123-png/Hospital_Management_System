@@ -260,26 +260,6 @@ public sealed class ReceptionService(
                             || e.Shift == schedule.Shift),
                     ct),
                 "Bác sĩ đã có thay đổi lịch được duyệt.");
-            var start = Today.ToDateTime(schedule!.StartTime);
-            var end = Today.ToDateTime(schedule.EndTime);
-
-            var visits = db.Appointments
-                .Where(a => a.DoctorId == schedule.DoctorId
-                    && !a.AppointmentCode.StartsWith("DEP-")
-                    && a.StatusId >= 1
-                    && a.StatusId <= 6
-                    && ((a.Slot != null
-                            && a.Slot.StartTime >= start
-                            && a.Slot.StartTime < end)
-                        || (a.Slot == null
-                            && a.CreatedAt >= start
-                            && a.CreatedAt <= end)));
-            Require(
-                await visits
-                    .CountAsync(ct) < schedule.MaxPatients
-                    && await visits
-                    .CountAsync(a => a.BookingChannel == BookingChannel.OnSite, ct) < schedule.MaxPatients - schedule.OnlineSlots,
-                "Ca khám đã hết hạn mức khách vãng lai.");
             Patient? patient;
 
             if (request.PatientId.HasValue)
@@ -363,7 +343,7 @@ public sealed class ReceptionService(
                 AppointmentCode = "HIS-" + Today.ToString("yyyyMMdd") + "-" + Convert.ToHexString(RandomNumberGenerator.GetBytes(4)),
                 Patient = patient,
                 DepartmentId = nurse.DepartmentId,
-                DoctorId = schedule.DoctorId,
+                DoctorId = schedule!.DoctorId,
                 RoomId = schedule.RoomId,
                 BookingChannel = BookingChannel.OnSite,
                 VisitType = VisitType.WalkIn,

@@ -249,7 +249,7 @@ for (const [role, route, expected] of [
     });
 }
 
-test('editing a doctor schedule preserves an online quota of zero', () => {
+test('editing a doctor schedule populates modal time, shift and schedule id', () => {
     const view = readFileSync(
         resolve(root, 'src/HIS.Web/Areas/Staff/Views/Schedule/Index.cshtml'),
         'utf8',
@@ -267,7 +267,11 @@ test('editing a doctor schedule preserves an online quota of zero', () => {
             "\nopenScheduleModalWithData(1, 1, 1, 0, '07:30', '11:30', 40, 0, 1, '2026-11-10')",
         { document },
     );
-    assert.equal(fields.get('scheduleModalOnlineSlots').value, 0);
+    assert.equal(fields.get('scheduleModalScheduleId').value, 1);
+    assert.equal(fields.get('scheduleModalShiftSelect').value, 0);
+    assert.equal(fields.get('scheduleModalStartTime').value, '07:30');
+    assert.equal(fields.get('scheduleModalEndTime').value, '11:30');
+    assert.equal(fields.get('scheduleModalEffectiveFrom').value, '2026-11-10');
 });
 
 test('choosing a doctor keeps the identifier through the public booking link', () => {

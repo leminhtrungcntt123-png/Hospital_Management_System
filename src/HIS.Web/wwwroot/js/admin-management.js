@@ -689,16 +689,35 @@
         );
     }
 
+    function syncRequestsDeptFilter() {
+        const sel = find('#requests-dept-filter');
+        if (!sel || !directory?.departments) return;
+        const prev = sel.value;
+        sel.innerHTML =
+            '<option value="">-- Chọn khoa để duyệt --</option>' +
+            directory.departments.map((d) => /* HTML */ `<option value="${d.id}">${escape(d.name)}</option>`).join('');
+        if (prev && directory.departments.some((d) => String(d.id) === prev)) {
+            sel.value = prev;
+        } else if (directory.departments.length > 0 && !sel.value) {
+            sel.value = String(directory.departments[0].id);
+        }
+    }
+
     async function loadRequests() {
         requestRows = await request('Requests');
+        syncRequestsDeptFilter();
         renderRequestsTable();
     }
 
     function renderRequestsTable() {
         const statuses = { Pending: 'Chờ duyệt', Approved: 'Đã duyệt', Rejected: 'Từ chối' };
+        const selectedDeptId = Number(find('#requests-dept-filter')?.value || 0);
+        const deptFiltered = selectedDeptId > 0
+            ? requestRows.filter((r) => Number(r.departmentId) === selectedDeptId)
+            : [];
         const filtered = requestStatusFilter === 'all'
-            ? requestRows
-            : requestRows.filter((r) => r.status === requestStatusFilter);
+            ? deptFiltered
+            : deptFiltered.filter((r) => r.status === requestStatusFilter);
 
         document.querySelectorAll('[data-req-filter]').forEach((btn) => {
             const active = btn.dataset.reqFilter === requestStatusFilter;
@@ -739,6 +758,10 @@
         const btn = e.target.closest('[data-req-filter]');
         if (!btn) return;
         requestStatusFilter = btn.dataset.reqFilter;
+        renderRequestsTable();
+    });
+
+    find('#requests-dept-filter')?.addEventListener('change', () => {
         renderRequestsTable();
     });
 
@@ -1173,10 +1196,13 @@
         ) {
             const container = decision.closest('[data-request]');
             const replacement = container.querySelector('select')?.value;
+            const departmentId = Number(find('#requests-dept-filter')?.value || 0);
+            if (!departmentId) return notify('Vui lòng chọn khoa chuyên môn trước khi duyệt.', true);
             mutate('Decision', {
                 exceptionId: Number(container.dataset.request),
                 approve: decision.dataset.decision === 'approve',
                 replacementDoctorId: replacement ? Number(replacement) : null,
+                departmentId,
             });
         }
     });
@@ -1227,12 +1253,12 @@
             const scopeSelect = find('#period-scope-dept');
             if (scopeSelect) {
                 const prevScope = scopeSelect.value;
-                scopeSelect.innerHTML =
-                    '<option value="">Toàn bệnh viện (dùng chung)</option>' +
-                    directory.departments
-                        .map((d) => /* HTML */ `<option value="${d.id}">${escape(d.name)}</option>`)
-                        .join('');
-                if (prevScope) scopeSelect.value = prevScope;
+                scopeSelect.innerHTML = directory.departments
+                    .map((d) => /* HTML */ `<option value="${d.id}">${escape(d.name)}</option>`)
+                    .join('');
+                if (prevScope && directory.departments.some((d) => String(d.id) === prevScope)) {
+                    scopeSelect.value = prevScope;
+                }
             }
         }
 
@@ -1458,6 +1484,8 @@
             if (row.hasOpenPeriod) return '<span class="dp-badge is-open">Đang mở</span>';
             return '<span class="dp-badge is-idle">Chưa mở</span>';
         };
+        const allPeriods = schedulingState?.periods || [];
+        const latestPeriodOf = (deptId) => allPeriods.find((p) => p.departmentId === deptId) || null;
         host.innerHTML = /* HTML */ `
             <div class="dp-scroll">
                 <table class="dept-progress">
@@ -1465,6 +1493,7 @@
                         <tr>
                             <th>Khoa</th>
                             <th>Trưởng khoa</th>
+                            <th>Đợt duyệt ca mới nhất</th>
                             <th>Bác sĩ đăng ký</th>
                             <th>Trạng thái duyệt</th>
                             <th class="dp-actions-col">Thao tác</th>
@@ -1473,10 +1502,16 @@
                     <tbody>
                         ${rows.map((row) => {
                             const percent = row.doctorCount > 0 ? Math.round((row.registeredDoctorCount / row.doctorCount) * 100) : 0;
+                            const latest = latestPeriodOf(row.departmentId);
                             return /* HTML */ `
                                 <tr>
                                     <td class="dp-name">${escape(row.name)}</td>
                                     <td class="dp-head">${escape(row.headName || '—')}</td>
+                                    <td>
+                                        ${latest
+                                            ? /* HTML */ `<strong>${escape(latest.name)}</strong><br /><small style="color:#64748b;">${escape(date(latest.startDate))} – ${escape(date(latest.endDate))}</small>`
+                                            : '<span style="color:#94a3b8;">Chưa có đợt</span>'}
+                                    </td>
                                     <td>
                                         <div class="dp-progress">
                                             <span class="dp-bar"><i style="width:${Math.min(100, Math.max(0, percent))}%"></i></span>
@@ -1485,7 +1520,7 @@
                                     </td>
                                     <td>${badge(row)}</td>
                                     <td class="dp-actions">
-                                        <button type="button" class="dp-action" data-sched-dept="${row.departmentId}" data-sched-dept-view="roster">Xem lưới</button>
+                                        <button type="button" class="dp-action" data-sched-dept="${row.departmentId}" data-sched-dept-view="roster">Chi tiết</button>
                                         <button type="button" class="dp-action" data-sched-dept="${row.departmentId}" data-sched-dept-view="assign">Xếp ca</button>
                                         ${row.pendingShifts > 0
                                             ? `<button type="button" class="dp-action is-strong" data-sched-dept="${row.departmentId}" data-sched-dept-view="requests">Duyệt ${row.pendingShifts}</button>`
@@ -1534,7 +1569,7 @@
         const scheduleTitle = (sched, shift) => {
             const schedStart = schedHhmm(sched.startTime) || (shift === 0 ? '07:30' : '13:00');
             const end = schedHhmm(sched.endTime) || (shift === 0 ? '11:30' : '16:30');
-            return `${shift === 0 ? 'Ca sáng' : 'Ca chiều'} ${schedStart} – ${end} · ${roomOf(sched)} · ${sched.maxPatients} BN`;
+            return `${shift === 0 ? 'Ca sáng' : 'Ca chiều'} ${schedStart} – ${end} · ${roomOf(sched)}`;
         };
         const checkIcon = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>';
 
@@ -1800,8 +1835,6 @@
                     roomId,
                     workDate: task.workDate,
                     shift,
-                    maxPatients: 40,
-                    onlineSlots: 28,
                     doctorNote: note,
                 });
                 created += 1;
@@ -1977,7 +2010,6 @@
             <div class="req-detail-body">
                 <div class="req-detail-row"><span>Ngày làm việc</span><strong>${reqDayLabel(sched.workDate)}</strong></div>
                 <div class="req-detail-row"><span>Ca khám</span><strong>${start} – ${end}</strong></div>
-                <div class="req-detail-row"><span>Quy mô</span><strong>${sched.maxPatients} bệnh nhân · ${sched.onlineSlots} slot trực tuyến</strong></div>
                 <div class="req-detail-row"><span>Phòng khám</span><div class="req-room-field">${roomField}</div></div>
                 ${sched.doctorNote ? /* HTML */ `<blockquote class="req-note">“${escape(sched.doctorNote)}”</blockquote>` : ''}
                 ${!isPending && sched.reviewedByName
@@ -2063,6 +2095,24 @@
         const form = find('#create-period-form');
         form.reset();
         form.querySelector('.form-error').textContent = '';
+        const deptId = Number(find('#scheduling-dept')?.value || 0) || schedulingState?.selectedDeptId;
+        if (deptId && form.elements.departmentId) {
+            form.elements.departmentId.value = String(deptId);
+        }
+        const now = new Date();
+        const day = now.getDay();
+        const diffToMon = (day === 0 ? -6 : 1) - day;
+        const thisMon = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMon);
+        const nextSun = new Date(thisMon.getFullYear(), thisMon.getMonth(), thisMon.getDate() + 13);
+        const toIso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        if (form.elements.startDate) {
+            form.elements.startDate.min = toIso(thisMon);
+            form.elements.startDate.max = toIso(nextSun);
+        }
+        if (form.elements.endDate) {
+            form.elements.endDate.min = toIso(thisMon);
+            form.elements.endDate.max = toIso(nextSun);
+        }
         dialog.showModal();
     });
 
@@ -2070,14 +2120,16 @@
         e.preventDefault();
         const data = Object.fromEntries(new FormData(e.currentTarget));
         data.departmentId = data.departmentId ? Number(data.departmentId) : null;
+        if (!data.departmentId) return notify('Vui lòng chọn khoa chuyên môn.', true);
         mutate('SchedulingPeriods', data, e.currentTarget);
     });
 
     find('#publish-period-btn')?.addEventListener('click', async (e) => {
         const periodId = Number(e.currentTarget.dataset.periodId || 0);
         if (!periodId) return;
+        const departmentId = schedulingState?.selectedDeptId || Number(find('#scheduling-dept')?.value || 0) || null;
         if (await askConfirm('Xác nhận xuất bản kỳ lịch và sinh slot khám trực tuyến cho tất cả ca đã duyệt?', 'Xuất bản kỳ lịch', 'Xuất bản')) {
-            mutate('PublishPeriod', { periodId });
+            mutate('PublishPeriod', { periodId, departmentId });
         }
     });
 
@@ -2100,8 +2152,6 @@
         if (preset?.roomId) form.elements.roomId.value = String(preset.roomId);
         if (preset?.workDate) form.elements.workDate.value = preset.workDate;
         if (preset?.shift !== undefined && preset?.shift !== null) form.elements.shift.value = String(preset.shift);
-        if (preset?.maxPatients) form.elements.maxPatients.value = String(preset.maxPatients);
-        if (preset?.onlineSlots !== undefined) form.elements.onlineSlots.value = String(preset.onlineSlots);
         if (preset?.doctorNote) form.elements.doctorNote.value = preset.doctorNote;
         find('#upsert-schedule-title').textContent = 'Chỉnh sửa ca khám';
         dialog.showModal();
@@ -2209,7 +2259,8 @@
             const roomId = Number(find('#req-room')?.value || 0);
             if (!roomId) return notify('Chọn phòng khám trước khi duyệt.', true);
             reqSelectedId = scheduleId;
-            runSchedAction('ApproveShift', { scheduleId, roomId }, 'Đã duyệt ca khám.', 'approved');
+            const departmentId = schedulingState?.selectedDeptId || Number(find('#scheduling-dept')?.value || 0) || null;
+            runSchedAction('ApproveShift', { scheduleId, roomId, departmentId }, 'Đã duyệt ca khám.', 'approved');
             return;
         }
         const rejectBtn = e.target.closest('[data-req-reject]');
@@ -2252,8 +2303,6 @@
         data.doctorId = Number(data.doctorId);
         data.roomId = data.roomId ? Number(data.roomId) : null;
         data.shift = Number(data.shift);
-        data.maxPatients = Number(data.maxPatients || 40);
-        data.onlineSlots = Number(data.onlineSlots || 28);
         mutate('UpsertSchedule', data, e.currentTarget);
     });
 
@@ -2286,8 +2335,6 @@
                     roomId: sched.roomId,
                     workDate: sched.workDate,
                     shift: sched.shift === 1 || sched.shift === 'Afternoon' ? 1 : 0,
-                    maxPatients: sched.maxPatients,
-                    onlineSlots: sched.onlineSlots,
                     doctorNote: sched.doctorNote || '',
                 });
             }

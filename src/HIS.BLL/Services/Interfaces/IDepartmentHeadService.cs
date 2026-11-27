@@ -19,6 +19,7 @@ public interface IDepartmentHeadService
 
     // 1. Quản lý đề nghị ngoại lệ (Nghỉ phép / Đổi ca)
     Task<IReadOnlyList<DepartmentExceptionItemDto>> GetExceptionsAsync(int departmentId, ScheduleExceptionStatus? status = null, CancellationToken ct = default);
+    Task<Result<ExceptionApprovalPreviewDto>> GetExceptionApprovalPreviewAsync(int exceptionId, int departmentId, CancellationToken ct = default);
     Task<Result> ApproveExceptionAsync(ApproveExceptionRequest request, CancellationToken ct = default);
     Task<Result> RejectExceptionAsync(RejectExceptionRequest request, CancellationToken ct = default);
 
@@ -31,13 +32,14 @@ public interface IDepartmentHeadService
     // Shift Bidding & Decision Matrix
     Task<Result<int>> CreateSchedulingPeriodAsync(CreateSchedulingPeriodRequest request, CancellationToken ct = default);
     Task<SchedulingPeriodDto?> GetActiveSchedulingPeriodAsync(int? departmentId, CancellationToken ct = default);
+    Task<IReadOnlyList<SchedulingPeriodDto>> GetSchedulingPeriodsAsync(int? departmentId, CancellationToken ct = default);
     Task<DepartmentDemandGridDto> GetDepartmentDemandGridAsync(int departmentId, int periodId, CancellationToken ct = default);
     Task<Result<int>> RegisterShiftBidAsync(RegisterShiftBidRequest request, CancellationToken ct = default);
     Task<Result> CancelShiftBidAsync(int doctorId, int scheduleId, CancellationToken ct = default);
     Task<DecisionMatrixResultDto> GetDecisionMatrixAsync(int departmentId, DateOnly workDate, ExamShift shift, CancellationToken ct = default);
     Task<Result> ApproveShiftAsync(ApproveShiftRequest request, CancellationToken ct = default);
     Task<Result<int>> ReallocateShiftAsync(ReallocateShiftRequest request, CancellationToken ct = default);
-    Task<Result<int>> PublishSchedulingPeriodAsync(int periodId, int reviewedByAccountId, CancellationToken ct = default);
+    Task<Result<int>> PublishSchedulingPeriodAsync(int periodId, int reviewedByAccountId, int? expectedDepartmentId = null, CancellationToken ct = default);
     Task<SchedulingBoardDto> GetSchedulingBoardAsync(DateOnly weekStart, DateOnly weekEnd, CancellationToken ct = default);
 
     // 3. Phân công ca trực đêm nhân sự
