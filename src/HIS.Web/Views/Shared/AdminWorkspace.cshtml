@@ -172,7 +172,13 @@
                 </p>
                 <div class="card">
                     <div class="card-heading" style="flex-wrap:wrap; gap:10px;">
-                        <div style="display:flex; gap:8px; flex-wrap:wrap;" id="requests-status-tabs">
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;" id="requests-status-tabs">
+                            <label class="filter-dropdown-label" for="requests-dept-filter" style="margin-right:8px;">
+                                Khoa chuyên môn *:
+                                <select id="requests-dept-filter">
+                                    <option value="">-- Chọn khoa để duyệt --</option>
+                                </select>
+                            </label>
                             <button type="button" class="btn button primary sm" data-req-filter="all">Tất cả</button>
                             <button type="button" class="btn button secondary sm" data-req-filter="Pending">Chờ duyệt</button>
                             <button type="button" class="btn button secondary sm" data-req-filter="Approved">Đã duyệt</button>
@@ -188,7 +194,7 @@
                 <div class="section-actions">
                     <div class="section-filter-group">
                         <label class="filter-dropdown-label" for="scheduling-dept">
-                            Khoa chuyên môn:
+                            Lọc theo khoa:
                             <select id="scheduling-dept"></select>
                         </label>
                     </div>
@@ -197,6 +203,13 @@
                         <button class="btn button primary" id="publish-period-btn" type="button" hidden>Xuất bản kỳ &amp; Sinh Slot</button>
                         <button class="btn button primary" id="open-upsert-schedule" type="button">+ Xếp lịch trực tiếp</button>
                     </div>
+                </div>
+                <div class="card" style="margin-bottom:14px;">
+                    <div class="card-heading">
+                        <h2 style="margin:0;">Danh sách đợt duyệt ca theo khoa &amp; tuần</h2>
+                        <span>Chọn nút Chi tiết để mở lưới lịch duyệt ca của khoa</span>
+                    </div>
+                    <div class="table-scroll" id="dept-periods-table"></div>
                 </div>
                 <div class="card" id="active-period-card" style="padding:14px 18px; margin-bottom:14px;">
                     <div id="active-period-info">Đang tải thông tin kỳ đăng ký...</div>
@@ -615,10 +628,8 @@
                 <input name="name" placeholder="VD: Tuần 16/11 - 22/11/2026" maxlength="120" required />
             </label>
             <label>
-                Phạm vi áp dụng
-                <select name="departmentId" id="period-scope-dept">
-                    <option value="">Toàn bệnh viện (dùng chung)</option>
-                </select>
+                Khoa chuyên môn *
+                <select name="departmentId" id="period-scope-dept" required></select>
             </label>
             <label>
                 Từ ngày *
@@ -688,14 +699,6 @@
                     <option value="0">Ca Sáng (07:30 - 11:30)</option>
                     <option value="1">Ca Chiều (13:00 - 16:30)</option>
                 </select>
-            </label>
-            <label>
-                Số BN tối đa
-                <input name="maxPatients" type="number" min="1" max="100" value="40" />
-            </label>
-            <label>
-                Số slot online
-                <input name="onlineSlots" type="number" min="0" max="100" value="28" />
             </label>
             <label style="grid-column:1 / -1;">
                 Ghi chú

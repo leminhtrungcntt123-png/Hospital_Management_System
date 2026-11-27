@@ -459,16 +459,35 @@
         );
     }
 
+    function syncRequestsDeptFilter() {
+        const sel = find('#requests-dept-filter');
+        if (!sel || !directory?.departments) return;
+        const prev = sel.value;
+        sel.innerHTML =
+            '<option value="">-- Chọn khoa để duyệt --</option>' +
+            directory.departments.map((d) => /* HTML */ `<option value="${d.id}">${escape(d.name)}</option>`).join('');
+        if (prev && directory.departments.some((d) => String(d.id) === prev)) {
+            sel.value = prev;
+        } else if (directory.departments.length > 0 && !sel.value) {
+            sel.value = String(directory.departments[0].id);
+        }
+    }
+
     async function loadRequests() {
         requestRows = await request('Requests');
+        syncRequestsDeptFilter();
         renderRequestsTable();
     }
 
     function renderRequestsTable() {
         const statuses = { Pending: 'Chờ duyệt', Approved: 'Đã duyệt', Rejected: 'Từ chối' };
+        const selectedDeptId = Number(find('#requests-dept-filter')?.value || 0);
+        const deptFiltered = selectedDeptId > 0
+            ? requestRows.filter((r) => Number(r.departmentId) === selectedDeptId)
+            : [];
         const filtered = requestStatusFilter === 'all'
-            ? requestRows
-            : requestRows.filter((r) => r.status === requestStatusFilter);
+            ? deptFiltered
+            : deptFiltered.filter((r) => r.status === requestStatusFilter);
 
         document.querySelectorAll('[data-req-filter]').forEach((btn) => {
             const active = btn.dataset.reqFilter === requestStatusFilter;
@@ -509,6 +528,10 @@
         const btn = e.target.closest('[data-req-filter]');
         if (!btn) return;
         requestStatusFilter = btn.dataset.reqFilter;
+        renderRequestsTable();
+    });
+
+    find('#requests-dept-filter')?.addEventListener('change', () => {
         renderRequestsTable();
     });
 
@@ -782,10 +805,13 @@
         ) {
             const container = decision.closest('[data-request]');
             const replacement = container.querySelector('select')?.value;
+            const departmentId = Number(find('#requests-dept-filter')?.value || 0);
+            if (!departmentId) return notify('Vui lòng chọn khoa chuyên môn trước khi duyệt.', true);
             mutate('Decision', {
                 exceptionId: Number(container.dataset.request),
                 approve: decision.dataset.decision === 'approve',
                 replacementDoctorId: replacement ? Number(replacement) : null,
+                departmentId,
             });
         }
     });
@@ -822,43 +848,77 @@
         }
     });
 
-    async function loadScheduling(deptIdOverride = null) {
+    async function loadScheduling(deptIdOverride = null, periodIdOverride = null) {
         const deptSelect = find('#scheduling-dept');
         if (!deptSelect) return;
 
         if (directory?.departments) {
-            const currentVal = deptIdOverride ?? (deptSelect.value || String(directory.departments[0]?.id ?? ''));
-            deptSelect.innerHTML = directory.departments
-                .map((d) => /* HTML */ `<option value="${d.id}">${escape(d.name)}</option>`)
-                .join('');
-            if (currentVal) deptSelect.value = String(currentVal);
+            const currentVal = deptIdOverride ?? (deptSelect.value || '0');
+            deptSelect.innerHTML =
+                '<option value="0">Tất cả khoa chuyên môn</option>' +
+                directory.departments
+                    .map((d) => /* HTML */ `<option value="${d.id}">${escape(d.name)}</option>`)
+                    .join('');
+            deptSelect.value = String(currentVal);
 
             const scopeSelect = find('#period-scope-dept');
             if (scopeSelect) {
                 const prevScope = scopeSelect.value;
-                scopeSelect.innerHTML =
-                    '<option value="">Toàn bệnh viện (dùng chung)</option>' +
-                    directory.departments
-                        .map((d) => /* HTML */ `<option value="${d.id}">${escape(d.name)}</option>`)
-                        .join('');
-                if (prevScope) scopeSelect.value = prevScope;
+                scopeSelect.innerHTML = directory.departments
+                    .map((d) => /* HTML */ `<option value="${d.id}">${escape(d.name)}</option>`)
+                    .join('');
+                if (prevScope && directory.departments.some((d) => String(d.id) === prevScope)) {
+                    scopeSelect.value = prevScope;
+                }
             }
         }
 
-        const explicitDept = deptIdOverride ?? (deptSelect.dataset.userPicked ? Number(deptSelect.value || 0) : 0);
+        const filterDeptId = Number(deptSelect.value || 0);
+        const explicitDept = deptIdOverride ?? (filterDeptId > 0 ? filterDeptId : 0);
         const params = new URLSearchParams();
         if (explicitDept > 0) params.set('departmentId', String(explicitDept));
+        if (periodIdOverride) params.set('periodId', String(periodIdOverride));
         params.set('weekOffset', String(schedulingWeekOffset));
         schedulingState = await request('SchedulingOverview?' + params.toString());
-        if (schedulingState?.selectedDeptId && deptSelect.value !== String(schedulingState.selectedDeptId)) {
-            deptSelect.value = String(schedulingState.selectedDeptId);
-        }
+
+        const allDepts = directory?.departments || [];
+        const visibleDepts = filterDeptId > 0 ? allDepts.filter((d) => d.id === filterDeptId) : allDepts;
+        const allPeriods = schedulingState?.periods || [];
+        const periodStatusLabel = (p) => {
+            if (p.status === 3 || p.status === 'Published') return 'Đã xuất bản';
+            if (p.status === 4 || p.status === 'Closed') return 'Đã đóng';
+            return p.isOpenForBidding ? 'Đang mở đăng ký' : 'Chờ chốt / duyệt';
+        };
+        table(
+            '#dept-periods-table',
+            ['Khoa chuyên môn', 'Đợt duyệt ca mới nhất', 'Số đợt / Chờ duyệt', 'Thao tác'],
+            visibleDepts.map((dept) => {
+                const list = allPeriods.filter((p) => p.departmentId === dept.id);
+                const latest = list[0] || null;
+                return [
+                    /* HTML */ `<strong>${escape(dept.name)}</strong>`,
+                    latest
+                        ? /* HTML */ `<strong>${escape(latest.name)}</strong><br /><small style="color:#64748b;">${escape(date(latest.startDate))} – ${escape(date(latest.endDate))} · ${escape(periodStatusLabel(latest))}</small>`
+                        : '<span style="color:#94a3b8;">Chưa có đợt đăng ký nào</span>',
+                    /* HTML */ `${list.length} đợt · <strong>${latest ? latest.pendingBidsCount : 0}</strong> ca chờ duyệt`,
+                    /* HTML */ `<button type="button" class="btn button primary sm small-button" data-view-dept-period="${dept.id}" data-period-id="${latest ? latest.id : ''}">Chi tiết</button>`,
+                ];
+            }),
+        );
 
         const periodInfo = find('#active-period-info');
         const publishBtn = find('#publish-period-btn');
+        const createPeriodBtn = find('#open-create-period');
         const period = schedulingState?.activePeriod;
+        const activeDeptName = allDepts.find((d) => d.id === schedulingState?.selectedDeptId)?.name || '';
+        const hasUnfinalized = allPeriods.some(
+            (p) => p.departmentId === schedulingState?.selectedDeptId && p.status !== 3 && p.status !== 'Published' && p.status !== 4 && p.status !== 'Closed',
+        );
+        if (createPeriodBtn) {
+            createPeriodBtn.title = hasUnfinalized ? 'Khoa đang chọn còn đợt chưa chốt/xuất bản' : '';
+        }
         if (!period) {
-            periodInfo.innerHTML = '<strong>Chưa có kỳ đăng ký nào.</strong> Bấm <em>+ Tạo kỳ đăng ký</em> để mở đợt đăng ký ca cho bác sĩ.';
+            periodInfo.innerHTML = /* HTML */ `<strong>${escape(activeDeptName)}:</strong> Chưa có kỳ đăng ký nào. Bấm <em>+ Tạo kỳ đăng ký</em> để mở đợt đăng ký ca cho bác sĩ.`;
             if (publishBtn) publishBtn.hidden = true;
         } else {
             const isPublished = period.status === 3 || period.status === 'Published';
@@ -866,7 +926,7 @@
             periodInfo.innerHTML = /* HTML */ `
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
                     <div>
-                        <strong>${escape(period.name)}</strong> (${escape(period.departmentName || 'Toàn viện')}) ·
+                        <strong>${escape(period.name)}</strong> (${escape(period.departmentName || activeDeptName)}) ·
                         <span>${escape(date(period.startDate))} – ${escape(date(period.endDate))}</span>
                     </div>
                     <span class="badge">${escape(statusText)}</span>
@@ -1051,7 +1111,6 @@
             const bg = isMorning ? '#e0f2fe' : '#f3e8ff';
             const border = isMorning ? '#bae6fd' : '#e9d5ff';
             const accent = isMorning ? '#0369a1' : '#7e22ce';
-            const walkIn = Math.max(0, (sched.maxPatients ?? 40) - (sched.onlineSlots ?? 0));
             return /* HTML */ `
                 <div style="background:${bg}; border:1px solid ${border}; border-radius:6px; padding:6px 8px; font-size:11px; cursor:pointer;" data-edit-schedule="${sched.id}">
                     <div style="display:flex; justify-content:space-between; align-items:center; gap:4px; color:${accent};">
@@ -1062,7 +1121,7 @@
                     </div>
                     <div style="margin-top:3px; color:#1e293b;">
                         <span style="background:#fff; padding:1px 5px; border-radius:4px; font-weight:700; color:${accent};">${escape(sched.roomNumber || '—')}</span>
-                        <strong>${sched.maxPatients}</strong> <small>(On: ${sched.onlineSlots} · Quầy: ${walkIn})</small>
+                        <small style="color:#475569;">Đã phân phòng</small>
                     </div>
                 </div>
             `;
@@ -1314,6 +1373,24 @@
         const form = find('#create-period-form');
         form.reset();
         form.querySelector('.form-error').textContent = '';
+        const deptId = Number(find('#scheduling-dept')?.value || 0) || schedulingState?.selectedDeptId;
+        if (deptId && form.elements.departmentId) {
+            form.elements.departmentId.value = String(deptId);
+        }
+        const now = new Date();
+        const day = now.getDay();
+        const diffToMon = (day === 0 ? -6 : 1) - day;
+        const thisMon = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMon);
+        const nextSun = new Date(thisMon.getFullYear(), thisMon.getMonth(), thisMon.getDate() + 13);
+        const toIso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        if (form.elements.startDate) {
+            form.elements.startDate.min = toIso(thisMon);
+            form.elements.startDate.max = toIso(nextSun);
+        }
+        if (form.elements.endDate) {
+            form.elements.endDate.min = toIso(thisMon);
+            form.elements.endDate.max = toIso(nextSun);
+        }
         dialog.showModal();
     });
 
@@ -1321,14 +1398,16 @@
         e.preventDefault();
         const data = Object.fromEntries(new FormData(e.currentTarget));
         data.departmentId = data.departmentId ? Number(data.departmentId) : null;
+        if (!data.departmentId) return notify('Vui lòng chọn khoa chuyên môn.', true);
         mutate('SchedulingPeriods', data, e.currentTarget);
     });
 
     find('#publish-period-btn')?.addEventListener('click', (e) => {
         const periodId = Number(e.currentTarget.dataset.periodId || 0);
         if (!periodId) return;
+        const departmentId = schedulingState?.selectedDeptId || Number(find('#scheduling-dept')?.value || 0) || null;
         if (confirm('Xác nhận xuất bản kỳ lịch và sinh slot khám trực tuyến cho tất cả ca đã duyệt?')) {
-            mutate('PublishPeriod', { periodId });
+            mutate('PublishPeriod', { periodId, departmentId });
         }
     });
 
@@ -1351,10 +1430,8 @@
         if (preset?.roomId) form.elements.roomId.value = String(preset.roomId);
         if (preset?.workDate) form.elements.workDate.value = preset.workDate;
         if (preset?.shift !== undefined && preset?.shift !== null) form.elements.shift.value = String(preset.shift);
-        if (preset?.maxPatients) form.elements.maxPatients.value = String(preset.maxPatients);
-        if (preset?.onlineSlots !== undefined) form.elements.onlineSlots.value = String(preset.onlineSlots);
         if (preset?.doctorNote) form.elements.doctorNote.value = preset.doctorNote;
-        find('#upsert-schedule-title').textContent = preset?.id ? 'Chỉnh sửa Quota / Phòng khám' : 'Xếp lịch trực tiếp';
+        find('#upsert-schedule-title').textContent = preset?.id ? 'Chỉnh sửa Phòng khám / Ca' : 'Xếp lịch trực tiếp';
         dialog.showModal();
     }
 
@@ -1390,8 +1467,6 @@
         data.doctorId = Number(data.doctorId);
         data.roomId = data.roomId ? Number(data.roomId) : null;
         data.shift = Number(data.shift);
-        data.maxPatients = Number(data.maxPatients || 40);
-        data.onlineSlots = Number(data.onlineSlots || 28);
         mutate('UpsertSchedule', data, e.currentTarget);
     });
 
@@ -1402,7 +1477,8 @@
             const roomId = Number(find(`#matrix-room-${scheduleId}`)?.value || 0);
             if (!roomId) return notify('Vui lòng chọn phòng khám.', true);
             find('#decision-matrix-dialog').close();
-            mutate('ApproveShift', { scheduleId, roomId });
+            const departmentId = schedulingState?.selectedDeptId || Number(find('#scheduling-dept')?.value || 0) || null;
+            mutate('ApproveShift', { scheduleId, roomId, departmentId });
             return;
         }
         const reallocBtn = e.target.closest('[data-realloc-shift]');
@@ -1413,7 +1489,8 @@
             const targetRoomId = Number(find(`#realloc-room-${oldScheduleId}`)?.value || 0);
             if (!targetDate || !targetRoomId) return notify('Vui lòng chọn đủ ngày và phòng điều chuyển.', true);
             find('#decision-matrix-dialog').close();
-            mutate('ReallocateShift', { oldScheduleId, targetDate, targetShift, targetRoomId });
+            const departmentId = schedulingState?.selectedDeptId || Number(find('#scheduling-dept')?.value || 0) || null;
+            mutate('ReallocateShift', { oldScheduleId, targetDate, targetShift, targetRoomId, departmentId });
         }
     });
 
@@ -1446,8 +1523,6 @@
                     roomId: sched.roomId,
                     workDate: sched.workDate,
                     shift: sched.shift === 1 || sched.shift === 'Afternoon' ? 1 : 0,
-                    maxPatients: sched.maxPatients,
-                    onlineSlots: sched.onlineSlots,
                     doctorNote: sched.doctorNote || '',
                 });
             }
@@ -1462,12 +1537,24 @@
                 .catch((err) => notify(err.message, true));
             return;
         }
+        const viewPeriodBtn = e.target.closest('[data-view-dept-period]');
+        if (viewPeriodBtn) {
+            const deptId = Number(viewPeriodBtn.dataset.viewDeptPeriod);
+            const periodId = viewPeriodBtn.dataset.periodId ? Number(viewPeriodBtn.dataset.periodId) : null;
+            const deptSel = find('#scheduling-dept');
+            if (deptSel) deptSel.value = String(deptId);
+            loadScheduling(deptId, periodId)
+                .then(() => find('#active-period-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+                .catch((err) => notify(err.message, true));
+            return;
+        }
         const inlineApproveBtn = e.target.closest('[data-inline-approve]');
         if (inlineApproveBtn) {
             const scheduleId = Number(inlineApproveBtn.dataset.inlineApprove);
             const roomId = Number(find(`#inline-room-${scheduleId}`)?.value || 0);
             if (!roomId) return notify('Vui lòng chọn phòng khám trước khi duyệt.', true);
-            mutate('ApproveShift', { scheduleId, roomId });
+            const departmentId = schedulingState?.selectedDeptId || Number(find('#scheduling-dept')?.value || 0) || null;
+            mutate('ApproveShift', { scheduleId, roomId, departmentId });
             return;
         }
         const matrixBtn = e.target.closest('[data-open-matrix]');

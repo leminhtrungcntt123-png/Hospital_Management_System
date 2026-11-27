@@ -31,13 +31,14 @@ public interface IDepartmentHeadService
     // Shift Bidding & Decision Matrix
     Task<Result<int>> CreateSchedulingPeriodAsync(CreateSchedulingPeriodRequest request, CancellationToken ct = default);
     Task<SchedulingPeriodDto?> GetActiveSchedulingPeriodAsync(int? departmentId, CancellationToken ct = default);
+    Task<IReadOnlyList<SchedulingPeriodDto>> GetSchedulingPeriodsAsync(int? departmentId, CancellationToken ct = default);
     Task<DepartmentDemandGridDto> GetDepartmentDemandGridAsync(int departmentId, int periodId, CancellationToken ct = default);
     Task<Result<int>> RegisterShiftBidAsync(RegisterShiftBidRequest request, CancellationToken ct = default);
     Task<Result> CancelShiftBidAsync(int doctorId, int scheduleId, CancellationToken ct = default);
     Task<DecisionMatrixResultDto> GetDecisionMatrixAsync(int departmentId, DateOnly workDate, ExamShift shift, CancellationToken ct = default);
     Task<Result> ApproveShiftAsync(ApproveShiftRequest request, CancellationToken ct = default);
     Task<Result<int>> ReallocateShiftAsync(ReallocateShiftRequest request, CancellationToken ct = default);
-    Task<Result<int>> PublishSchedulingPeriodAsync(int periodId, int reviewedByAccountId, CancellationToken ct = default);
+    Task<Result<int>> PublishSchedulingPeriodAsync(int periodId, int reviewedByAccountId, int? expectedDepartmentId = null, CancellationToken ct = default);
 
     // 3. Phân công ca trực đêm nhân sự
     Task<IReadOnlyList<DepartmentDutyShiftDto>> GetDutyShiftsAsync(int departmentId, CancellationToken ct = default);

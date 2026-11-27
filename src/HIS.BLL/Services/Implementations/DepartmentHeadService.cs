@@ -105,6 +105,10 @@ public partial class DepartmentHeadService : IDepartmentHeadService
 
             var affectedCount = await appQuery.CountAsync(ct);
 
+            var availableReplacements = e.Status == ScheduleExceptionStatus.Pending
+                ? await ReplacementDoctorHelper.GetAvailableReplacementsAsync(_context, departmentId, e.DoctorId, e.Date, e.Shift, ct)
+                : null;
+
             result.Add(new DepartmentExceptionItemDto(
                 e.Id,
                 e.DoctorId,
@@ -119,7 +123,8 @@ public partial class DepartmentHeadService : IDepartmentHeadService
                 e.CreatedAt,
                 e.ApprovedByAccount != null ? e.ApprovedByAccount.Username : null,
                 e.ApprovedAt,
-                affectedCount
+                affectedCount,
+                availableReplacements
             ));
         }
 
@@ -142,6 +147,22 @@ public partial class DepartmentHeadService : IDepartmentHeadService
 
             if (ex.Status != ScheduleExceptionStatus.Pending)
                 return Result.Failure("INVALID_STATUS", "Chỉ có thể phê duyệt đề nghị đang ở trạng thái chờ duyệt.");
+
+            if (request.ReplacementDoctorId is > 0)
+            {
+                var repDoc = await _context.Doctors
+                    .Include(d => d.Account)
+                    .FirstOrDefaultAsync(d => d.Id == request.ReplacementDoctorId.Value
+                        && d.DepartmentId == request.DepartmentId.Value
+                        && d.Account.IsActive, ct);
+                if (repDoc == null || repDoc.Id == ex.DoctorId)
+                    return Result.Failure("INVALID_REPLACEMENT", "Bác sĩ thay thế không hợp lệ hoặc không thuộc khoa.");
+
+                if (await ReplacementDoctorHelper.IsDoctorBusyAsync(_context, repDoc.Id, repDoc.AccountId, ex.Date, ex.Shift, ct))
+                    return Result.Failure("REPLACEMENT_BUSY", $"BS. {repDoc.FullName} đã có lịch khám hoặc ca trực trong thời gian này.");
+
+                ex.ReplacementDoctorId = repDoc.Id;
+            }
 
             await using var tx = await _context.Database.BeginTransactionAsync(ct);
             await _context.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(11028, 1)", ct);
@@ -350,8 +371,6 @@ public partial class DepartmentHeadService : IDepartmentHeadService
                 s.StartTime,
                 s.EndTime,
                 s.SlotDurationMinutes,
-                s.MaxPatients,
-                s.OnlineSlots,
                 s.IsHotShift,
                 s.Status,
                 s.DoctorNote,
@@ -368,9 +387,6 @@ public partial class DepartmentHeadService : IDepartmentHeadService
         var today = DateOnly.FromDateTime(_timeProvider.GetLocalNow().DateTime);
         if (request.WorkDate < today)
             return Result.Failure<int>("PAST_DATE", "Không thể thiết lập lịch khám cho ngày trong quá khứ. Chỉ được phép thiết lập từ ngày hiện tại hoặc tương lai.");
-
-        if (request.OnlineSlots < 0 || request.OnlineSlots > request.MaxPatients)
-            return Result.Failure<int>("INVALID_QUOTA", "Số lượng slot trực tuyến phải từ 0 đến tổng số bệnh nhân.");
 
         if (request.EndTime <= request.StartTime)
             return Result.Failure<int>("INVALID_TIME", "Giờ kết thúc ca khám phải sau giờ bắt đầu.");
@@ -475,8 +491,6 @@ public partial class DepartmentHeadService : IDepartmentHeadService
             schedule.StartTime = request.StartTime;
             schedule.EndTime = request.EndTime;
             schedule.SlotDurationMinutes = request.SlotDurationMinutes;
-            schedule.MaxPatients = request.MaxPatients;
-            schedule.OnlineSlots = request.OnlineSlots;
             schedule.Status = request.Status;
             schedule.DoctorNote = request.DoctorNote ?? schedule.DoctorNote;
         }
@@ -493,8 +507,6 @@ public partial class DepartmentHeadService : IDepartmentHeadService
                 StartTime = request.StartTime,
                 EndTime = request.EndTime,
                 SlotDurationMinutes = request.SlotDurationMinutes,
-                MaxPatients = request.MaxPatients,
-                OnlineSlots = request.OnlineSlots,
                 Status = request.Status,
                 DoctorNote = request.DoctorNote,
                 CreatedAt = LocalNow

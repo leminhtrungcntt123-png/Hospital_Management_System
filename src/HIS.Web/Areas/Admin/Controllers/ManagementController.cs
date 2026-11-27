@@ -178,7 +178,7 @@ public sealed class ManagementController(
     });
 
     [HttpGet("SchedulingOverview")]
-    public Task<IActionResult> SchedulingOverview(int? departmentId, int weekOffset = 0, CancellationToken ct = default) => ExecuteAsync(async () =>
+    public Task<IActionResult> SchedulingOverview(int? departmentId, int? periodId = null, int weekOffset = 0, CancellationToken ct = default) => ExecuteAsync(async () =>
     {
         var deptList = await departments.GetDepartmentsAsync(ct);
         int selectedDeptId;
@@ -198,7 +198,13 @@ public sealed class ManagementController(
         var weekStart = today.AddDays(-daysFromMonday + weekOffset * 7);
         var weekEnd = weekStart.AddDays(6);
 
-        var activePeriod = await departmentHead.GetActiveSchedulingPeriodAsync(selectedDeptId > 0 ? selectedDeptId : null, ct);
+        var allPeriods = await departmentHead.GetSchedulingPeriodsAsync(null, ct);
+        var deptPeriods = selectedDeptId > 0
+            ? allPeriods.Where(p => p.DepartmentId == selectedDeptId).ToList()
+            : [];
+        var activePeriod = periodId is > 0
+            ? deptPeriods.FirstOrDefault(p => p.Id == periodId.Value) ?? await departmentHead.GetActiveSchedulingPeriodAsync(selectedDeptId, ct)
+            : await departmentHead.GetActiveSchedulingPeriodAsync(selectedDeptId, ct);
         var demandGrid = activePeriod != null && selectedDeptId > 0
             ? await departmentHead.GetDepartmentDemandGridAsync(selectedDeptId, activePeriod.Id, ct)
             : null;
@@ -227,6 +233,8 @@ public sealed class ManagementController(
             weekStart,
             weekEnd,
             activePeriod,
+            periods = allPeriods,
+            deptPeriods,
             demandGrid,
             schedules = deptSchedules,
             dutyShifts = deptDutyShifts,
@@ -247,6 +255,8 @@ public sealed class ManagementController(
     public Task<IActionResult> CreateSchedulingPeriod([FromBody] AdminCreatePeriodRequest request, CancellationToken ct) =>
         ExecuteAsync(async () =>
         {
+            if (request.DepartmentId is not > 0)
+                throw new AdminOperationException("Vui lòng chọn khoa chuyên môn khi tạo kỳ đăng ký mới.");
             var result = await departmentHead.CreateSchedulingPeriodAsync(
                 new CreateSchedulingPeriodRequest(
                     request.DepartmentId,
@@ -264,7 +274,7 @@ public sealed class ManagementController(
     public Task<IActionResult> PublishPeriod([FromBody] AdminPublishPeriodRequest request, CancellationToken ct) =>
         ExecuteAsync(async () =>
         {
-            var result = await departmentHead.PublishSchedulingPeriodAsync(request.PeriodId, ActorId, ct);
+            var result = await departmentHead.PublishSchedulingPeriodAsync(request.PeriodId, ActorId, request.DepartmentId, ct);
             return UnwrapResult(result, slots => new { slots, message = $"Đã xuất bản kỳ lịch và tạo {slots} slot khám trực tuyến." });
         });
 
@@ -286,7 +296,7 @@ public sealed class ManagementController(
     public Task<IActionResult> ApproveShift([FromBody] AdminApproveShiftRequest request, CancellationToken ct) =>
         ExecuteAsync(async () =>
         {
-            var result = await departmentHead.ApproveShiftAsync(new ApproveShiftRequest(request.ScheduleId, request.RoomId, ActorId), ct);
+            var result = await departmentHead.ApproveShiftAsync(new ApproveShiftRequest(request.ScheduleId, request.RoomId, ActorId, request.DepartmentId), ct);
             if (!result.IsSuccess) throw new AdminOperationException(result.Error.Message);
             return Ok(new { message = "Đã duyệt ca khám và gán phòng thành công." });
         });
@@ -296,7 +306,7 @@ public sealed class ManagementController(
         ExecuteAsync(async () =>
         {
             var result = await departmentHead.ReallocateShiftAsync(
-                new ReallocateShiftRequest(request.OldScheduleId, request.TargetDate, request.TargetShift, request.TargetRoomId, ActorId),
+                new ReallocateShiftRequest(request.OldScheduleId, request.TargetDate, request.TargetShift, request.TargetRoomId, ActorId, request.DepartmentId),
                 ct);
             return UnwrapResult(result, id => new { id, message = "Đã điều chuyển ca khám thành công." });
         });
@@ -319,8 +329,6 @@ public sealed class ManagementController(
                     start,
                     end,
                     30,
-                    request.MaxPatients > 0 ? request.MaxPatients : 40,
-                    request.OnlineSlots >= 0 ? request.OnlineSlots : 28,
                     DoctorScheduleStatus.Approved,
                     request.DoctorNote),
                 ct);
@@ -343,11 +351,11 @@ public sealed class ManagementController(
     }
 
     public sealed record AdminCreatePeriodRequest(int? DepartmentId, string Name, DateOnly StartDate, DateOnly EndDate, DateTime BiddingOpensAt, DateTime BiddingClosesAt);
-    public sealed record AdminPublishPeriodRequest(int PeriodId);
+    public sealed record AdminPublishPeriodRequest(int PeriodId, int? DepartmentId = null);
     public sealed record AdminGenerateSlotsRequest(DateOnly StartDate, DateOnly EndDate, int? DepartmentId);
-    public sealed record AdminApproveShiftRequest(int ScheduleId, int RoomId);
-    public sealed record AdminReallocateShiftRequest(int OldScheduleId, DateOnly TargetDate, ExamShift TargetShift, int TargetRoomId);
-    public sealed record AdminUpsertScheduleRequest(int? Id, int DoctorId, int DepartmentId, int? RoomId, DateOnly WorkDate, ExamShift Shift, int MaxPatients, int OnlineSlots, string? DoctorNote);
+    public sealed record AdminApproveShiftRequest(int ScheduleId, int RoomId, int? DepartmentId = null);
+    public sealed record AdminReallocateShiftRequest(int OldScheduleId, DateOnly TargetDate, ExamShift TargetShift, int TargetRoomId, int? DepartmentId = null);
+    public sealed record AdminUpsertScheduleRequest(int? Id, int DoctorId, int DepartmentId, int? RoomId, DateOnly WorkDate, ExamShift Shift, string? DoctorNote);
     public sealed record AdminDeleteScheduleRequest(int ScheduleId, int DepartmentId);
 
     private async Task<IActionResult> ExecuteAsync(Func<Task<IActionResult>> operation)

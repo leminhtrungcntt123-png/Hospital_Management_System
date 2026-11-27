@@ -10,6 +10,13 @@ public partial class DepartmentHeadService
 {
     public async Task<Result<int>> CreateSchedulingPeriodAsync(CreateSchedulingPeriodRequest request, CancellationToken ct = default)
     {
+        if (!request.DepartmentId.HasValue || request.DepartmentId.Value <= 0)
+            return Result.Failure<int>("INVALID_DEPARTMENT", "Vui lòng chọn khoa chuyên môn cho đợt đăng ký lịch.");
+
+        bool deptExists = await _context.Departments.AnyAsync(d => d.Id == request.DepartmentId.Value, ct);
+        if (!deptExists)
+            return Result.Failure<int>("NOT_FOUND", "Không tìm thấy khoa chuyên môn đã chọn.");
+
         if (string.IsNullOrWhiteSpace(request.Name))
             return Result.Failure<int>("INVALID_NAME", "Tên đợt đăng ký lịch không được để trống.");
 
@@ -19,9 +26,30 @@ public partial class DepartmentHeadService
         if (request.BiddingClosesAt <= request.BiddingOpensAt)
             return Result.Failure<int>("INVALID_BIDDING_WINDOW", "Thời điểm đóng cổng đăng ký phải sau thời điểm mở cổng.");
 
+        var localNow = LocalNow;
+        var today = DateOnly.FromDateTime(localNow);
+        int daysSinceMonday = ((int)today.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+        var currentMonday = today.AddDays(-daysSinceMonday);
+        var nextSunday = currentMonday.AddDays(13);
+
+        if (request.StartDate < currentMonday)
+            return Result.Failure<int>("INVALID_DATES", "Không thể mở đợt đăng ký cho tuần đã qua.");
+
+        if (request.EndDate > nextSunday)
+            return Result.Failure<int>("TOO_FAR_AHEAD", "Chỉ được phép mở đợt đăng ký cho tuần hiện tại hoặc tuần kế tiếp (tối đa hết Chủ Nhật tuần sau).");
+
+        bool hasUnfinalizedPeriod = await _context.SchedulingPeriods
+            .AnyAsync(p => p.DepartmentId == request.DepartmentId.Value
+                && p.Status != SchedulingPeriodStatus.Published
+                && p.Status != SchedulingPeriodStatus.Closed, ct);
+
+        if (hasUnfinalizedPeriod)
+            return Result.Failure<int>("UNFINALIZED_PERIOD_EXISTS",
+                "Khoa này vẫn còn đợt đăng ký chưa được chốt/xuất bản. Vui lòng chốt và xuất bản đợt hiện tại trước khi tạo đợt mới.");
+
         var period = new SchedulingPeriod
         {
-            DepartmentId = request.DepartmentId,
+            DepartmentId = request.DepartmentId.Value,
             Name = request.Name.Trim(),
             StartDate = request.StartDate,
             EndDate = request.EndDate,
@@ -29,7 +57,7 @@ public partial class DepartmentHeadService
             BiddingClosesAt = DateTime.SpecifyKind(request.BiddingClosesAt, DateTimeKind.Unspecified),
             Status = SchedulingPeriodStatus.Open,
             CreatedBy = request.CreatedByAccountId,
-            CreatedAt = LocalNow
+            CreatedAt = localNow
         };
 
         _context.SchedulingPeriods.Add(period);
@@ -40,12 +68,19 @@ public partial class DepartmentHeadService
 
     public async Task<SchedulingPeriodDto?> GetActiveSchedulingPeriodAsync(int? departmentId, CancellationToken ct = default)
     {
+        if (!departmentId.HasValue || departmentId.Value <= 0)
+            return null;
+
         var now = LocalNow;
+        // Ưu tiên kỳ đang Open & còn hạn trong đúng khoa trước, sau đó mới tới kỳ Published gần nhất của khoa đó
         var period = await _context.SchedulingPeriods
             .AsNoTracking()
             .Include(p => p.Department)
-            .Where(p => p.DepartmentId == null || departmentId == null || p.DepartmentId == departmentId)
-            .OrderByDescending(p => p.StartDate)
+            .Where(p => p.DepartmentId == departmentId.Value)
+            .OrderByDescending(p => p.Status == SchedulingPeriodStatus.Open && p.BiddingOpensAt <= now && p.BiddingClosesAt >= now)
+            .ThenByDescending(p => p.Status == SchedulingPeriodStatus.Open)
+            .ThenByDescending(p => p.StartDate)
+            .ThenByDescending(p => p.Id)
             .FirstOrDefaultAsync(ct);
 
         if (period == null) return null;
@@ -55,7 +90,7 @@ public partial class DepartmentHeadService
         return new SchedulingPeriodDto(
             period.Id,
             period.DepartmentId,
-            period.Department != null ? period.Department.Name : "Toàn viện",
+            period.Department != null ? period.Department.Name : "Chưa gán khoa",
             period.Name,
             period.StartDate,
             period.EndDate,
@@ -64,6 +99,56 @@ public partial class DepartmentHeadService
             period.Status,
             isOpen
         );
+    }
+
+    public async Task<IReadOnlyList<SchedulingPeriodDto>> GetSchedulingPeriodsAsync(int? departmentId, CancellationToken ct = default)
+    {
+        var now = LocalNow;
+        var query = _context.SchedulingPeriods
+            .AsNoTracking()
+            .Include(p => p.Department)
+            .Where(p => p.DepartmentId != null);
+
+        if (departmentId is > 0)
+        {
+            query = query.Where(p => p.DepartmentId == departmentId.Value);
+        }
+
+        var periods = await query
+            .OrderByDescending(p => p.StartDate)
+            .ThenByDescending(p => p.Id)
+            .ToListAsync(ct);
+
+        var periodIds = periods.Select(p => p.Id).ToList();
+        var countsByPeriod = periodIds.Count > 0
+            ? await _context.DoctorSchedules
+                .AsNoTracking()
+                .Where(s => s.PeriodId.HasValue && periodIds.Contains(s.PeriodId.Value)
+                    && (s.Status == DoctorScheduleStatus.Bidding || s.Status == DoctorScheduleStatus.Approved))
+                .GroupBy(s => new { PeriodId = s.PeriodId!.Value, s.Status })
+                .Select(g => new { g.Key.PeriodId, g.Key.Status, Count = g.Count() })
+                .ToListAsync(ct)
+            : [];
+
+        return periods.Select(period =>
+        {
+            int pending = countsByPeriod.Where(c => c.PeriodId == period.Id && c.Status == DoctorScheduleStatus.Bidding).Sum(c => c.Count);
+            int approved = countsByPeriod.Where(c => c.PeriodId == period.Id && c.Status == DoctorScheduleStatus.Approved).Sum(c => c.Count);
+            return new SchedulingPeriodDto(
+                period.Id,
+                period.DepartmentId,
+                period.Department != null ? period.Department.Name : "Chưa gán khoa",
+                period.Name,
+                period.StartDate,
+                period.EndDate,
+                period.BiddingOpensAt,
+                period.BiddingClosesAt,
+                period.Status,
+                period.Status == SchedulingPeriodStatus.Open && now >= period.BiddingOpensAt && now <= period.BiddingClosesAt,
+                pending,
+                approved
+            );
+        }).ToList();
     }
 
     public async Task<DepartmentDemandGridDto> GetDepartmentDemandGridAsync(int departmentId, int periodId, CancellationToken ct = default)
@@ -258,8 +343,6 @@ public partial class DepartmentHeadService
             StartTime = request.Shift == ExamShift.Morning ? new TimeOnly(7, 30) : new TimeOnly(13, 0),
             EndTime = request.Shift == ExamShift.Morning ? new TimeOnly(11, 30) : new TimeOnly(16, 30),
             SlotDurationMinutes = 30,
-            MaxPatients = 40,
-            OnlineSlots = 28,
             IsHotShift = isHot,
             Status = DoctorScheduleStatus.Bidding,
             DoctorNote = request.DoctorNote,
@@ -470,6 +553,9 @@ public partial class DepartmentHeadService
         if (schedule == null)
             return Result.Failure("NOT_FOUND", "Không tìm thấy ca đăng ký.");
 
+        if (request.ExpectedDepartmentId is > 0 && schedule.DepartmentId != request.ExpectedDepartmentId.Value)
+            return Result.Failure("FORBIDDEN", "Ca khám này không thuộc khoa bạn đang chọn.");
+
         if (!await IsActiveHospitalAdminAsync(request.ReviewedByAccountId, ct))
         {
             var callerDeptId = await ResolveDepartmentIdByAccountIdAsync(request.ReviewedByAccountId, ct);
@@ -575,6 +661,9 @@ public partial class DepartmentHeadService
         if (oldRecord == null)
             return Result.Failure<int>("NOT_FOUND", "Không tìm thấy bản ghi ca khám gốc.");
 
+        if (request.ExpectedDepartmentId is > 0 && oldRecord.DepartmentId != request.ExpectedDepartmentId.Value)
+            return Result.Failure<int>("FORBIDDEN", "Ca khám này không thuộc khoa bạn đang chọn.");
+
         if (!await IsActiveHospitalAdminAsync(request.ReviewedByAccountId, ct))
         {
             var callerDeptId = await ResolveDepartmentIdByAccountIdAsync(request.ReviewedByAccountId, ct);
@@ -646,8 +735,6 @@ public partial class DepartmentHeadService
                 StartTime = request.TargetShift == ExamShift.Morning ? new TimeOnly(7, 30) : new TimeOnly(13, 0),
                 EndTime = request.TargetShift == ExamShift.Morning ? new TimeOnly(11, 30) : new TimeOnly(16, 30),
                 SlotDurationMinutes = 30,
-                MaxPatients = 40,
-                OnlineSlots = 28,
                 Status = DoctorScheduleStatus.Approved,
                 ReallocatedFromId = oldRecord.Id,
                 ReviewedBy = request.ReviewedByAccountId,
@@ -675,7 +762,7 @@ public partial class DepartmentHeadService
         return Result<int>.Success(targetSchedule.Id);
     }
 
-    public async Task<Result<int>> PublishSchedulingPeriodAsync(int periodId, int reviewedByAccountId, CancellationToken ct = default)
+    public async Task<Result<int>> PublishSchedulingPeriodAsync(int periodId, int reviewedByAccountId, int? expectedDepartmentId = null, CancellationToken ct = default)
     {
         var period = await _context.SchedulingPeriods
             .Include(p => p.Department)
@@ -683,6 +770,9 @@ public partial class DepartmentHeadService
 
         if (period == null)
             return Result.Failure<int>("NOT_FOUND", "Không tìm thấy kỳ đăng ký.");
+
+        if (expectedDepartmentId is > 0 && period.DepartmentId != expectedDepartmentId.Value)
+            return Result.Failure<int>("FORBIDDEN", "Kỳ đăng ký này không thuộc khoa bạn đang chọn.");
 
         bool isHospitalAdmin = await IsActiveHospitalAdminAsync(reviewedByAccountId, ct);
 
@@ -697,6 +787,13 @@ public partial class DepartmentHeadService
             if (callerDeptId <= 0 || period.DepartmentId.Value != callerDeptId)
                 return Result.Failure<int>("FORBIDDEN", "Bạn không có quyền xuất bản kỳ đăng ký của khoa khác.");
         }
+
+        bool hasPendingBids = await _context.DoctorSchedules
+            .AnyAsync(s => s.PeriodId == periodId && s.Status == DoctorScheduleStatus.Bidding, ct);
+
+        if (hasPendingBids)
+            return Result.Failure<int>("PENDING_BIDS_EXIST",
+                "Vẫn còn ca đăng ký đang ở trạng thái Chờ duyệt (Bidding). Vui lòng duyệt hoặc từ chối hết trước khi chốt & xuất bản đợt này.");
 
         period.Status = SchedulingPeriodStatus.Published;
 

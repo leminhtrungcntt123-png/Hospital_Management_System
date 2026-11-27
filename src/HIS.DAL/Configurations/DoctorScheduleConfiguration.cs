@@ -13,7 +13,6 @@ public class DoctorScheduleConfiguration : IEntityTypeConfiguration<DoctorSchedu
         {
             t.HasCheckConstraint("ck_doctor_schedules_shift", "shift IN ('MORNING','AFTERNOON')");
             t.HasCheckConstraint("ck_doctor_schedules_status", "status IN ('BIDDING','APPROVED','REJECTED','REALLOCATED','CANCELLED')");
-            t.HasCheckConstraint("ck_online_slots", "online_slots BETWEEN 0 AND max_patients");
             t.HasCheckConstraint("ck_schedule_time", "end_time > start_time");
             t.HasCheckConstraint("ck_approved_requires_room", "status <> 'APPROVED' OR room_id IS NOT NULL");
         });
@@ -25,8 +24,6 @@ public class DoctorScheduleConfiguration : IEntityTypeConfiguration<DoctorSchedu
         builder.Property(e => e.StartTime).HasDefaultValue(new TimeOnly(7, 30));
         builder.Property(e => e.EndTime).HasDefaultValue(new TimeOnly(11, 30));
         builder.Property(e => e.SlotDurationMinutes).HasDefaultValue(30);
-        builder.Property(e => e.MaxPatients).HasDefaultValue(40);
-        builder.Property(e => e.OnlineSlots).HasDefaultValue(28);
         builder.Property(e => e.IsHotShift).HasDefaultValue(false);
         builder.Property(e => e.Status)
             .HasConversion<UpperSnakeCaseEnumConverter<DoctorScheduleStatus>>()

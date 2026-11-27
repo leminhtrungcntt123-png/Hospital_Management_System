@@ -883,7 +883,7 @@ else if (tab == "schedule")
                                         }
                                         else if (Model.ActivePeriod.IsOpenForBidding)
                                         {
-                                            @if (morningCell.ApprovedCount >= morningCell.TotalRooms)
+                                            @if (morningCell.TotalRooms > 0 && morningCell.ApprovedCount >= morningCell.TotalRooms)
                                             {
                                                 <div style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:4px; padding:4px 6px; margin-top:4px; text-align:center;">
                                                     <span style="font-size:10px; font-weight:700; color:#dc2626;">🔒 Đã duyệt kín buồng (@morningCell.ApprovedCount/@morningCell.TotalRooms)</span>
@@ -965,7 +965,7 @@ else if (tab == "schedule")
                                         }
                                         else if (Model.ActivePeriod.IsOpenForBidding)
                                         {
-                                            @if (afternoonCell.ApprovedCount >= afternoonCell.TotalRooms)
+                                            @if (afternoonCell.TotalRooms > 0 && afternoonCell.ApprovedCount >= afternoonCell.TotalRooms)
                                             {
                                                 <div style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:4px; padding:4px 6px; margin-top:4px; text-align:center;">
                                                     <span style="font-size:10px; font-weight:700; color:#dc2626;">🔒 Đã duyệt kín buồng (@afternoonCell.ApprovedCount/@afternoonCell.TotalRooms)</span>

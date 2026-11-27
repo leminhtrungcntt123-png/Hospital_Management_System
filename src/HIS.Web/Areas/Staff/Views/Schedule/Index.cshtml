@@ -266,7 +266,9 @@
                                     @if (ex.Status == ScheduleExceptionStatus.Pending)
                                     {
                                         <div style="display:flex; gap:8px; align-items:center;">
-                                            <button type="button" class="btn primary sm" onclick="openApproveModal(@ex.Id, 'BS. @ex.DoctorName', '@ex.Date.ToString("dd/MM/yyyy")', '@(ex.ReplacementDoctorName != null ? "BS. " + ex.ReplacementDoctorName : "Điều phối trong khoa")', @ex.AffectedAppointmentsCount)">
+                                            <button type="button" class="btn primary sm"
+                                                    data-replacements='@Html.Raw(System.Text.Json.JsonSerializer.Serialize(ex.AvailableReplacements ?? Array.Empty<AdminOption>(), new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }))'
+                                                    onclick="openApproveModal(@ex.Id, 'BS. @ex.DoctorName', '@ex.Date.ToString("dd/MM/yyyy")', '@(ex.ReplacementDoctorName != null ? "BS. " + ex.ReplacementDoctorName : "Điều phối trong khoa")', @ex.AffectedAppointmentsCount, this)">
                                                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><polyline points="20 6 9 17 4 12"></polyline></svg>
                                                 <span>Duyệt</span>
                                             </button>
@@ -320,6 +322,14 @@
                             <small style="color:#64748b; display:block; font-size:11px;">Đề xuất thay thế</small>
                             <strong id="approveReplacementName" style="font-size:14px; color:#079bc9;">BS. Nguyễn Hoàng Nam</strong>
                         </div>
+                    </div>
+                    <div style="margin-bottom:14px;">
+                        <label for="approveReplacementSelect" style="display:block; font-size:12px; font-weight:600; color:#334155; margin-bottom:6px;">
+                            Chọn bác sĩ thay thế (chỉ liệt kê bác sĩ cùng khoa đang rảnh ngày/ca này):
+                        </label>
+                        <select name="replacementDoctorId" id="approveReplacementSelect" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px; background:#fff;">
+                            <option value="">-- Giữ đề xuất / tự điều phối trong khoa --</option>
+                        </select>
                     </div>
                     <p style="font-size:12px; color:#64748b; margin:0; line-height:1.5;">
                         Lịch hẹn được cập nhật cùng thông báo gửi về tài khoản đặt. Lượt hết chỗ thay thế cần chọn lại lịch.
@@ -1609,9 +1619,6 @@ else if (tab == "my-schedule")
     var morningCount = myApprovedSchedules.Count(s => s.Shift == ExamShift.Morning);
     var afternoonCount = myApprovedSchedules.Count(s => s.Shift == ExamShift.Afternoon);
     var totalShifts = morningCount + afternoonCount;
-    var totalMaxPatients = myApprovedSchedules.Sum(s => s.MaxPatients);
-    var totalOnlineSlots = myApprovedSchedules.Sum(s => s.OnlineSlots);
-    var totalDeskSlots = Math.Max(0, totalMaxPatients - totalOnlineSlots);
     var totalBookedCount = myApprovedSchedules.Sum(s => s.BookedAppointmentsCount);
     var weekDutyCount = myDutyShifts.Count(ds => Model.WeekDates.Contains(DateOnly.FromDateTime(ds.StartTime)));
 
@@ -1695,9 +1702,9 @@ else if (tab == "my-schedule")
             <small style="color:#64748b; font-size:11px;">Trực cấp cứu / Chỉ huy khoa</small>
         </div>
         <div style="background:#fff; border:1px solid #e2ebf3; border-radius:10px; padding:12px 16px;">
-            <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">🎯 Chỉ tiêu tiếp nhận</div>
-            <div style="font-size:22px; font-weight:800; color:#16a34a; margin-top:4px;">@totalMaxPatients <span style="font-size:12px; font-weight:600; color:#64748b;">lượt</span></div>
-            <small style="color:#64748b; font-size:11px;">Online: <strong>@totalOnlineSlots</strong> · Quầy: <strong>@totalDeskSlots</strong></small>
+            <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">🏥 Trạng thái tiếp nhận</div>
+            <div style="font-size:16px; font-weight:800; color:#16a34a; margin-top:6px;">Theo thứ tự ca</div>
+            <small style="color:#64748b; font-size:11px;">Khám liên tục trong giờ ca</small>
         </div>
         <div style="background:#fff; border:1px solid #e2ebf3; border-radius:10px; padding:12px 16px;">
             <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">👥 Lịch hẹn đã đặt</div>
@@ -1775,8 +1782,7 @@ else if (tab == "my-schedule")
                                 }
                                 else if (schedMorning != null)
                                 {
-                                    var mQuay = Math.Max(0, schedMorning.MaxPatients - schedMorning.OnlineSlots);
-                                    <div onclick="openScheduleModalWithData(@headDocId, @(schedMorning.RoomId ?? 0), @((int)dOfWeek), 0, '@schedMorning.StartTime.ToString("HH:mm")', '@schedMorning.EndTime.ToString("HH:mm")', @schedMorning.MaxPatients, @schedMorning.OnlineSlots, @schedMorning.Id, '@curDate.ToString("yyyy-MM-dd")', @schedMorning.BookedAppointmentsCount)"
+                                    <div onclick="openScheduleModalWithData(@headDocId, @(schedMorning.RoomId ?? 0), @((int)dOfWeek), 0, '@schedMorning.StartTime.ToString("HH:mm")', '@schedMorning.EndTime.ToString("HH:mm")', 0, 0, @schedMorning.Id, '@curDate.ToString("yyyy-MM-dd")', @schedMorning.BookedAppointmentsCount)"
                                          style="background:#e0f2fe; border-left:3px solid #0284c7; border-radius:6px; padding:8px; cursor:pointer; position:relative; transition:all 0.15s ease;"
                                          onmouseover="this.style.boxShadow='0 2px 6px rgba(2,132,199,0.25)'" onmouseout="this.style.boxShadow='none'"
                                          title="Nhấp để xem/sửa cấu hình ca sáng">
@@ -1789,11 +1795,8 @@ else if (tab == "my-schedule")
                                                     style="background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.3); color:#dc2626; width:18px; height:18px; border-radius:4px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; cursor:pointer; padding:0; line-height:1;"
                                                     title="Hủy ca sáng này">✕</button>
                                         </div>
-                                        <div style="font-size:11px; color:#0369a1; font-weight:700; margin-top:4px;">
-                                            🎯 @schedMorning.MaxPatients BN
-                                        </div>
-                                        <div style="font-size:10px; color:#0284c7; display:flex; justify-content:space-between; margin-top:2px;">
-                                            <span>On: @schedMorning.OnlineSlots · Quầy: @mQuay</span>
+                                        <div style="font-size:10px; color:#0284c7; display:flex; justify-content:space-between; margin-top:6px;">
+                                            <span>@schedMorning.StartTime.ToString("HH:mm")–@schedMorning.EndTime.ToString("HH:mm")</span>
                                             <span style="font-weight:700; color:#ea580c;">Đã đặt: @schedMorning.BookedAppointmentsCount</span>
                                         </div>
                                     </div>
@@ -1830,8 +1833,7 @@ else if (tab == "my-schedule")
                                 }
                                 else if (schedAfternoon != null)
                                 {
-                                    var aQuay = Math.Max(0, schedAfternoon.MaxPatients - schedAfternoon.OnlineSlots);
-                                    <div onclick="openScheduleModalWithData(@headDocId, @(schedAfternoon.RoomId ?? 0), @((int)dOfWeek), 1, '@schedAfternoon.StartTime.ToString("HH:mm")', '@schedAfternoon.EndTime.ToString("HH:mm")', @schedAfternoon.MaxPatients, @schedAfternoon.OnlineSlots, @schedAfternoon.Id, '@curDate.ToString("yyyy-MM-dd")', @schedAfternoon.BookedAppointmentsCount)"
+                                    <div onclick="openScheduleModalWithData(@headDocId, @(schedAfternoon.RoomId ?? 0), @((int)dOfWeek), 1, '@schedAfternoon.StartTime.ToString("HH:mm")', '@schedAfternoon.EndTime.ToString("HH:mm")', 0, 0, @schedAfternoon.Id, '@curDate.ToString("yyyy-MM-dd")', @schedAfternoon.BookedAppointmentsCount)"
                                          style="background:#ede9fe; border-left:3px solid #7c3aed; border-radius:6px; padding:8px; cursor:pointer; position:relative; transition:all 0.15s ease;"
                                          onmouseover="this.style.boxShadow='0 2px 6px rgba(124,58,237,0.25)'" onmouseout="this.style.boxShadow='none'"
                                          title="Nhấp để xem/sửa cấu hình ca chiều">
@@ -1844,11 +1846,8 @@ else if (tab == "my-schedule")
                                                     style="background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.3); color:#dc2626; width:18px; height:18px; border-radius:4px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; cursor:pointer; padding:0; line-height:1;"
                                                     title="Hủy ca chiều này">✕</button>
                                         </div>
-                                        <div style="font-size:11px; color:#5b21b6; font-weight:700; margin-top:4px;">
-                                            🎯 @schedAfternoon.MaxPatients BN
-                                        </div>
-                                        <div style="font-size:10px; color:#7c3aed; display:flex; justify-content:space-between; margin-top:2px;">
-                                            <span>On: @schedAfternoon.OnlineSlots · Quầy: @aQuay</span>
+                                        <div style="font-size:10px; color:#7c3aed; display:flex; justify-content:space-between; margin-top:6px;">
+                                            <span>@schedAfternoon.StartTime.ToString("HH:mm")–@schedAfternoon.EndTime.ToString("HH:mm")</span>
                                             <span style="font-weight:700; color:#ea580c;">Đã đặt: @schedAfternoon.BookedAppointmentsCount</span>
                                         </div>
                                     </div>
@@ -1951,9 +1950,6 @@ else
     var deptMorningCount = deptApprovedSchedules.Count(s => s.Shift == ExamShift.Morning);
     var deptAfternoonCount = deptApprovedSchedules.Count(s => s.Shift == ExamShift.Afternoon);
     var deptTotalShifts = deptMorningCount + deptAfternoonCount;
-    var deptTotalMaxPatients = deptApprovedSchedules.Sum(s => s.MaxPatients);
-    var deptTotalOnlineSlots = deptApprovedSchedules.Sum(s => s.OnlineSlots);
-    var deptTotalDeskSlots = Math.Max(0, deptTotalMaxPatients - deptTotalOnlineSlots);
     var deptTotalBooked = deptApprovedSchedules.Sum(s => s.BookedAppointmentsCount);
     var deptTotalReceived = deptApprovedSchedules.Sum(s => s.ReceivedPatientsCount);
     var deptWeekDutyCount = Model.DutyShifts.Count(ds => Model.WeekDates.Contains(DateOnly.FromDateTime(ds.StartTime)));
@@ -2040,9 +2036,9 @@ else
             <small style="color:#64748b; font-size:11px;">Trực cấp cứu / Bệnh phòng</small>
         </div>
         <div style="background:#fff; border:1px solid #e2ebf3; border-radius:10px; padding:12px 16px;">
-            <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">🎯 Chỉ tiêu tiếp nhận khoa</div>
-            <div style="font-size:22px; font-weight:800; color:#16a34a; margin-top:4px;">@deptTotalMaxPatients <span style="font-size:12px; font-weight:600; color:#64748b;">lượt</span></div>
-            <small style="color:#64748b; font-size:11px;">Online: <strong>@deptTotalOnlineSlots</strong> · Quầy: <strong>@deptTotalDeskSlots</strong></small>
+            <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">🏥 Trạng thái tiếp nhận</div>
+            <div style="font-size:16px; font-weight:800; color:#16a34a; margin-top:6px;">Theo thứ tự ca</div>
+            <small style="color:#64748b; font-size:11px;">Khám liên tục trong giờ ca</small>
         </div>
         <div style="background:#fff; border:1px solid #e2ebf3; border-radius:10px; padding:12px 16px;">
             <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">👥 Bệnh nhân đã tiếp nhận</div>
@@ -2291,7 +2287,6 @@ else
                                     }
                                     else if (schedMorning != null)
                                     {
-                                        var mQuay = Math.Max(0, schedMorning.MaxPatients - schedMorning.OnlineSlots);
                                         if (curDate < Model.Today)
                                         {
                                             <div style="background:#e0f2fe; border-left:3px solid #0284c7; border-radius:6px; padding:6px 8px; cursor:default; opacity:0.85;"
@@ -2302,16 +2297,15 @@ else
                                                 </div>
                                                 <div style="font-size:10px; color:#0369a1; margin-top:3px; display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
                                                     <span style="background:#bae6fd; padding:1px 4px; border-radius:4px; font-weight:700;">@schedMorning.RoomNumber</span>
-                                                    <span>🎯 <strong>@schedMorning.MaxPatients</strong> (<span style="color:#0284c7;">On: @schedMorning.OnlineSlots</span> · <span style="color:#0369a1;">Quầy: @mQuay</span>)</span>
                                                 </div>
                                             </div>
                                         }
                                         else
                                         {
-                                            <div onclick="openScheduleModalWithData(@doc.Id, @schedMorning.RoomId, @((int)dOfWeek), 0, '@schedMorning.StartTime.ToString("HH:mm")', '@schedMorning.EndTime.ToString("HH:mm")', @schedMorning.MaxPatients, @schedMorning.OnlineSlots, @schedMorning.Id, '@curDate.ToString("yyyy-MM-dd")')"
+                                            <div onclick="openScheduleModalWithData(@doc.Id, @schedMorning.RoomId, @((int)dOfWeek), 0, '@schedMorning.StartTime.ToString("HH:mm")', '@schedMorning.EndTime.ToString("HH:mm")', 0, 0, @schedMorning.Id, '@curDate.ToString("yyyy-MM-dd")')"
                                                  style="background:#e0f2fe; border-left:3px solid #0284c7; border-radius:6px; padding:6px 8px; cursor:pointer; transition:transform 0.1s; position:relative;"
                                                  onmouseover="this.style.boxShadow='0 2px 6px rgba(2,132,199,0.25)'" onmouseout="this.style.boxShadow='none'"
-                                                 title="Nhấp để xem/sửa cấu hình Quota ca sáng">
+                                                 title="Nhấp để xem/sửa cấu hình ca sáng">
                                                 <div style="display:flex; justify-content:space-between; align-items:center;">
                                                     <strong style="font-size:11px; color:#0369a1;">Ca sáng</strong>
                                                     <div style="display:flex; align-items:center; gap:6px;">
@@ -2328,7 +2322,6 @@ else
                                                 </div>
                                                 <div style="font-size:10px; color:#0369a1; margin-top:3px; display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
                                                     <span style="background:#bae6fd; padding:1px 4px; border-radius:4px; font-weight:700;">@schedMorning.RoomNumber</span>
-                                                    <span>🎯 <strong>@schedMorning.MaxPatients</strong> (<span style="color:#0284c7;">On: @schedMorning.OnlineSlots</span> · <span style="color:#0369a1;">Quầy: @mQuay</span>)</span>
                                                 </div>
                                             </div>
                                         }
@@ -2400,7 +2393,6 @@ else
                                     }
                                     else if (schedAfternoon != null)
                                     {
-                                        var aQuay = Math.Max(0, schedAfternoon.MaxPatients - schedAfternoon.OnlineSlots);
                                         if (curDate < Model.Today)
                                         {
                                             <div style="background:#ede9fe; border-left:3px solid #7c3aed; border-radius:6px; padding:6px 8px; cursor:default; opacity:0.85;"
@@ -2411,16 +2403,15 @@ else
                                                 </div>
                                                 <div style="font-size:10px; color:#5b21b6; margin-top:3px; display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
                                                     <span style="background:#ddd6fe; padding:1px 4px; border-radius:4px; font-weight:700;">@schedAfternoon.RoomNumber</span>
-                                                    <span>🎯 <strong>@schedAfternoon.MaxPatients</strong> (<span style="color:#7c3aed;">On: @schedAfternoon.OnlineSlots</span> · <span style="color:#5b21b6;">Quầy: @aQuay</span>)</span>
                                                 </div>
                                             </div>
                                         }
                                         else
                                         {
-                                            <div onclick="openScheduleModalWithData(@doc.Id, @schedAfternoon.RoomId, @((int)dOfWeek), 1, '@schedAfternoon.StartTime.ToString("HH:mm")', '@schedAfternoon.EndTime.ToString("HH:mm")', @schedAfternoon.MaxPatients, @schedAfternoon.OnlineSlots, @schedAfternoon.Id, '@curDate.ToString("yyyy-MM-dd")')"
+                                            <div onclick="openScheduleModalWithData(@doc.Id, @schedAfternoon.RoomId, @((int)dOfWeek), 1, '@schedAfternoon.StartTime.ToString("HH:mm")', '@schedAfternoon.EndTime.ToString("HH:mm")', 0, 0, @schedAfternoon.Id, '@curDate.ToString("yyyy-MM-dd")')"
                                                  style="background:#ede9fe; border-left:3px solid #7c3aed; border-radius:6px; padding:6px 8px; cursor:pointer; transition:transform 0.1s; position:relative;"
                                                  onmouseover="this.style.boxShadow='0 2px 6px rgba(124,58,237,0.25)'" onmouseout="this.style.boxShadow='none'"
-                                                 title="Nhấp để xem/sửa cấu hình Quota ca chiều">
+                                                 title="Nhấp để xem/sửa cấu hình ca chiều">
                                                 <div style="display:flex; justify-content:space-between; align-items:center;">
                                                     <strong style="font-size:11px; color:#5b21b6;">Ca chiều</strong>
                                                     <div style="display:flex; align-items:center; gap:6px;">
@@ -2437,7 +2428,6 @@ else
                                                 </div>
                                                 <div style="font-size:10px; color:#5b21b6; margin-top:3px; display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
                                                     <span style="background:#ddd6fe; padding:1px 4px; border-radius:4px; font-weight:700;">@schedAfternoon.RoomNumber</span>
-                                                    <span>🎯 <strong>@schedAfternoon.MaxPatients</strong> (<span style="color:#7c3aed;">On: @schedAfternoon.OnlineSlots</span> · <span style="color:#5b21b6;">Quầy: @aQuay</span>)</span>
                                                 </div>
                                             </div>
                                         }
@@ -2781,19 +2771,8 @@ else
                         </div>
                     </div>
 
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:6px;">
-                        <div>
-                            <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Tổng chỉ tiêu / ca</label>
-                            <input type="number" name="maxPatients" id="scheduleModalMaxPatients" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" value="40" min="1" max="100" required />
-                        </div>
-                        <div>
-                            <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Hạn mức trực tuyến</label>
-                            <input type="number" name="onlineSlots" id="scheduleModalOnlineSlots" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" value="28" min="0" max="100" required />
-                        </div>
-                    </div>
-
                     <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:8px 10px; font-size:11px; color:#475569; margin-top:8px;">
-                        💡 <strong>Cơ chế Quota:</strong> Khám trực tuyến tối đa = <code>Hạn mức trực tuyến</code>. Số lượt khám tại quầy (tiếp nhận trực tiếp) tự động = <code>Tổng chỉ tiêu - Hạn mức trực tuyến</code>. Khi sửa cấu hình, hệ thống sẽ tự động cập nhật đè bản ghi cũ của bác sĩ trong ca đó.
+                        💡 Khi sửa cấu hình, hệ thống sẽ tự động cập nhật phòng và giờ trực của bác sĩ trong ca đó.
                     </div>
                 </div>
                 <div class="app-modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
@@ -3033,11 +3012,24 @@ else
         });
     }
 
-    function openApproveModal(id, doctorName, date, replacementName, affectedCount) {
+    function openApproveModal(id, doctorName, date, replacementName, affectedCount, btn) {
         document.getElementById('approveExceptionId').value = id;
         document.getElementById('approveModalSub').textContent = doctorName + ' · ' + date;
         document.getElementById('approveReplacementName').textContent = replacementName;
         document.getElementById('approveAffectedCount').textContent = (affectedCount !== undefined && affectedCount !== null) ? affectedCount : 0;
+        const select = document.getElementById('approveReplacementSelect');
+        if (select) {
+            select.innerHTML = '<option value="">-- Giữ đề xuất / tự điều phối trong khoa --</option>';
+            try {
+                const list = btn && btn.dataset.replacements ? JSON.parse(btn.dataset.replacements) : [];
+                list.forEach(item => {
+                    const opt = document.createElement('option');
+                    opt.value = item.id;
+                    opt.textContent = item.name;
+                    select.appendChild(opt);
+                });
+            } catch { /* ignore */ }
+        }
         document.getElementById('approveModal').classList.add('show');
     }
     function closeApproveModal() {
@@ -3384,12 +3376,6 @@ else
 
         const etInput = document.getElementById('scheduleModalEndTime');
         if (etInput) etInput.value = endTime || (shift === 1 ? '16:30' : '11:30');
-
-        const mpInput = document.getElementById('scheduleModalMaxPatients');
-        if (mpInput) mpInput.value = maxPatients || 40;
-
-        const osInput = document.getElementById('scheduleModalOnlineSlots');
-        if (osInput) osInput.value = (onlineSlots !== undefined && onlineSlots !== null && onlineSlots !== '') ? onlineSlots : 28;
 
         // Cập nhật danh sách buồng khám trống / đã có người cho ngày & ca đã chọn:
         if (typeof updateModalRoomAvailability === 'function') {

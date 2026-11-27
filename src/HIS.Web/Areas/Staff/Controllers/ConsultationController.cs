@@ -373,10 +373,12 @@ public class ConsultationController : Controller
                 .Select(m => new MedicationOptionDto(m.Id, m.Name, m.Strength, m.Unit, m.Price))
                 .ToListAsync(ct);
 
-            // Tải thông tin kỳ đăng ký ca khám & bảng độ cạnh tranh
-            var activePeriod = await _departmentHeadService.GetActiveSchedulingPeriodAsync(departmentId, ct);
+            // Tải thông tin kỳ đăng ký ca khám & bảng độ cạnh tranh (chỉ khi bác sĩ/trưởng khoa có khoa hợp lệ)
+            var activePeriod = departmentId > 0
+                ? await _departmentHeadService.GetActiveSchedulingPeriodAsync(departmentId, ct)
+                : null;
             DepartmentDemandGridDto? demandGrid = null;
-            if (activePeriod != null)
+            if (departmentId > 0 && activePeriod != null)
             {
                 demandGrid = await _departmentHeadService.GetDepartmentDemandGridAsync(departmentId, activePeriod.Id, ct);
             }
@@ -541,6 +543,41 @@ public class ConsultationController : Controller
             if (targetDate < DateOnly.FromDateTime(_timeProvider.GetLocalNow().DateTime))
             {
                 TempData["ErrorMessage"] = "Không thể gửi đề nghị nghỉ hoặc đổi ca cho ngày trong quá khứ.";
+                return RedirectToAction(nameof(Index), new { tab = "exceptions" });
+            }
+
+            // Ràng buộc: chỉ được xin nghỉ / đổi ca vào ngày & ca bác sĩ thực sự có lịch khám hoặc ca trực đêm đã duyệt
+            var accountId = GetCurrentAccountId();
+            var (winStart, winEnd) = shift switch
+            {
+                ExamShift.Morning => (targetDate.ToDateTime(new TimeOnly(6, 0)), targetDate.ToDateTime(new TimeOnly(12, 0))),
+                ExamShift.Afternoon => (targetDate.ToDateTime(new TimeOnly(12, 0)), targetDate.ToDateTime(new TimeOnly(18, 0))),
+                _ => (targetDate.ToDateTime(TimeOnly.MinValue), targetDate.ToDateTime(new TimeOnly(23, 59, 59)))
+            };
+            bool hasApprovedSchedule = await _context.DoctorSchedules.AnyAsync(s =>
+                s.DoctorId == doctorId
+                && s.WorkDate == targetDate
+                && s.Status == DoctorScheduleStatus.Approved
+                && (shift == null || s.Shift == shift.Value), ct);
+            bool hasApprovedDuty = await _context.DutyShifts.AnyAsync(ds =>
+                ds.AccountId == accountId
+                && ds.Status == DutyShiftStatus.Approved
+                && ds.StartTime < winEnd
+                && ds.EndTime > winStart, ct);
+            if (!hasApprovedSchedule && !hasApprovedDuty)
+            {
+                TempData["ErrorMessage"] = "Bạn không có lịch khám hay ca trực nào vào ngày/ca đã chọn nên không thể gửi đơn xin nghỉ hoặc đổi ca.";
+                return RedirectToAction(nameof(Index), new { tab = "exceptions" });
+            }
+
+            bool duplicateException = await _context.ScheduleExceptions.AnyAsync(e =>
+                e.DoctorId == doctorId
+                && e.Date == targetDate
+                && (e.Status == ScheduleExceptionStatus.Pending || e.Status == ScheduleExceptionStatus.Approved)
+                && (e.Shift == null || shift == null || e.Shift == shift.Value), ct);
+            if (duplicateException)
+            {
+                TempData["ErrorMessage"] = "Bạn đã có đơn xin nghỉ hoặc đổi ca cho ngày/ca này rồi.";
                 return RedirectToAction(nameof(Index), new { tab = "exceptions" });
             }
 

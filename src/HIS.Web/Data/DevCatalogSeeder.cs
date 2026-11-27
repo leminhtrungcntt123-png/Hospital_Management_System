@@ -247,36 +247,44 @@ public static class DevCatalogSeeder
         var offset = ((int)DayOfWeek.Monday - (int)today.DayOfWeek + 7) % 7;
         var nextMonday = today.AddDays(offset == 0 ? 7 : offset);
         var nextSunday = nextMonday.AddDays(6);
-        var period = await db.SchedulingPeriods.FirstOrDefaultAsync(p => p.StartDate == nextMonday && p.DepartmentId == null);
-        if (period == null)
-        {
-            period = new SchedulingPeriod
-            {
-                Name = $"Kỳ làm việc tuần {nextMonday:dd/MM} - {nextSunday:dd/MM/yyyy}",
-                StartDate = nextMonday,
-                EndDate = nextSunday,
-                BiddingOpensAt = DateTime.UtcNow.AddDays(-7),
-                BiddingClosesAt = DateTime.UtcNow.AddDays(-1),
-                Status = SchedulingPeriodStatus.Published,
-                CreatedBy = reviewerAccountId,
-                CreatedAt = DateTime.UtcNow
-            };
-            db.SchedulingPeriods.Add(period);
-            await db.SaveChangesAsync();
-        }
-
         var doctorIds = roomOf.Keys.ToList();
         var deptOfDoctor = await db.Doctors.Where(d => doctorIds.Contains(d.Id)).ToDictionaryAsync(d => d.Id, d => d.DepartmentId);
+        var periodByDept = new Dictionary<int, SchedulingPeriod>();
+        foreach (var deptId in deptOfDoctor.Values.Distinct())
+        {
+            var deptPeriod = await db.SchedulingPeriods.FirstOrDefaultAsync(p => p.StartDate == nextMonday && p.DepartmentId == deptId);
+            if (deptPeriod == null)
+            {
+                deptPeriod = new SchedulingPeriod
+                {
+                    DepartmentId = deptId,
+                    Name = $"Kỳ làm việc tuần {nextMonday:dd/MM} - {nextSunday:dd/MM/yyyy}",
+                    StartDate = nextMonday,
+                    EndDate = nextSunday,
+                    BiddingOpensAt = DateTime.UtcNow.AddDays(-7),
+                    BiddingClosesAt = DateTime.UtcNow.AddDays(-1),
+                    Status = SchedulingPeriodStatus.Published,
+                    CreatedBy = reviewerAccountId,
+                    CreatedAt = DateTime.UtcNow
+                };
+                db.SchedulingPeriods.Add(deptPeriod);
+                await db.SaveChangesAsync();
+            }
+            periodByDept[deptId] = deptPeriod;
+        }
+
         var i = 0;
         foreach (var (doctorId, roomId) in roomOf)
         {
             i++;
             if (await db.DoctorSchedules.AnyAsync(s => s.DoctorId == doctorId && s.WorkDate >= nextMonday && s.WorkDate <= nextSunday))
                 continue;
+            var deptId = deptOfDoctor[doctorId];
+            var period = periodByDept[deptId];
             for (var day = 0; day < 6; day++)
             {
                 var date = nextMonday.AddDays(day);
-                db.DoctorSchedules.Add(Approved(doctorId, deptOfDoctor[doctorId], roomId, period.Id, date, ExamShift.Morning, reviewerAccountId));
+                db.DoctorSchedules.Add(Approved(doctorId, deptId, roomId, period.Id, date, ExamShift.Morning, reviewerAccountId));
                 if ((day + i) % 2 == 0 && day < 5)
                     db.DoctorSchedules.Add(Approved(doctorId, deptOfDoctor[doctorId], roomId, period.Id, date, ExamShift.Afternoon, reviewerAccountId));
             }
@@ -295,8 +303,6 @@ public static class DevCatalogSeeder
         StartTime = shift == ExamShift.Morning ? new TimeOnly(7, 30) : new TimeOnly(13, 0),
         EndTime = shift == ExamShift.Morning ? new TimeOnly(11, 30) : new TimeOnly(16, 30),
         SlotDurationMinutes = 30,
-        MaxPatients = 30,
-        OnlineSlots = 20,
         Status = DoctorScheduleStatus.Approved,
         ReviewedBy = reviewer,
         ReviewedAt = DateTime.UtcNow,
