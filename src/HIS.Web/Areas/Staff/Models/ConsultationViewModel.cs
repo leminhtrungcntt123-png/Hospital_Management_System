@@ -33,7 +33,15 @@ public record ConsultationLabItemDto(
     string Note,
     DateTime OrderTime,
     string Status,
-    string? ResultData
+    string? ResultData,
+    int MedicalRecordId = 0,
+    int AppointmentStatusId = 6,
+    string? Symptoms = null,
+    string? ClinicalExamination = null,
+    string? PrimaryDiagnosisCode = null,
+    string? PrimaryDiagnosisDesc = null,
+    string? SecondaryDiagnosis = null,
+    string? Conclusion = null
 );
 
 public record ConsultationRecordItemDto(
@@ -127,4 +135,31 @@ public class ConsultationViewModel
     public int CurrentDoctorId { get; set; }
     public int MinShiftsPerWeek { get; set; } = 6;
     public int MaxShiftsPerWeek { get; set; } = 10;
+}
+
+public class LabSlipViewModel
+{
+    public int MedicalRecordId { get; set; }
+    public string AppointmentCode { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+    public string PatientName { get; set; } = string.Empty;
+    public string PatientCode { get; set; } = string.Empty;
+    public string Gender { get; set; } = string.Empty;
+    public int Age { get; set; }
+    public string? PhoneNumber { get; set; }
+    public string? Address { get; set; }
+    public string DoctorName { get; set; } = string.Empty;
+    public string DepartmentName { get; set; } = string.Empty;
+    public string? Symptoms { get; set; }
+    public string? ClinicalExamination { get; set; }
+    public List<LabSlipItemDto> Items { get; set; } = new();
+    public decimal TotalAmount => Items.Sum(i => i.Price);
+}
+
+public class LabSlipItemDto
+{
+    public string ServiceName { get; set; } = string.Empty;
+    public decimal Price { get; set; }
+    public string? Note { get; set; }
+    public string Status { get; set; } = string.Empty;
 }

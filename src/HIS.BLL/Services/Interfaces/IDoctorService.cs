@@ -20,4 +20,10 @@ public interface IDoctorService
 
     // Tạo hồ sơ bệnh án cho lượt khám
     Task<int> CreateMedicalRecordAsync(CreateMedicalRecordRequest request, CancellationToken cancellationToken = default);
+
+    // Cập nhật kết quả cận lâm sàng cho chỉ định
+    Task<Result> SaveLabResultAsync(int doctorAccountId, int labOrderId, string resultText, CancellationToken cancellationToken = default);
+
+    // Chẩn đoán tiếp, kê đơn và hoàn tất ca khám sau khi có kết quả cận lâm sàng
+    Task<Result> CompleteRecordAfterLabsAsync(CompleteRecordAfterLabsRequest request, CancellationToken cancellationToken = default);
 }

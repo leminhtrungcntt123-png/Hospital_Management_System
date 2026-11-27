@@ -249,7 +249,15 @@ public class ConsultationController : Controller
                         l.Note ?? "Chỉ định chuyên khoa",
                         l.CreatedAt,
                         l.Status == LabOrderStatus.Completed ? "Đã có kết quả" : "Chờ kết quả",
-                        l.LabResult != null ? l.LabResult.Result : null
+                        l.LabResult != null ? l.LabResult.Result : null,
+                        l.MedicalRecordId,
+                        l.MedicalRecord.Appointment.StatusId,
+                        l.MedicalRecord.Symptoms,
+                        l.MedicalRecord.ClinicalExamination,
+                        l.MedicalRecord.PrimaryDiagnosisCode,
+                        l.MedicalRecord.PrimaryDiagnosisDesc,
+                        l.MedicalRecord.SecondaryDiagnosis,
+                        l.MedicalRecord.Conclusion
                     ))
                     .Take(200)
                     .ToListAsync(ct);
@@ -261,7 +269,7 @@ public class ConsultationController : Controller
             {
                 var recordsQuery = _context.MedicalRecords
                     .AsNoTracking()
-                    .AsQueryable();
+                    .Where(r => r.Appointment.StatusId == (int)AppointmentStatusId.Completed);
 
                 if (isDeptHead)
                 {
@@ -404,13 +412,6 @@ public class ConsultationController : Controller
                     .Select(s => new ClinicalServiceOptionDto(s.Id, s.Name, s.Price))
                     .ToListAsync(ct);
 
-                Task<List<MedicationOptionDto>> LoadMedicationsAsync() => _context.Medications
-                    .AsNoTracking()
-                    .Where(m => m.IsActive)
-                    .OrderBy(m => m.Name)
-                    .Select(m => new MedicationOptionDto(m.Id, m.Name, m.Strength, m.Unit, m.Price))
-                    .ToListAsync(ct);
-
                 availableServices = _cache != null
                     ? (await _cache.GetOrCreateAsync("Consultation:ActiveServices", entry =>
                     {
@@ -418,6 +419,16 @@ public class ConsultationController : Controller
                         return LoadServicesAsync();
                     })) ?? []
                     : await LoadServicesAsync();
+            }
+
+            if (activeTab == "consultation" || activeTab == "labs")
+            {
+                Task<List<MedicationOptionDto>> LoadMedicationsAsync() => _context.Medications
+                    .AsNoTracking()
+                    .Where(m => m.IsActive)
+                    .OrderBy(m => m.Name)
+                    .Select(m => new MedicationOptionDto(m.Id, m.Name, m.Strength, m.Unit, m.Price))
+                    .ToListAsync(ct);
 
                 availableMedications = _cache != null
                     ? (await _cache.GetOrCreateAsync("Consultation:ActiveMedications", entry =>
@@ -542,7 +553,10 @@ public class ConsultationController : Controller
                 IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
             };
             await _doctorService.CreateMedicalRecordAsync(recordRequest, ct);
-            TempData["SuccessMessage"] = "Đã lưu hồ sơ bệnh án và hoàn thành lượt khám.";
+            var hasLabs = recordRequest.LabOrders.Any(l => l.ServiceId > 0);
+            TempData["SuccessMessage"] = hasLabs
+                ? "Đã lưu phiếu khám sơ bộ và chuyển bệnh nhân chờ kết quả chỉ định cận lâm sàng."
+                : "Đã lưu hồ sơ bệnh án và hoàn thành lượt khám.";
         }
         catch (Exception ex) when (ex is InvalidOperationException)
         {
@@ -555,6 +569,126 @@ public class ConsultationController : Controller
         }
 
         return RedirectToAction(nameof(Index));
+    }
+
+    // 3b. Cập nhật kết quả chỉ định cận lâm sàng
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveLabResult(int labOrderId, string resultText, CancellationToken ct)
+    {
+        var accountId = GetCurrentAccountId();
+        var result = await _doctorService.SaveLabResultAsync(accountId, labOrderId, resultText, ct);
+        if (!result.IsSuccess)
+        {
+            TempData["ErrorMessage"] = result.Error.Message;
+        }
+        else
+        {
+            TempData["SuccessMessage"] = "Đã cập nhật kết quả cận lâm sàng.";
+        }
+
+        return RedirectToAction(nameof(Index), new { tab = "labs" });
+    }
+
+    // 3d. Xuất / in phiếu chỉ định cận lâm sàng cho bệnh nhân mang qua Lễ tân đóng tạm ứng
+    [HttpGet]
+    public async Task<IActionResult> PrintLabSlip(int recordId, CancellationToken ct)
+    {
+        var record = await _context.MedicalRecords
+            .AsNoTracking()
+            .Include(r => r.Appointment).ThenInclude(a => a.Patient)
+            .Include(r => r.Doctor).ThenInclude(d => d.Department)
+            .Include(r => r.LabOrders).ThenInclude(l => l.Service)
+            .FirstOrDefaultAsync(r => r.Id == recordId, ct);
+
+        if (record == null)
+        {
+            return NotFound("Không tìm thấy hồ sơ chỉ định.");
+        }
+
+        if (!User.IsInRole("DepartmentHead"))
+        {
+            var doctorId = await ResolveDoctorIdAsync(ct);
+            if (doctorId <= 0 || record.DoctorId != doctorId)
+            {
+                return Forbid();
+            }
+        }
+
+        var localNow = _timeProvider.GetLocalNow().DateTime;
+        var today = DateOnly.FromDateTime(localNow);
+        var patient = record.Appointment.Patient;
+        var dob = patient.DateOfBirth;
+        var age = today.Year - dob.Year - (dob > today.AddYears(-(today.Year - dob.Year)) ? 1 : 0);
+
+        var model = new LabSlipViewModel
+        {
+            MedicalRecordId = record.Id,
+            AppointmentCode = record.Appointment.AppointmentCode,
+            CreatedAt = TimeZoneInfo.ConvertTimeFromUtc(
+                DateTime.SpecifyKind(record.CreatedAt, DateTimeKind.Utc),
+                TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time")),
+            PatientName = patient.FullName,
+            PatientCode = $"BN{patient.Id:D5}",
+            Gender = patient.Gender == Gender.Male ? "Nam" : (patient.Gender == Gender.Female ? "Nữ" : "Khác"),
+            Age = Math.Max(0, age),
+            PhoneNumber = patient.PhoneNumber,
+            Address = patient.Address,
+            DoctorName = record.Doctor.FullName,
+            DepartmentName = record.Doctor.Department?.Name ?? "",
+            Symptoms = record.Symptoms,
+            ClinicalExamination = record.ClinicalExamination,
+            Items = record.LabOrders
+                .OrderBy(l => l.Id)
+                .Select(l => new LabSlipItemDto
+                {
+                    ServiceName = l.Service.Name,
+                    Price = l.Service.Price,
+                    Note = l.Note,
+                    Status = l.Status == LabOrderStatus.Completed ? "Đã có kết quả" : "Chờ thực hiện"
+                })
+                .ToList()
+        };
+
+        return View(model);
+    }
+
+    // 3c. Chẩn đoán tiếp, kê đơn và hoàn tất ca khám sau khi có kết quả cận lâm sàng
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CompleteRecordAfterLabs([FromForm] CompleteRecordAfterLabsRequest request, CancellationToken ct)
+    {
+        var doctorId = await ResolveDoctorIdAsync(ct);
+        if (doctorId <= 0)
+        {
+            TempData["ErrorMessage"] = "Tài khoản hiện tại chưa được liên kết với hồ sơ bác sĩ.";
+            return RedirectToAction(nameof(Index), new { tab = "labs" });
+        }
+
+        var fullRequest = new CompleteRecordAfterLabsRequest
+        {
+            MedicalRecordId = request.MedicalRecordId,
+            DoctorId = doctorId,
+            PrimaryDiagnosisCode = request.PrimaryDiagnosisCode,
+            PrimaryDiagnosisDesc = request.PrimaryDiagnosisDesc,
+            SecondaryDiagnosis = request.SecondaryDiagnosis,
+            Conclusion = request.Conclusion,
+            PrescriptionNote = request.PrescriptionNote,
+            IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+            PrescriptionItems = request.PrescriptionItems
+        };
+
+        var result = await _doctorService.CompleteRecordAfterLabsAsync(fullRequest, ct);
+        if (!result.IsSuccess)
+        {
+            TempData["ErrorMessage"] = result.Error.Message;
+        }
+        else
+        {
+            TempData["SuccessMessage"] = "Đã hoàn tất chẩn đoán, kê đơn và kết thúc ca khám.";
+        }
+
+        return RedirectToAction(nameof(Index), new { tab = "labs" });
     }
 
     // 4. Bác sĩ gửi đề nghị nghỉ / đổi ca

@@ -33,6 +33,13 @@
 .app-dialog-card.lg {
     max-width: 760px;
 }
+.app-dialog-card > form {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
 .app-dialog-header {
     display: flex;
     align-items: center;
@@ -77,6 +84,7 @@
     color: #334155;
     overflow-y: auto;
     flex: 1 1 auto;
+    min-height: 0;
 }
 .app-dialog-footer {
     padding: 12px 20px;
@@ -653,6 +661,12 @@
     font-size: 12px;
     border: 1px solid #cbd5e1;
     border-radius: 6px;
+}
+.app-dialog-body .dynamic-row-field {
+    width: auto;
+}
+.app-dialog-body .dynamic-row-qty {
+    width: 72px;
 }
 .dynamic-row-remove {
     color: #ef4444;
