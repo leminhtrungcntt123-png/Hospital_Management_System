@@ -249,7 +249,7 @@ for (const [role, route, expected] of [
     });
 }
 
-test('editing a doctor schedule preserves an online quota of zero', () => {
+test('editing a doctor schedule populates modal time, shift and schedule id', () => {
     const view = readFileSync(
         resolve(root, 'src/HIS.Web/Areas/Staff/Views/Schedule/Index.cshtml'),
         'utf8',
@@ -267,7 +267,11 @@ test('editing a doctor schedule preserves an online quota of zero', () => {
             "\nopenScheduleModalWithData(1, 1, 1, 0, '07:30', '11:30', 40, 0, 1, '2026-11-10')",
         { document },
     );
-    assert.equal(fields.get('scheduleModalOnlineSlots').value, 0);
+    assert.equal(fields.get('scheduleModalScheduleId').value, 1);
+    assert.equal(fields.get('scheduleModalShiftSelect').value, 0);
+    assert.equal(fields.get('scheduleModalStartTime').value, '07:30');
+    assert.equal(fields.get('scheduleModalEndTime').value, '11:30');
+    assert.equal(fields.get('scheduleModalEffectiveFrom').value, '2026-11-10');
 });
 
 test('choosing a doctor keeps the identifier through the public booking link', () => {
@@ -383,13 +387,56 @@ test('failed confirmation preserves entered details and shows no receipt', async
     assert.match(client.app.innerHTML, /Slot filled/);
 });
 
-test('carousel exposes three images and respects reduced motion', () => {
+test('home banners link to booking, show benefits, and respect reduced motion', () => {
     const client = createClient(undefined, { initialRoute: 'public/home', authenticated: false });
     client.run("window.matchMedia=()=>({matches:true});catalog.status='ready';render();");
     assert.equal((client.app.innerHTML.match(/data-hero-slide/g) || []).length, 3);
     assert.equal(client.run('ui.heroPaused'), true);
     assert.doesNotMatch(client.app.innerHTML, /data-act="hero-pause"/);
-    assert.match(client.run('doctorPhoto()'), /Ảnh minh hoạ/);
+    assert.equal((client.app.innerHTML.match(/class="campaign-copy"/g) || []).length, 3);
+    assert.equal((client.app.innerHTML.match(/class="why-feature"/g) || []).length, 4);
+    assert.match(client.app.innerHTML, /Tại sao chọn <em>MediCare\?/);
+    assert.match(client.app.innerHTML, /class="public-main home-main"/);
+    assert.doesNotMatch(client.app.innerHTML, /Khu vực nhân viên/);
+    const banners = client.app.innerHTML.split('<div class="home-content">')[0];
+    assert.equal((banners.match(/data-route="public\/booking"/g) || []).length, 5);
+    for (const file of ['home-banner-family.jpg', 'home-banner-senior.jpg', 'home-banner-welcome.jpg', 'home-care-nurse.png']) {
+        assert.ok(readFileSync(resolve(root, 'src/HIS.Web/wwwroot/ui/assets', file)).length > 0);
+    }
+});
+
+test('carousel switches the active image and prevents focus on hidden slide actions', () => {
+    const client = createClient();
+    client.run(`
+        globalThis.slides = [0, 1, 2].map(() => ({
+            inert: false,
+            classList: { toggle(name, active) { this.active = active; } },
+            setAttribute(name, value) { this[name] = value; },
+        }));
+        globalThis.dots = [0, 1, 2].map(() => ({ setAttribute(name, value) { this[name] = value; } }));
+        document.querySelectorAll = selector => selector === '[data-hero-slide]' ? slides : dots;
+        setHeroSlide(1);
+    `);
+    assert.equal(client.run('ui.heroIndex'), 1);
+    assert.equal(client.run('slides[1].classList.active'), true);
+    assert.equal(client.run('slides[1].inert'), false);
+    assert.equal(client.run('slides[0].inert && slides[2].inert'), true);
+    assert.equal(client.run("dots[1]['aria-pressed']"), 'true');
+    client.run('setHeroSlide(3);');
+    assert.equal(client.run('ui.heroIndex'), 0);
+});
+
+test('returning home places focus outside the carousel so automatic slides can resume', () => {
+    const client = createClient(undefined, { initialRoute: 'public/home', authenticated: false });
+    client.run(`
+        globalThis.focusTarget = '';
+        const query = document.querySelector;
+        document.querySelector = selector => selector === '#portal-main' || selector === 'main h1'
+            ? { focus() { focusTarget = selector; } } : query(selector);
+        catalog.status = 'ready';
+        go('public/home');
+    `);
+    assert.equal(client.run('focusTarget'), '#portal-main');
 });
 
 test('doctor portraits are distinct local assets across system and illustrative profiles', () => {
@@ -594,6 +641,40 @@ test('specialty introduction links and illustrative doctor filters work without 
         client.run("specialtyIntroductionDetail('unknown')"),
         /Không tìm thấy chuyên khoa/,
     );
+});
+
+
+test('specialty pages match the real department, expose sections, and list only its public doctors', () => {
+    const client = createClient(undefined, { authenticated: false, initialRoute: 'public/home' });
+    client.run(`catalog = {
+        status: 'ready',
+        departments: [{ id: 4, name: 'Khoa Nhi' }, { id: 7, name: 'Mắt' }, { id: 9, name: 'Khoa mới' }],
+        doctors: [
+            { id: 21, name: 'Public pediatrician', department: 'Khoa Nhi', isPublic: true },
+            { id: 22, name: 'Private pediatrician', department: 'Khoa Nhi', isPublic: false },
+            { id: 23, name: 'Public ophthalmologist', department: 'Mắt', isPublic: true },
+        ],
+    };`);
+    assert.match(client.run('specialtyCards()'), /specialties\/nhi\.jpg[\s\S]*Khoa Nhi/);
+    assert.match(client.run('specialtyCards()'), /specialties\/mat\.jpg[\s\S]*Mắt/);
+    assert.match(client.run('specialtyCards()'), /#\/public\/specialty\/4/);
+    client.run("go('public/specialty/4');");
+    assert.match(client.app.innerHTML, /tăng trưởng và phát triển/);
+    assert.match(client.app.innerHTML, /specialties\/nhi\.jpg/);
+    client.run("go('public/specialty/4?tab=scope');");
+    assert.match(client.app.innerHTML, /aria-current="page">Phạm vi khám/);
+    assert.match(client.app.innerHTML, /Khám bệnh ở trẻ em/);
+    client.run("go('public/specialty/4?tab=prepare');");
+    assert.match(client.app.innerHTML, /Mang sổ theo dõi sức khỏe/);
+    client.run("go('public/specialty/4?tab=doctors');");
+    assert.match(client.app.innerHTML, /Public pediatrician/);
+    assert.match(client.app.innerHTML, /\/Booking\?doctorId=21/);
+    assert.doesNotMatch(client.app.innerHTML, /Private pediatrician|Public ophthalmologist/);
+    client.run("go('public/specialty/9?tab=scope');");
+    assert.match(client.app.innerHTML, /Thông tin giới thiệu đang được cập nhật/);
+    assert.doesNotMatch(client.app.innerHTML, /specialties\/.*\.jpg/);
+    client.run("go('public/specialty/unknown');");
+    assert.match(client.app.innerHTML, /Không tìm thấy chuyên khoa/);
 });
 
 test('patient profile screen renders personal form and family navigation', () => {

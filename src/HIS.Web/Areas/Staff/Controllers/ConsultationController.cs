@@ -4,9 +4,11 @@ using HIS.BLL.Services;
 using HIS.DAL;
 using HIS.Domain;
 using HIS.Web.Areas.Staff.Models;
+using HIS.Web.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace HIS.Web.Areas.Staff.Controllers;
 
@@ -20,6 +22,7 @@ public class ConsultationController : Controller
     private readonly AppDbContext _context;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<ConsultationController> _logger;
+    private readonly IMemoryCache? _cache;
 
     public ConsultationController(
         IDoctorService doctorService,
@@ -27,7 +30,8 @@ public class ConsultationController : Controller
         IDepartmentHeadService departmentHeadService,
         AppDbContext context,
         TimeProvider timeProvider,
-        ILogger<ConsultationController> logger)
+        ILogger<ConsultationController> logger,
+        IMemoryCache? cache = null)
     {
         _doctorService = doctorService;
         _queueService = queueService;
@@ -35,6 +39,7 @@ public class ConsultationController : Controller
         _context = context;
         _timeProvider = timeProvider;
         _logger = logger;
+        _cache = cache;
     }
 
     // 1. Màn hình Bác sĩ & Trưởng khoa: Phân luồng dữ liệu chuẩn theo phân quyền
@@ -51,6 +56,7 @@ public class ConsultationController : Controller
             string departmentName = "";
             string currentDoctorName = "";
             string currentDoctorRoom = "";
+            (int MinShiftsPerWeek, int MaxShiftsPerWeek)? docQuota = null;
 
             if (isDeptHead)
             {
@@ -97,6 +103,7 @@ public class ConsultationController : Controller
                     departmentName = doc.Department.Name;
                     currentDoctorName = doc.FullName;
                     currentDoctorRoom = doc.Schedules.FirstOrDefault()?.Room?.RoomNumber ?? "Chưa phân phòng";
+                    docQuota = (doc.MinShiftsPerWeek, doc.MaxShiftsPerWeek);
                 }
                 else
                 {
@@ -108,6 +115,10 @@ public class ConsultationController : Controller
                     departmentName = fallbackDoc?.Department?.Name ?? "";
                     currentDoctorName = fallbackDoc?.FullName ?? "Bác sĩ";
                     currentDoctorRoom = "Chưa phân phòng";
+                    if (fallbackDoc != null)
+                    {
+                        docQuota = (fallbackDoc.MinShiftsPerWeek, fallbackDoc.MaxShiftsPerWeek);
+                    }
                 }
             }
 
@@ -181,201 +192,246 @@ public class ConsultationController : Controller
                     a.StatusId
                 ));
 
-            var activePatient = await ProjectQueueItems(
-                    baseQueueQuery
-                        .Where(a => a.StatusId == (int)AppointmentStatusId.InProgress && a.MedicalRecord == null)
-                        .OrderByDescending(a => a.UpdatedAt)
-                        .ThenBy(a => a.QueueNumber))
-                .FirstOrDefaultAsync(ct);
+            ConsultationQueueItemDto? activePatient = null;
+            List<ConsultationQueueItemDto> queue = [];
+            if (activeTab == "consultation")
+            {
+                activePatient = await ProjectQueueItems(
+                        baseQueueQuery
+                            .Where(a => a.StatusId == (int)AppointmentStatusId.InProgress && a.MedicalRecord == null)
+                            .OrderByDescending(a => a.UpdatedAt)
+                            .ThenBy(a => a.QueueNumber))
+                    .FirstOrDefaultAsync(ct);
 
-            var queue = await ProjectQueueItems(
-                    baseQueueQuery
-                        .Where(a => (a.StatusId == (int)AppointmentStatusId.ReadyForDoctor ||
-                                     a.StatusId == (int)AppointmentStatusId.CheckedIn) &&
-                                    a.MedicalRecord == null)
-                        .OrderByDescending(a => a.PriorityLevel)
-                        .ThenBy(a => a.CheckedInAt ?? a.CreatedAt)
-                        .ThenBy(a => a.Id))
-                .ToListAsync(ct);
+                queue = await ProjectQueueItems(
+                        baseQueueQuery
+                            .Where(a => (a.StatusId == (int)AppointmentStatusId.ReadyForDoctor ||
+                                         a.StatusId == (int)AppointmentStatusId.CheckedIn) &&
+                                        a.MedicalRecord == null)
+                            .OrderByDescending(a => a.PriorityLevel)
+                            .ThenBy(a => a.CheckedInAt ?? a.CreatedAt)
+                            .ThenBy(a => a.Id))
+                    .ToListAsync(ct);
+            }
 
             // 2. Danh sách Chỉ định & kết quả từ Database
-            var labsQuery = _context.LabOrders
-                .AsNoTracking()
-                .Include(l => l.Service)
-                .Include(l => l.MedicalRecord).ThenInclude(r => r.Appointment).ThenInclude(a => a.Patient)
-                .Include(l => l.MedicalRecord).ThenInclude(r => r.Doctor)
-                .Include(l => l.LabResult)
-                .AsQueryable();
-
-            if (isDeptHead)
+            List<ConsultationLabItemDto> labs = [];
+            if (activeTab == "labs")
             {
-                labsQuery = labsQuery.Where(l => l.MedicalRecord != null && l.MedicalRecord.Doctor != null && l.MedicalRecord.Doctor.DepartmentId == departmentId);
-                if (doctorId.HasValue && doctorId.Value > 0)
+                var labsQuery = _context.LabOrders
+                    .AsNoTracking()
+                    .AsQueryable();
+
+                if (isDeptHead)
                 {
-                    labsQuery = labsQuery.Where(l => l.MedicalRecord != null && l.MedicalRecord.DoctorId == doctorId.Value);
+                    labsQuery = labsQuery.Where(l => l.MedicalRecord != null && l.MedicalRecord.Doctor != null && l.MedicalRecord.Doctor.DepartmentId == departmentId);
+                    if (doctorId.HasValue && doctorId.Value > 0)
+                    {
+                        labsQuery = labsQuery.Where(l => l.MedicalRecord != null && l.MedicalRecord.DoctorId == doctorId.Value);
+                    }
                 }
-            }
-            else
-            {
-                labsQuery = labsQuery.Where(l => l.MedicalRecord != null && l.MedicalRecord.DoctorId == currentDoctorId);
-            }
+                else
+                {
+                    labsQuery = labsQuery.Where(l => l.MedicalRecord != null && l.MedicalRecord.DoctorId == currentDoctorId);
+                }
 
-            var labs = await labsQuery
-                .OrderByDescending(l => l.CreatedAt)
-                .Select(l => new ConsultationLabItemDto(
-                    l.Id,
-                    l.MedicalRecord.Appointment.Patient.FullName,
-                    l.MedicalRecord.Appointment.AppointmentCode,
-                    todayYear - l.MedicalRecord.Appointment.Patient.DateOfBirth.Year
-                        - ((l.MedicalRecord.Appointment.Patient.DateOfBirth.Month > todayMonth
-                            || (l.MedicalRecord.Appointment.Patient.DateOfBirth.Month == todayMonth
-                                && l.MedicalRecord.Appointment.Patient.DateOfBirth.Day > todayDay)) ? 1 : 0),
-                    l.Service.Name,
-                    l.Note ?? "Chỉ định chuyên khoa",
-                    l.CreatedAt,
-                    l.Status == LabOrderStatus.Completed ? "Đã có kết quả" : "Chờ kết quả",
-                    l.LabResult != null ? l.LabResult.Result : null
-                ))
-                .ToListAsync(ct);
+                labs = await labsQuery
+                    .OrderByDescending(l => l.CreatedAt)
+                    .Select(l => new ConsultationLabItemDto(
+                        l.Id,
+                        l.MedicalRecord.Appointment.Patient.FullName,
+                        l.MedicalRecord.Appointment.AppointmentCode,
+                        todayYear - l.MedicalRecord.Appointment.Patient.DateOfBirth.Year
+                            - ((l.MedicalRecord.Appointment.Patient.DateOfBirth.Month > todayMonth
+                                || (l.MedicalRecord.Appointment.Patient.DateOfBirth.Month == todayMonth
+                                    && l.MedicalRecord.Appointment.Patient.DateOfBirth.Day > todayDay)) ? 1 : 0),
+                        l.Service.Name,
+                        l.Note ?? "Chỉ định chuyên khoa",
+                        l.CreatedAt,
+                        l.Status == LabOrderStatus.Completed ? "Đã có kết quả" : "Chờ kết quả",
+                        l.LabResult != null ? l.LabResult.Result : null
+                    ))
+                    .Take(200)
+                    .ToListAsync(ct);
+            }
 
             // 3. Danh sách Bệnh án trong khoa từ Database
-            var recordsQuery = _context.MedicalRecords
-                .AsNoTracking()
-                .Include(r => r.Doctor).ThenInclude(d => d.Department)
-                .Include(r => r.Appointment).ThenInclude(a => a.Patient)
-                .AsQueryable();
-
-            if (isDeptHead)
+            List<ConsultationRecordItemDto> records = [];
+            if (activeTab == "records")
             {
-                recordsQuery = recordsQuery.Where(r => r.Doctor != null && r.Doctor.DepartmentId == departmentId);
-                if (doctorId.HasValue && doctorId.Value > 0)
+                var recordsQuery = _context.MedicalRecords
+                    .AsNoTracking()
+                    .AsQueryable();
+
+                if (isDeptHead)
                 {
-                    recordsQuery = recordsQuery.Where(r => r.DoctorId == doctorId.Value);
+                    recordsQuery = recordsQuery.Where(r => r.Doctor != null && r.Doctor.DepartmentId == departmentId);
+                    if (doctorId.HasValue && doctorId.Value > 0)
+                    {
+                        recordsQuery = recordsQuery.Where(r => r.DoctorId == doctorId.Value);
+                    }
                 }
-            }
-            else
-            {
-                recordsQuery = recordsQuery.Where(r => r.DoctorId == currentDoctorId);
-            }
+                else
+                {
+                    recordsQuery = recordsQuery.Where(r => r.DoctorId == currentDoctorId);
+                }
 
-            var records = await recordsQuery
-                .OrderByDescending(r => r.CreatedAt)
-                .Select(r => new ConsultationRecordItemDto(
-                    r.Id,
-                    r.Appointment.Patient.FullName,
-                    r.Appointment.AppointmentCode,
-                    todayYear - r.Appointment.Patient.DateOfBirth.Year
-                        - ((r.Appointment.Patient.DateOfBirth.Month > todayMonth
-                            || (r.Appointment.Patient.DateOfBirth.Month == todayMonth
-                                && r.Appointment.Patient.DateOfBirth.Day > todayDay)) ? 1 : 0),
-                    r.Appointment.Patient.Gender == Gender.Male ? "Nam" : "Nữ",
-                    r.CreatedAt,
-                    r.Doctor.FullName,
-                    r.Doctor.Department.Name,
-                    r.Symptoms ?? "Không ghi nhận",
-                    r.ClinicalExamination ?? "Không ghi nhận",
-                    r.PrimaryDiagnosisCode ?? "—",
-                    r.PrimaryDiagnosisDesc ?? "—",
-                    r.Conclusion ?? "Đã hoàn tất khám"
-                ))
-                .ToListAsync(ct);
+                records = await recordsQuery
+                    .OrderByDescending(r => r.CreatedAt)
+                    .Select(r => new ConsultationRecordItemDto(
+                        r.Id,
+                        r.Appointment.Patient.FullName,
+                        r.Appointment.AppointmentCode,
+                        todayYear - r.Appointment.Patient.DateOfBirth.Year
+                            - ((r.Appointment.Patient.DateOfBirth.Month > todayMonth
+                                || (r.Appointment.Patient.DateOfBirth.Month == todayMonth
+                                    && r.Appointment.Patient.DateOfBirth.Day > todayDay)) ? 1 : 0),
+                        r.Appointment.Patient.Gender == Gender.Male ? "Nam" : "Nữ",
+                        r.CreatedAt,
+                        r.Doctor.FullName,
+                        r.Doctor.Department.Name,
+                        r.Symptoms ?? "Không ghi nhận",
+                        r.ClinicalExamination ?? "Không ghi nhận",
+                        r.PrimaryDiagnosisCode ?? "—",
+                        r.PrimaryDiagnosisDesc ?? "—",
+                        r.Conclusion ?? "Đã hoàn tất khám"
+                    ))
+                    .Take(200)
+                    .ToListAsync(ct);
+            }
 
             // 4. Lịch làm việc trong tuần & Ca trực đêm từ Database
-            var schedules = await _context.DoctorSchedules
-                .AsNoTracking()
-                .Include(s => s.Doctor)
-                .Include(s => s.Room)
-                .Where(s => isDeptHead ? s.Doctor.DepartmentId == departmentId : s.DoctorId == currentDoctorId)
-                .OrderBy(s => s.WorkDate)
-                .ThenBy(s => s.Shift)
-                .Select(s => new DoctorScheduleItemDto(
-                    s.Id,
-                    s.WorkDate,
-                    s.Shift,
-                    s.StartTime,
-                    s.EndTime,
-                    s.Doctor.FullName,
-                    s.Room != null ? s.Room.RoomNumber : null,
-                    s.Doctor.Specialty ?? "Chuyên khoa",
-                    s.DoctorId,
-                    s.Status,
-                    s.IsHotShift,
-                    s.DoctorNote
-                ))
-                .ToListAsync(ct);
-
-            var dutyShifts = await _context.DutyShifts
-                .AsNoTracking()
-                .Include(d => d.Account).ThenInclude(a => a.Doctor)
-                .Include(d => d.Account).ThenInclude(a => a.DepartmentHead)
-                .Include(d => d.Account).ThenInclude(a => a.Nurse)
-                .Where(d => d.DepartmentId == departmentId || d.AccountId == accountId)
-                .OrderByDescending(d => d.StartTime)
-                .Select(d => new DutyShiftItemDto(
-                    d.Account.Doctor != null ? d.Account.Doctor.FullName :
-                    d.Account.DepartmentHead != null ? d.Account.DepartmentHead.FullName :
-                    d.Account.Nurse != null ? d.Account.Nurse.FullName : d.Account.Username,
-                    d.StartTime,
-                    d.EndTime,
-                    d.Note ?? "Trực đêm tại khoa",
-                    d.AccountId
-                ))
-                .ToListAsync(ct);
-
-            // 5. Đề nghị nghỉ / đổi ca từ Database
-            var exceptionsQuery = _context.ScheduleExceptions
-                .AsNoTracking()
-                .Include(e => e.ReplacementDoctor)
-                .Include(e => e.Doctor)
-                .AsQueryable();
-
-            if (isDeptHead)
+            List<DoctorScheduleItemDto> schedules = [];
+            List<DutyShiftItemDto> dutyShifts = [];
+            if (activeTab == "schedule")
             {
-                exceptionsQuery = exceptionsQuery.Where(e => e.Doctor.DepartmentId == departmentId);
-            }
-            else
-            {
-                exceptionsQuery = exceptionsQuery.Where(e => e.DoctorId == currentDoctorId || (e.ReplacementDoctorId.HasValue && e.ReplacementDoctorId.Value == currentDoctorId));
+                schedules = await _context.DoctorSchedules
+                    .AsNoTracking()
+                    .Where(s => isDeptHead ? s.Doctor.DepartmentId == departmentId : s.DoctorId == currentDoctorId)
+                    .OrderBy(s => s.WorkDate)
+                    .ThenBy(s => s.Shift)
+                    .Select(s => new DoctorScheduleItemDto(
+                        s.Id,
+                        s.WorkDate,
+                        s.Shift,
+                        s.StartTime,
+                        s.EndTime,
+                        s.Doctor.FullName,
+                        s.Room != null ? s.Room.RoomNumber : null,
+                        s.Doctor.Specialty ?? "Chuyên khoa",
+                        s.DoctorId,
+                        s.Status,
+                        s.IsHotShift,
+                        s.DoctorNote
+                    ))
+                    .Take(500)
+                    .ToListAsync(ct);
+
+                dutyShifts = await _context.DutyShifts
+                    .AsNoTracking()
+                    .Where(d => d.DepartmentId == departmentId || d.AccountId == accountId)
+                    .OrderByDescending(d => d.StartTime)
+                    .Select(d => new DutyShiftItemDto(
+                        d.Account.Doctor != null ? d.Account.Doctor.FullName :
+                        d.Account.DepartmentHead != null ? d.Account.DepartmentHead.FullName :
+                        d.Account.Nurse != null ? d.Account.Nurse.FullName : d.Account.Username,
+                        d.StartTime,
+                        d.EndTime,
+                        d.Note ?? "Trực đêm tại khoa",
+                        d.AccountId
+                    ))
+                    .Take(200)
+                    .ToListAsync(ct);
             }
 
-            var exceptions = await exceptionsQuery
-                .OrderByDescending(e => e.CreatedAt)
-                .Select(e => new ScheduleExceptionItemDto(
-                    e.Id,
-                    e.Date,
-                    e.Shift,
-                    e.Type.ToString(),
-                    e.Status == ScheduleExceptionStatus.Pending ? "Chờ duyệt" : e.Status == ScheduleExceptionStatus.Approved ? "Đã duyệt" : "Từ chối",
-                    e.Reason ?? "Nghỉ việc riêng",
-                    e.ReplacementDoctor != null ? e.ReplacementDoctor.FullName : null,
-                    e.DoctorId,
-                    e.ReplacementDoctorId
-                ))
-                .ToListAsync(ct);
+            // 5. Đề nghị nghỉ / đổi ca từ Database (tab schedule cần exceptions để tô ngày đã duyệt nghỉ)
+            List<ScheduleExceptionItemDto> exceptions = [];
+            if (activeTab == "exceptions" || activeTab == "schedule")
+            {
+                var exceptionsQuery = _context.ScheduleExceptions
+                    .AsNoTracking()
+                    .AsQueryable();
 
-            var availableDoctors = await _context.Doctors
-                .AsNoTracking()
-                .Where(d => d.DepartmentId == departmentId)
-                .OrderBy(d => d.FullName)
-                .Select(d => new DoctorSelectItemDto(d.Id, d.FullName, d.Specialty ?? "Chuyên khoa", d.LicenseNumber))
-                .ToListAsync(ct);
+                if (isDeptHead)
+                {
+                    exceptionsQuery = exceptionsQuery.Where(e => e.Doctor.DepartmentId == departmentId);
+                }
+                else if (activeTab == "schedule")
+                {
+                    exceptionsQuery = exceptionsQuery.Where(e => e.DoctorId == currentDoctorId || (e.ReplacementDoctorId.HasValue && e.ReplacementDoctorId.Value == currentDoctorId));
+                }
+                else
+                {
+                    exceptionsQuery = exceptionsQuery.Where(e => e.DoctorId == currentDoctorId);
+                }
 
-            var availableServices = await _context.Services
-                .AsNoTracking()
-                .Where(s => s.IsActive)
-                .OrderBy(s => s.Name)
-                .Select(s => new ClinicalServiceOptionDto(s.Id, s.Name, s.Price))
-                .ToListAsync(ct);
+                exceptions = await exceptionsQuery
+                    .OrderByDescending(e => e.CreatedAt)
+                    .Select(e => new ScheduleExceptionItemDto(
+                        e.Id,
+                        e.Date,
+                        e.Shift,
+                        e.Type.ToString(),
+                        e.Status == ScheduleExceptionStatus.Pending ? "Chờ duyệt" : e.Status == ScheduleExceptionStatus.Approved ? "Đã duyệt" : "Từ chối",
+                        e.Reason ?? "Nghỉ việc riêng",
+                        e.ReplacementDoctor != null ? e.ReplacementDoctor.FullName : null,
+                        e.DoctorId,
+                        e.ReplacementDoctorId
+                    ))
+                    .Take(200)
+                    .ToListAsync(ct);
+            }
 
-            var availableMedications = await _context.Medications
-                .AsNoTracking()
-                .Where(m => m.IsActive)
-                .OrderBy(m => m.Name)
-                .Select(m => new MedicationOptionDto(m.Id, m.Name, m.Strength, m.Unit, m.Price))
-                .ToListAsync(ct);
+            bool needDoctors = activeTab == "exceptions"
+                || (isDeptHead && (activeTab == "consultation" || activeTab == "labs" || activeTab == "records"));
+            List<DoctorSelectItemDto> availableDoctors = needDoctors
+                ? await _context.Doctors
+                    .AsNoTracking()
+                    .Where(d => d.DepartmentId == departmentId)
+                    .OrderBy(d => d.FullName)
+                    .Select(d => new DoctorSelectItemDto(d.Id, d.FullName, d.Specialty ?? "Chuyên khoa", d.LicenseNumber))
+                    .ToListAsync(ct)
+                : [];
 
-            // Tải thông tin kỳ đăng ký ca khám & bảng độ cạnh tranh
-            var activePeriod = await _departmentHeadService.GetActiveSchedulingPeriodAsync(departmentId, ct);
+            List<ClinicalServiceOptionDto> availableServices = [];
+            List<MedicationOptionDto> availableMedications = [];
+            if (activeTab == "consultation")
+            {
+                Task<List<ClinicalServiceOptionDto>> LoadServicesAsync() => _context.Services
+                    .AsNoTracking()
+                    .Where(s => s.IsActive)
+                    .OrderBy(s => s.Name)
+                    .Select(s => new ClinicalServiceOptionDto(s.Id, s.Name, s.Price))
+                    .ToListAsync(ct);
+
+                Task<List<MedicationOptionDto>> LoadMedicationsAsync() => _context.Medications
+                    .AsNoTracking()
+                    .Where(m => m.IsActive)
+                    .OrderBy(m => m.Name)
+                    .Select(m => new MedicationOptionDto(m.Id, m.Name, m.Strength, m.Unit, m.Price))
+                    .ToListAsync(ct);
+
+                availableServices = _cache != null
+                    ? (await _cache.GetOrCreateAsync("Consultation:ActiveServices", entry =>
+                    {
+                        entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
+                        return LoadServicesAsync();
+                    })) ?? []
+                    : await LoadServicesAsync();
+
+                availableMedications = _cache != null
+                    ? (await _cache.GetOrCreateAsync("Consultation:ActiveMedications", entry =>
+                    {
+                        entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
+                        return LoadMedicationsAsync();
+                    })) ?? []
+                    : await LoadMedicationsAsync();
+            }
+
+            // Tải thông tin kỳ đăng ký ca khám & bảng độ cạnh tranh (chỉ ở tab lịch làm việc)
+            var activePeriod = (activeTab == "schedule" && departmentId > 0)
+                ? await _departmentHeadService.GetActiveSchedulingPeriodAsync(departmentId, ct)
+                : null;
             DepartmentDemandGridDto? demandGrid = null;
             if (activePeriod != null)
             {
@@ -389,18 +445,10 @@ public class ConsultationController : Controller
                 int totalDays = (activePeriod.EndDate.DayNumber - activePeriod.StartDate.DayNumber) + 1;
                 maxShifts = Math.Max(10, totalDays * 2);
             }
-            if (currentDoctorId > 0)
+            if (docQuota.HasValue)
             {
-                var docQuota = await _context.Doctors
-                    .AsNoTracking()
-                    .Where(d => d.Id == currentDoctorId)
-                    .Select(d => new { d.MinShiftsPerWeek, d.MaxShiftsPerWeek })
-                    .FirstOrDefaultAsync(ct);
-                if (docQuota != null)
-                {
-                    minShifts = docQuota.MinShiftsPerWeek <= 2 ? docQuota.MinShiftsPerWeek : 2;
-                    maxShifts = Math.Max(maxShifts, docQuota.MaxShiftsPerWeek);
-                }
+                minShifts = docQuota.Value.MinShiftsPerWeek <= 2 ? docQuota.Value.MinShiftsPerWeek : 2;
+                maxShifts = Math.Max(maxShifts, docQuota.Value.MaxShiftsPerWeek);
             }
 
             var vm = new ConsultationViewModel
@@ -545,6 +593,41 @@ public class ConsultationController : Controller
                 return RedirectToAction(nameof(Index), new { tab = "exceptions" });
             }
 
+            // Ràng buộc: chỉ được xin nghỉ / đổi ca vào ngày & ca bác sĩ thực sự có lịch khám hoặc ca trực đêm đã duyệt
+            var accountId = GetCurrentAccountId();
+            var (winStart, winEnd) = shift switch
+            {
+                ExamShift.Morning => (targetDate.ToDateTime(new TimeOnly(6, 0)), targetDate.ToDateTime(new TimeOnly(12, 0))),
+                ExamShift.Afternoon => (targetDate.ToDateTime(new TimeOnly(12, 0)), targetDate.ToDateTime(new TimeOnly(18, 0))),
+                _ => (targetDate.ToDateTime(TimeOnly.MinValue), targetDate.ToDateTime(new TimeOnly(23, 59, 59)))
+            };
+            bool hasApprovedSchedule = await _context.DoctorSchedules.AnyAsync(s =>
+                s.DoctorId == doctorId
+                && s.WorkDate == targetDate
+                && s.Status == DoctorScheduleStatus.Approved
+                && (shift == null || s.Shift == shift.Value), ct);
+            bool hasApprovedDuty = await _context.DutyShifts.AnyAsync(ds =>
+                ds.AccountId == accountId
+                && ds.Status == DutyShiftStatus.Approved
+                && ds.StartTime < winEnd
+                && ds.EndTime > winStart, ct);
+            if (!hasApprovedSchedule && !hasApprovedDuty)
+            {
+                TempData["ErrorMessage"] = "Bạn không có lịch khám hay ca trực nào vào ngày/ca đã chọn nên không thể gửi đơn xin nghỉ hoặc đổi ca.";
+                return RedirectToAction(nameof(Index), new { tab = "exceptions" });
+            }
+
+            bool duplicateException = await _context.ScheduleExceptions.AnyAsync(e =>
+                e.DoctorId == doctorId
+                && e.Date == targetDate
+                && (e.Status == ScheduleExceptionStatus.Pending || e.Status == ScheduleExceptionStatus.Approved)
+                && (e.Shift == null || shift == null || e.Shift == shift.Value), ct);
+            if (duplicateException)
+            {
+                TempData["ErrorMessage"] = "Bạn đã có đơn xin nghỉ hoặc đổi ca cho ngày/ca này rồi.";
+                return RedirectToAction(nameof(Index), new { tab = "exceptions" });
+            }
+
             if (type == ScheduleExceptionType.ShiftSwap)
             {
                 if (!replacementDoctorId.HasValue || replacementDoctorId.Value <= 0 || replacementDoctorId.Value == doctorId)
@@ -582,6 +665,11 @@ public class ConsultationController : Controller
 
             _context.ScheduleExceptions.Add(exception);
             await _context.SaveChangesAsync(ct);
+            if (_cache != null)
+            {
+                var docDeptId = await _context.Doctors.Where(d => d.Id == doctorId).Select(d => d.DepartmentId).FirstOrDefaultAsync(ct);
+                ScheduleBoardCacheHelper.InvalidateDepartment(_cache, docDeptId);
+            }
             TempData["SuccessMessage"] = "Đã gửi đề nghị nghỉ / đổi ca thành công. Đang chờ trưởng khoa phê duyệt.";
         }
         catch (Exception ex) when (ex is InvalidOperationException)
@@ -631,6 +719,11 @@ public class ConsultationController : Controller
         }
         else
         {
+            if (_cache != null)
+            {
+                var docDeptId = await _context.Doctors.Where(d => d.Id == doctorId).Select(d => d.DepartmentId).FirstOrDefaultAsync(ct);
+                ScheduleBoardCacheHelper.InvalidateDepartment(_cache, docDeptId);
+            }
             TempData["SuccessMessage"] = $"Đã đăng ký ca khám ngày {workDate:dd/MM/yyyy} ({shift}) thành công!";
         }
 
@@ -651,6 +744,11 @@ public class ConsultationController : Controller
         }
         else
         {
+            if (_cache != null)
+            {
+                var docDeptId = await _context.Doctors.Where(d => d.Id == doctorId).Select(d => d.DepartmentId).FirstOrDefaultAsync(ct);
+                ScheduleBoardCacheHelper.InvalidateDepartment(_cache, docDeptId);
+            }
             TempData["SuccessMessage"] = "Đã hủy ca đăng ký thành công.";
         }
 

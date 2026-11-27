@@ -716,7 +716,7 @@ else if (tab == "schedule")
                                         }
                                         else if (Model.ActivePeriod.IsOpenForBidding)
                                         {
-                                            @if (morningCell.ApprovedCount >= morningCell.TotalRooms)
+                                            @if (morningCell.TotalRooms > 0 && morningCell.ApprovedCount >= morningCell.TotalRooms)
                                             {
                                                 <div class="bid-full">Kín buồng (@morningCell.ApprovedCount/@morningCell.TotalRooms)</div>
                                             }
@@ -791,7 +791,7 @@ else if (tab == "schedule")
                                         }
                                         else if (Model.ActivePeriod.IsOpenForBidding)
                                         {
-                                            @if (afternoonCell.ApprovedCount >= afternoonCell.TotalRooms)
+                                            @if (afternoonCell.TotalRooms > 0 && afternoonCell.ApprovedCount >= afternoonCell.TotalRooms)
                                             {
                                                 <div class="bid-full">Kín buồng (@afternoonCell.ApprovedCount/@afternoonCell.TotalRooms)</div>
                                             }

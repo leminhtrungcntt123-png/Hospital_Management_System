@@ -3,6 +3,7 @@ using HIS.BLL.DTOs;
 using HIS.BLL.Services;
 using HIS.Domain;
 using HIS.Web.Areas.Staff.Models;
+using HIS.Web.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
@@ -99,7 +100,7 @@ public class ScheduleController : Controller
         // slot phụ thuộc cửa sổ tìm kiếm của riêng tab.
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
         var isHead = User.IsInRole("DEPARTMENT_HEAD");
-        var medicalRecords = (isHead && departmentId > 0)
+        var medicalRecords = (activeTab == "records" && isHead && departmentId > 0)
             ? await _departmentHeadService.GetMedicalRecordsAsync(departmentId, accountId, ipAddress, ct)
             : (IReadOnlyList<DepartmentMedicalRecordDto>)[];
 
@@ -141,11 +142,36 @@ public class ScheduleController : Controller
         return View(vm);
     }
 
+    // Tải thông tin số lịch hẹn bị ảnh hưởng & bác sĩ thay thế khả dụng khi mở modal duyệt
+    [HttpGet]
+    [Authorize(Policy = "DepartmentHeadOnly")]
+    public async Task<IActionResult> GetExceptionApprovalPreview(int id, CancellationToken ct)
+    {
+        var accountId = GetCurrentAccountId();
+        var departmentId = await _departmentHeadService.ResolveDepartmentIdByAccountIdAsync(accountId, ct);
+        if (departmentId <= 0)
+        {
+            return Forbid();
+        }
+
+        var result = await _departmentHeadService.GetExceptionApprovalPreviewAsync(id, departmentId, ct);
+        if (!result.IsSuccess || result.Value == null)
+        {
+            return NotFound(new { message = result.Error.Message });
+        }
+
+        return Json(new
+        {
+            affectedCount = result.Value.AffectedAppointmentsCount,
+            availableReplacements = result.Value.AvailableReplacements.Select(r => new { id = r.Id, name = r.Name })
+        });
+    }
+
     // Duyệt đề nghị nghỉ / đổi ca
     [HttpPost]
     [Authorize(Policy = "DepartmentHeadOnly")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ApproveException(int id, CancellationToken ct)
+    public async Task<IActionResult> ApproveException(int id, int? replacementDoctorId, CancellationToken ct)
     {
         var accountId = GetCurrentAccountId();
         var departmentId = await _departmentHeadService.ResolveDepartmentIdByAccountIdAsync(accountId, ct);
@@ -155,7 +181,7 @@ public class ScheduleController : Controller
             return RedirectToAction(nameof(Index), new { tab = "exceptions" });
         }
 
-        var result = await _departmentHeadService.ApproveExceptionAsync(new ApproveExceptionRequest(id, accountId, departmentId), ct);
+        var result = await _departmentHeadService.ApproveExceptionAsync(new ApproveExceptionRequest(id, accountId, departmentId, replacementDoctorId), ct);
 
         if (!result.IsSuccess)
         {
@@ -313,8 +339,6 @@ public class ScheduleController : Controller
         TimeOnly startTime,
         TimeOnly endTime,
         int slotDurationMinutes,
-        int maxPatients,
-        int onlineSlots,
         string? returnTab,
         CancellationToken ct)
     {
@@ -369,8 +393,6 @@ public class ScheduleController : Controller
             startTime,
             endTime,
             slotDurationMinutes <= 0 ? 30 : slotDurationMinutes,
-            maxPatients <= 0 ? 40 : maxPatients,
-            onlineSlots <= 0 ? 28 : onlineSlots,
             DoctorScheduleStatus.Approved
         );
 
@@ -419,7 +441,8 @@ public class ScheduleController : Controller
     public async Task<IActionResult> ApproveShift(int scheduleId, int roomId, string? tab, DateOnly? date, string? shift, CancellationToken ct)
     {
         var currentAccountId = GetCurrentAccountId();
-        var request = new ApproveShiftRequest(scheduleId, roomId, currentAccountId);
+        var departmentId = await _departmentHeadService.ResolveDepartmentIdByAccountIdAsync(currentAccountId, ct);
+        var request = new ApproveShiftRequest(scheduleId, roomId, currentAccountId, departmentId);
         var result = await _departmentHeadService.ApproveShiftAsync(request, ct);
 
         if (!result.IsSuccess)
@@ -447,7 +470,8 @@ public class ScheduleController : Controller
     public async Task<IActionResult> ReallocateShift(int oldScheduleId, DateOnly targetDate, ExamShift targetShift, int targetRoomId, string? tab, DateOnly? date, string? shift, CancellationToken ct)
     {
         var currentAccountId = GetCurrentAccountId();
-        var request = new ReallocateShiftRequest(oldScheduleId, targetDate, targetShift, targetRoomId, currentAccountId);
+        var departmentId = await _departmentHeadService.ResolveDepartmentIdByAccountIdAsync(currentAccountId, ct);
+        var request = new ReallocateShiftRequest(oldScheduleId, targetDate, targetShift, targetRoomId, currentAccountId, departmentId);
         var result = await _departmentHeadService.ReallocateShiftAsync(request, ct);
 
         if (!result.IsSuccess)
@@ -475,7 +499,10 @@ public class ScheduleController : Controller
     public async Task<IActionResult> PublishPeriod(int periodId, string? tab, CancellationToken ct)
     {
         var currentAccountId = GetCurrentAccountId();
-        var result = await _departmentHeadService.PublishSchedulingPeriodAsync(periodId, currentAccountId, ct);
+        int? expectedDeptId = User.IsInRole("ADMIN")
+            ? null
+            : await _departmentHeadService.ResolveDepartmentIdByAccountIdAsync(currentAccountId, ct);
+        var result = await _departmentHeadService.PublishSchedulingPeriodAsync(periodId, currentAccountId, expectedDeptId, ct);
 
         if (!result.IsSuccess)
         {
@@ -690,6 +717,10 @@ public class ScheduleController : Controller
             entry.Value = board;
             entry.AbsoluteExpirationRelativeToNow = BoardCacheTtl;
             entry.AddExpirationToken(new CancellationChangeToken(cts.Token));
+            if (departmentId > 0)
+            {
+                entry.AddExpirationToken(ScheduleBoardCacheHelper.GetDepartmentToken(_cache, departmentId));
+            }
         }
 
         return board;

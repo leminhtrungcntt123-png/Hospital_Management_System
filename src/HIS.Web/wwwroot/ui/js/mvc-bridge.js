@@ -57,6 +57,7 @@ function go(route) {
     closeModal();
     const [page, query = ''] = route.split('?', 2);
     const filters = new URLSearchParams(query);
+    const sameSpecialty = page.startsWith('public/specialty/') && ui.route === page;
     ui.route = page;
     ui.address = route;
     ui.query = filters.get('q') || '';
@@ -66,16 +67,17 @@ function go(route) {
     ui.mobileMenu = false;
     location.hash = '#/' + route;
     render();
-    const homeDoctorHeading =
+    const sectionTarget =
         page === 'public/home' && filters.has('page')
             ? document.querySelector('#home-doctors-title')
-            : null;
-    if (homeDoctorHeading) {
-        homeDoctorHeading.scrollIntoView({ block: 'start', behavior: 'instant' });
-        homeDoctorHeading.focus({ preventScroll: true });
+            : sameSpecialty ? document.querySelector('.specialty-sections') : null;
+    if (sectionTarget) {
+        sectionTarget.scrollIntoView({ block: 'start', behavior: 'instant' });
+        const focusTarget = sameSpecialty ? document.querySelector('.specialty-article') : sectionTarget;
+        focusTarget?.focus({ preventScroll: true });
     } else {
-        window.scrollTo(0, 0);
-        document.querySelector('main h1')?.focus({ preventScroll: true });
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        document.querySelector(page === 'public/home' ? '#portal-main' : 'main h1')?.focus({ preventScroll: true });
     }
     if (catalog.status === 'idle') loadCatalog();
 }

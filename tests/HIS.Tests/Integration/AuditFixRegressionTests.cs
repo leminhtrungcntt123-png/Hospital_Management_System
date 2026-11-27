@@ -52,8 +52,6 @@ public class AuditFixRegressionTests
             StartTime = new TimeOnly(7, 30),
             EndTime = new TimeOnly(11, 30),
             SlotDurationMinutes = 30,
-            MaxPatients = 20,
-            OnlineSlots = 10,
             Status = DoctorScheduleStatus.Bidding
         };
 
@@ -67,8 +65,6 @@ public class AuditFixRegressionTests
             StartTime = new TimeOnly(13, 0),
             EndTime = new TimeOnly(16, 30),
             SlotDurationMinutes = 30,
-            MaxPatients = 20,
-            OnlineSlots = 10,
             Status = DoctorScheduleStatus.Approved
         };
 
@@ -81,8 +77,6 @@ public class AuditFixRegressionTests
             StartTime = new TimeOnly(7, 30),
             EndTime = new TimeOnly(11, 30),
             SlotDurationMinutes = 30,
-            MaxPatients = 20,
-            OnlineSlots = 10,
             Status = DoctorScheduleStatus.Rejected,
             IsHotShift = true
         };

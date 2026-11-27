@@ -60,9 +60,6 @@ public partial class DepartmentHeadService : IDepartmentHeadService
     {
         var query = _context.ScheduleExceptions
             .AsNoTracking()
-            .Include(e => e.Doctor)
-            .Include(e => e.ReplacementDoctor)
-            .Include(e => e.ApprovedByAccount)
             .Where(e => e.Doctor.DepartmentId == departmentId);
 
         if (status.HasValue)
@@ -70,44 +67,9 @@ public partial class DepartmentHeadService : IDepartmentHeadService
             query = query.Where(e => e.Status == status.Value);
         }
 
-        var exceptions = await query
+        return await query
             .OrderByDescending(e => e.CreatedAt)
-            .ToListAsync(ct);
-
-        var validStatusIds = new[] { 1, 2, 3, 4, 5 };
-        var result = new List<DepartmentExceptionItemDto>(exceptions.Count);
-
-        foreach (var e in exceptions)
-        {
-            var startOfDay = e.Date.ToDateTime(new TimeOnly(0, 0, 0));
-            var endOfDay = e.Date.ToDateTime(new TimeOnly(23, 59, 59, 999));
-
-            var appQuery = _context.Appointments
-                .AsNoTracking()
-                .Where(a => a.DoctorId == e.DoctorId && validStatusIds.Contains(a.StatusId));
-
-            if (e.Shift == ExamShift.Morning)
-            {
-                appQuery = appQuery.Where(a =>
-                    (a.Slot != null && a.Slot.StartTime >= startOfDay && a.Slot.StartTime <= endOfDay && a.Slot.StartTime.Hour < 12) ||
-                    (a.SlotId == null && a.CreatedAt >= startOfDay && a.CreatedAt <= endOfDay && a.CreatedAt.Hour < 12));
-            }
-            else if (e.Shift == ExamShift.Afternoon)
-            {
-                appQuery = appQuery.Where(a =>
-                    (a.Slot != null && a.Slot.StartTime >= startOfDay && a.Slot.StartTime <= endOfDay && a.Slot.StartTime.Hour >= 12) ||
-                    (a.SlotId == null && a.CreatedAt >= startOfDay && a.CreatedAt <= endOfDay && a.CreatedAt.Hour >= 12));
-            }
-            else
-            {
-                appQuery = appQuery.Where(a =>
-                    (a.Slot != null && a.Slot.StartTime >= startOfDay && a.Slot.StartTime <= endOfDay) ||
-                    (a.SlotId == null && a.CreatedAt >= startOfDay && a.CreatedAt <= endOfDay));
-            }
-
-            var affectedCount = await appQuery.CountAsync(ct);
-
-            result.Add(new DepartmentExceptionItemDto(
+            .Select(e => new DepartmentExceptionItemDto(
                 e.Id,
                 e.DoctorId,
                 e.Doctor.FullName,
@@ -121,11 +83,56 @@ public partial class DepartmentHeadService : IDepartmentHeadService
                 e.CreatedAt,
                 e.ApprovedByAccount != null ? e.ApprovedByAccount.Username : null,
                 e.ApprovedAt,
-                affectedCount
-            ));
+                0,
+                null
+            ))
+            .ToListAsync(ct);
+    }
+
+    public async Task<Result<ExceptionApprovalPreviewDto>> GetExceptionApprovalPreviewAsync(int exceptionId, int departmentId, CancellationToken ct = default)
+    {
+        var ex = await _context.ScheduleExceptions
+            .AsNoTracking()
+            .Where(e => e.Id == exceptionId && e.Doctor.DepartmentId == departmentId)
+            .Select(e => new { e.Id, e.DoctorId, e.Date, e.Shift })
+            .FirstOrDefaultAsync(ct);
+
+        if (ex == null)
+        {
+            return Result.Failure<ExceptionApprovalPreviewDto>("NOT_FOUND", "Không tìm thấy đề nghị ngoại lệ.");
         }
 
-        return result;
+        var validStatusIds = new[] { 1, 2, 3, 4, 5 };
+        var startOfDay = ex.Date.ToDateTime(new TimeOnly(0, 0, 0));
+        var endOfDay = ex.Date.ToDateTime(new TimeOnly(23, 59, 59, 999));
+
+        var appQuery = _context.Appointments
+            .AsNoTracking()
+            .Where(a => a.DoctorId == ex.DoctorId && validStatusIds.Contains(a.StatusId));
+
+        if (ex.Shift == ExamShift.Morning)
+        {
+            appQuery = appQuery.Where(a =>
+                (a.Slot != null && a.Slot.StartTime >= startOfDay && a.Slot.StartTime <= endOfDay && a.Slot.StartTime.Hour < 12) ||
+                (a.SlotId == null && a.CreatedAt >= startOfDay && a.CreatedAt <= endOfDay && a.CreatedAt.Hour < 12));
+        }
+        else if (ex.Shift == ExamShift.Afternoon)
+        {
+            appQuery = appQuery.Where(a =>
+                (a.Slot != null && a.Slot.StartTime >= startOfDay && a.Slot.StartTime <= endOfDay && a.Slot.StartTime.Hour >= 12) ||
+                (a.SlotId == null && a.CreatedAt >= startOfDay && a.CreatedAt <= endOfDay && a.CreatedAt.Hour >= 12));
+        }
+        else
+        {
+            appQuery = appQuery.Where(a =>
+                (a.Slot != null && a.Slot.StartTime >= startOfDay && a.Slot.StartTime <= endOfDay) ||
+                (a.SlotId == null && a.CreatedAt >= startOfDay && a.CreatedAt <= endOfDay));
+        }
+
+        var affectedCount = await appQuery.CountAsync(ct);
+        var availableReplacements = await ReplacementDoctorHelper.GetAvailableReplacementsAsync(_context, departmentId, ex.DoctorId, ex.Date, ex.Shift, ct);
+
+        return Result.Success(new ExceptionApprovalPreviewDto(affectedCount, availableReplacements));
     }
 
     public async Task<Result> ApproveExceptionAsync(ApproveExceptionRequest request, CancellationToken ct = default)
@@ -147,6 +154,26 @@ public partial class DepartmentHeadService : IDepartmentHeadService
 
             if (ex.Status != ScheduleExceptionStatus.Pending)
                 return Result.Failure("INVALID_STATUS", "Chỉ có thể phê duyệt đề nghị đang ở trạng thái chờ duyệt.");
+
+            var today = DateOnly.FromDateTime(LocalNow);
+            if (ex.Date < today)
+                return Result.Failure("PAST_DATE", "Không thể phê duyệt đề nghị đã quá ngày.");
+
+            if (request.ReplacementDoctorId is > 0)
+            {
+                var repDoc = await _context.Doctors
+                    .Include(d => d.Account)
+                    .FirstOrDefaultAsync(d => d.Id == request.ReplacementDoctorId.Value
+                        && d.DepartmentId == request.DepartmentId.Value
+                        && d.Account.IsActive, ct);
+                if (repDoc == null || repDoc.Id == ex.DoctorId)
+                    return Result.Failure("INVALID_REPLACEMENT", "Bác sĩ thay thế không hợp lệ hoặc không thuộc khoa.");
+
+                if (await ReplacementDoctorHelper.IsDoctorBusyAsync(_context, repDoc.Id, repDoc.AccountId, ex.Date, ex.Shift, ct))
+                    return Result.Failure("REPLACEMENT_BUSY", $"BS. {repDoc.FullName} đã có lịch khám hoặc ca trực trong thời gian này.");
+
+                ex.ReplacementDoctorId = repDoc.Id;
+            }
 
             await using var tx = await _context.Database.BeginTransactionAsync(ct);
             await _context.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(11028, 1)", ct);
@@ -420,8 +447,6 @@ public partial class DepartmentHeadService : IDepartmentHeadService
                 s.StartTime,
                 s.EndTime,
                 s.SlotDurationMinutes,
-                s.MaxPatients,
-                s.OnlineSlots,
                 s.IsHotShift,
                 s.Status,
                 s.DoctorNote,
@@ -438,9 +463,6 @@ public partial class DepartmentHeadService : IDepartmentHeadService
         var today = DateOnly.FromDateTime(_timeProvider.GetLocalNow().DateTime);
         if (request.WorkDate < today)
             return Result.Failure<int>("PAST_DATE", "Không thể thiết lập lịch khám cho ngày trong quá khứ. Chỉ được phép thiết lập từ ngày hiện tại hoặc tương lai.");
-
-        if (request.OnlineSlots < 0 || request.OnlineSlots > request.MaxPatients)
-            return Result.Failure<int>("INVALID_QUOTA", "Số lượng slot trực tuyến phải từ 0 đến tổng số bệnh nhân.");
 
         if (request.EndTime <= request.StartTime)
             return Result.Failure<int>("INVALID_TIME", "Giờ kết thúc ca khám phải sau giờ bắt đầu.");
@@ -622,8 +644,6 @@ public partial class DepartmentHeadService : IDepartmentHeadService
             schedule.StartTime = request.StartTime;
             schedule.EndTime = request.EndTime;
             schedule.SlotDurationMinutes = request.SlotDurationMinutes;
-            schedule.MaxPatients = request.MaxPatients;
-            schedule.OnlineSlots = request.OnlineSlots;
             schedule.Status = request.Status;
             schedule.DoctorNote = request.DoctorNote ?? schedule.DoctorNote;
         }
@@ -640,8 +660,6 @@ public partial class DepartmentHeadService : IDepartmentHeadService
                 StartTime = request.StartTime,
                 EndTime = request.EndTime,
                 SlotDurationMinutes = request.SlotDurationMinutes,
-                MaxPatients = request.MaxPatients,
-                OnlineSlots = request.OnlineSlots,
                 Status = request.Status,
                 DoctorNote = request.DoctorNote,
                 CreatedAt = LocalNow

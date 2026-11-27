@@ -111,83 +111,201 @@
     transform: rotate(180deg);
 }
 
-.introduction-notice {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 13px 16px;
-    margin-bottom: 20px;
-    border: 1px solid #d6e7ef;
-    border-radius: 9px;
-    background: #f1f8fc;
-    color: #42667e;
-    font-size: 12px;
-    line-height: 1.75;
-}
-
-.introduction-notice .icon {
-    flex-shrink: 0;
-    margin-top: 2px;
-}
-
 .specialty-introductions .portal-specialty {
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+    color: inherit;
+    text-decoration: none;
 }
 
-.specialty-introductions .text-link {
+.specialty-media {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 3 / 2;
+    object-fit: cover;
+    background: #e8f4f8;
+}
+
+.specialty-media-empty {
+    display: grid;
+    place-items: center;
+    color: #00718e;
+}
+
+.specialty-media-empty .icon {
+    width: 42px;
+    height: 42px;
+}
+
+.specialty-card-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 18px 20px 20px;
+}
+
+.specialty-card-body .text-link {
     margin-top: auto;
 }
 
-.specialty-overview {
+.specialty-page {
+    padding: 24px 0 64px;
+}
+
+.specialty-page > .breadcrumb {
+    margin-bottom: 18px;
+}
+
+.specialty-hero {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: start;
-    gap: 24px;
-    padding: 28px;
-    margin-bottom: 36px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+    overflow: hidden;
+    border: 1px solid #d0e4ee;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #edf8fc, #f9fbfd);
 }
 
-.specialty-overview h2,
-.specialty-next-step h2 {
-    margin-bottom: 8px;
-    font-size: 21px;
+.specialty-hero-copy {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    padding: clamp(24px, 4vw, 48px);
 }
 
-.specialty-overview p,
-.specialty-next-step p {
-    color: #536e81;
-    font-size: 13px;
+.specialty-hero-copy h1 {
+    margin: 0 0 12px;
+    font-size: clamp(28px, 4vw, 44px);
+    line-height: 1.15;
+    letter-spacing: -0.03em;
+}
+
+.specialty-hero-copy p {
+    max-width: 42ch;
+    margin: 0;
+    color: #34576f;
+    font-size: 15px;
+}
+
+.specialty-hero-copy .btn {
+    margin-top: 22px;
+}
+
+.specialty-cover {
+    position: relative;
+    margin: 0;
+    min-height: 0;
+}
+
+.specialty-cover .specialty-media {
+    height: 100%;
+    max-height: 320px;
+}
+
+.specialty-cover figcaption {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    padding: 3px 8px;
+    border-radius: 5px;
+    background: #fff;
+    color: #34576f;
+    font-size: 11px;
+}
+
+.specialty-sections {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 24px 0 0;
+    padding: 0 0 8px;
+    border-bottom: 1px solid #d0e4ee;
+}
+
+.specialty-sections a {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 7px 14px;
+    border-radius: 8px;
+    color: #285168;
+    font-weight: 650;
+    text-decoration: none;
+}
+
+.specialty-sections a:hover {
+    background: #eaf5fa;
+}
+
+.specialty-sections a[aria-current='page'] {
+    background: #00718e;
+    color: #fff;
+}
+
+.specialty-article {
+    margin-top: 22px;
+    padding: clamp(18px, 3vw, 32px);
+    border: 1px solid #d6e5ed;
+    border-radius: 12px;
+}
+
+.specialty-article h2 {
+    margin: 0 0 12px;
+    font-size: clamp(20px, 3vw, 26px);
+}
+
+.specialty-article p {
+    max-width: 76ch;
+    margin-bottom: 16px;
+    color: #34576f;
+    font-size: 15px;
+    line-height: 1.8;
+}
+
+.specialty-overview-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 22px;
+}
+
+.specialty-article .text-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .specialty-topics {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px 20px;
-    margin: 18px 0 0;
+    display: grid;
+    gap: 8px;
+    margin: 0;
     padding: 0;
     list-style: none;
-    color: #285f71;
-    font-size: 13px;
 }
 
 .specialty-topics li {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-}
-
-.specialty-next-step {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 24px;
-    margin-bottom: 42px;
-    padding: 28px;
-    border: 1px solid #c9e4ee;
-    border-radius: 12px;
-    background: #eef8fc;
+    gap: 10px;
+}
+
+.specialty-topics .icon {
+    flex: none;
+    color: #00718e;
+}
+
+@media (max-width: 700px) {
+    .specialty-hero {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .specialty-cover .specialty-media {
+        height: auto;
+        aspect-ratio: 16 / 9;
+    }
 }
 
 @media (max-width: 600px) {
@@ -215,10 +333,5 @@
     }
     .doctor-card-meta {
         font-size: 12px;
-    }
-    .specialty-overview {
-        grid-template-columns: 1fr;
-        gap: 12px;
-        padding: 22px;
     }
 }

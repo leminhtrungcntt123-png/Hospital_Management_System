@@ -1,5 +1,5 @@
 function brand() {
-    return '<span class="brand"><span class="brand-mark">+</span><span>MediCare<sup>+</sup></span></span>';
+    return `<span class="brand"><span class="brand-mark brand-logo"><img src="${esc(config.pathBase + '/images/medicare-logo.jpg')}" alt="" /></span><span>MediCare<sup>+</sup></span></span>`;
 }
 
 function headerUserActions() {
@@ -34,11 +34,15 @@ function publicShell() {
         <div class="utility-bar"><div><span>${icon('building')}Bệnh viện MediCare</span><span>Chăm sóc bạn và gia đình</span>
             ${config.authenticated && config.role === 'PATIENT'
                 ? link('Lịch hẹn của tôi', 'patient/appointments', 'clock')
-                : `<a href="${esc(config.authenticated ? config.home : config.login)}">${icon('shield')}Khu vực nhân viên</a>`}</div></div>
+                : ''}</div></div>
         <header class="public-header"><div class="header-inner">
             ${link(brand(), 'public/home', '', 'brand-link')}
             <nav id="portal-navigation" class="public-nav ${ui.mobileMenu ? 'open' : ''}" aria-label="Điều hướng chính">
-                ${menu.map(([route, title]) => link(title, route, '', ui.route === route ? 'active' : '')).join('')}
+                ${menu.map(([route, title]) => {
+                    const active = ui.route === route ||
+                        (route === 'public/specialties' && ui.route.startsWith('public/specialty/'));
+                    return link(title, route, '', active ? 'active' : '');
+                }).join('')}
                 ${canBook ? link('Đặt lịch khám', 'public/booking', 'calendar', 'nav-mobile menu-book') : ''}
                 ${!config.authenticated ? link('Đăng nhập', 'account/login', '', 'nav-mobile') : ''}
             </nav>
@@ -46,7 +50,7 @@ function publicShell() {
                 ${button('', 'menu', 'menu', 'icon-btn mobile-only', `aria-label="Mở menu" aria-controls="portal-navigation" aria-expanded="${ui.mobileMenu}"`)}
             </div></div></header>
         ${patientArea ? `<nav class="patient-nav" aria-label="Không gian bệnh nhân"><div>${patientMenu.map(([route, title, name]) => link(title, route, name, ui.route === route ? 'active' : '')).join('')}</div></nav>` : ''}
-        <main id="portal-main" tabindex="-1" class="${patientArea ? 'patient-main' : 'public-main'}">${publicContent()}</main>
+        <main id="portal-main" tabindex="-1" class="${patientArea ? 'patient-main' : 'public-main'}${ui.route === 'public/home' ? ' home-main' : ''}">${publicContent()}</main>
         <footer class="public-footer"><div class="footer-top">
             <div>${brand()}<p>Một nơi kết nối lịch hẹn, người khám<br />và hành trình chăm sóc sức khỏe.</p></div>
             <div><h3>Khám tại MediCare</h3>${link('Chuyên khoa', 'public/specialties')}${link('Đội ngũ bác sĩ', 'public/doctors')}${link('Hướng dẫn khám', 'public/guide')}</div>

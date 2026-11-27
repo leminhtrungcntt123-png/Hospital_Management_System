@@ -16,11 +16,8 @@
         <div class="sidebar-top">
             <!-- Brand Group -->
             <a class="admin-brand" href="@home" title="HIS MediCare - Về trang chủ">
-                <div class="brand-logo-box">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="12" y1="5" x2="12" y2="19"></line>
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                    </svg>
+                <div class="brand-logo-box brand-logo">
+                    <img src="~/images/medicare-logo.jpg" alt="" />
                 </div>
                 <div class="brand-text">
                     <span class="brand-title">HIS <em>MediCare</em></span>
@@ -330,7 +327,13 @@
                                 <p class="card-subtitle">Hiển thị tối đa 200 đề nghị ca trực gần nhất</p>
                             </div>
                         </div>
-                        <div style="display:flex; gap:8px; flex-wrap:wrap;" id="requests-status-tabs">
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;" id="requests-status-tabs">
+                            <label class="filter-dropdown-label" for="requests-dept-filter" style="margin-right:8px;">
+                                Khoa chuyên môn *:
+                                <select id="requests-dept-filter">
+                                    <option value="">-- Chọn khoa để duyệt --</option>
+                                </select>
+                            </label>
                             <button type="button" class="btn button primary sm" data-req-filter="all">Tất cả</button>
                             <button type="button" class="btn button secondary sm" data-req-filter="Pending">Chờ duyệt</button>
                             <button type="button" class="btn button secondary sm" data-req-filter="Approved">Đã duyệt</button>
@@ -938,10 +941,8 @@
                 <input name="name" placeholder="VD: Tuần 16/11 - 22/11/2026" maxlength="120" required />
             </label>
             <label>
-                Phạm vi áp dụng
-                <select name="departmentId" id="period-scope-dept">
-                    <option value="">Toàn bệnh viện (dùng chung)</option>
-                </select>
+                Khoa chuyên môn *
+                <select name="departmentId" id="period-scope-dept" required></select>
             </label>
             <label>
                 Từ ngày *
@@ -997,14 +998,6 @@
                     <option value="0">Ca Sáng (07:30 - 11:30)</option>
                     <option value="1">Ca Chiều (13:00 - 16:30)</option>
                 </select>
-            </label>
-            <label>
-                Số BN tối đa
-                <input name="maxPatients" type="number" min="1" max="100" value="40" />
-            </label>
-            <label>
-                Số slot online
-                <input name="onlineSlots" type="number" min="0" max="100" value="28" />
             </label>
             <label style="grid-column:1 / -1;">
                 Ghi chú
