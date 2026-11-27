@@ -206,3 +206,23 @@ public record DepartmentVisitStat(
     int Visits,
     decimal Revenue);
 
+public record RevenueBucket(
+    string Label,
+    string FullLabel,
+    decimal Deposits,
+    decimal Payments,
+    decimal Refunds,
+    decimal Revenue,
+    int Visits);
+
+public record RevenueSeriesReport(
+    string Mode,
+    DateOnly From,
+    DateOnly To,
+    decimal Deposits,
+    decimal Payments,
+    decimal Refunds,
+    decimal Revenue,
+    int Visits,
+    IReadOnlyList<RevenueBucket> Buckets);
+

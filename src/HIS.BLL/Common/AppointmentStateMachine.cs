@@ -8,9 +8,9 @@ public static class AppointmentStateMachine
     {
         [AppointmentStatusId.Pending] = [AppointmentStatusId.Confirmed, AppointmentStatusId.Expired, AppointmentStatusId.Cancelled, AppointmentStatusId.RescheduleRequired],
         [AppointmentStatusId.Confirmed] = [AppointmentStatusId.CheckedIn, AppointmentStatusId.Cancelled, AppointmentStatusId.NoShow, AppointmentStatusId.RescheduleRequired],
-        [AppointmentStatusId.CheckedIn] = [AppointmentStatusId.ReadyForDoctor, AppointmentStatusId.Cancelled],
-        [AppointmentStatusId.ReadyForDoctor] = [AppointmentStatusId.InProgress],
-        [AppointmentStatusId.InProgress] = [AppointmentStatusId.Completed],
+        [AppointmentStatusId.CheckedIn] = [AppointmentStatusId.ReadyForDoctor, AppointmentStatusId.Cancelled, AppointmentStatusId.Expired],
+        [AppointmentStatusId.ReadyForDoctor] = [AppointmentStatusId.InProgress, AppointmentStatusId.Expired],
+        [AppointmentStatusId.InProgress] = [AppointmentStatusId.Completed, AppointmentStatusId.Expired],
         [AppointmentStatusId.RescheduleRequired] = [AppointmentStatusId.Cancelled, AppointmentStatusId.Pending, AppointmentStatusId.Confirmed],
         [AppointmentStatusId.Completed] = [],
         [AppointmentStatusId.Cancelled] = [],

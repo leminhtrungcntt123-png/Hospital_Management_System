@@ -14,6 +14,55 @@ public sealed class AdminReportService(AppDbContext db) : IAdminReportService
         AdminRules.Require(from <= to && to < DateOnly.MaxValue && to.DayNumber - from.DayNumber <= 365,
             "Chọn khoảng báo cáo từ 1 đến 366 ngày.");
 
+    private sealed record RevenueEntry(DateTime OccurredAt, int DepartmentId, decimal Amount);
+
+    private async Task<List<RevenueEntry>> LoadEarnedRevenueEntriesAsync(
+        DateTime start, DateTime end, CancellationToken ct)
+    {
+        // 1. Doanh thu từ hóa đơn đã tất toán (PatientAmount sau khi trừ BHYT), lấy mốc ngày thanh toán cuối hoặc ngày lập hóa đơn
+        var settledInvoices = await db.Invoices.AsNoTracking()
+            .Where(i => i.Status == InvoiceStatus.Paid
+                && i.PatientAmount > 0
+                && !i.Patient.FullName.StartsWith("BN Test"))
+            .Select(i => new
+            {
+                SettledAt = i.Payments
+                    .Where(p => p.PaymentType == PaymentType.Payment)
+                    .Select(p => (DateTime?)p.PaidAt)
+                    .Max() ?? i.CreatedAt,
+                DeptId = i.Appointment.DepartmentId ?? (i.Appointment.Doctor != null ? i.Appointment.Doctor.DepartmentId : 0),
+                Amount = i.PatientAmount
+            })
+            .Where(x => x.SettledAt >= start && x.SettledAt < end)
+            .ToListAsync(ct);
+
+        var entries = settledInvoices
+            .Select(x => new RevenueEntry(x.SettledAt, x.DeptId, x.Amount))
+            .ToList();
+
+        // 2. Các khoản thu trực tiếp trên hóa đơn chưa chốt Paid (thu một phần) và hoàn tiền hóa đơn (không trừ nhầm hoàn tạm ứng)
+        var paymentAdjustments = await db.Payments.AsNoTracking()
+            .Where(p => p.PaidAt >= start
+                && p.PaidAt < end
+                && !p.Invoice.Patient.FullName.StartsWith("BN Test")
+                && ((p.PaymentType == PaymentType.Payment && (p.Invoice.Status != InvoiceStatus.Paid || p.Invoice.PatientAmount <= 0))
+                    || (p.PaymentType == PaymentType.Refund && (p.Note == null || !p.Note.StartsWith("Tất toán hoàn trả")))))
+            .Select(p => new
+            {
+                p.PaidAt,
+                DeptId = p.Invoice.Appointment.DepartmentId ?? (p.Invoice.Appointment.Doctor != null ? p.Invoice.Appointment.Doctor.DepartmentId : 0),
+                Amount = p.PaymentType == PaymentType.Refund ? -p.Amount : p.Amount
+            })
+            .ToListAsync(ct);
+
+        foreach (var item in paymentAdjustments)
+        {
+            entries.Add(new RevenueEntry(item.PaidAt, item.DeptId, item.Amount));
+        }
+
+        return entries;
+    }
+
     public async Task<RevenueReport> GetRevenueAsync(
         int actorId, DateOnly from, DateOnly to, CancellationToken ct = default)
     {
@@ -36,6 +85,10 @@ public sealed class AdminReportService(AppDbContext db) : IAdminReportService
                 Refunds = group.Sum(payment => payment.PaymentType == PaymentType.Refund ? payment.Amount : 0)
             })
             .ToDictionaryAsync(row => DateOnly.FromDateTime(row.Date), ct);
+
+        var revenueByDate = (await LoadEarnedRevenueEntriesAsync(start, end, ct))
+            .GroupBy(e => DateOnly.FromDateTime(e.OccurredAt))
+            .ToDictionary(g => g.Key, g => g.Sum(e => e.Amount));
 
         var visits = await db.Appointments.AsNoTracking()
             .Where(appointment => appointment.CheckedInAt >= start
@@ -60,12 +113,141 @@ public sealed class AdminReportService(AppDbContext db) : IAdminReportService
             var refunds = money?.Refunds ?? 0;
 
             days.Add(new RevenueDay(day, deposits, paid, refunds,
-                deposits + paid - refunds, visits.GetValueOrDefault(day)));
+                revenueByDate.GetValueOrDefault(day), visits.GetValueOrDefault(day)));
         }
 
         return new RevenueReport(from, to, days.Sum(day => day.Deposits),
             days.Sum(day => day.Payments), days.Sum(day => day.Refunds),
             days.Sum(day => day.Revenue), days.Sum(day => day.Visits), days);
+    }
+
+    public async Task<RevenueSeriesReport> GetRevenueSeriesAsync(
+        int actorId, string mode, DateOnly anchor, CancellationToken ct = default)
+    {
+        await AdminRules.RequireAdminAsync(db, actorId, ct);
+        var normalized = (mode ?? "week").Trim().ToLowerInvariant();
+        if (normalized is not ("day" or "week" or "month" or "year"))
+        {
+            normalized = "week";
+        }
+
+        if (normalized is "day" or "week")
+        {
+            var offset = ((int)anchor.DayOfWeek + 6) % 7; // Thứ 2 = 0 .. CN = 6
+            var monday = anchor.AddDays(-offset);
+            var sunday = monday.AddDays(6);
+            var weekReport = await GetRevenueAsync(actorId, monday, sunday, ct);
+
+            var buckets = weekReport.Days
+                .Select(d => new RevenueBucket(
+                    d.Date.ToString("dd/MM", CultureInfo.InvariantCulture),
+                    d.Date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
+                    d.Deposits, d.Payments, d.Refunds, d.Revenue, d.Visits))
+                .ToList();
+
+            if (normalized == "day")
+            {
+                var singleDay = weekReport.Days.First(d => d.Date == anchor);
+                return new RevenueSeriesReport(
+                    "day", anchor, anchor,
+                    singleDay.Deposits, singleDay.Payments, singleDay.Refunds, singleDay.Revenue, singleDay.Visits,
+                    buckets);
+            }
+
+            return new RevenueSeriesReport(
+                "week", monday, sunday,
+                weekReport.Deposits, weekReport.Payments, weekReport.Refunds, weekReport.Revenue, weekReport.Visits,
+                buckets);
+        }
+
+        if (normalized == "month")
+        {
+            var yearStart = new DateOnly(anchor.Year, 1, 1);
+            var yearEnd = new DateOnly(anchor.Year, 12, 31);
+            var start = yearStart.ToDateTime(TimeOnly.MinValue);
+            var end = yearEnd.AddDays(1).ToDateTime(TimeOnly.MinValue);
+
+            var payments = await db.Payments.AsNoTracking()
+                .Where(p => p.PaidAt >= start && p.PaidAt < end && !p.Invoice.Patient.FullName.StartsWith("BN Test"))
+                .GroupBy(p => p.PaidAt.Month)
+                .Select(g => new
+                {
+                    Month = g.Key,
+                    Deposits = g.Sum(p => p.PaymentType == PaymentType.Deposit ? p.Amount : 0),
+                    Payments = g.Sum(p => p.PaymentType == PaymentType.Payment ? p.Amount : 0),
+                    Refunds = g.Sum(p => p.PaymentType == PaymentType.Refund ? p.Amount : 0)
+                })
+                .ToDictionaryAsync(x => x.Month, ct);
+
+            var visits = await db.Appointments.AsNoTracking()
+                .Where(a => a.CheckedInAt >= start && a.CheckedInAt < end
+                    && !a.AppointmentCode.StartsWith("DEP-") && !a.Patient.FullName.StartsWith("BN Test"))
+                .GroupBy(a => a.CheckedInAt!.Value.Month)
+                .Select(g => new { Month = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.Month, x => x.Count, ct);
+
+            var revByMonth = (await LoadEarnedRevenueEntriesAsync(start, end, ct))
+                .GroupBy(e => e.OccurredAt.Month)
+                .ToDictionary(g => g.Key, g => g.Sum(e => e.Amount));
+
+            var buckets = Enumerable.Range(1, 12).Select(m =>
+            {
+                payments.TryGetValue(m, out var money);
+                var dep = money?.Deposits ?? 0;
+                var paid = money?.Payments ?? 0;
+                var refAmt = money?.Refunds ?? 0;
+                return new RevenueBucket($"T{m}", $"Tháng {m:00}/{anchor.Year}", dep, paid, refAmt, revByMonth.GetValueOrDefault(m), visits.GetValueOrDefault(m));
+            }).ToList();
+
+            return new RevenueSeriesReport(
+                "month", yearStart, yearEnd,
+                buckets.Sum(b => b.Deposits), buckets.Sum(b => b.Payments), buckets.Sum(b => b.Refunds),
+                buckets.Sum(b => b.Revenue), buckets.Sum(b => b.Visits), buckets);
+        }
+
+        // mode == "year": 5 năm gần nhất kết thúc ở anchor.Year
+        var startYear = anchor.Year - 4;
+        var fiveYearStart = new DateOnly(startYear, 1, 1);
+        var fiveYearEnd = new DateOnly(anchor.Year, 12, 31);
+        var yStart = fiveYearStart.ToDateTime(TimeOnly.MinValue);
+        var yEnd = fiveYearEnd.AddDays(1).ToDateTime(TimeOnly.MinValue);
+
+        var yearPayments = await db.Payments.AsNoTracking()
+            .Where(p => p.PaidAt >= yStart && p.PaidAt < yEnd && !p.Invoice.Patient.FullName.StartsWith("BN Test"))
+            .GroupBy(p => p.PaidAt.Year)
+            .Select(g => new
+            {
+                Year = g.Key,
+                Deposits = g.Sum(p => p.PaymentType == PaymentType.Deposit ? p.Amount : 0),
+                Payments = g.Sum(p => p.PaymentType == PaymentType.Payment ? p.Amount : 0),
+                Refunds = g.Sum(p => p.PaymentType == PaymentType.Refund ? p.Amount : 0)
+            })
+            .ToDictionaryAsync(x => x.Year, ct);
+
+        var yearVisits = await db.Appointments.AsNoTracking()
+            .Where(a => a.CheckedInAt >= yStart && a.CheckedInAt < yEnd
+                && !a.AppointmentCode.StartsWith("DEP-") && !a.Patient.FullName.StartsWith("BN Test"))
+            .GroupBy(a => a.CheckedInAt!.Value.Year)
+            .Select(g => new { Year = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.Year, x => x.Count, ct);
+
+        var revByYear = (await LoadEarnedRevenueEntriesAsync(yStart, yEnd, ct))
+            .GroupBy(e => e.OccurredAt.Year)
+            .ToDictionary(g => g.Key, g => g.Sum(e => e.Amount));
+
+        var yearBuckets = Enumerable.Range(startYear, 5).Select(y =>
+        {
+            yearPayments.TryGetValue(y, out var money);
+            var dep = money?.Deposits ?? 0;
+            var paid = money?.Payments ?? 0;
+            var refAmt = money?.Refunds ?? 0;
+            return new RevenueBucket(y.ToString(CultureInfo.InvariantCulture), $"Năm {y}", dep, paid, refAmt, revByYear.GetValueOrDefault(y), yearVisits.GetValueOrDefault(y));
+        }).ToList();
+
+        return new RevenueSeriesReport(
+            "year", fiveYearStart, fiveYearEnd,
+            yearBuckets.Sum(b => b.Deposits), yearBuckets.Sum(b => b.Payments), yearBuckets.Sum(b => b.Refunds),
+            yearBuckets.Sum(b => b.Revenue), yearBuckets.Sum(b => b.Visits), yearBuckets);
     }
 
     public async Task<byte[]> ExportRevenueAsync(
@@ -91,7 +273,8 @@ public sealed class AdminReportService(AppDbContext db) : IAdminReportService
         int actorId, DateOnly from, DateOnly to, CancellationToken ct = default)
     {
         await AdminRules.RequireAdminAsync(db, actorId, ct);
-        ValidateReportRange(from, to);
+        AdminRules.Require(from <= to && to < DateOnly.MaxValue && to.DayNumber - from.DayNumber <= 366 * 5,
+            "Khoảng thống kê khoa tối đa 5 năm.");
         var start = from.ToDateTime(TimeOnly.MinValue);
         var end = to.AddDays(1).ToDateTime(TimeOnly.MinValue);
 
@@ -100,29 +283,16 @@ public sealed class AdminReportService(AppDbContext db) : IAdminReportService
         var visitsByDept = await db.Appointments.AsNoTracking()
             .Where(a => a.CheckedInAt >= start
                 && a.CheckedInAt < end
+                && a.StatusId == (int)AppointmentStatusId.Completed
                 && !a.AppointmentCode.StartsWith("DEP-")
                 && !a.Patient.FullName.StartsWith("BN Test"))
             .GroupBy(a => a.DepartmentId ?? (a.Doctor != null ? a.Doctor.DepartmentId : 0))
             .Select(g => new { DepartmentId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.DepartmentId, x => x.Count, ct);
 
-        var paymentsByDept = await db.Payments.AsNoTracking()
-            .Include(p => p.Invoice)
-                .ThenInclude(i => i.Appointment)
-                    .ThenInclude(a => a.Doctor)
-            .Where(p => p.PaidAt >= start
-                && p.PaidAt < end
-                && p.Invoice != null
-                && p.Invoice.Appointment != null
-                && !p.Invoice.Appointment.AppointmentCode.StartsWith("DEP-")
-                && !p.Invoice.Patient.FullName.StartsWith("BN Test"))
-            .GroupBy(p => p.Invoice.Appointment!.DepartmentId ?? (p.Invoice.Appointment.Doctor != null ? p.Invoice.Appointment.Doctor.DepartmentId : 0))
-            .Select(g => new
-            {
-                DepartmentId = g.Key,
-                Revenue = g.Sum(p => p.PaymentType == PaymentType.Refund ? -p.Amount : p.Amount)
-            })
-            .ToDictionaryAsync(x => x.DepartmentId, x => x.Revenue, ct);
+        var paymentsByDept = (await LoadEarnedRevenueEntriesAsync(start, end, ct))
+            .GroupBy(e => e.DepartmentId)
+            .ToDictionary(g => g.Key, g => g.Sum(e => e.Amount));
 
         return departments.Select(d => new DepartmentVisitStat(
             d.Id,

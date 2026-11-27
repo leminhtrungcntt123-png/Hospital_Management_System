@@ -140,34 +140,9 @@
                 <tbody id="exceptionsTableBody">
                     @if (Model.Exceptions.Count == 0)
                     {
-                        <!-- Dữ liệu mẫu khớp 100% hình 1 nếu DB chưa có -->
-                        <tr class="exception-row" data-status="PENDING">
-                            <td><strong>BS. Trần Minh Thư</strong></td>
-                            <td>
-                                <div>05/11/2026</div>
-                                <small class="text-muted">Ca sáng</small>
-                            </td>
-                            <td>
-                                <div><strong>Đào tạo</strong></div>
-                                <small class="text-muted">Tham gia đào tạo chuyên môn</small>
-                            </td>
-                            <td>BS. Nguyễn Hoàng Nam</td>
-                            <td>
-                                <span class="badge" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; padding:4px 8px; border-radius:50px; font-size:11px;">
-                                    • Chờ duyệt
-                                </span>
-                            </td>
-                            <td>
-                                <div style="display:flex; gap:8px; align-items:center;">
-                                    <button type="button" class="btn primary sm" onclick="openApproveModal(1, 'BS. Trần Minh Thư', '05/11/2026', 'BS. Nguyễn Hoàng Nam', 3)">
-                                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                                        <span>Duyệt</span>
-                                    </button>
-                                    <button type="button" class="btn ghost sm" onclick="openRejectModal(1)">
-                                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                                        <span>Từ chối</span>
-                                    </button>
-                                </div>
+                        <tr>
+                            <td colspan="6" style="text-align:center; padding:28px; color:#64748b;">
+                                Chưa có đề nghị nghỉ / đổi ca nào trong khoa.
                             </td>
                         </tr>
                     }
@@ -367,45 +342,9 @@ else if (tab == "records")
                 <tbody id="recordsTableBody">
                     @if (Model.MedicalRecords.Count == 0)
                     {
-                        <!-- Mẫu chuẩn theo hình 2 -->
-                        <tr class="record-row" data-search="đỗ gia khang bn0010 đã hoàn tất khám theo yêu cầu">
-                            <td>
-                                <div style="display:flex; align-items:center; gap:10px;">
-                                    <span class="avatar" style="background:#dcfce7; color:#0d6535; font-weight:700; width:32px; height:32px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:11px;">GK</span>
-                                    <div>
-                                        <strong>Đỗ Gia Khang</strong>
-                                        <div class="text-muted small">BN0010 · 43 tuổi</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td>04/11/2026</td>
-                            <td>BS. Lê Quang Huy</td>
-                            <td>Đã hoàn tất khám theo yêu cầu</td>
-                            <td>
-                                <button type="button" class="btn outline sm" onclick="openRecordDetailModal('Đỗ Gia Khang', 'BN0010', '43 tuổi', 'BS. Lê Quang Huy', '04/11/2026', 'Đã hoàn tất khám theo yêu cầu', 'I10 Tăng huyết áp nguyên phát', 'Khám lâm sàng tim mạch ổn định, không ghi nhận tiếng ran.')">
-                                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><circle cx="12" cy="12" r="3"></circle><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path></svg>
-                                    <span>Xem phiếu</span>
-                                </button>
-                            </td>
-                        </tr>
-                        <tr class="record-row" data-search="nguyễn thanh hà bn0001 khám sức khỏe định kỳ">
-                            <td>
-                                <div style="display:flex; align-items:center; gap:10px;">
-                                    <span class="avatar" style="background:#fce7f3; color:#be185d; font-weight:700; width:32px; height:32px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:11px;">TH</span>
-                                    <div>
-                                        <strong>Nguyễn Thanh Hà</strong>
-                                        <div class="text-muted small">BN0001 · 32 tuổi</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td>15/10/2026</td>
-                            <td>BS. Nguyễn Hoàng Nam</td>
-                            <td>Khám sức khỏe định kỳ</td>
-                            <td>
-                                <button type="button" class="btn outline sm" onclick="openRecordDetailModal('Nguyễn Thanh Hà', 'BN0001', '32 tuổi', 'BS. Nguyễn Hoàng Nam', '15/10/2026', 'Khám sức khỏe định kỳ', 'Z00.0 Khám sức khỏe tổng quát', 'Thể trạng tốt, các chỉ số sinh hiệu trong giới hạn bình thường.')">
-                                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><circle cx="12" cy="12" r="3"></circle><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path></svg>
-                                    <span>Xem phiếu</span>
-                                </button>
+                        <tr>
+                            <td colspan="5" style="text-align:center; padding:28px; color:#64748b;">
+                                Chưa có hồ sơ bệnh án nào trong khoa.
                             </td>
                         </tr>
                     }
@@ -719,7 +658,7 @@ else if (tab == "patients")
                 </svg>
                 <input type="text" id="patientSearchInput" oninput="filterPatients(this.value)" placeholder="Tìm tên, mã hoặc số điện thoại..." style="width:100%; padding:7px 12px 7px 34px; border:1px solid #cbd5e1; border-radius:8px; font-size:12px;" />
             </div>
-            <span id="patientCountDisplay" style="font-size:12px; color:#64748b; font-weight:600;">6 hồ sơ</span>
+            <span id="patientCountDisplay" style="font-size:12px; color:#64748b; font-weight:600;">@Model.Patients.Count hồ sơ</span>
         </div>
 
         <div class="table-wrap">
@@ -734,126 +673,57 @@ else if (tab == "patients")
                     </tr>
                 </thead>
                 <tbody id="patientsTableBody">
-                    <tr class="patient-row" data-search="nguyễn thanh hà bn0001 0901234567">
-                        <td>
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                <span class="avatar" style="background:#fce7f3; color:#be185d; font-weight:700; width:32px; height:32px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:11px;">TH</span>
-                                <div>
-                                    <strong>Nguyễn Thanh Hà</strong>
-                                    <div class="text-muted small">BN0001 · 32 tuổi</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td>Nữ</td>
-                        <td>0901234567</td>
-                        <td>15/06/1994</td>
-                        <td>
-                            <button type="button" class="btn outline sm" onclick="openPatientModal('Nguyễn Thanh Hà', 'BN0001', 'Nữ', '15/06/1994 (32 tuổi)', '0901234567', 'Quận 1, TP. Hồ Chí Minh')">
-                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><circle cx="12" cy="12" r="3"></circle><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path></svg>
-                                <span>Thông tin</span>
-                            </button>
-                        </td>
-                    </tr>
-                    <tr class="patient-row" data-search="nguyễn văn minh bn0003 0902223344">
-                        <td>
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                <span class="avatar" style="background:#dcfce7; color:#0d6535; font-weight:700; width:32px; height:32px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:11px;">VM</span>
-                                <div>
-                                    <strong>Nguyễn Văn Minh</strong>
-                                    <div class="text-muted small">BN0003 · 64 tuổi</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td>Nam</td>
-                        <td>0902223344</td>
-                        <td>16/02/1962</td>
-                        <td>
-                            <button type="button" class="btn outline sm" onclick="openPatientModal('Nguyễn Văn Minh', 'BN0003', 'Nam', '16/02/1962 (64 tuổi)', '0902223344', 'Quận 3, TP. Hồ Chí Minh')">
-                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><circle cx="12" cy="12" r="3"></circle><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path></svg>
-                                <span>Thông tin</span>
-                            </button>
-                        </td>
-                    </tr>
-                    <tr class="patient-row" data-search="trần quốc bảo bn0006 0912345678">
-                        <td>
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                <span class="avatar" style="background:#dcfce7; color:#0d6535; font-weight:700; width:32px; height:32px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:11px;">QB</span>
-                                <div>
-                                    <strong>Trần Quốc Bảo</strong>
-                                    <div class="text-muted small">BN0006 · 40 tuổi</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td>Nam</td>
-                        <td>0912345678</td>
-                        <td>22/03/1986</td>
-                        <td>
-                            <button type="button" class="btn outline sm" onclick="openPatientModal('Trần Quốc Bảo', 'BN0006', 'Nam', '22/03/1986 (40 tuổi)', '0912345678', 'Quận Bình Thạnh, TP. Hồ Chí Minh')">
-                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><circle cx="12" cy="12" r="3"></circle><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path></svg>
-                                <span>Thông tin</span>
-                            </button>
-                        </td>
-                    </tr>
-                    <tr class="patient-row" data-search="phạm minh tuấn bn0007 0934567890">
-                        <td>
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                <span class="avatar" style="background:#f1f5f9; color:#334155; font-weight:700; width:32px; height:32px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:11px;">MT</span>
-                                <div>
-                                    <strong>Phạm Minh Tuấn</strong>
-                                    <div class="text-muted small">BN0007 · 36 tuổi</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td>Nam</td>
-                        <td>0934567890</td>
-                        <td>08/01/1990</td>
-                        <td>
-                            <button type="button" class="btn outline sm" onclick="openPatientModal('Phạm Minh Tuấn', 'BN0007', 'Nam', '08/01/1990 (36 tuổi)', '0934567890', 'Quận Phú Nhuận, TP. Hồ Chí Minh')">
-                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><circle cx="12" cy="12" r="3"></circle><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path></svg>
-                                <span>Thông tin</span>
-                            </button>
-                        </td>
-                    </tr>
-                    <tr class="patient-row" data-search="lê thị ngọc bn0008 0923456789">
-                        <td>
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                <span class="avatar" style="background:#fce7f3; color:#be185d; font-weight:700; width:32px; height:32px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:11px;">TN</span>
-                                <div>
-                                    <strong>Lê Thị Ngọc</strong>
-                                    <div class="text-muted small">BN0008 · 48 tuổi</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td>Nữ</td>
-                        <td>0923456789</td>
-                        <td>12/09/1978</td>
-                        <td>
-                            <button type="button" class="btn outline sm" onclick="openPatientModal('Lê Thị Ngọc', 'BN0008', 'Nữ', '12/09/1978 (48 tuổi)', '0923456789', 'Quận 5, TP. Hồ Chí Minh')">
-                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><circle cx="12" cy="12" r="3"></circle><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path></svg>
-                                <span>Thông tin</span>
-                            </button>
-                        </td>
-                    </tr>
-                    <tr class="patient-row" data-search="đỗ gia khang bn0010 0978901234">
-                        <td>
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                <span class="avatar" style="background:#dcfce7; color:#0d6535; font-weight:700; width:32px; height:32px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:11px;">GK</span>
-                                <div>
-                                    <strong>Đỗ Gia Khang</strong>
-                                    <div class="text-muted small">BN0010 · 43 tuổi</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td>Nam</td>
-                        <td>0978901234</td>
-                        <td>03/12/1982</td>
-                        <td>
-                            <button type="button" class="btn outline sm" onclick="openPatientModal('Đỗ Gia Khang', 'BN0010', 'Nam', '03/12/1982 (43 tuổi)', '0978901234', 'Quận 10, TP. Hồ Chí Minh')">
-                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><circle cx="12" cy="12" r="3"></circle><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path></svg>
-                                <span>Thông tin</span>
-                            </button>
-                        </td>
-                    </tr>
+                    @if (Model.Patients.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="5" style="text-align:center; padding:28px; color:#64748b;">
+                                Chưa có người khám nào trong khoa.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var p in Model.Patients)
+                        {
+                            var words = p.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                            var pInit = words.Length >= 2
+                                ? $"{words[^2][0]}{words[^1][0]}".ToUpper()
+                                : (p.FullName.Length >= 2 ? p.FullName[..2].ToUpper() : "BN");
+                            var avatarStyle = p.Gender == "Nữ"
+                                ? "background:#fce7f3; color:#be185d;"
+                                : "background:#dcfce7; color:#0d6535;";
+                            var searchKey = $"{p.FullName} {p.PatientCode} {p.PhoneNumber}".ToLowerInvariant();
+                            var dobDisplay = $"{p.DateOfBirth:dd/MM/yyyy} ({p.Age} tuổi)";
+
+                            <tr class="patient-row" data-search="@searchKey">
+                                <td>
+                                    <div style="display:flex; align-items:center; gap:10px;">
+                                        <span class="avatar" style="@avatarStyle font-weight:700; width:32px; height:32px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:11px;">@pInit</span>
+                                        <div>
+                                            <strong>@p.FullName</strong>
+                                            <div class="text-muted small">@p.PatientCode · @p.Age tuổi</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>@p.Gender</td>
+                                <td>@p.PhoneNumber</td>
+                                <td>@p.DateOfBirth.ToString("dd/MM/yyyy")</td>
+                                <td>
+                                    <button type="button" class="btn outline sm"
+                                            data-name="@p.FullName"
+                                            data-code="@p.PatientCode"
+                                            data-gender="@p.Gender"
+                                            data-dob="@dobDisplay"
+                                            data-phone="@p.PhoneNumber"
+                                            data-address="@(p.Address ?? "Chưa cập nhật")"
+                                            onclick="openPatientModal(this.dataset.name, this.dataset.code, this.dataset.gender, this.dataset.dob, this.dataset.phone, this.dataset.address)">
+                                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><circle cx="12" cy="12" r="3"></circle><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path></svg>
+                                        <span>Thông tin</span>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    }
                 </tbody>
             </table>
         </div>
@@ -1897,22 +1767,18 @@ else
                 @{
                     var weekDates = Model.WeekDates.Count == 5
                         ? Model.WeekDates
-                        : new List<DateOnly>
-                        {
-                            new(2026, 11, 2),
-                            new(2026, 11, 3),
-                            new(2026, 11, 4),
-                            new(2026, 11, 5),
-                            new(2026, 11, 6)
-                        };
+                        : Enumerable.Range(0, 5).Select(i => Model.WeekStart.AddDays(i)).ToList();
 
-                    var doctorsList = Model.AvailableDoctors.Count > 0
-                        ? Model.AvailableDoctors.Where(d => d.Id != Model.CurrentHeadDoctorId).ToList()
-                        : new List<DoctorListItemDto>
-                        {
-                            new(1, "Nguyễn Hoàng Nam", "Nội tổng quát", Model.DepartmentName, "P.201"),
-                            new(2, "Trần Minh Thư", "Tim mạch", Model.DepartmentName, "P.203")
-                        };
+                    var doctorsList = Model.AvailableDoctors
+                        .Where(d => d.Id != Model.CurrentHeadDoctorId)
+                        .ToList();
+                }
+
+                @if (doctorsList.Count == 0)
+                {
+                    <div style="grid-column: 1 / -1; text-align:center; padding:28px; color:#64748b; border-bottom:1px solid #e2e8f0;">
+                        Chưa có bác sĩ nào trong khoa.
+                    </div>
                 }
 
                 @foreach (var doc in doctorsList)
@@ -2266,9 +2132,7 @@ else
                         <select name="accountId" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" required>
                             @if (Model.AvailableStaff.Count == 0)
                             {
-                                <option value="1">BS. Nguyễn Hoàng Nam (Bác sĩ)</option>
-                                <option value="2">BS. Trần Minh Thư (Bác sĩ)</option>
-                                <option value="3">Điều dưỡng Hoàng Lan (Y tá)</option>
+                                <option value="">-- Chưa có nhân sự trong khoa --</option>
                             }
                             else
                             {
@@ -2332,8 +2196,7 @@ else
                             <select name="doctorId" id="scheduleModalDoctorSelect" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" required>
                                 @if (Model.AvailableDoctors.Count == 0)
                                 {
-                                    <option value="1">BS. Nguyễn Hoàng Nam</option>
-                                    <option value="2">BS. Trần Minh Thư</option>
+                                    <option value="">-- Chưa có bác sĩ trong khoa --</option>
                                 }
                                 else
                                 {

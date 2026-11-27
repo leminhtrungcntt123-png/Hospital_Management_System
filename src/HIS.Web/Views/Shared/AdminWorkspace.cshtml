@@ -174,21 +174,27 @@
                 </div>
                 <div class="heading-actions">
                     <form id="report-filter" class="dashboard-filter">
-                        <div class="date-input-group">
-                            <label>
-                                <span class="input-label-text">Từ ngày</span>
-                                <input name="from" type="date" required />
-                            </label>
-                            <span class="date-arrow">→</span>
-                            <label>
-                                <span class="input-label-text">Đến ngày</span>
-                                <input name="to" type="date" required />
-                            </label>
+                        <input type="hidden" name="mode" value="week" />
+                        <input type="hidden" name="from" />
+                        <input type="hidden" name="to" />
+                        <div class="period-mode-group" role="group" aria-label="Chế độ lọc thời gian">
+                            <button type="button" class="period-mode-btn" data-report-mode="day">Ngày</button>
+                            <button type="button" class="period-mode-btn active" data-report-mode="week">Tuần</button>
+                            <button type="button" class="period-mode-btn" data-report-mode="month">Tháng</button>
+                            <button type="button" class="period-mode-btn" data-report-mode="year">Năm</button>
                         </div>
-                        <button class="btn button primary" type="submit">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                            <span>Xem báo cáo</span>
-                        </button>
+                        <div class="date-input-group">
+                            <input name="anchor" type="date" aria-label="Chọn ngày tham chiếu" />
+                            <select name="year" aria-label="Chọn năm" hidden>
+                                @{
+                                    var curYear = DateTime.Now.Year;
+                                    for (var y = curYear + 1; y >= curYear - 5; y--)
+                                    {
+                                        <option value="@y" selected="@(y == curYear ? "selected" : null)">Năm @y</option>
+                                    }
+                                }
+                            </select>
+                        </div>
                     </form>
                     <button class="btn button secondary" id="refresh-data" type="button">
                         @await Html.PartialAsync("_AdminIcon", "refresh")
@@ -229,7 +235,7 @@
                                     </svg>
                                 </div>
                                 <div>
-                                    <h2>Doanh thu theo ngày</h2>
+                                    <h2 id="revenue-chart-title">Doanh thu theo ngày</h2>
                                 </div>
                             </div>
                         </div>
