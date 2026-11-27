@@ -66,6 +66,10 @@ public sealed class ReceptionService(
                     || a.Patient.NationalId == search
                     || a.QueueNumber == search);
         }
+        else
+        {
+            visits = visits.Where(a => a.StatusId >= 1 && a.StatusId <= 6);
+        }
 
         var rows = await visits
             .OrderByDescending(a => a.PriorityLevel)
@@ -185,7 +189,7 @@ public sealed class ReceptionService(
             Require(
                 schedule != null
                     && CanCheckIn(Now, a.Slot.StartTime, Today.ToDateTime(schedule.EndTime), options.Value.CheckInEarlyMinutes),
-                "Lịch không thuộc hôm nay, chưa đến thời gian tiếp nhận hoặc đã hết ca khám.");
+                "Chỉ tiếp nhận lịch khám thuộc ngày hôm nay và bác sĩ có lịch trực hợp lệ.");
             Require(
                 !await db.ScheduleExceptions
                     .AnyAsync(
@@ -368,9 +372,7 @@ public sealed class ReceptionService(
         DateTime now,
         DateTime slot,
         DateTime shiftEnd,
-        int earlyMinutes) => now.Date == slot.Date
-        && now >= slot.AddMinutes(-earlyMinutes)
-        && now <= shiftEnd;
+        int earlyMinutes) => now.Date == slot.Date;
 
     private async Task<string> IssueNumberAsync(
         int roomId,

@@ -13,21 +13,48 @@ public class MedicalRecordsController : Controller
 {
     private readonly IBillingService _billingService;
     private readonly IPatientAccessService _patientAccessService;
+    private readonly IPatientPortalService _portalService;
     private readonly AppDbContext _context;
 
     public MedicalRecordsController(
         IBillingService billingService,
         IPatientAccessService patientAccessService,
+        IPatientPortalService portalService,
         AppDbContext context)
     {
         _billingService = billingService;
         _patientAccessService = patientAccessService;
+        _portalService = portalService;
         _context = context;
     }
 
     private int CurrentAccountId => int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : 0;
 
     public IActionResult Index() => View();
+
+    [HttpGet]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> List(int? patientId, CancellationToken ct)
+    {
+        if (CurrentAccountId <= 0)
+        {
+            return Unauthorized(new { message = "Vui lòng đăng nhập lại." });
+        }
+
+        var result = await _portalService.GetMedicalRecordsAsync(CurrentAccountId, patientId, ct);
+        if (!result.IsSuccess)
+        {
+            return result.Error.Code == "FORBIDDEN"
+                ? StatusCode(403, new { message = result.Error.Message })
+                : BadRequest(new { message = result.Error.Message });
+        }
+
+        return Json(new
+        {
+            profiles = result.Value!.Profiles,
+            items = result.Value.Items
+        });
+    }
 
     [HttpGet]
     public async Task<IActionResult> BillingHistory(int? patientId, CancellationToken ct)

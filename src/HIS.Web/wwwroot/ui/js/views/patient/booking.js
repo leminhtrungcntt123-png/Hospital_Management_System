@@ -13,11 +13,111 @@ const patientNotificationsState = {
     marking: false,
 };
 
+function parsePortalWallParts(value) {
+    if (!value) return null;
+    const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/);
+    if (match) {
+        return {
+            year: match[1],
+            month: match[2],
+            day: match[3],
+            hour: match[4] ?? null,
+            minute: match[5] ?? null,
+        };
+    }
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return null;
+    return {
+        year: String(d.getFullYear()),
+        month: String(d.getMonth() + 1).padStart(2, '0'),
+        day: String(d.getDate()).padStart(2, '0'),
+        hour: String(d.getHours()).padStart(2, '0'),
+        minute: String(d.getMinutes()).padStart(2, '0'),
+    };
+}
+
+function formatPortalTime(value) {
+    const p = parsePortalWallParts(value);
+    if (!p || p.hour === null) return '';
+    return `${p.hour}:${p.minute}`;
+}
+
+function formatPortalDate(value) {
+    const p = parsePortalWallParts(value);
+    if (!p) return value ? String(value) : '—';
+    return `${p.day}/${p.month}/${p.year}`;
+}
+
 function formatPortalDateTime(value) {
     if (!value) return 'Chưa xếp giờ';
-    const d = new Date(value);
-    if (isNaN(d.getTime())) return String(value);
-    return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' · ' + d.toLocaleDateString('vi-VN');
+    const p = parsePortalWallParts(value);
+    if (!p) return String(value);
+    const dateStr = `${p.day}/${p.month}/${p.year}`;
+    return p.hour !== null ? `${p.hour}:${p.minute} · ${dateStr}` : dateStr;
+}
+
+function formatPortalSlotRange(startTime, endTime) {
+    if (!startTime) return '';
+    const startStr = formatPortalTime(startTime);
+    const endStr = endTime ? formatPortalTime(endTime) : '';
+    const dateStr = formatPortalDate(startTime);
+    return endStr ? `${startStr} – ${endStr} · ${dateStr}` : `${startStr} · ${dateStr}`;
+}
+
+function openAppointmentDetailModal(appointmentId) {
+    const item = patientAppointmentsState.items.find((a) => Number(a.id) === Number(appointmentId));
+    if (!item) return;
+
+    const timeRange = item.startTime
+        ? `${formatPortalTime(item.startTime)}${item.endTime ? ' – ' + formatPortalTime(item.endTime) : ''}`
+        : 'Chưa xếp giờ';
+    const examDate = item.startTime ? formatPortalDate(item.startTime) : 'Cần đặt lại';
+    const dobText = item.patientDateOfBirth ? formatPortalDate(item.patientDateOfBirth) : '—';
+
+    const rows = [
+        ['Mã lịch hẹn', `<strong style="color:#007d9f; font-size:16px;">${esc(item.appointmentCode)}</strong>`],
+        ['Trạng thái', `<span class="${appointmentBadgeClass(item.statusId)}">${esc(item.statusName)}</span>`],
+        ['Ngày khám', `<strong>${esc(examDate)}</strong>`],
+        ['Giờ khám', `<strong style="color:#007d9f;">${esc(timeRange)}</strong>`],
+        ['Chuyên khoa', esc(item.departmentName || '—')],
+        ['Bác sĩ phụ trách', `<strong>${esc(item.doctorName || 'Chưa phân công')}</strong>`],
+        ['Phòng khám', esc(item.roomNumber || '—')],
+        ['Người khám', `<strong>${esc(item.patientName || '—')}</strong>`],
+        ['Ngày sinh', esc(dobText)],
+        ['Số điện thoại', esc(item.patientPhone || '—')],
+        ['Email nhận thông báo', esc(item.contactEmail || '—')],
+    ];
+
+    if (item.queueNumber) {
+        rows.push(['Số thứ tự tiếp nhận', `<strong>${esc(item.queueNumber)}</strong>`]);
+    }
+    rows.push(['Lý do khám / Triệu chứng', esc(item.reason || 'Không có')]);
+    rows.push(['Thời gian đặt lịch', esc(formatPortalDateTime(item.createdAt))]);
+
+    const bodyHtml = `
+        <div style="background:#f0f8fb; border:1px solid #d5eaf3; border-radius:10px; padding:14px 16px; margin-bottom:12px;">
+            <dl style="display:grid; grid-template-columns:160px 1fr; gap:8px 14px; margin:0; font-size:14px;">
+                ${rows
+                    .map(
+                        ([label, val]) =>
+                            `<dt style="color:#4b677a; font-weight:600; margin:0;">${label}</dt><dd style="margin:0; color:#15334d;">${val}</dd>`,
+                    )
+                    .join('')}
+            </dl>
+        </div>
+        <p style="font-size:12px; color:#627d92; margin:0;">Vui lòng đến trước giờ khám 15 phút, mang theo giấy tờ tùy thân / thẻ BHYT (nếu có) và xuất trình mã lịch hẹn tại quầy tiếp nhận.</p>
+    `;
+
+    const footerHtml = `
+        ${
+            item.canCancel
+                ? `<button type="button" class="btn outline" onclick="closeModal(); cancelPatientAppointment(${item.id}, '${esc(item.appointmentCode)}')">Hủy lịch</button>`
+                : ''
+        }
+        <button type="button" class="btn primary" onclick="closeModal()">Đóng</button>
+    `;
+
+    openModal(`Thông tin lịch hẹn ${item.appointmentCode}`, bodyHtml, footerHtml);
 }
 
 function appointmentBadgeClass(statusId) {
@@ -125,11 +225,14 @@ function appointmentsPage() {
                     <td><strong>${esc(a.appointmentCode)}</strong></td>
                     <td>${esc(a.patientName)}</td>
                     <td>${esc(a.doctorName)}<br /><small class="text-muted">${esc(a.departmentName)} · Phòng ${esc(a.roomNumber)}</small></td>
-                    <td>${a.startTime ? esc(formatPortalDateTime(a.startTime)) : '<em>Cần đặt lại</em>'}</td>
+                    <td>${a.startTime ? esc(formatPortalSlotRange(a.startTime, a.endTime)) : '<em>Cần đặt lại</em>'}</td>
                     <td><span class="${appointmentBadgeClass(a.statusId)}">${esc(a.statusName)}</span></td>
                     <td>
-                        ${a.canCancel ? `<button type="button" class="btn outline" onclick="cancelPatientAppointment(${a.id}, '${esc(a.appointmentCode)}')" ${s.cancellingId === a.id ? 'disabled' : ''}>${s.cancellingId === a.id ? 'Đang hủy…' : 'Hủy lịch'}</button>` : ''}
-                        ${Number(a.statusId) === 10 ? link('Đặt lại', 'public/booking', 'calendar', 'btn primary') : ''}
+                        <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                            <button type="button" class="btn outline" onclick="openAppointmentDetailModal(${a.id})">${icon('eye')}Chi tiết</button>
+                            ${a.canCancel ? `<button type="button" class="btn outline" onclick="cancelPatientAppointment(${a.id}, '${esc(a.appointmentCode)}')" ${s.cancellingId === a.id ? 'disabled' : ''}>${s.cancellingId === a.id ? 'Đang hủy…' : 'Hủy lịch'}</button>` : ''}
+                            ${Number(a.statusId) === 10 ? link('Đặt lại', 'public/booking', 'calendar', 'btn primary') : ''}
+                        </div>
                     </td>
                 </tr>`,
                     )

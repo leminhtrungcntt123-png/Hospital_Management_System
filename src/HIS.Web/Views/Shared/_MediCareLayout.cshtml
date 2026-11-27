@@ -48,6 +48,7 @@
         addRelativeUrl = Url.Action("AddRelative", "FamilyProfiles", new { area = "Patient" }),
         myAppointmentsUrl = Url.Action("List", "MyAppointments", new { area = "Patient" }),
         cancelAppointmentUrl = Url.Action("Cancel", "MyAppointments", new { area = "Patient" }),
+        medicalRecordsUrl = Url.Action("List", "MedicalRecords", new { area = "Patient" }),
         notificationsUrl = Url.Action("List", "Notifications", new { area = "Patient" }),
         markNotificationReadUrl = Url.Action("MarkRead", "Notifications", new { area = "Patient" }),
         userEmail = User.FindFirst(ClaimTypes.Email)?.Value ?? "",
