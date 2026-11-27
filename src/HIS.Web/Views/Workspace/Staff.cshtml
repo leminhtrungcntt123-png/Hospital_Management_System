@@ -1,0 +1,31 @@
+@using System.Security.Claims
+@using System.Text.Json
+@{
+    Layout = "_StaffLayout";
+    ViewData["Title"] ??= "Không gian làm việc";
+    var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "NURSE";
+    var config = new
+    {
+        preview = false,
+        live = true,
+        role,
+        authenticated = User.Identity?.IsAuthenticated == true,
+        displayName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? "Nhân viên",
+        departmentName = User.FindFirst("DepartmentName")?.Value,
+        initialRoute = ViewData["MediCareRoute"]?.ToString() ?? "staff/dashboard",
+        pathBase = Context.Request.PathBase.ToString(),
+        assetBase = Url.Content("~/ui/assets/"),
+        publicHome = Url.Action("Index", "Home", new { area = "" }),
+        home = Url.Action("Index", "Reception", new { area = "Staff" }),
+        login = Url.Action("Login", "Account", new { area = "" }),
+        changePassword = Url.Action("ChangePassword", "Account", new { area = "" })
+    };
+}
+<div id="app" data-staff-content-only="true"></div>
+<partial name="MediCare/_Overlays" />
+<partial name="MediCare/_SessionControls" />
+
+@section Scripts {
+    <script id="his-ui-config" type="application/json">@Html.Raw(JsonSerializer.Serialize(config))</script>
+    <partial name="MediCare/_Scripts" />
+}

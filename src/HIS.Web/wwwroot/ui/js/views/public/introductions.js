@@ -411,19 +411,19 @@ function specialtyImage(article, isCover = false) {
     if (!article)
         return `<span class="specialty-media specialty-media-empty" aria-hidden="true">${icon('building')}</span>`;
     const src = esc(config.assetBase + 'specialties/' + article.image + '.jpg');
-    const alt = isCover ? esc('Ảnh minh hoạ: ' + article.alt) : '';
+    const alt = isCover ? esc(article.alt) : '';
     return `<img class="specialty-media" src="${src}" alt="${alt}" width="960" height="640" ${isCover ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async" />`;
 }
 
 function introductionNotice() {
-    return `<div class="introduction-notice">${icon('info')}<span>Nội dung giới thiệu minh hoạ. Các chuyên khoa và hồ sơ bổ sung chưa mở đặt lịch trực tuyến.</span></div>`;
+    return '';
 }
 
 function specialtyIntroductionSection() {
     return `<section class="home-section introduction-section" aria-labelledby="intro-specialties-title">
         <div class="section-heading"><div><span class="eyebrow">KHÁM PHÁ LĨNH VỰC CHĂM SÓC</span>
             <h2 id="intro-specialties-title">Hiểu thêm về các chuyên khoa</h2><p>Thông tin ngắn gọn để bạn dễ tìm hiểu từng lĩnh vực.</p>
-        </div><span class="catalog-badge illustration">Giới thiệu minh hoạ</span></div>
+        </div></div>
         ${introductionNotice()}
         <div class="portal-specialties specialty-introductions">${specialtyIntroductions
             .map((specialty) =>
@@ -443,7 +443,7 @@ function doctorIntroductionSection(doctors = doctorIntroductions.slice(0, 4)) {
     if (!doctors.length) return '';
     return `<section class="home-section introduction-section" aria-labelledby="intro-doctors-title">
         <div class="section-heading"><div><span class="eyebrow">GÓC GIỚI THIỆU CHUYÊN MÔN</span>
-            <h2 id="intro-doctors-title">Khám phá thêm đội ngũ bác sĩ</h2><p>Các hồ sơ mẫu giúp bạn hình dung thông tin theo từng chuyên khoa.</p>
+            <h2 id="intro-doctors-title">Khám phá thêm đội ngũ bác sĩ</h2><p>Thông tin đội ngũ bác sĩ theo từng chuyên khoa.</p>
         </div>${link('Xem tất cả bác sĩ', 'public/doctors', 'arrow', 'text-link')}</div>
         ${introductionNotice()}<div class="doctor-grid">${doctors.map(doctorCard).join('')}</div>
     </section>`;
@@ -559,7 +559,6 @@ function specialtyIntroductionDetail(id) {
             </div>
             <figure class="specialty-cover">
                 ${specialtyImage(article, true)}
-                ${article ? '<figcaption>Ảnh minh hoạ</figcaption>' : ''}
             </figure>
         </section>
         <nav class="specialty-sections" aria-label="Nội dung chuyên khoa">

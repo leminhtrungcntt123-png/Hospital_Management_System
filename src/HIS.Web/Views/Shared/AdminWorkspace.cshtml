@@ -148,10 +148,19 @@
                 </div>
 
                 <!-- Admin Session -->
-                <div class="admin-session">
-                    <div class="session-avatar">@initials</div>
-                    <span class="admin-identity">@userFullName</span>
-                </div>
+                <details class="admin-account">
+                    <summary class="admin-session" aria-label="Tài khoản của @userFullName">
+                        <div class="session-avatar">@initials</div>
+                        <span class="admin-identity">@userFullName</span>
+                        @await Html.PartialAsync("_AdminIcon", "down")
+                    </summary>
+                    <div class="admin-account-menu">
+                        <a asp-area="" asp-controller="Account" asp-action="ChangePassword">Đổi mật khẩu</a>
+                        <form asp-area="" asp-controller="Account" asp-action="Logout" method="post">
+                            <button type="submit" class="admin-logout-btn">Đăng xuất</button>
+                        </form>
+                    </div>
+                </details>
             </div>
         </header>
 

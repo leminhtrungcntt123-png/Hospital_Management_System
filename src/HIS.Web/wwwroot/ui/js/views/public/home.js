@@ -30,7 +30,7 @@ function homePage() {
                 [
                     'home-banner-family.jpg',
                     'healthcare-hero.png',
-                    'Ảnh minh hoạ bác sĩ trò chuyện cùng mẹ và bé tại phòng khám',
+                    'Bác sĩ trò chuyện cùng mẹ và bé tại phòng khám',
                     'AN TÂM TỪ CUỘC HẸN ĐẦU TIÊN',
                     'An tâm đặt khám.<br /><em>Chủ động mỗi ngày.</em>',
                     'Chọn chuyên khoa, tìm bác sĩ và chuẩn bị lịch khám ngay trên MediCare.',
@@ -38,7 +38,7 @@ function homePage() {
                 [
                     'home-banner-senior.jpg',
                     'healthcare-hero-2.jpg',
-                    'Ảnh minh họa bác sĩ tư vấn cho hai người cao tuổi',
+                    'Bác sĩ tư vấn cho hai người cao tuổi',
                     'QUAN TÂM ĐẾN NHỮNG NGƯỜI BẠN YÊU',
                     'Chăm sóc sức khỏe.<br /><em>Kết nối cả gia đình.</em>',
                     'Quản lý hồ sơ người khám của bạn và người thân, thuận tiện theo dõi mỗi cuộc hẹn.',
@@ -46,7 +46,7 @@ function homePage() {
                 [
                     'home-banner-welcome.jpg',
                     'healthcare-hero-3.jpg',
-                    'Ảnh minh họa điều dưỡng hướng dẫn người đến khám',
+                    'Điều dưỡng hướng dẫn người đến khám',
                     'ĐỒNG HÀNH TỪ BƯỚC TIẾP ĐÓN',
                     'Đúng chuyên khoa.<br /><em>Thuận tiện từng bước.</em>',
                     'Tìm hiểu thông tin trước khi khám, lựa chọn bác sĩ phù hợp và chủ động sắp xếp thời gian.',
@@ -70,7 +70,7 @@ function homePage() {
     <div class="quick-access" aria-label="Truy cập nhanh">${shortcuts.map(([route, name, title, detail]) => link(`<span class="quick-icon">${icon(name)}</span><span><strong>${title}</strong><small>${detail}</small></span>${icon('arrow')}`, route, '', 'quick-item')).join('')}</div>
     <section class="why-medicare" aria-labelledby="why-medicare-title">
         <div class="why-layout">
-            <figure class="why-portrait"><img src="${esc(config.assetBase + 'home-care-nurse.png')}" alt="Ảnh minh hoạ nhân viên y tế MediCare" width="800" height="1200" loading="lazy" /><figcaption>Đồng hành trong từng cuộc hẹn</figcaption></figure>
+            <figure class="why-portrait"><img src="${esc(config.assetBase + 'home-care-nurse.png')}" alt="Nhân viên y tế MediCare" width="800" height="1200" loading="lazy" /><figcaption>Đồng hành trong từng cuộc hẹn</figcaption></figure>
             <div class="why-content">
             <div class="why-heading"><span class="eyebrow">THUẬN TIỆN HƠN, AN TÂM HƠN</span><h2 id="why-medicare-title">Tại sao chọn <em>MediCare?</em></h2><p>Một nơi kết nối bạn với hành trình chăm sóc sức khỏe.</p></div>
             <div class="why-features">${[
@@ -154,10 +154,10 @@ function doctorCard(doctor) {
     const illustrative = doctor.kind === 'illustration';
     const canBook = !illustrative && (!config.authenticated || config.role === 'PATIENT');
     return `<article class="doctor-card">${doctorPhoto(doctor)}
-        <div class="doctor-card-body"><span class="catalog-badge ${illustrative ? 'illustration' : ''}">${illustrative ? 'Hồ sơ minh hoạ' : esc(doctor.department || 'Bác sĩ trong hệ thống')}</span><h3>${esc(doctor.name)}</h3>
+        <div class="doctor-card-body"><span class="catalog-badge">${esc(doctor.department || 'Bác sĩ chuyên khoa')}</span><h3>${esc(doctor.name)}</h3>
             <ul class="doctor-card-meta"><li>${icon('stethoscope')}<span>${esc(doctor.specialty || 'Thông tin chuyên môn đang được cập nhật.')}</span></li><li>${icon('building')}<span>${esc(doctor.department)}</span></li>${doctorCareerSummary(doctor)}</ul>
             <div class="doctor-card-actions">${canBook ? link('Xem lịch khám', 'public/booking?doctorId=' + encodeURIComponent(doctor.id), 'calendar', 'btn primary') : ''}
-                ${link(illustrative ? 'Xem hồ sơ minh hoạ' : 'Xem hồ sơ', 'public/doctor/' + encodeURIComponent(doctor.id), 'arrow', 'text-link')}
+                ${link('Xem hồ sơ', 'public/doctor/' + encodeURIComponent(doctor.id), 'arrow', 'text-link')}
             </div>
         </div></article>`;
 }
@@ -166,7 +166,7 @@ function doctorPhoto(doctor = {}) {
     const portrait = doctor.avatar || doctor.illustration || (typeof doctorIllustrations !== 'undefined' ? doctorIllustrations[doctor.name] : null);
     return `<figure class="doctor-portrait doctor-photo">${
         portrait
-            ? `<img src="${esc(config.assetBase + portrait)}" alt="Ảnh chân dung minh hoạ cho ${esc(doctor.name)}" width="640" height="800" loading="lazy" decoding="async" />`
+            ? `<img src="${esc(config.assetBase + portrait)}" alt="Ảnh chân dung ${esc(doctor.name)}" width="640" height="800" loading="lazy" decoding="async" />`
             : `<span class="doctor-initials" aria-hidden="true">${esc(initials(doctor.name)) || icon('stethoscope')}</span>`
-    }<figcaption>Ảnh minh hoạ</figcaption></figure>`;
+    }</figure>`;
 }

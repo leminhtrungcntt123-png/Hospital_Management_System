@@ -12,11 +12,12 @@
     var controller = ViewContext.RouteData.Values["controller"]?.ToString();
     var action = ViewContext.RouteData.Values["action"]?.ToString() ?? "Index";
     var tab = Context.Request.Query["tab"].FirstOrDefault() ?? "";
-    var activePage = controller is "Schedule" or "Consultation" && !string.IsNullOrEmpty(tab)
-        ? controller + "/" + tab 
-        : (controller == "Cashier" && !string.Equals(action, "Index", StringComparison.OrdinalIgnoreCase)
-            ? $"Cashier/{action.ToLowerInvariant()}" 
-            : controller);
+    var activePage = ViewData["ActiveStaffPage"]?.ToString()
+        ?? (controller is "Schedule" or "Consultation" && !string.IsNullOrEmpty(tab)
+            ? controller + "/" + tab
+            : (controller == "Cashier" && !string.Equals(action, "Index", StringComparison.OrdinalIgnoreCase)
+                ? $"Cashier/{action.ToLowerInvariant()}"
+                : controller));
     string StaffUrl(string name, string? page = null) => Url.Action("Index", name, new { area = "Staff", tab = page })!;
     string WorkspaceUrl(string page) => Url.Content("~/Workspace/staff/" + page);
     var links = new List<(string Key, string Icon, string Label, string Url)>();

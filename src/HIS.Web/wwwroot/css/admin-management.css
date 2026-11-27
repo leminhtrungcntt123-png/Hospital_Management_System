@@ -167,6 +167,20 @@ svg.icon {
     flex-shrink: 0;
 }
 
+.admin-brand .brand-logo-box.brand-logo {
+    padding: 0;
+    overflow: hidden;
+    background: #fff;
+    border: 1px solid #d9e6ed;
+}
+
+.brand-logo > img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
 .brand-text {
     display: flex;
     flex-direction: column;
@@ -575,10 +589,80 @@ svg.icon {
     white-space: nowrap;
 }
 
+.admin-account {
+    position: relative;
+}
+
+.admin-account summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 9px;
+    transition: background 0.15s ease;
+}
+
+.admin-account summary:hover,
+.admin-account[open] summary {
+    background: #f3f7f4;
+}
+
+.admin-account summary::-webkit-details-marker {
+    display: none;
+}
+
+.admin-account summary .icon {
+    width: 14px;
+    height: 14px;
+    color: var(--admin-ink-muted);
+}
+
 .admin-session {
     display: flex;
     align-items: center;
     gap: 10px;
+}
+
+.admin-account-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 8px);
+    min-width: 170px;
+    padding: 6px;
+    background: #ffffff;
+    border: 1px solid var(--admin-line);
+    border-radius: 10px;
+    box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.15);
+    z-index: 60;
+}
+
+.admin-account-menu a,
+.admin-account-menu button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 8px 12px;
+    border: 0;
+    background: transparent;
+    border-radius: 7px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--admin-ink);
+    text-decoration: none;
+    cursor: pointer;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+
+.admin-account-menu a:hover {
+    background: #f3f7f4;
+}
+
+.admin-account-menu .admin-logout-btn {
+    color: #dc2626;
+}
+
+.admin-account-menu .admin-logout-btn:hover {
+    background: #fef2f2;
 }
 
 .session-avatar {
