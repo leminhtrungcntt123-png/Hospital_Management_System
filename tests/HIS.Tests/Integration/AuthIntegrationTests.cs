@@ -119,7 +119,8 @@ public static class AuthIntegrationScenario
             {
                 Assert.Contains("id=\"staff-sidebar\"", ownHtml);
                 Assert.Contains("QA Role Matrix", ownHtml);
-                Assert.Contains("/Staff/Cashier", ownHtml);
+                Assert.DoesNotContain("/Staff/Cashier", ownHtml);
+                Assert.Equal(HttpStatusCode.Redirect, (await client.GetAsync("/Staff/Cashier")).StatusCode);
                 var invalidWalkIn = await client.PostAsync("/Staff/Reception/WalkIn", new FormUrlEncodedContent(new Dictionary<string, string>
                 {
                     ["WalkIn.ScheduleId"] = "0",

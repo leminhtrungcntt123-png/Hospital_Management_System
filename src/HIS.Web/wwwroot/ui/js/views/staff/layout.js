@@ -7,7 +7,6 @@ const staffMenus = {
                 ['staff/dashboard', 'grid', 'Bàn làm việc'],
                 ['staff/reception', 'users', 'Tiếp nhận & gọi số'],
                 ['staff/vitals', 'pulse', 'Sinh hiệu'],
-                ['staff/cashier', 'wallet', 'Thu phí & BHYT'],
             ],
         ],
         [

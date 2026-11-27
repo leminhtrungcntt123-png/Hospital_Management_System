@@ -257,6 +257,90 @@
         var settleQrSeq = 0;
         var settleIdempotencyKeys = {};
 
+        function setOpenTopUp(val) {
+            var inp = document.getElementById('open-topup-cash');
+            if (inp) {
+                inp.value = val;
+                recalcOpenShiftTotal();
+            }
+        }
+
+        function recalcOpenShiftTotal() {
+            var handover = Math.max(0, parseFloat(document.getElementById('open-handover-cash')?.value || '0') || 0);
+            var topup = Math.max(0, parseFloat(document.getElementById('open-topup-cash')?.value || '0') || 0);
+            var total = handover + topup;
+
+            var hiddenTotal = document.getElementById('open-total-cash-hidden');
+            var dispTotal = document.getElementById('open-total-cash-display');
+            var lowWarn = document.getElementById('open-low-float-warn');
+            if (hiddenTotal) hiddenTotal.value = total;
+            if (dispTotal) dispTotal.textContent = total.toLocaleString('vi-VN') + ' đ';
+            if (lowWarn) lowWarn.style.display = total < 1000000 ? 'block' : 'none';
+
+            var prevEl = document.getElementById('open-prev-expected');
+            var diffAlert = document.getElementById('open-handover-diff-alert');
+            var noteReq = document.getElementById('open-note-req');
+            var noteInp = document.getElementById('open-shift-note');
+            if (prevEl && diffAlert) {
+                var prevExpected = parseFloat(prevEl.value || '0') || 0;
+                var diff = handover - prevExpected;
+                if (diff !== 0) {
+                    diffAlert.style.display = 'block';
+                    diffAlert.textContent = diff < 0
+                        ? ('⚠️ Thiếu ' + Math.abs(diff).toLocaleString('vi-VN') + ' đ so với số bàn giao của ca trước (' + prevExpected.toLocaleString('vi-VN') + ' đ). Bắt buộc ghi rõ lý do bên dưới!')
+                        : ('⚠️ Thừa +' + diff.toLocaleString('vi-VN') + ' đ so với số bàn giao của ca trước (' + prevExpected.toLocaleString('vi-VN') + ' đ). Bắt buộc ghi rõ lý do bên dưới!');
+                    if (noteReq) noteReq.style.display = 'inline';
+                    if (noteInp) noteInp.required = true;
+                } else {
+                    diffAlert.style.display = 'none';
+                    if (noteReq) noteReq.style.display = 'none';
+                    if (noteInp) noteInp.required = false;
+                }
+            }
+        }
+
+        function validateOpenShiftForm() {
+            recalcOpenShiftTotal();
+            var prevEl = document.getElementById('open-prev-expected');
+            if (prevEl) {
+                var prevExpected = parseFloat(prevEl.value || '0') || 0;
+                var handover = Math.max(0, parseFloat(document.getElementById('open-handover-cash')?.value || '0') || 0);
+                var note = (document.getElementById('open-shift-note')?.value || '').trim();
+                if (handover !== prevExpected && !note) {
+                    Swal.fire({ icon: 'warning', title: 'Chênh lệch tiền nhận bàn giao', text: 'Vui lòng nhập lý do chênh lệch so với ca trước vào ô Ghi chú.', confirmButtonColor: '#0284c7' });
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function recalcCloseShiftCarryOver() {
+            var counted = Math.max(0, parseFloat(document.getElementById('close-counted-cash')?.value || '0') || 0);
+            var dropInp = document.getElementById('close-vault-drop');
+            var drop = Math.max(0, parseFloat(dropInp?.value || '0') || 0);
+            if (drop > counted && dropInp) {
+                drop = counted;
+                dropInp.value = counted;
+            }
+            var carry = Math.max(0, counted - drop);
+            var disp = document.getElementById('close-carry-over-display');
+            if (disp) disp.textContent = carry.toLocaleString('vi-VN') + ' đ';
+        }
+
+        function keepDrawerFloatForNextShift(keepAmount) {
+            var counted = Math.max(0, parseFloat(document.getElementById('close-counted-cash')?.value || '0') || 0);
+            var dropInp = document.getElementById('close-vault-drop');
+            if (!dropInp) return;
+            if (keepAmount <= 0) {
+                dropInp.value = 0;
+            } else {
+                dropInp.value = Math.max(0, counted - keepAmount);
+            }
+            recalcCloseShiftCarryOver();
+        }
+
+        document.addEventListener('DOMContentLoaded', recalcOpenShiftTotal);
+
         function escapeHtml(value) {
             return String(value ?? '')
                 .replace(/&/g, '&amp;')
@@ -1058,77 +1142,6 @@
                     await Swal.fire({ icon: 'success', title: 'Đã cập nhật BHYT', text: data.message, timer: 2200, showConfirmButton: false });
                 } else {
                     await Swal.fire({ icon: 'error', title: 'Không thể lưu thẻ BHYT', text: data.message || 'Vui lòng kiểm tra lại thông tin thẻ.', confirmButtonColor: '#dc2626' });
-                }
-            } catch (err) {
-                await Swal.fire({ icon: 'error', title: 'Lỗi kết nối', text: err.message, confirmButtonColor: '#dc2626' });
-            } finally {
-                if (btn) btn.disabled = false;
-            }
-        }
-
-        function openRefundInvoiceModal() {
-            var dlg = document.getElementById('modal-refund-invoice');
-            if (dlg) dlg.showModal();
-        }
-
-        function toggleRefundInvRef() {
-            var method = document.getElementById('refund-inv-method')?.value;
-            var box = document.getElementById('refund-inv-ref-box');
-            if (box) box.style.display = method === '1' ? 'block' : 'none';
-        }
-
-        async function submitRefundInvoice(appId, invoiceId, maxRefundable) {
-            if (!isShiftOpen) {
-                await Swal.fire({ icon: 'warning', title: 'Chưa mở ca thu ngân', text: 'Vui lòng mở ca trước khi thực hiện hoàn viện phí.', confirmButtonColor: '#0284c7' });
-                return;
-            }
-
-            var amount = parseFloat(document.getElementById('refund-inv-amount')?.value || '0');
-            var method = parseInt(document.getElementById('refund-inv-method')?.value || '0');
-            var refCode = (document.getElementById('refund-inv-ref')?.value || '').trim();
-            var approvedBy = (document.getElementById('refund-inv-approver')?.value || '').trim();
-            var reason = (document.getElementById('refund-inv-reason')?.value || '').trim();
-
-            if (!amount || amount <= 0 || amount > maxRefundable) {
-                await Swal.fire({ icon: 'warning', title: 'Số tiền không hợp lệ', text: 'Số tiền hoàn phải từ 1.000 đ đến tối đa ' + maxRefundable.toLocaleString('vi-VN') + ' đ.', confirmButtonColor: '#0284c7' });
-                return;
-            }
-            if (!reason) {
-                await Swal.fire({ icon: 'warning', title: 'Thiếu lý do hoàn tiền', text: 'Bắt buộc nhập lý do hoàn trả / điều chỉnh hóa đơn.', confirmButtonColor: '#0284c7' });
-                return;
-            }
-            if (method === 1 && !refCode) {
-                await Swal.fire({ icon: 'warning', title: 'Thiếu mã giao dịch ngân hàng', text: 'Vui lòng nhập mã giao dịch chuyển khoản hoàn tiền.', confirmButtonColor: '#0284c7' });
-                return;
-            }
-
-            var btn = document.getElementById('btn-submit-refund-inv');
-            if (btn) btn.disabled = true;
-
-            try {
-                var res = await fetch('@Url.Action("RefundInvoice", "Cashier", new { area = "Staff" })', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'RequestVerificationToken': getAntiForgeryToken()
-                    },
-                    body: JSON.stringify({
-                        invoiceId: invoiceId,
-                        amount: amount,
-                        reason: reason,
-                        method: method,
-                        referenceCode: method === 1 ? refCode : null,
-                        cashierAccountId: 0,
-                        approvedBy: approvedBy || null
-                    })
-                });
-                var data = await res.json();
-                if (res.ok && data.success) {
-                    document.getElementById('modal-refund-invoice')?.close();
-                    await selectAppointment(appId, document.getElementById('app-card-' + appId));
-                    await Swal.fire({ icon: 'success', title: 'Hoàn viện phí thành công', text: data.message, confirmButtonColor: '#15803d' });
-                } else {
-                    await Swal.fire({ icon: 'error', title: 'Không thể hoàn viện phí', text: data.message || 'Thao tác thất bại.', confirmButtonColor: '#dc2626' });
                 }
             } catch (err) {
                 await Swal.fire({ icon: 'error', title: 'Lỗi kết nối', text: err.message, confirmButtonColor: '#dc2626' });

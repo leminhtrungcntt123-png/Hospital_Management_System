@@ -226,9 +226,10 @@
                 </div>
                 <button type="button" class="app-dialog-close" onclick="closeAppDialog('completeAfterLabDialog')" title="Đóng (Esc)">✕</button>
             </div>
-            <form method="post" asp-action="CompleteRecordAfterLabs">
+            <form method="post" asp-action="CompleteRecordAfterLabs" onsubmit="reindexMedications('medicationsListLab', 'noMedicationsNoticeLab');">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="MedicalRecordId" id="complete-lab-record-id" />
+                <input type="hidden" name="ReplaceExistingPrescriptions" value="true" />
                 <div class="app-dialog-body">
                     <div class="detail-box">
                         <div><strong>Triệu chứng ban đầu:</strong> <span id="complete-lab-symptoms">—</span></div>
@@ -254,6 +255,9 @@
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
                             <strong>Kê đơn thuốc</strong>
                             <button type="button" class="btn outline sm" onclick="addMedicationRow('medicationsListLab', 'noMedicationsNoticeLab')">+ Thêm thuốc</button>
+                        </div>
+                        <div id="stage1MedicationsHintLab" style="display:none; font-size:12px; color:#0369a1; background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px; padding:6px 10px; margin-bottom:8px;">
+                            Đã tải sẵn đơn thuốc kê ở bước khám ban đầu — bác sĩ có thể giữ nguyên, chỉnh sửa số lượng hoặc bấm <strong>+ Thêm thuốc</strong> để kê bổ sung.
                         </div>
                         <div id="medicationsListLab" class="dynamic-list" style="display:none;"></div>
                         <p id="noMedicationsNoticeLab" class="muted" style="margin:6px 0;">Chưa kê thuốc nào.</p>
@@ -1664,8 +1668,20 @@ else
             document.getElementById('complete-conclusion').value = d.conclusion || '';
 
             const medList = document.getElementById('medicationsListLab');
+            const stage1Hint = document.getElementById('stage1MedicationsHintLab');
             if (medList) medList.innerHTML = '';
-            reindexMedications('medicationsListLab', 'noMedicationsNoticeLab');
+
+            const existingMeds = (d.recordId && existingPrescriptionsByRecord && existingPrescriptionsByRecord[d.recordId])
+                ? existingPrescriptionsByRecord[d.recordId]
+                : [];
+            if (stage1Hint) {
+                stage1Hint.style.display = existingMeds.length > 0 ? 'block' : 'none';
+            }
+            if (existingMeds.length > 0) {
+                existingMeds.forEach(item => addMedicationRow('medicationsListLab', 'noMedicationsNoticeLab', item));
+            } else {
+                reindexMedications('medicationsListLab', 'noMedicationsNoticeLab');
+            }
         }
 
         function openCompleteAfterLabModalFromBtn(btn) {
@@ -1847,6 +1863,7 @@ else
         // --- 9. CHỈ ĐỊNH CẬN LÂM SÀNG & ĐƠN THUỐC ĐỘNG TỪ DATABASE ---
         const dbServices = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AvailableServices));
         const dbMedications = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AvailableMedications));
+        const existingPrescriptionsByRecord = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ExistingPrescriptionsByRecord));
 
         function buildDynamicSelect(className, placeholder, items, formatLabel) {
             const select = document.createElement('select');
@@ -1919,7 +1936,7 @@ else
             submitBtn.textContent = hasLabs ? 'Chuyển chờ kết quả chỉ định' : 'Hoàn tất khám';
             if (hint) {
                 hint.textContent = hasLabs
-                    ? 'Ca khám sẽ tạm giữ để chờ kết quả chỉ định; bác sĩ hoàn tất chẩn đoán và kê đơn ở tab Chỉ định & kết quả.'
+                    ? 'Ca khám sẽ tạm giữ để chờ kết quả chỉ định (đơn thuốc đã chọn sẽ được lưu sẵn sang bước hoàn tất ở tab Chỉ định & kết quả).'
                     : 'Hoàn tất sẽ tạo hóa đơn thu phí.';
             }
             if (icdInput) icdInput.required = !hasLabs;
@@ -1946,7 +1963,7 @@ else
             updateConsultSubmitState();
         }
 
-        function addMedicationRow(listId = 'medicationsList', noticeId = 'noMedicationsNotice') {
+        function addMedicationRow(listId = 'medicationsList', noticeId = 'noMedicationsNotice', initialItem = null) {
             const list = document.getElementById(listId);
             const notice = document.getElementById(noticeId);
             if (!list) return;
@@ -1966,15 +1983,28 @@ else
             const qty = document.createElement('input');
             qty.type = 'number';
             qty.min = '1';
-            qty.value = '10';
+            qty.value = initialItem && initialItem.Quantity ? String(initialItem.Quantity) : '10';
             qty.required = true;
             qty.className = 'form-control med-item-qty dynamic-row-qty';
             qty.placeholder = 'Số lượng';
 
             const dosage = document.createElement('input');
             dosage.type = 'text';
+            dosage.value = initialItem && initialItem.Dosage ? initialItem.Dosage : '';
             dosage.className = 'med-item-dosage dynamic-row-field wide';
             dosage.placeholder = 'Liều dùng (vd: 2 viên/ngày chia 2 lần sau ăn)...';
+
+            if (initialItem && initialItem.MedicationId) {
+                const targetVal = String(initialItem.MedicationId);
+                select.value = targetVal;
+                if (select.value !== targetVal) {
+                    const fallbackOpt = document.createElement('option');
+                    fallbackOpt.value = targetVal;
+                    fallbackOpt.textContent = `${initialItem.MedicationName || 'Thuốc đã kê'} (${initialItem.Unit || 'Đơn vị'})`;
+                    select.appendChild(fallbackOpt);
+                    select.value = targetVal;
+                }
+            }
 
             row.append(select, qty, dosage, createRemoveRowButton(() => reindexMedications(listId, noticeId)));
             list.appendChild(row);
