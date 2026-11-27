@@ -507,6 +507,12 @@
 </dialog>
 
 @section Scripts {
+    <style>
+        dialog > .swal2-container {
+            position: fixed !important;
+            inset: 0 !important;
+        }
+    </style>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
         var isShiftOpen = @(shift != null ? "true" : "false");
@@ -722,10 +728,16 @@
             }
         }
 
+        function getSwalTarget(dialogId) {
+            var dlg = dialogId ? document.getElementById(dialogId) : document.querySelector('dialog[open]');
+            return (dlg && dlg.open) ? dlg : document.body;
+        }
+
         function copyText(text) {
             if (!text) return;
             navigator.clipboard.writeText(text).then(() => {
                 Swal.fire({
+                    target: getSwalTarget(),
                     toast: true,
                     position: 'top-end',
                     icon: 'success',
@@ -942,8 +954,11 @@
             var note = document.getElementById('dep-note').value.trim();
             var appointmentId = parseInt(document.getElementById('dep-appointment-id').value) || null;
 
+            var swalTarget = getSwalTarget('modal-create-deposit');
+
             if (!patientId || isNaN(patientId) || patientId <= 0) {
                 await Swal.fire({
+                    target: swalTarget,
                     icon: 'warning',
                     title: 'Chưa chọn bệnh nhân',
                     text: 'Vui lòng tra cứu và bấm chọn hồ sơ bệnh nhân để đối chiếu trước khi thu tiền.',
@@ -954,6 +969,7 @@
             }
             if (!amount || amount <= 0) {
                 await Swal.fire({
+                    target: swalTarget,
                     icon: 'warning',
                     title: 'Số tiền không hợp lệ',
                     text: 'Số tiền tạm ứng phải lớn hơn 0 đ.',
@@ -964,6 +980,7 @@
             }
             if (!approvedBy) {
                 await Swal.fire({
+                    target: swalTarget,
                     icon: 'warning',
                     title: 'Thiếu thông tin người duyệt',
                     text: 'Vui lòng nhập tên Bác sĩ chỉ định / Người duyệt tạm ứng.',
@@ -974,6 +991,7 @@
             }
             if (method === 1 && !ref) {
                 await Swal.fire({
+                    target: swalTarget,
                     icon: 'warning',
                     title: 'Thiếu mã giao dịch ngân hàng',
                     text: 'Người bệnh quét mã VietQR thành công: vui lòng nhập mã chuẩn chi / giao dịch ngân hàng để đối soát.',
@@ -987,6 +1005,7 @@
             var methodStr = method === 0 ? 'Tiền mặt' : 'Chuyển khoản (VietQR)';
 
             var confirmRes = await Swal.fire({
+                target: swalTarget,
                 icon: 'question',
                 title: 'Xác nhận thu tạm ứng viện phí?',
                 html: `<div style="text-align:left; font-size:14px; line-height:1.6;">
@@ -1070,6 +1089,7 @@
                     window.location.reload();
                 } else {
                     await Swal.fire({
+                        target: swalTarget,
                         icon: 'error',
                         title: 'Không thể tạo phiếu tạm ứng',
                         text: data.message || 'Không thể tạo phiếu tạm ứng.',
@@ -1082,6 +1102,7 @@
                 }
             } catch (err) {
                 await Swal.fire({
+                    target: swalTarget,
                     icon: 'error',
                     title: 'Lỗi kết nối',
                     text: err.message,
@@ -1157,16 +1178,18 @@
             var refCode = (document.getElementById('ref-dep-bank-code')?.value || '').trim();
             var reason = (document.getElementById('ref-dep-reason')?.value || '').trim();
 
+            var swalTarget = getSwalTarget('modal-refund-deposit');
+
             if (!amount || amount <= 0 || amount > maxBal) {
-                await Swal.fire({ icon: 'warning', title: 'Số tiền không hợp lệ', text: 'Số tiền hoàn phải lớn hơn 0 và không vượt quá ' + maxBal.toLocaleString('vi-VN') + ' đ.', confirmButtonColor: '#0284c7' });
+                await Swal.fire({ target: swalTarget, icon: 'warning', title: 'Số tiền không hợp lệ', text: 'Số tiền hoàn phải lớn hơn 0 và không vượt quá ' + maxBal.toLocaleString('vi-VN') + ' đ.', confirmButtonColor: '#0284c7' });
                 return;
             }
             if (!reason) {
-                await Swal.fire({ icon: 'warning', title: 'Thiếu lý do hoàn tiền', text: 'Bắt buộc nhập lý do hoàn trả tạm ứng.', confirmButtonColor: '#0284c7' });
+                await Swal.fire({ target: swalTarget, icon: 'warning', title: 'Thiếu lý do hoàn tiền', text: 'Bắt buộc nhập lý do hoàn trả tạm ứng.', confirmButtonColor: '#0284c7' });
                 return;
             }
             if (method === 1 && !refCode) {
-                await Swal.fire({ icon: 'warning', title: 'Thiếu mã giao dịch ngân hàng', text: 'Vui lòng nhập mã giao dịch chuyển khoản hoàn tiền.', confirmButtonColor: '#0284c7' });
+                await Swal.fire({ target: swalTarget, icon: 'warning', title: 'Thiếu mã giao dịch ngân hàng', text: 'Vui lòng nhập mã giao dịch chuyển khoản hoàn tiền.', confirmButtonColor: '#0284c7' });
                 return;
             }
 
@@ -1196,10 +1219,10 @@
                     await Swal.fire({ icon: 'success', title: 'Hoàn tạm ứng thành công!', text: data.message, confirmButtonColor: '#15803d' });
                     window.location.reload();
                 } else {
-                    await Swal.fire({ icon: 'error', title: 'Không thể hoàn tạm ứng', text: data.message || 'Thao tác thất bại.', confirmButtonColor: '#dc2626' });
+                    await Swal.fire({ target: swalTarget, icon: 'error', title: 'Không thể hoàn tạm ứng', text: data.message || 'Thao tác thất bại.', confirmButtonColor: '#dc2626' });
                 }
             } catch (err) {
-                await Swal.fire({ icon: 'error', title: 'Lỗi kết nối', text: err.message, confirmButtonColor: '#dc2626' });
+                await Swal.fire({ target: swalTarget, icon: 'error', title: 'Lỗi kết nối', text: err.message, confirmButtonColor: '#dc2626' });
             } finally {
                 if (btn) btn.disabled = false;
             }
