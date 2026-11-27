@@ -9,9 +9,6 @@
     .hospital-portal .public-nav {
         gap: 17px;
     }
-    .hospital-portal .home-hero {
-        gap: 35px;
-    }
 }
 
 @media (max-width: 1000px) {
@@ -38,12 +35,6 @@
     .hospital-portal .quick-item > .icon {
         display: none;
     }
-    .hospital-portal .hero-copy h1 {
-        font-size: 34px;
-    }
-    .hospital-portal .hero-copy > p {
-        font-size: 13px;
-    }
 }
 
 @media (max-width: 850px) {
@@ -57,7 +48,7 @@
     }
 
     .hospital-portal .header-inner {
-        min-height: 72px;
+        min-height: 64px;
     }
     .hospital-portal .public-nav {
         display: none;
@@ -86,22 +77,6 @@
     }
     .hospital-portal .public-header-actions > .btn.ghost {
         display: none;
-    }
-    .hospital-portal .home-hero {
-        grid-template-columns: 1fr 1fr;
-        gap: 25px;
-        padding-top: 30px;
-    }
-    .hospital-portal .hero-trust {
-        display: none;
-    }
-    .hospital-portal .hero-actions {
-        gap: 9px;
-        margin-top: 20px;
-    }
-    .hospital-portal .hero-actions .btn {
-        font-size: 11px;
-        padding: 9px 12px;
     }
     .hospital-portal .quick-access {
         grid-template-columns: 1fr;
@@ -151,7 +126,7 @@
         width: calc(100% - 32px);
     }
     .hospital-portal .utility-bar > div {
-        padding: 6px 0;
+        padding: 4px 0;
         font-size: 9px;
     }
     .hospital-portal .utility-bar > div > span:nth-child(2) {
@@ -172,33 +147,6 @@
     }
     .hospital-portal .public-header-actions:has(.patient-account) .header-book {
         display: none;
-    }
-    .hospital-portal .home-hero {
-        grid-template-columns: 1fr;
-        padding: 28px 0 26px;
-        gap: 26px;
-    }
-    .hospital-portal .hero-copy h1 {
-        font-size: 34px;
-        margin: 12px 0 15px;
-    }
-    .hospital-portal .hero-copy > p {
-        font-size: 13px;
-        line-height: 1.85;
-    }
-    .hospital-portal .hero-actions .btn {
-        flex: 1;
-        font-size: 12px;
-    }
-    .hospital-portal .hero-photo {
-        aspect-ratio: 1.48;
-        border-radius: 13px;
-    }
-    .hospital-portal .photo-note {
-        bottom: 60px;
-        left: 12px;
-        font-size: 10px;
-        padding: 7px 10px;
     }
     .doctor-search-section {
         padding: 20px;
@@ -260,9 +208,5 @@
 @media (max-width: 380px) {
     .hospital-portal .public-header-actions .header-book {
         display: none;
-    }
-    .hospital-portal .hero-copy h1 {
-        font-size: 28px;
-        letter-spacing: -1px;
     }
 }
