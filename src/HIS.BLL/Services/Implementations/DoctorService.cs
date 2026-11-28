@@ -264,32 +264,14 @@ public class DoctorService : IDoctorService
             }
         }
 
-        // Tạo đơn thuốc và các chi tiết thuốc nếu có (khi hoàn tất khám luôn)
-        if (!waitingForLabs && request.PrescriptionItems != null && request.PrescriptionItems.Count > 0)
+        // Lưu đơn thuốc nếu bác sĩ đã kê (bao gồm cả thuốc kê sơ bộ trước khi chuyển chờ kết quả cận lâm sàng)
+        var initialPrescription = BuildInitialPrescription(record, request.PrescriptionItems, request.PrescriptionNote, DateOnly.FromDateTime(now));
+        if (initialPrescription != null)
         {
-            var validMeds = request.PrescriptionItems.Where(p => p.MedicationId > 0 && p.Quantity > 0).ToList();
-            if (validMeds.Count > 0)
+            _context.Prescriptions.Add(initialPrescription);
+            foreach (var item in initialPrescription.PrescriptionItems)
             {
-                var prescription = new Prescription
-                {
-                    MedicalRecord = record,
-                    PrescribedDate = DateOnly.FromDateTime(now),
-                    Note = string.IsNullOrWhiteSpace(request.PrescriptionNote) ? null : request.PrescriptionNote.Trim()
-                };
-                _context.Prescriptions.Add(prescription);
-
-                foreach (var med in validMeds)
-                {
-                    _context.PrescriptionItems.Add(new PrescriptionItem
-                    {
-                        Prescription = prescription,
-                        MedicationId = med.MedicationId,
-                        Quantity = med.Quantity,
-                        Dosage = string.IsNullOrWhiteSpace(med.Dosage) ? null : med.Dosage.Trim(),
-                        DurationDays = med.DurationDays,
-                        UsageInstructions = string.IsNullOrWhiteSpace(med.UsageInstructions) ? null : med.UsageInstructions.Trim()
-                    });
-                }
+                _context.PrescriptionItems.Add(item);
             }
         }
 
@@ -383,6 +365,8 @@ public class DoctorService : IDoctorService
 
         var record = await _context.MedicalRecords
             .Include(r => r.Appointment)
+            .Include(r => r.Prescriptions)
+                .ThenInclude(p => p.PrescriptionItems)
             .FirstOrDefaultAsync(r => r.Id == request.MedicalRecordId, cancellationToken);
 
         if (record == null)
@@ -408,29 +392,31 @@ public class DoctorService : IDoctorService
         record.Conclusion = string.IsNullOrWhiteSpace(request.Conclusion) ? "Đã hoàn tất khám sau cận lâm sàng" : request.Conclusion.Trim();
         record.UpdatedAt = now;
 
-        var validMeds = (request.PrescriptionItems ?? []).Where(p => p.MedicationId > 0 && p.Quantity > 0).ToList();
-        if (validMeds.Count > 0)
-        {
-            var prescription = new Prescription
-            {
-                MedicalRecordId = record.Id,
-                PrescribedDate = DateOnly.FromDateTime(now),
-                Note = string.IsNullOrWhiteSpace(request.PrescriptionNote) ? null : request.PrescriptionNote.Trim()
-            };
-            _context.Prescriptions.Add(prescription);
+        var mutation = SyncPostLabPrescriptions(
+            record,
+            request.PrescriptionItems,
+            request.PrescriptionNote,
+            DateOnly.FromDateTime(now),
+            request.ReplaceExistingPrescriptions);
 
-            foreach (var med in validMeds)
-            {
-                _context.PrescriptionItems.Add(new PrescriptionItem
-                {
-                    Prescription = prescription,
-                    MedicationId = med.MedicationId,
-                    Quantity = med.Quantity,
-                    Dosage = string.IsNullOrWhiteSpace(med.Dosage) ? null : med.Dosage.Trim(),
-                    DurationDays = med.DurationDays,
-                    UsageInstructions = string.IsNullOrWhiteSpace(med.UsageInstructions) ? null : med.UsageInstructions.Trim()
-                });
-            }
+        if (mutation.RemovedItems.Count > 0)
+        {
+            _context.PrescriptionItems.RemoveRange(mutation.RemovedItems);
+        }
+
+        if (mutation.RemovedPrescriptions.Count > 0)
+        {
+            _context.Prescriptions.RemoveRange(mutation.RemovedPrescriptions);
+        }
+
+        foreach (var p in mutation.AddedPrescriptions)
+        {
+            _context.Prescriptions.Add(p);
+        }
+
+        foreach (var item in mutation.AddedItems)
+        {
+            _context.PrescriptionItems.Add(item);
         }
 
         record.Appointment.StatusId = (int)AppointmentStatusId.Completed;
@@ -457,5 +443,256 @@ public class DoctorService : IDoctorService
 
         await _context.SaveChangesAsync(cancellationToken);
         return Result.Success();
+    }
+
+    public sealed record PrescriptionSyncMutation(
+        IReadOnlyList<Prescription> AddedPrescriptions,
+        IReadOnlyList<Prescription> RemovedPrescriptions,
+        IReadOnlyList<PrescriptionItem> AddedItems,
+        IReadOnlyList<PrescriptionItem> RemovedItems);
+
+    public static Prescription? BuildInitialPrescription(
+        MedicalRecord record,
+        IEnumerable<CreatePrescriptionItemDto>? items,
+        string? note,
+        DateOnly prescribedDate)
+    {
+        var normalized = NormalizePrescriptionItems(items);
+        if (normalized.Count == 0)
+        {
+            return null;
+        }
+
+        var prescription = new Prescription
+        {
+            MedicalRecord = record,
+            MedicalRecordId = record.Id,
+            PrescribedDate = prescribedDate,
+            Note = TruncateText(note, 255)
+        };
+
+        foreach (var med in normalized)
+        {
+            prescription.PrescriptionItems.Add(new PrescriptionItem
+            {
+                Prescription = prescription,
+                MedicationId = med.MedicationId,
+                Quantity = med.Quantity,
+                Dosage = med.Dosage,
+                DurationDays = med.DurationDays,
+                UsageInstructions = med.UsageInstructions
+            });
+        }
+
+        record.Prescriptions.Add(prescription);
+        return prescription;
+    }
+
+    public static PrescriptionSyncMutation SyncPostLabPrescriptions(
+        MedicalRecord record,
+        IEnumerable<CreatePrescriptionItemDto>? submittedItems,
+        string? note,
+        DateOnly prescribedDate,
+        bool replaceExisting)
+    {
+        var normalized = NormalizePrescriptionItems(submittedItems);
+        var addedPrescriptions = new List<Prescription>();
+        var removedPrescriptions = new List<Prescription>();
+        var addedItems = new List<PrescriptionItem>();
+        var removedItems = new List<PrescriptionItem>();
+
+        var existingPrescriptions = record.Prescriptions.OrderBy(p => p.Id).ToList();
+
+        if (replaceExisting && normalized.Count == 0)
+        {
+            foreach (var p in existingPrescriptions)
+            {
+                removedItems.AddRange(p.PrescriptionItems);
+                p.PrescriptionItems.Clear();
+                removedPrescriptions.Add(p);
+                record.Prescriptions.Remove(p);
+            }
+
+            return new PrescriptionSyncMutation(addedPrescriptions, removedPrescriptions, addedItems, removedItems);
+        }
+
+        if (!replaceExisting && normalized.Count == 0)
+        {
+            return new PrescriptionSyncMutation(addedPrescriptions, removedPrescriptions, addedItems, removedItems);
+        }
+
+        var primary = existingPrescriptions.FirstOrDefault();
+        if (primary == null)
+        {
+            primary = new Prescription
+            {
+                MedicalRecord = record,
+                MedicalRecordId = record.Id,
+                PrescribedDate = prescribedDate,
+                Note = TruncateText(note, 255)
+            };
+            record.Prescriptions.Add(primary);
+            addedPrescriptions.Add(primary);
+        }
+        else
+        {
+            primary.PrescribedDate = prescribedDate;
+            var cleanNote = TruncateText(note, 255);
+            if (cleanNote != null)
+            {
+                primary.Note = cleanNote;
+            }
+
+            foreach (var extra in existingPrescriptions.Skip(1))
+            {
+                foreach (var extraItem in extra.PrescriptionItems.ToList())
+                {
+                    if (!replaceExisting)
+                    {
+                        var targetExisting = primary.PrescriptionItems.FirstOrDefault(x => x.MedicationId == extraItem.MedicationId);
+                        if (targetExisting != null)
+                        {
+                            targetExisting.Quantity += extraItem.Quantity;
+                            removedItems.Add(extraItem);
+                        }
+                        else
+                        {
+                            extraItem.Prescription = primary;
+                            extraItem.PrescriptionId = primary.Id;
+                            primary.PrescriptionItems.Add(extraItem);
+                        }
+                    }
+                    else
+                    {
+                        removedItems.Add(extraItem);
+                    }
+                }
+
+                extra.PrescriptionItems.Clear();
+                removedPrescriptions.Add(extra);
+                record.Prescriptions.Remove(extra);
+            }
+        }
+
+        if (replaceExisting)
+        {
+            var requestedIds = normalized.Select(m => m.MedicationId).ToHashSet();
+            var seenIds = new HashSet<int>();
+            foreach (var existingItem in primary.PrescriptionItems.ToList())
+            {
+                if (!requestedIds.Contains(existingItem.MedicationId) || !seenIds.Add(existingItem.MedicationId))
+                {
+                    primary.PrescriptionItems.Remove(existingItem);
+                    removedItems.Add(existingItem);
+                }
+            }
+
+            foreach (var med in normalized)
+            {
+                var existing = primary.PrescriptionItems.FirstOrDefault(x => x.MedicationId == med.MedicationId);
+                if (existing != null)
+                {
+                    existing.Quantity = med.Quantity;
+                    existing.Dosage = med.Dosage;
+                    existing.DurationDays = med.DurationDays;
+                    existing.UsageInstructions = med.UsageInstructions;
+                }
+                else
+                {
+                    var newItem = new PrescriptionItem
+                    {
+                        Prescription = primary,
+                        PrescriptionId = primary.Id,
+                        MedicationId = med.MedicationId,
+                        Quantity = med.Quantity,
+                        Dosage = med.Dosage,
+                        DurationDays = med.DurationDays,
+                        UsageInstructions = med.UsageInstructions
+                    };
+                    primary.PrescriptionItems.Add(newItem);
+                    addedItems.Add(newItem);
+                }
+            }
+        }
+        else
+        {
+            foreach (var med in normalized)
+            {
+                var existing = primary.PrescriptionItems.FirstOrDefault(x => x.MedicationId == med.MedicationId);
+                if (existing != null)
+                {
+                    existing.Quantity += med.Quantity;
+                    if (!string.IsNullOrWhiteSpace(med.Dosage))
+                    {
+                        existing.Dosage = med.Dosage;
+                    }
+
+                    if (med.DurationDays.HasValue)
+                    {
+                        existing.DurationDays = med.DurationDays;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(med.UsageInstructions))
+                    {
+                        existing.UsageInstructions = med.UsageInstructions;
+                    }
+                }
+                else
+                {
+                    var newItem = new PrescriptionItem
+                    {
+                        Prescription = primary,
+                        PrescriptionId = primary.Id,
+                        MedicationId = med.MedicationId,
+                        Quantity = med.Quantity,
+                        Dosage = med.Dosage,
+                        DurationDays = med.DurationDays,
+                        UsageInstructions = med.UsageInstructions
+                    };
+                    primary.PrescriptionItems.Add(newItem);
+                    addedItems.Add(newItem);
+                }
+            }
+        }
+
+        return new PrescriptionSyncMutation(addedPrescriptions, removedPrescriptions, addedItems, removedItems);
+    }
+
+    private static List<CreatePrescriptionItemDto> NormalizePrescriptionItems(IEnumerable<CreatePrescriptionItemDto>? items)
+    {
+        if (items == null)
+        {
+            return [];
+        }
+
+        return items
+            .Where(p => p.MedicationId > 0 && p.Quantity > 0)
+            .GroupBy(p => p.MedicationId)
+            .Select(g =>
+            {
+                var lastWithDosage = g.LastOrDefault(x => !string.IsNullOrWhiteSpace(x.Dosage));
+                var lastWithDuration = g.LastOrDefault(x => x.DurationDays.HasValue);
+                var lastWithInstructions = g.LastOrDefault(x => !string.IsNullOrWhiteSpace(x.UsageInstructions));
+                return new CreatePrescriptionItemDto
+                {
+                    MedicationId = g.Key,
+                    Quantity = g.Sum(x => x.Quantity),
+                    Dosage = TruncateText(lastWithDosage?.Dosage, 100),
+                    DurationDays = lastWithDuration?.DurationDays,
+                    UsageInstructions = TruncateText(lastWithInstructions?.UsageInstructions, 255)
+                };
+            })
+            .ToList();
+    }
+
+    private static string? TruncateText(string? value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var trimmed = value.Trim();
+        return trimmed.Length <= maxLength ? trimmed : trimmed[..maxLength];
     }
 }

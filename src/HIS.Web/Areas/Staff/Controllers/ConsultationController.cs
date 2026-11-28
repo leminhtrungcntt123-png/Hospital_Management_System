@@ -216,6 +216,7 @@ public class ConsultationController : Controller
 
             // 2. Danh sách Chỉ định & kết quả từ Database
             List<ConsultationLabItemDto> labs = [];
+            Dictionary<int, IReadOnlyList<ConsultationPrescriptionItemDto>> existingPrescriptionsByRecord = [];
             if (activeTab == "labs")
             {
                 var labsQuery = _context.LabOrders
@@ -261,6 +262,37 @@ public class ConsultationController : Controller
                     ))
                     .Take(200)
                     .ToListAsync(ct);
+
+                var labRecordIds = labs
+                    .Where(l => l.MedicalRecordId > 0)
+                    .Select(l => l.MedicalRecordId)
+                    .Distinct()
+                    .ToList();
+
+                if (labRecordIds.Count > 0)
+                {
+                    var stageOneItems = await _context.PrescriptionItems
+                        .AsNoTracking()
+                        .Where(pi => labRecordIds.Contains(pi.Prescription.MedicalRecordId))
+                        .OrderBy(pi => pi.Id)
+                        .Select(pi => new
+                        {
+                            pi.Prescription.MedicalRecordId,
+                            Item = new ConsultationPrescriptionItemDto(
+                                pi.MedicationId,
+                                pi.Medication.Name,
+                                pi.Medication.Unit,
+                                pi.Quantity,
+                                pi.Dosage)
+                        })
+                        .ToListAsync(ct);
+
+                    existingPrescriptionsByRecord = stageOneItems
+                        .GroupBy(x => x.MedicalRecordId)
+                        .ToDictionary(
+                            g => g.Key,
+                            g => (IReadOnlyList<ConsultationPrescriptionItemDto>)g.Select(x => x.Item).ToList());
+                }
             }
 
             // 3. Danh sách Bệnh án trong khoa từ Database
@@ -488,6 +520,7 @@ public class ConsultationController : Controller
                 AvailableDoctors = availableDoctors,
                 AvailableServices = availableServices,
                 AvailableMedications = availableMedications,
+                ExistingPrescriptionsByRecord = existingPrescriptionsByRecord,
                 ActivePeriod = activePeriod,
                 DemandGrid = demandGrid
             };
@@ -675,6 +708,7 @@ public class ConsultationController : Controller
             Conclusion = request.Conclusion,
             PrescriptionNote = request.PrescriptionNote,
             IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+            ReplaceExistingPrescriptions = request.ReplaceExistingPrescriptions,
             PrescriptionItems = request.PrescriptionItems
         };
 

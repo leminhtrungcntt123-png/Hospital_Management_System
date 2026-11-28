@@ -36,9 +36,6 @@
             ("dashboard", "grid", "Bàn làm việc", WorkspaceUrl("dashboard")),
             ("Reception", "users", "Tiếp nhận & gọi số", StaffUrl("Reception")),
             ("vitals", "pulse", "Sinh hiệu", WorkspaceUrl("vitals")),
-            ("Cashier", "wallet", "Thu phí & BHYT", StaffUrl("Cashier")),
-            ("Cashier/deposits", "wallet", "Quản lý tạm ứng", Url.Action("Deposits", "Cashier", new { area = "Staff" })!),
-            ("Cashier/ledger", "clipboard", "Sổ thu ngân", Url.Action("Ledger", "Cashier", new { area = "Staff" })!),
             ("patients", "clipboard", "Người khám", WorkspaceUrl("patients")),
             ("Schedule", "calendar", "Lịch làm việc", StaffUrl("Schedule"))
         ]);
@@ -74,7 +71,7 @@
         }
     }
 
-    var splitAt = isNurse ? 6 : isHead ? 5 : 3;
+    var splitAt = isHead ? 5 : 3;
     var menuGroups = new[]
     {
         (Title: isNurse ? "CÔNG VIỆC HÔM NAY" : isDoctor ? "CHUYÊN MÔN" : isHead ? "ĐIỀU PHỐI KHOA" : "CÔNG VIỆC", Items: links.Take(splitAt)),

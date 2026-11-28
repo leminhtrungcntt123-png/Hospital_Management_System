@@ -76,5 +76,6 @@ public sealed class CompleteRecordAfterLabsRequest
     public string? Conclusion { get; set; }
     public string? PrescriptionNote { get; set; }
     public string? IpAddress { get; set; }
+    public bool ReplaceExistingPrescriptions { get; set; }
     public List<CreatePrescriptionItemDto> PrescriptionItems { get; set; } = [];
 }

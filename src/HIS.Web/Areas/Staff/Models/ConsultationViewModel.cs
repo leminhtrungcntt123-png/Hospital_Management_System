@@ -92,6 +92,7 @@ public record DoctorSelectItemDto(
 
 public record ClinicalServiceOptionDto(int Id, string Name, decimal Price);
 public record MedicationOptionDto(int Id, string Name, string? Strength, string Unit, decimal Price);
+public record ConsultationPrescriptionItemDto(int MedicationId, string MedicationName, string Unit, int Quantity, string? Dosage);
 
 public record ScheduleExceptionItemDto(
     int Id,
@@ -130,6 +131,8 @@ public class ConsultationViewModel
     public IReadOnlyList<DoctorSelectItemDto> AvailableDoctors { get; set; } = [];
     public IReadOnlyList<ClinicalServiceOptionDto> AvailableServices { get; set; } = [];
     public IReadOnlyList<MedicationOptionDto> AvailableMedications { get; set; } = [];
+    public IReadOnlyDictionary<int, IReadOnlyList<ConsultationPrescriptionItemDto>> ExistingPrescriptionsByRecord { get; set; }
+        = new Dictionary<int, IReadOnlyList<ConsultationPrescriptionItemDto>>();
     public SchedulingPeriodDto? ActivePeriod { get; set; }
     public DepartmentDemandGridDto? DemandGrid { get; set; }
     public int CurrentDoctorId { get; set; }

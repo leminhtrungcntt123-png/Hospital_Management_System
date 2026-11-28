@@ -275,7 +275,7 @@ public class AccountController : Controller
             new("FullName", string.IsNullOrWhiteSpace(auth.FullName) ? auth.Username : auth.FullName)
         };
 
-        bool isCashierAccount = string.Equals(auth.Username, "ketoan", StringComparison.OrdinalIgnoreCase);
+        bool isCashierAccount = IsCashierUsername(auth.Username);
         if (isCashierAccount)
         {
             claims.Add(new Claim(ClaimTypes.Role, "ACCOUNTANT"));
@@ -460,13 +460,20 @@ public class AccountController : Controller
     private static string? ResolveDashboardRole(ClaimsPrincipal user)
     {
         if (user.IsInRole("ACCOUNTANT")
-            || string.Equals(user.Identity?.Name, "ketoan", StringComparison.OrdinalIgnoreCase))
+            || user.IsInRole("CASHIER")
+            || IsCashierUsername(user.Identity?.Name))
         {
             return "ACCOUNTANT";
         }
 
         return user.FindFirst(ClaimTypes.Role)?.Value;
     }
+
+    private static bool IsCashierUsername(string? username) =>
+        !string.IsNullOrWhiteSpace(username)
+        && (username.StartsWith("ketoan", StringComparison.OrdinalIgnoreCase)
+            || username.StartsWith("thungan", StringComparison.OrdinalIgnoreCase)
+            || username.StartsWith("cashier", StringComparison.OrdinalIgnoreCase));
 
     private IActionResult RedirectToDashboard(string? role)
     {
